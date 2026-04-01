@@ -41,10 +41,6 @@ export const metadata: Metadata = {
   },
 };
 
-const hasClerkKeys =
-  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
-  !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.includes("REPLACE_ME");
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -60,9 +56,5 @@ export default function RootLayout({
     </html>
   );
 
-  if (hasClerkKeys) {
-    return <ClerkProvider>{content}</ClerkProvider>;
-  }
-
-  return content;
+  return <ClerkProvider>{content}</ClerkProvider>;
 }

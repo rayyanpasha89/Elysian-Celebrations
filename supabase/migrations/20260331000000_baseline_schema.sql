@@ -1,5 +1,5 @@
 -- Elysian Celebrations — Supabase Schema
--- Run this in the Supabase SQL Editor to create all tables.
+-- Baseline migration generated from the current schema source of truth.
 
 create extension if not exists pgcrypto;
 

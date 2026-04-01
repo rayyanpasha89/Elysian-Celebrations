@@ -7,7 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed": "tsx --tsconfig tsconfig.json scripts/supabase-seed.ts"
+    "seed": "tsx --tsconfig tsconfig.json scripts/supabase-seed.ts",
+    "db:link": "tsx --tsconfig tsconfig.json scripts/supabase-remote.ts link",
+    "db:push": "tsx --tsconfig tsconfig.json scripts/supabase-remote.ts push",
+    "db:push:seed": "tsx --tsconfig tsconfig.json scripts/supabase-remote.ts push:seed",
+    "db:pull": "tsx --tsconfig tsconfig.json scripts/supabase-remote.ts pull",
+    "db:migrations": "tsx --tsconfig tsconfig.json scripts/supabase-remote.ts list",
+    "db:query": "tsx --tsconfig tsconfig.json scripts/supabase-remote.ts query"
   },
   "prisma": {
     "seed": "tsx --tsconfig tsconfig.json scripts/supabase-seed.ts"
@@ -21,7 +27,6 @@
     "@hookform/resolvers": "^5.2.2",
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.100.1",
-    "@types/pg": "^8.20.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dotenv": "^17.3.1",
@@ -30,6 +35,7 @@
     "lenis": "^1.3.20",
     "lucide-react": "^1.6.0",
     "next": "16.2.1",
+    "pg": "^8.20.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-hook-form": "^7.72.0",
@@ -42,6 +48,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
