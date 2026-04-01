@@ -1,5 +1,6 @@
 import { createClerkClient, type ClerkClient } from "@clerk/backend";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { getSupabaseSecretKey, getSupabaseUrl } from "@/lib/supabase/env";
 
 type PortalRole = "ADMIN" | "CLIENT" | "VENDOR";
 
@@ -1052,8 +1053,8 @@ function requireEnv(name: string) {
 
 function createSupabaseAdminClient() {
   return createClient(
-    requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
-    requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
+    getSupabaseUrl(),
+    getSupabaseSecretKey(),
     {
       auth: {
         autoRefreshToken: false,

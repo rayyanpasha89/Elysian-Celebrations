@@ -9,9 +9,11 @@ npm run seed
 Prerequisites:
 
 - `NEXT_PUBLIC_SUPABASE_URL` must point to the target Supabase project.
-- `SUPABASE_SERVICE_ROLE_KEY` must be set for that same project.
+- `SUPABASE_SECRET_KEY` should be set for that same project.
 - `CLERK_SECRET_KEY` must be set because the bootstrap creates or updates the Clerk fixture users.
 - `supabase/schema.sql` must already be applied, including the newer `saved_vendors` and `vendor_profile_views` tables.
+
+Legacy `SUPABASE_SERVICE_ROLE_KEY` is still supported as a fallback.
 
 What the seed does:
 
