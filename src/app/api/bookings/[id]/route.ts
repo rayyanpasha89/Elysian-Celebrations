@@ -14,12 +14,16 @@ export async function PATCH(
     const supabase = createAdminSupabaseClient();
     const body = await request.json();
 
-    const { data: booking } = await supabase
+    const { data: booking, error: loadErr } = await supabase
       .from("bookings")
       .select("*, client:client_profiles(user_id), vendor:vendor_profiles(user_id)")
       .eq("id", id)
-      .single();
+      .maybeSingle();
 
+    if (loadErr) {
+      console.error("Booking load error:", loadErr);
+      return apiError("Failed to load booking", 500);
+    }
     if (!booking) {
       return apiError("Booking not found", 404);
     }
@@ -49,6 +53,9 @@ export async function PATCH(
     if (error) {
       console.error("Booking update error:", error);
       return apiError("Failed to update booking", 500);
+    }
+    if (!updated) {
+      return apiError("Booking not found", 404);
     }
 
     return apiSuccess(updated);

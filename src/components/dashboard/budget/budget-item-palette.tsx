@@ -1,106 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import {
+  BUDGET_CATEGORY_BLUEPRINTS,
+  BUDGET_ITEM_DRAG_MIME,
+} from "@/lib/budget-blueprint";
+import { formatCurrency, formatNumber } from "@/lib/utils";
 import { useBudgetStore } from "@/stores/budget-store";
 import { cn } from "@/lib/utils";
 
-const PALETTE_ITEMS = [
-  {
-    category: "Venue & Hospitality",
-    items: [
-      { name: "Wedding Venue", estimatedCost: 500000 },
-      { name: "Mehendi Venue", estimatedCost: 150000 },
-      { name: "Sangeet Venue", estimatedCost: 200000 },
-      { name: "Reception Venue", estimatedCost: 300000 },
-      { name: "Hotel Rooms (Guests)", estimatedCost: 400000 },
-      { name: "Suite (Couple)", estimatedCost: 50000 },
-    ],
-  },
-  {
-    category: "Decor & Design",
-    items: [
-      { name: "Mandap Decoration", estimatedCost: 200000 },
-      { name: "Stage Setup", estimatedCost: 150000 },
-      { name: "Floral Arrangements", estimatedCost: 100000 },
-      { name: "Lighting Design", estimatedCost: 80000 },
-      { name: "Entry Gate", estimatedCost: 50000 },
-      { name: "Table Centerpieces", estimatedCost: 40000 },
-    ],
-  },
-  {
-    category: "Catering",
-    items: [
-      { name: "Wedding Dinner", estimatedCost: 300000 },
-      { name: "Cocktail Party", estimatedCost: 150000 },
-      { name: "Mehendi Food", estimatedCost: 100000 },
-      { name: "Welcome Dinner", estimatedCost: 120000 },
-      { name: "Beverages & Bar", estimatedCost: 80000 },
-      { name: "Wedding Cake", estimatedCost: 30000 },
-    ],
-  },
-  {
-    category: "Photography & Video",
-    items: [
-      { name: "Wedding Photography", estimatedCost: 200000 },
-      { name: "Wedding Videography", estimatedCost: 150000 },
-      { name: "Pre-Wedding Shoot", estimatedCost: 80000 },
-      { name: "Drone Coverage", estimatedCost: 50000 },
-      { name: "Photo Album", estimatedCost: 25000 },
-    ],
-  },
-  {
-    category: "Makeup & Styling",
-    items: [
-      { name: "Bridal Makeup", estimatedCost: 80000 },
-      { name: "Groom Styling", estimatedCost: 30000 },
-      { name: "Family Makeup", estimatedCost: 50000 },
-      { name: "Hair Styling", estimatedCost: 20000 },
-    ],
-  },
-  {
-    category: "Entertainment",
-    items: [
-      { name: "DJ / Sound System", estimatedCost: 80000 },
-      { name: "Live Band", estimatedCost: 150000 },
-      { name: "Choreographer", estimatedCost: 60000 },
-      { name: "Anchor / MC", estimatedCost: 40000 },
-      { name: "Fireworks", estimatedCost: 50000 },
-    ],
-  },
-  {
-    category: "Travel & Logistics",
-    items: [
-      { name: "Guest Transport", estimatedCost: 100000 },
-      { name: "Couple Travel", estimatedCost: 50000 },
-      { name: "Airport Transfers", estimatedCost: 30000 },
-      { name: "Event Coordination", estimatedCost: 100000 },
-    ],
-  },
-  {
-    category: "Miscellaneous",
-    items: [
-      { name: "Wedding Invitations", estimatedCost: 40000 },
-      { name: "Favors & Gifts", estimatedCost: 50000 },
-      { name: "Mehndi Artist", estimatedCost: 30000 },
-      { name: "Pandit / Officiant", estimatedCost: 25000 },
-      { name: "Insurance", estimatedCost: 20000 },
-    ],
-  },
-];
-
 export function BudgetItemPalette() {
-  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(
+    BUDGET_CATEGORY_BLUEPRINTS[0]?.name ?? null
+  );
   const [searchQuery, setSearchQuery] = useState("");
-  const categories = useBudgetStore((s) => s.categories);
-  const addItem = useBudgetStore((s) => s.addItem);
+  const categories = useBudgetStore((state) => state.categories);
+  const addItem = useBudgetStore((state) => state.addItem);
+
+  const filteredPalette = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return BUDGET_CATEGORY_BLUEPRINTS;
+
+    return BUDGET_CATEGORY_BLUEPRINTS.map((group) => ({
+      ...group,
+      items: group.items.filter((item) =>
+        item.name.toLowerCase().includes(query)
+      ),
+    })).filter((group) => group.items.length > 0);
+  }, [searchQuery]);
 
   const handleAddItem = (
-    paletteCategory: string,
+    groupName: string,
     item: { name: string; estimatedCost: number }
   ) => {
-    // Find matching budget category
-    const targetCategory = categories.find((c) =>
-      c.name.toLowerCase() === paletteCategory.toLowerCase()
+    const targetCategory = categories.find(
+      (category) => category.name.toLowerCase() === groupName.toLowerCase()
     );
     if (!targetCategory) return;
 
@@ -114,72 +48,110 @@ export function BudgetItemPalette() {
     });
   };
 
-  const filteredPalette = searchQuery
-    ? PALETTE_ITEMS.map((group) => ({
-        ...group,
-        items: group.items.filter((item) =>
-          item.name.toLowerCase().includes(searchQuery.toLowerCase())
-        ),
-      })).filter((group) => group.items.length > 0)
-    : PALETTE_ITEMS;
-
   return (
     <div className="space-y-4">
-      <div>
-        <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-slate mb-3">
-          Add Items
+      <div className="border border-charcoal/8 bg-cream/60 p-4">
+        <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-slate">
+          Budget Builder
         </p>
+        <h3 className="mt-2 font-display text-xl text-charcoal">
+          Add line items with intent
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-slate">
+          Click to add instantly, or drag an item onto a category to shape your
+          plan around the wedding you actually want.
+        </p>
+      </div>
+
+      <div>
+        <label
+          htmlFor="budget-item-search"
+          className="font-accent text-[10px] uppercase tracking-[0.2em] text-slate"
+        >
+          Search palette
+        </label>
         <input
+          id="budget-item-search"
           type="text"
-          placeholder="Search items..."
+          placeholder="Venue, decor, transport..."
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full border-b border-charcoal/15 bg-transparent px-0 py-2 text-sm text-charcoal placeholder:text-slate/50 focus:border-gold-primary focus:outline-none transition-colors"
+          onChange={(event) => setSearchQuery(event.target.value)}
+          className="mt-3 w-full border-b border-charcoal/15 bg-transparent px-0 py-2 text-sm text-charcoal placeholder:text-slate/50 transition-colors focus:border-gold-primary focus:outline-none"
         />
       </div>
 
-      <div className="scrollbar-elysian max-h-[calc(100vh-300px)] space-y-1 overflow-y-auto">
-        {filteredPalette.map((group) => (
-          <div key={group.category}>
-            <button
-              onClick={() =>
-                setExpandedCategory(
-                  expandedCategory === group.category ? null : group.category
-                )
-              }
-              className={cn(
-                "flex w-full items-center justify-between py-2.5 font-accent text-[11px] uppercase tracking-[0.15em] transition-colors",
-                expandedCategory === group.category
-                  ? "text-gold-primary"
-                  : "text-charcoal hover:text-gold-primary"
-              )}
-            >
-              <span>{group.category}</span>
-              <span className="text-[10px] text-slate">
-                {group.items.length}
-              </span>
-            </button>
+      <div className="scrollbar-elysian max-h-[calc(100vh-310px)] space-y-2 overflow-y-auto pr-1">
+        {filteredPalette.map((group) => {
+          const isOpen = expandedCategory === group.name;
 
-            {expandedCategory === group.category && (
-              <div className="space-y-1 pb-3">
-                {group.items.map((item) => (
-                  <button
-                    key={item.name}
-                    onClick={() => handleAddItem(group.category, item)}
-                    className="group flex w-full items-center justify-between border border-charcoal/8 px-3 py-2.5 text-left transition-all hover:border-gold-primary/30 hover:bg-gold-primary/5"
+          return (
+            <div
+              key={group.name}
+              className="border border-charcoal/8 bg-ivory/90 backdrop-blur"
+            >
+              <button
+                onClick={() => setExpandedCategory(isOpen ? null : group.name)}
+                className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-cream/70"
+              >
+                <div className="min-w-0">
+                  <p
+                    className="font-accent text-[11px] uppercase tracking-[0.15em]"
+                    style={{ color: group.color }}
                   >
-                    <span className="text-xs text-charcoal group-hover:text-gold-dark">
-                      {item.name}
-                    </span>
-                    <span className="font-accent text-[10px] text-slate tabular-nums">
-                      ₹{(item.estimatedCost / 1000).toFixed(0)}K
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
+                    {group.name}
+                  </p>
+                  <p className="mt-1 text-xs text-slate">
+                    Target {Math.round(group.recommendedShare * 100)}% of plan
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="font-accent text-[10px] uppercase tracking-[0.15em] text-charcoal">
+                    {group.items.length} items
+                  </p>
+                  <p className="mt-1 text-xs text-slate">
+                    From {formatNumber(group.items[0]?.estimatedCost ?? 0)}
+                  </p>
+                </div>
+              </button>
+
+              {isOpen ? (
+                <div className="space-y-2 border-t border-charcoal/6 px-3 py-3">
+                  {group.items.map((item) => (
+                    <button
+                      key={item.name}
+                      type="button"
+                      draggable
+                      onDragStart={(event) => {
+                        event.dataTransfer.effectAllowed = "copy";
+                        event.dataTransfer.setData(
+                          BUDGET_ITEM_DRAG_MIME,
+                          JSON.stringify(item)
+                        );
+                      }}
+                      onClick={() => handleAddItem(group.name, item)}
+                      className={cn(
+                        "group flex w-full items-center justify-between gap-3 border border-charcoal/8 px-3 py-3 text-left transition-all duration-300",
+                        "hover:-translate-y-0.5 hover:border-gold-primary/35 hover:bg-gold-primary/5"
+                      )}
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm text-charcoal group-hover:text-gold-dark">
+                          {item.name}
+                        </p>
+                        <p className="mt-1 font-accent text-[10px] uppercase tracking-[0.15em] text-slate">
+                          Drag to a category or click to add
+                        </p>
+                      </div>
+                      <span className="shrink-0 font-accent text-[10px] uppercase tracking-[0.15em] text-charcoal">
+                        {formatCurrency(item.estimatedCost)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

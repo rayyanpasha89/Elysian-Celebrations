@@ -11,33 +11,33 @@ import {
 
 const steps = [
   {
-    title: "Share Your Vision",
+    title: "Frame the atmosphere",
     body:
-      "Tell us how you want the weekend to feel—intimate or grand, rooted in tradition or boldly contemporary. We translate mood boards into a clear plan.",
+      "We begin with the emotional brief: how the arrival should feel, what kind of energy the ceremony needs, and how the weekend should live in memory and in photographs.",
     icon: Sparkles,
   },
   {
-    title: "Choose Your Destination",
+    title: "Reduce the world",
     body:
-      "Explore handpicked cities and venues matched to season, scale, and guest experience. We narrow the world to the places that fit your story.",
+      "Then we narrow destinations, venues, and timing until only the places that truly fit your guest flow, budget, and visual language remain.",
     icon: MapPin,
   },
   {
-    title: "Curate Your Vendors",
+    title: "Assemble the cast",
     body:
-      "We introduce you to teams we trust—florists, photographers, chefs—so every creative partner aligns with your taste and timeline.",
+      "Photographers, florists, hospitality teams, and production partners are chosen for chemistry, not just availability, so the wedding feels coherent instead of crowded.",
     icon: UsersRound,
   },
   {
-    title: "Refine Your Budget",
+    title: "Model the investment",
     body:
-      "Transparent categories, scenario planning, and honest trade-offs. You always know where the investment goes before you commit.",
+      "Before scope expands, we make the investment legible through target categories, scenario planning, and trade-offs that protect what matters most.",
     icon: Wallet,
   },
   {
-    title: "Celebrate Your Day",
+    title: "Conduct the weekend",
     body:
-      "On the ground, we choreograph arrivals, cues, and contingencies—so you stay present while we hold the frame.",
+      "On site, every cue, arrival, contingency, and late-night shift is conducted in sequence so you can stay present while the experience holds together around you.",
     icon: PartyPopper,
   },
 ] as const;
@@ -62,6 +62,7 @@ const itemVariants = {
 export function JourneySteps() {
   return (
     <section
+      id="how-it-works"
       className="relative bg-ivory px-[var(--section-padding-x)] py-[var(--section-padding-y)] text-charcoal overflow-hidden"
       aria-labelledby="how-it-works-heading"
     >
@@ -92,11 +93,11 @@ export function JourneySteps() {
             id="how-it-works-heading"
             className="font-display text-[length:var(--text-h1)] leading-tight text-charcoal"
           >
-            From first conversation to last dance
+            The planning unfolds in five deliberate acts.
           </h2>
           <p className="font-sans mx-auto mt-4 max-w-2xl text-[length:var(--text-body)] text-slate">
-            Five deliberate steps—each one designed to protect your time, your guests, and the
-            feeling you want to carry home.
+            Each act reduces noise, strengthens taste, and keeps the wedding readable from the
+            first brief through the final dance.
           </p>
           {/* Gold divider */}
           <div className="mx-auto mt-8 h-[1px] w-16 bg-gradient-to-r from-transparent via-gold-primary/40 to-transparent" />

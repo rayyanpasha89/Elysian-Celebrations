@@ -1,47 +1,77 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useForm } from "react-hook-form";
+import { UserProfile, useUser } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer } from "@/animations/variants";
 import { FloatingField } from "@/components/auth/floating-field";
 import { dashBtn, dashCard, dashLabel } from "@/lib/dashboard-styles";
-import { cn } from "@/lib/utils";
 
-function ToggleRow({ id, label, defaultChecked }: { id: string; label: string; defaultChecked?: boolean }) {
-  return (
-    <label
-      htmlFor={id}
-      className="flex cursor-pointer items-center justify-between border border-charcoal/10 px-4 py-3 transition-colors hover:border-charcoal/20"
-    >
-      <span className="font-heading text-sm text-charcoal">{label}</span>
-      <input
-        id={id}
-        type="checkbox"
-        defaultChecked={defaultChecked}
-        className="h-4 w-4 border border-charcoal/30 accent-gold-primary"
-      />
-    </label>
-  );
-}
+type BusinessForm = {
+  businessName: string;
+  phone: string;
+  city: string;
+  state: string;
+  country: string;
+};
 
 export default function VendorSettingsPage() {
-  const business = useForm({
+  const { user, isLoaded: clerkLoaded } = useUser();
+  const [loading, setLoading] = useState(true);
+  const [hasVendorProfile, setHasVendorProfile] = useState(true);
+
+  const business = useForm<BusinessForm>({
     defaultValues: {
-      name: "Lens & Light Studios",
-      email: "hello@lenslight.studio",
-      phone: "+91 98200 11223",
-      gst: "27AAAAA0000A1Z5",
+      businessName: "",
+      phone: "",
+      city: "",
+      state: "",
+      country: "India",
     },
   });
 
-  const password = useForm({
-    defaultValues: { current: "", next: "", confirm: "" },
-  });
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/settings/vendor");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Failed to load settings");
+        if (cancelled) return;
+        const v = data.vendor;
+        const u = data.user ?? {};
+        setHasVendorProfile(!!v);
+        business.reset({
+          businessName: v?.businessName ?? "",
+          phone: u.phone ?? "",
+          city: v?.city ?? "",
+          state: v?.state ?? "",
+          country: v?.country ?? "India",
+        });
+      } catch (e) {
+        if (!cancelled) toast.error(e instanceof Error ? e.message : "Could not load settings");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once on mount
+  }, []);
 
-  const [availSaving, setAvailSaving] = useState(false);
-  const [notifSaving, setNotifSaving] = useState(false);
+  const email = user?.primaryEmailAddress?.emailAddress ?? "";
+
+  if (!clerkLoaded || loading) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="h-10 w-48 bg-charcoal/10" />
+        <div className="h-40 border border-charcoal/8 bg-charcoal/5" />
+      </div>
+    );
+  }
 
   return (
     <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-10">
@@ -52,105 +82,99 @@ export default function VendorSettingsPage() {
 
       <motion.section variants={fadeUp} className={dashCard}>
         <h3 className="font-display text-lg text-charcoal">Business info</h3>
+        <p className="font-heading mt-2 text-sm text-slate">
+          These fields update your vendor profile in the database. For portfolio, category, and bio, use the Profile
+          page—this screen focuses on contact and location used for operations.
+        </p>
+        {!hasVendorProfile && (
+          <p className="font-heading mt-4 border border-charcoal/10 bg-cream/40 px-4 py-3 text-sm text-charcoal">
+            No vendor profile was found for your account. Complete signup or contact support before saving business
+            details.
+          </p>
+        )}
         <form
-          onSubmit={business.handleSubmit(async () => {
+          onSubmit={business.handleSubmit(async (values) => {
             try {
-              await new Promise((r) => setTimeout(r, 600));
+              const res = await fetch("/api/settings/vendor", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  businessName: values.businessName,
+                  phone: values.phone,
+                  city: values.city,
+                  state: values.state,
+                  country: values.country,
+                }),
+              });
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.error ?? "Save failed");
               toast.success("Business details saved");
-            } catch {
-              toast.error("Failed to save. Please try again.");
+            } catch (e) {
+              toast.error(e instanceof Error ? e.message : "Could not save");
             }
           })}
           className="mt-6 space-y-8"
         >
-          <FloatingField id="vb-name" label="Business name" {...business.register("name")} />
-          <FloatingField id="vb-email" label="Email" type="email" {...business.register("email")} />
+          <FloatingField id="vb-name" label="Business name" {...business.register("businessName")} />
+          <div>
+            <p className="font-accent mb-2 text-[10px] uppercase tracking-[0.2em] text-slate">Email</p>
+            <p className="font-heading text-sm text-charcoal">{email || "—"}</p>
+            <p className="font-heading mt-2 text-xs text-slate">Read-only. Change it under Account security.</p>
+          </div>
           <FloatingField id="vb-phone" label="Phone" type="tel" {...business.register("phone")} />
-          <FloatingField id="vb-gst" label="GST number" {...business.register("gst")} />
-          <button type="submit" className={dashBtn} disabled={business.formState.isSubmitting}>
-            Save Changes
+          <div className="border border-charcoal/10 bg-cream/30 px-4 py-3">
+            <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-slate">GST / tax ID</p>
+            <p className="font-heading mt-2 text-sm text-slate">
+              Tax identifiers are not stored on your vendor profile in this database yet. Keep GST on invoices and
+              contracts outside the app until we add a dedicated field.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
+            <FloatingField id="vb-city" label="City" {...business.register("city")} />
+            <FloatingField id="vb-state" label="State" {...business.register("state")} />
+          </div>
+          <FloatingField id="vb-country" label="Country" {...business.register("country")} />
+          <button
+            type="submit"
+            className={dashBtn}
+            disabled={business.formState.isSubmitting || !hasVendorProfile}
+          >
+            Save changes
           </button>
         </form>
       </motion.section>
 
       <motion.section variants={fadeUp} className={dashCard}>
         <h3 className="font-display text-lg text-charcoal">Availability</h3>
-        <p className="font-heading mt-2 text-sm text-slate">When off, new inquiries are paused on your profile.</p>
-        <div className="mt-6">
-          <ToggleRow id="avail" label="Available for new bookings" defaultChecked />
-        </div>
-        <button
-          type="button"
-          className={cn(dashBtn, "mt-8")}
-          disabled={availSaving}
-          onClick={async () => {
-            setAvailSaving(true);
-            try {
-              await new Promise((r) => setTimeout(r, 500));
-              toast.success("Availability saved");
-            } catch {
-              toast.error("Failed to save. Please try again.");
-            } finally {
-              setAvailSaving(false);
-            }
-          }}
-        >
-          Save Changes
-        </button>
+        <p className="font-heading mt-2 text-sm text-slate">
+          A &quot;pause new inquiries&quot; flag is not stored in the database yet. To manage demand, coordinate with
+          your planner or hide individual services on the Services page until this feature ships.
+        </p>
       </motion.section>
 
       <motion.section variants={fadeUp} className={dashCard}>
         <h3 className="font-display text-lg text-charcoal">Notifications</h3>
-        <div className="mt-6 space-y-3">
-          <ToggleRow id="vn-inq" label="New inquiries" defaultChecked />
-          <ToggleRow id="vn-msg" label="Messages" defaultChecked />
-          <ToggleRow id="vn-book" label="Booking updates" defaultChecked />
-        </div>
-        <button
-          type="button"
-          className={cn(dashBtn, "mt-8")}
-          disabled={notifSaving}
-          onClick={async () => {
-            setNotifSaving(true);
-            try {
-              await new Promise((r) => setTimeout(r, 500));
-              toast.success("Notification preferences saved");
-            } catch {
-              toast.error("Failed to save. Please try again.");
-            } finally {
-              setNotifSaving(false);
-            }
-          }}
-        >
-          Save Changes
-        </button>
+        <p className="font-heading mt-2 text-sm text-slate">
+          Per-channel notification preferences are not stored yet. You will still receive booking and message alerts
+          according to platform events.
+        </p>
       </motion.section>
 
       <motion.section variants={fadeUp} className={dashCard}>
-        <h3 className="font-display text-lg text-charcoal">Password</h3>
-        <form
-          onSubmit={password.handleSubmit(async (d) => {
-            if (d.next !== d.confirm) {
-              toast.error("New passwords do not match.");
-              return;
-            }
-            try {
-              await new Promise((r) => setTimeout(r, 600));
-              toast.success("Password updated");
-              password.reset({ current: "", next: "", confirm: "" });
-            } catch {
-              toast.error("Failed to save. Please try again.");
-            }
-          })}
-          className="mt-6 space-y-8"
-        >
-          <FloatingField id="vpw-c" label="Current password" type="password" {...password.register("current")} />
-          <FloatingField id="vpw-n" label="New password" type="password" {...password.register("next")} />
-          <FloatingField id="vpw-x" label="Confirm password" type="password" {...password.register("confirm")} />
-          <button type="submit" className={dashBtn} disabled={password.formState.isSubmitting}>
-            Save Changes
-          </button>
-        </form>
+        <h3 className="font-display text-lg text-charcoal">Account security</h3>
+        <p className="font-heading mt-2 text-sm text-slate">
+          Password and email are managed by Clerk. Use the profile panel below.
+        </p>
+        <div className="mt-6 overflow-hidden border border-charcoal/10">
+          <UserProfile
+            appearance={{
+              elements: {
+                rootBox: "w-full",
+                card: "shadow-none border-0",
+              },
+            }}
+          />
+        </div>
       </motion.section>
     </motion.div>
   );

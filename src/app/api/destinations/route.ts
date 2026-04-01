@@ -1,8 +1,7 @@
-import { NextRequest } from "next/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { apiError, apiSuccess } from "@/lib/api-utils";
 
-export async function GET(_request: NextRequest) {
+export async function GET() {
   try {
     const supabase = createAdminSupabaseClient();
 

@@ -1,46 +1,89 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useForm } from "react-hook-form";
+import { UserProfile, useUser } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer } from "@/animations/variants";
 import { FloatingField } from "@/components/auth/floating-field";
 import { dashBtn, dashCard, dashLabel } from "@/lib/dashboard-styles";
 import { cn } from "@/lib/utils";
 
-type ProfileForm = { name: string; email: string; phone: string };
-type WeddingForm = { date: string; guestCount: string; destination: string };
-
-function ToggleRow({ id, label, defaultChecked }: { id: string; label: string; defaultChecked?: boolean }) {
-  return (
-    <label
-      htmlFor={id}
-      className="flex cursor-pointer items-center justify-between border border-charcoal/10 px-4 py-3 transition-colors hover:border-charcoal/20"
-    >
-      <span className="font-heading text-sm text-charcoal">{label}</span>
-      <input
-        id={id}
-        type="checkbox"
-        defaultChecked={defaultChecked}
-        className="h-4 w-4 border border-charcoal/30 accent-gold-primary"
-      />
-    </label>
-  );
-}
+type ProfileForm = { name: string; phone: string };
+type WeddingForm = {
+  partnerName: string;
+  date: string;
+  guestCount: string;
+  destinationId: string;
+};
 
 export default function ClientSettingsPage() {
+  const { user, isLoaded: clerkLoaded } = useUser();
+  const [loading, setLoading] = useState(true);
+  const [hasWedding, setHasWedding] = useState(false);
+
   const profile = useForm<ProfileForm>({
-    defaultValues: { name: "Priya Sharma", email: "priya@email.com", phone: "+91 98765 43210" },
+    defaultValues: { name: "", phone: "" },
   });
   const wedding = useForm<WeddingForm>({
-    defaultValues: { date: "2026-02-14", guestCount: "180", destination: "Udaipur" },
-  });
-  const password = useForm<{ current: string; next: string; confirm: string }>({
-    defaultValues: { current: "", next: "", confirm: "" },
+    defaultValues: { partnerName: "", date: "", guestCount: "", destinationId: "" },
   });
 
-  const [notifSaving, setNotifSaving] = useState(false);
+  const [destinationOptions, setDestinationOptions] = useState<
+    { id: string; name: string; country: string; slug: string }[]
+  >([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/settings/client");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Failed to load settings");
+        if (cancelled) return;
+        const u = data.user ?? {};
+        profile.reset({
+          name: u.name ?? "",
+          phone: u.phone ?? "",
+        });
+        const cp = data.clientProfile;
+        const w = data.wedding;
+        setHasWedding(!!w?.id);
+        const wd = w?.date ?? cp?.weddingDate;
+        const dateStr =
+          typeof wd === "string" && wd.length > 0
+            ? wd.slice(0, 10)
+            : "";
+        wedding.reset({
+          partnerName: cp?.partnerName ?? "",
+          date: dateStr,
+          guestCount: cp?.guestCount != null ? String(cp.guestCount) : "",
+          destinationId: w?.destinationId ?? "",
+        });
+        setDestinationOptions(data.destinationOptions ?? []);
+      } catch (e) {
+        if (!cancelled) toast.error(e instanceof Error ? e.message : "Could not load settings");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once on mount
+  }, []);
+
+  const email = user?.primaryEmailAddress?.emailAddress ?? "";
+
+  if (!clerkLoaded || loading) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="h-10 w-48 bg-charcoal/10" />
+        <div className="h-40 border border-charcoal/8 bg-charcoal/5" />
+      </div>
+    );
+  }
 
   return (
     <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-10">
@@ -51,101 +94,131 @@ export default function ClientSettingsPage() {
 
       <motion.section variants={fadeUp} className={dashCard}>
         <h3 className="font-display text-lg text-charcoal">Profile info</h3>
+        <p className="font-heading mt-2 text-sm text-slate">
+          Name and phone are saved to your Elysian profile. Email is managed by your sign-in account (see Account
+          security below).
+        </p>
         <form
-          onSubmit={profile.handleSubmit(async () => {
+          onSubmit={profile.handleSubmit(async (values) => {
             try {
-              await new Promise((r) => setTimeout(r, 600));
-              toast.success("Profile updated");
-            } catch {
-              toast.error("Failed to save. Please try again.");
+              const res = await fetch("/api/settings/client", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: values.name, phone: values.phone }),
+              });
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.error ?? "Save failed");
+              toast.success("Profile saved");
+            } catch (e) {
+              toast.error(e instanceof Error ? e.message : "Could not save");
             }
           })}
           className="mt-6 space-y-8"
         >
           <FloatingField id="set-name" label="Name" {...profile.register("name")} />
-          <FloatingField id="set-email" label="Email" type="email" {...profile.register("email")} />
+          <div>
+            <p className={cn(dashLabel, "mb-2")}>Email</p>
+            <p className="font-heading text-sm text-charcoal">{email || "—"}</p>
+            <p className="font-heading mt-2 text-xs text-slate">Read-only. Change it under Account security.</p>
+          </div>
           <FloatingField id="set-phone" label="Phone" type="tel" {...profile.register("phone")} />
           <button type="submit" className={dashBtn} disabled={profile.formState.isSubmitting}>
-            Save Changes
+            Save changes
           </button>
         </form>
       </motion.section>
 
       <motion.section variants={fadeUp} className={dashCard}>
         <h3 className="font-display text-lg text-charcoal">Wedding details</h3>
+        <p className="font-heading mt-2 text-sm text-slate">
+          Updates your client profile and, when a wedding exists, the wedding record (date and destination).
+        </p>
+        {!hasWedding && (
+          <p className="font-heading mt-3 text-sm text-charcoal/80">
+            You don&apos;t have a wedding record yet—destination and shared wedding date will apply after onboarding
+            or when a wedding is created. Partner name and guest count still save here.
+          </p>
+        )}
         <form
-          onSubmit={wedding.handleSubmit(async () => {
+          onSubmit={wedding.handleSubmit(async (values) => {
             try {
-              await new Promise((r) => setTimeout(r, 600));
+              const res = await fetch("/api/settings/client", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  partnerName: values.partnerName,
+                  weddingDate: values.date || null,
+                  guestCount: values.guestCount === "" ? null : Number(values.guestCount),
+                  destinationId: values.destinationId || null,
+                }),
+              });
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.error ?? "Save failed");
               toast.success("Wedding details saved");
-            } catch {
-              toast.error("Failed to save. Please try again.");
+            } catch (e) {
+              toast.error(e instanceof Error ? e.message : "Could not save");
             }
           })}
           className="mt-6 space-y-8"
         >
+          <FloatingField id="partner" label="Partner / couple name" {...wedding.register("partnerName")} />
           <FloatingField id="wed-date" label="Wedding date" type="date" {...wedding.register("date")} />
-          <FloatingField id="wed-guests" label="Guest count" {...wedding.register("guestCount")} />
-          <FloatingField id="wed-dest" label="Destination" {...wedding.register("destination")} />
+          <FloatingField id="wed-guests" label="Guest count" type="number" min={0} {...wedding.register("guestCount")} />
+          <div>
+            <label htmlFor="wed-dest" className={cn(dashLabel, "block")}>
+              Destination
+            </label>
+            <select
+              id="wed-dest"
+              disabled={!hasWedding}
+              className="mt-3 w-full border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary disabled:cursor-not-allowed disabled:opacity-60"
+              {...wedding.register("destinationId")}
+            >
+              <option value="">None selected</option>
+              {destinationOptions.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}, {d.country}
+                </option>
+              ))}
+            </select>
+            {!hasWedding && (
+              <p className="font-heading mt-2 text-xs text-slate">Available after a wedding record exists.</p>
+            )}
+          </div>
           <button type="submit" className={dashBtn} disabled={wedding.formState.isSubmitting}>
-            Save Changes
+            Save changes
           </button>
         </form>
       </motion.section>
 
       <motion.section variants={fadeUp} className={dashCard}>
         <h3 className="font-display text-lg text-charcoal">Notifications</h3>
-        <p className="font-heading mt-2 text-sm text-slate">Choose how we reach you about planning updates.</p>
-        <div className="mt-6 space-y-3">
-          <ToggleRow id="notif-email" label="Email" defaultChecked />
-          <ToggleRow id="notif-sms" label="SMS" />
-          <ToggleRow id="notif-push" label="Push" defaultChecked />
+        <p className="font-heading mt-2 text-sm text-slate">
+          Per-channel notification preferences are not stored in the database yet. You will still receive critical
+          booking and account email from the platform when events occur.
+        </p>
+        <div className="mt-6 space-y-3 border border-charcoal/10 bg-cream/30 px-4 py-3">
+          <p className="font-heading text-sm text-charcoal">Email · SMS · Push</p>
+          <p className="font-heading text-xs text-slate">Granular toggles will appear here once notification preferences are implemented.</p>
         </div>
-        <button
-          type="button"
-          className={cn(dashBtn, "mt-8")}
-          disabled={notifSaving}
-          onClick={async () => {
-            setNotifSaving(true);
-            try {
-              await new Promise((r) => setTimeout(r, 500));
-              toast.success("Notification preferences saved");
-            } catch {
-              toast.error("Failed to save. Please try again.");
-            } finally {
-              setNotifSaving(false);
-            }
-          }}
-        >
-          Save Changes
-        </button>
       </motion.section>
 
       <motion.section variants={fadeUp} className={dashCard}>
-        <h3 className="font-display text-lg text-charcoal">Password</h3>
-        <form
-          onSubmit={password.handleSubmit(async (d) => {
-            if (d.next !== d.confirm) {
-              toast.error("New passwords do not match.");
-              return;
-            }
-            try {
-              await new Promise((r) => setTimeout(r, 600));
-              toast.success("Password updated");
-              password.reset({ current: "", next: "", confirm: "" });
-            } catch {
-              toast.error("Failed to save. Please try again.");
-            }
-          })}
-          className="mt-6 space-y-8"
-        >
-          <FloatingField id="pw-current" label="Current password" type="password" {...password.register("current")} />
-          <FloatingField id="pw-next" label="New password" type="password" {...password.register("next")} />
-          <FloatingField id="pw-confirm" label="Confirm new password" type="password" {...password.register("confirm")} />
-          <button type="submit" className={dashBtn} disabled={password.formState.isSubmitting}>
-            Save Changes
-          </button>
-        </form>
+        <h3 className="font-display text-lg text-charcoal">Account security</h3>
+        <p className="font-heading mt-2 text-sm text-slate">
+          Password, email, and connected accounts are managed by Clerk. Use the profile panel below—changes apply
+          immediately to your sign-in.
+        </p>
+        <div className="mt-6 overflow-hidden border border-charcoal/10">
+          <UserProfile
+            appearance={{
+              elements: {
+                rootBox: "w-full",
+                card: "shadow-none border-0",
+              },
+            }}
+          />
+        </div>
       </motion.section>
     </motion.div>
   );

@@ -38,9 +38,12 @@ export function Sidebar({ groups, portalName, portalHref }: SidebarProps) {
             Celebrations
           </span>
         </Link>
-        <div className="mt-3 font-accent text-[10px] uppercase tracking-[0.2em] text-ivory/30">
+        <Link
+          href={portalHref}
+          className="mt-3 block font-accent text-[10px] uppercase tracking-[0.2em] text-ivory/30 transition-colors hover:text-gold-primary"
+        >
           {portalName}
-        </div>
+        </Link>
       </div>
 
       {/* Navigation */}
@@ -139,9 +142,13 @@ export function MobileSidebar({ groups, portalName, portalHref }: SidebarProps) 
                   <span className="font-display text-xl font-bold text-ivory">
                     Elysian
                   </span>
-                  <span className="block font-accent text-[9px] uppercase tracking-[0.3em] text-gold-primary">
+                  <Link
+                    href={portalHref}
+                    onClick={() => setIsOpen(false)}
+                    className="block font-accent text-[9px] uppercase tracking-[0.3em] text-gold-primary hover:text-ivory"
+                  >
                     {portalName}
-                  </span>
+                  </Link>
                 </div>
                 <button
                   onClick={() => setIsOpen(false)}

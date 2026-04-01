@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { AnimatedCounter } from "@/components/shared/animated-counter";
 import { cn } from "@/lib/utils";
 

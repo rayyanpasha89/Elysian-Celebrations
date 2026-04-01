@@ -5,7 +5,7 @@ import { apiError, apiSuccess } from "@/lib/api-utils";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, email, phone, destination, weddingDate, guestCount, message } = body;
+    const { name, email, phone, destination, weddingDate, guestCount: guestRaw, message } = body;
 
     if (!name || !email || !message) {
       return apiError("Name, email, and message are required");
@@ -14,6 +14,16 @@ export async function POST(request: NextRequest) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return apiError("Invalid email address");
+    }
+
+    let guestCount: number | null = null;
+    if (guestRaw !== undefined && guestRaw !== null && guestRaw !== "") {
+      const n =
+        typeof guestRaw === "number" ? guestRaw : parseInt(String(guestRaw), 10);
+      if (!Number.isFinite(n) || n < 1) {
+        return apiError("Invalid guest count");
+      }
+      guestCount = n;
     }
 
     const supabase = createAdminSupabaseClient();
@@ -26,7 +36,7 @@ export async function POST(request: NextRequest) {
         phone: phone || null,
         destination: destination || null,
         wedding_date: weddingDate || null,
-        guest_count: guestCount || null,
+        guest_count: guestCount,
         message,
       })
       .select("id, name, email, created_at")

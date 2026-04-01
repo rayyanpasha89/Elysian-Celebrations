@@ -79,7 +79,7 @@ export function CustomCursor() {
   return (
     <div
       ref={ringRef}
-      className="pointer-events-none fixed left-0 top-0 z-[9999] -translate-x-1/2 -translate-y-1/2 will-change-transform"
+      className="pointer-events-none fixed left-0 top-0 z-[10040] -translate-x-1/2 -translate-y-1/2 will-change-transform"
       aria-hidden
     >
       <div

@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
-import { getAuthSession, requireRole, apiError, apiSuccess } from "@/lib/api-utils";
+import {
+  getAuthSession,
+  requireRole,
+  apiError,
+  apiSuccess,
+} from "@/lib/api-utils";
 
 export async function GET(request: NextRequest) {
   const session = await getAuthSession();
   if (session instanceof NextResponse) return session;
+
+  const roleCheck = requireRole(session, "client", "vendor", "admin", "manager");
+  if (roleCheck) return roleCheck;
 
   try {
     const supabase = createAdminSupabaseClient();
@@ -14,7 +22,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from("bookings")
       .select(
-        `*, client:client_profiles(id, user_id), vendor:vendor_profiles(business_name, slug), service:vendor_services(name, base_price)`
+        `*, client:client_profiles(id, user_id), vendor:vendor_profiles(business_name, slug, user_id), service:vendor_services(name, base_price)`
       )
       .order("created_at", { ascending: false });
 
@@ -22,11 +30,34 @@ export async function GET(request: NextRequest) {
       query = query.eq("status", status);
     }
 
-    // Scope by role
     if (session.role === "client") {
-      query = query.eq("client.user_id", session.userId);
+      const { data: profile, error: pErr } = await supabase
+        .from("client_profiles")
+        .select("id")
+        .eq("user_id", session.userId)
+        .maybeSingle();
+      if (pErr) {
+        console.error("Client profile lookup error:", pErr);
+        return apiError("Failed to load profile", 500);
+      }
+      if (!profile) {
+        return apiSuccess({ bookings: [] });
+      }
+      query = query.eq("client_profile_id", profile.id);
     } else if (session.role === "vendor") {
-      query = query.eq("vendor.user_id", session.userId);
+      const { data: profile, error: pErr } = await supabase
+        .from("vendor_profiles")
+        .select("id")
+        .eq("user_id", session.userId)
+        .maybeSingle();
+      if (pErr) {
+        console.error("Vendor profile lookup error:", pErr);
+        return apiError("Failed to load profile", 500);
+      }
+      if (!profile) {
+        return apiSuccess({ bookings: [] });
+      }
+      query = query.eq("vendor_profile_id", profile.id);
     }
 
     const { data: bookings, error } = await query;
@@ -53,19 +84,23 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createAdminSupabaseClient();
     const body = await request.json();
-    const { vendorProfileId, vendorServiceId, weddingEventId, eventDate, notes } = body;
+    const { vendorProfileId, vendorServiceId, weddingEventId, eventDate, notes } =
+      body;
 
-    if (!vendorProfileId) {
+    if (!vendorProfileId || typeof vendorProfileId !== "string") {
       return apiError("Vendor profile ID is required");
     }
 
-    // Get client profile
-    const { data: clientProfile } = await supabase
+    const { data: clientProfile, error: cpErr } = await supabase
       .from("client_profiles")
       .select("id")
       .eq("user_id", session.userId)
-      .single();
+      .maybeSingle();
 
+    if (cpErr) {
+      console.error("Client profile error:", cpErr);
+      return apiError("Failed to load client profile", 500);
+    }
     if (!clientProfile) {
       return apiError("Client profile not found", 404);
     }

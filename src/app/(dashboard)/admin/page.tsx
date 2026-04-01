@@ -1,33 +1,143 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { staggerContainer, staggerItem, fadeUp } from "@/animations/variants";
 
-const stats = [
-  { label: "Total Weddings", value: 23, trend: { value: 15, isPositive: true } },
-  { label: "Active Vendors", value: 87 },
-  { label: "Revenue (MTD)", value: 2800000, prefix: "₹", formatter: (v: number) => `${(v / 100000).toFixed(1)}L` },
-  { label: "New Inquiries", value: 12, trend: { value: 8, isPositive: true } },
-];
+type AdminDashboardPayload = {
+  usersByRole: { client: number; vendor: number; admin: number };
+  weddingsCount: number;
+  bookingsByStatus: Record<string, number>;
+  newContactInquiries: number;
+  pendingVendors: {
+    id: string;
+    name: string;
+    category: string;
+    date: string;
+  }[];
+  pendingVendorCount: number;
+  recentContactInquiries: {
+    id: string;
+    name: string;
+    email: string;
+    destination: string | null;
+    status: string;
+    createdAt: string;
+    preview: string;
+  }[];
+  subtitle?: string;
+};
 
-const recentVendorApprovals = [
-  { name: "Royal Decor Studios", category: "Decor & Design", date: "Mar 24" },
-  { name: "Spice Route Catering", category: "Catering", date: "Mar 22" },
-  { name: "Wanderlens Photography", category: "Photography", date: "Mar 20" },
-];
-
-const platformMetrics = [
-  { label: "Vendor Approval Rate", value: "92%" },
-  { label: "Avg Response Time", value: "4.2h" },
-  { label: "Client Satisfaction", value: "4.8/5" },
-  { label: "Repeat Bookings", value: "34%" },
-];
+function DashboardSkeleton() {
+  return (
+    <div className="mx-auto max-w-6xl animate-pulse">
+      <div className="mb-8 space-y-2">
+        <div className="h-8 w-56 bg-charcoal/10" />
+        <div className="h-4 w-full max-w-md bg-charcoal/5" />
+      </div>
+      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-28 border border-charcoal/8 bg-charcoal/5" />
+        ))}
+      </div>
+      <div className="grid gap-6 lg:grid-cols-5">
+        <div className="lg:col-span-3 h-72 border border-charcoal/8 bg-charcoal/5" />
+        <div className="lg:col-span-2 h-72 border border-charcoal/8 bg-charcoal/5" />
+      </div>
+    </div>
+  );
+}
 
 export default function AdminDashboard() {
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<AdminDashboardPayload | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/dashboard/admin");
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "Failed to load dashboard");
+        if (!cancelled) setData(json);
+      } catch (e) {
+        if (!cancelled)
+          setError(e instanceof Error ? e.message : "Something went wrong");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loading) return <DashboardSkeleton />;
+  if (error) {
+    return (
+      <div className="mx-auto max-w-6xl border border-rose/20 bg-ivory p-6 text-charcoal">
+        <p className="text-sm">{error}</p>
+      </div>
+    );
+  }
+  if (!data) return <DashboardSkeleton />;
+
+  const activeBookings =
+    (data.bookingsByStatus.CONFIRMED ?? 0) +
+    (data.bookingsByStatus.DEPOSIT_PAID ?? 0) +
+    (data.bookingsByStatus.INQUIRY ?? 0) +
+    (data.bookingsByStatus.QUOTE_SENT ?? 0);
+
+  const stats = [
+    {
+      label: "Total Weddings",
+      value: data.weddingsCount,
+      trend: { value: 0, isPositive: true },
+    },
+    { label: "Active Vendors", value: data.usersByRole.vendor },
+    {
+      label: "Active Bookings",
+      value: activeBookings,
+      prefix: "",
+      formatter: (v: number) => String(v),
+    },
+    {
+      label: "New Inquiries",
+      value: data.newContactInquiries,
+      trend: { value: 0, isPositive: true },
+    },
+  ];
+
+  const platformMetrics = [
+    {
+      label: "Clients registered",
+      value: String(data.usersByRole.client),
+    },
+    {
+      label: "Vendors registered",
+      value: String(data.usersByRole.vendor),
+    },
+    {
+      label: "Pending vendor approvals",
+      value: String(data.pendingVendorCount),
+    },
+    {
+      label: "Bookings (all statuses)",
+      value: String(
+        Object.values(data.bookingsByStatus).reduce((a, b) => a + b, 0)
+      ),
+    },
+  ];
+
+  const subtitle =
+    data.subtitle ??
+    "Platform-wide metrics and recent activity.";
+
   return (
     <div className="mx-auto max-w-6xl">
-      {/* Welcome */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -38,16 +148,15 @@ export default function AdminDashboard() {
           Platform Overview
         </h2>
         <p className="mt-1 font-heading text-base font-light text-slate">
-          12 new inquiries this week. 3 vendor applications pending review.
+          {subtitle}
         </p>
       </motion.div>
 
-      {/* Stats */}
       <motion.div
         variants={staggerContainer}
         initial="hidden"
         animate="visible"
-        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8"
+        className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
       >
         {stats.map((stat) => (
           <motion.div key={stat.label} variants={staggerItem}>
@@ -57,47 +166,54 @@ export default function AdminDashboard() {
       </motion.div>
 
       <div className="grid gap-6 lg:grid-cols-5">
-        {/* Vendor Approvals */}
         <motion.div
           variants={fadeUp}
           initial="hidden"
           animate="visible"
           className="lg:col-span-3 border border-charcoal/8 bg-ivory p-6"
         >
-          <div className="flex items-center justify-between mb-6">
+          <div className="mb-6 flex items-center justify-between">
             <h3 className="font-display text-lg font-semibold text-charcoal">
-              Recent Vendor Approvals
+              Vendors awaiting verification
             </h3>
-            <button className="font-accent text-[10px] uppercase tracking-[0.2em] text-gold-primary hover:underline">
+            <Link
+              href="/admin/vendors"
+              className="font-accent text-[10px] uppercase tracking-[0.2em] text-gold-primary hover:underline"
+            >
               View All
-            </button>
+            </Link>
           </div>
           <div className="space-y-3">
-            {recentVendorApprovals.map((vendor, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between border-b border-charcoal/5 pb-3 last:border-0"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 bg-cream flex items-center justify-center font-accent text-[10px] text-gold-primary">
-                    {vendor.name[0]}
+            {data.pendingVendors.length === 0 ? (
+              <p className="text-sm text-slate">No pending vendors.</p>
+            ) : (
+              data.pendingVendors.map((vendor) => (
+                <div
+                  key={vendor.id}
+                  className="flex items-center justify-between border-b border-charcoal/5 pb-3 last:border-0"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 items-center justify-center bg-cream font-accent text-[10px] text-gold-primary">
+                      {vendor.name[0]}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-charcoal">
+                        {vendor.name}
+                      </p>
+                      <p className="font-accent text-[10px] uppercase tracking-[0.15em] text-slate">
+                        {vendor.category}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-charcoal">{vendor.name}</p>
-                    <p className="font-accent text-[10px] uppercase tracking-[0.15em] text-slate">
-                      {vendor.category}
-                    </p>
-                  </div>
+                  <span className="font-accent text-[10px] uppercase tracking-[0.15em] text-slate">
+                    {vendor.date}
+                  </span>
                 </div>
-                <span className="font-accent text-[10px] uppercase tracking-[0.15em] text-slate">
-                  {vendor.date}
-                </span>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </motion.div>
 
-        {/* Platform Health */}
         <motion.div
           variants={fadeUp}
           initial="hidden"
@@ -105,13 +221,13 @@ export default function AdminDashboard() {
           transition={{ delay: 0.1 }}
           className="lg:col-span-2 border border-charcoal/8 bg-ivory p-6"
         >
-          <h3 className="font-display text-lg font-semibold text-charcoal mb-6">
+          <h3 className="mb-6 font-display text-lg font-semibold text-charcoal">
             Platform Health
           </h3>
           <div className="space-y-5">
             {platformMetrics.map((metric, i) => (
-              <div key={i}>
-                <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-slate mb-1">
+              <div key={metric.label}>
+                <p className="mb-1 font-accent text-[10px] uppercase tracking-[0.2em] text-slate">
                   {metric.label}
                 </p>
                 <p className="font-display text-xl font-bold text-charcoal">
@@ -122,6 +238,23 @@ export default function AdminDashboard() {
                 )}
               </div>
             ))}
+          </div>
+          <div className="mt-8 border-t border-charcoal/8 pt-6">
+            <h4 className="mb-3 font-accent text-[10px] uppercase tracking-[0.2em] text-slate">
+              Recent contact inquiries
+            </h4>
+            <ul className="space-y-3">
+              {data.recentContactInquiries.length === 0 ? (
+                <li className="text-sm text-slate">None yet.</li>
+              ) : (
+                data.recentContactInquiries.map((q) => (
+                  <li key={q.id} className="text-sm">
+                    <span className="font-medium text-charcoal">{q.name}</span>
+                    <span className="text-slate"> — {q.preview}</span>
+                  </li>
+                ))
+              )}
+            </ul>
           </div>
         </motion.div>
       </div>

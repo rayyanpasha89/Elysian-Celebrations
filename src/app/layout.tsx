@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "sonner";
 import { fontVariables } from "@/lib/fonts";
-import { SmoothScrollProvider } from "@/components/shared/smooth-scroll-provider";
 import { ScrollProgress } from "@/components/shared/scroll-progress";
 import "./globals.css";
 
@@ -54,11 +53,9 @@ export default function RootLayout({
   const content = (
     <html lang="en" className={`${fontVariables} h-full antialiased`}>
       <body className="min-h-full flex flex-col font-sans">
-        <SmoothScrollProvider>
-          <ScrollProgress />
-          {children}
-          <Toaster position="bottom-right" richColors toastOptions={{ className: "font-sans" }} />
-        </SmoothScrollProvider>
+        <ScrollProgress />
+        {children}
+        <Toaster position="bottom-right" richColors toastOptions={{ className: "font-sans" }} />
       </body>
     </html>
   );

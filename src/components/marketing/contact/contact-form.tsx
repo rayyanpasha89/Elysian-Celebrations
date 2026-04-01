@@ -5,10 +5,9 @@ import { toast } from "sonner";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAnimation } from "framer-motion";
 import { motion } from "framer-motion";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { destinations } from "@/data/destinations";
-import type { ContactFormData } from "@/types/common";
 import { cn } from "@/lib/utils";
 
 const contactSchema = z.object({
@@ -41,9 +40,9 @@ export function ContactForm() {
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
-    watch,
     formState: { errors },
   } = useForm<FormInput, unknown, FormOutput>({
     resolver: zodResolver(contactSchema),
@@ -66,10 +65,30 @@ export function ContactForm() {
     controls.set({ x: 0 });
   };
 
-  const onSubmit = async (data: ContactFormData) => {
+  const onSubmit = async (data: FormOutput) => {
     setStatus("loading");
     try {
-      await new Promise((r) => setTimeout(r, 1400));
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          destination: data.destination,
+          weddingDate: data.weddingDate,
+          guestCount: data.guestCount,
+          message: data.message,
+        }),
+      });
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        toast.error(
+          typeof json.error === "string" ? json.error : "Failed to send. Please try again."
+        );
+        setStatus("idle");
+        return;
+      }
       toast.success("Message sent — we will be in touch shortly.");
       setStatus("success");
       reset();
@@ -82,8 +101,8 @@ export function ContactForm() {
     setStatus("idle");
   };
 
-  const weddingDate = watch("weddingDate");
-  const destination = watch("destination");
+  const weddingDate = useWatch({ control, name: "weddingDate" });
+  const destination = useWatch({ control, name: "destination" });
   const dateLabelFloating = Boolean(weddingDate);
   const destLabelFloating = Boolean(destination);
 

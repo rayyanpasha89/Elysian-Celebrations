@@ -1,19 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { AnimatePresence, motion } from "framer-motion";
+import { Menu, X } from "lucide-react";
 import { MagneticButton } from "@/components/shared/magnetic-button";
+import { NavSignIn } from "@/components/layout/nav-sign-in";
+import { cn } from "@/lib/utils";
 
 const navLinks = [
-  { label: "Destinations", href: "#destinations" },
-  { label: "Packages", href: "#packages" },
-  { label: "Vendors", href: "#vendors" },
-  { label: "About", href: "#about" },
-  { label: "Gallery", href: "#gallery" },
-  { label: "Contact", href: "#contact" },
+  { label: "Destinations", href: "/#destinations" },
+  { label: "Packages", href: "/#packages" },
+  { label: "Vendors", href: "/#vendors" },
+  { label: "About", href: "/#about" },
+  { label: "Gallery", href: "/gallery" },
+  { label: "Contact", href: "/#contact" },
 ];
 
 export function Navbar() {
@@ -21,7 +22,8 @@ export function Navbar() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 50);
+    const handleScroll = () => setIsScrolled(window.scrollY > 24);
+    handleScroll();
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
@@ -29,123 +31,216 @@ export function Navbar() {
   return (
     <>
       <motion.header
-        initial={{ y: -100, opacity: 0 }}
+        initial={{ y: -80, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.5 }}
-        className={cn(
-          "fixed top-0 left-0 right-0 z-50 transition-all duration-500",
-          isScrolled
-            ? "bg-ivory/80 backdrop-blur-2xl border-b border-charcoal/[0.06] py-3"
-            : "bg-transparent py-6"
-        )}
+        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.45 }}
+        className="fixed inset-x-0 top-0 z-[10020]"
       >
-        <nav className="mx-auto flex max-w-7xl items-center justify-between px-[var(--section-padding-x)]">
-          {/* Logo */}
-          <Link href="/" className="relative z-10">
-            <span
+        <div className="mx-auto max-w-[1500px] px-[var(--section-padding-x)] pt-5">
+          <nav
+            className={cn(
+              "relative flex items-center justify-between overflow-hidden border px-4 py-3 transition-all duration-500 md:px-6",
+              isScrolled
+                ? "border-charcoal/6 bg-ivory/88 shadow-[0_22px_80px_rgba(17,24,39,0.12)] backdrop-blur-2xl"
+                : "border-white/12 bg-white/[0.04] shadow-[0_22px_90px_rgba(0,0,0,0.18)] backdrop-blur-2xl"
+            )}
+          >
+            <div
               className={cn(
-                "font-display text-2xl font-bold tracking-wide transition-colors duration-500",
-                isScrolled ? "text-charcoal" : "text-ivory"
+                "pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,169,110,0.14),transparent_28%),radial-gradient(circle_at_85%_0%,rgba(123,167,201,0.12),transparent_24%),linear-gradient(90deg,rgba(255,255,255,0.08),transparent_30%,transparent_70%,rgba(255,255,255,0.05))] transition-opacity duration-500",
+                isScrolled ? "opacity-55" : "opacity-100"
               )}
-            >
-              Elysian
-            </span>
-            <span
-              className={cn(
-                "block font-accent text-[10px] uppercase tracking-[0.3em] transition-colors duration-500",
-                isScrolled ? "text-gold-primary" : "text-gold-light"
-              )}
-            >
-              Celebrations
-            </span>
-          </Link>
+            />
 
-          {/* Desktop Nav */}
-          <div className="hidden lg:flex items-center gap-8 group/nav">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
+            <div
+              className={cn(
+                "pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold-primary/25 to-transparent transition-opacity duration-500",
+                isScrolled ? "opacity-70" : "opacity-100"
+              )}
+            />
+
+            <Link href="/" className="relative z-10 shrink-0">
+              <div className="flex items-center gap-3">
+                <div
+                  className={cn(
+                    "h-10 w-10 border transition-colors duration-500",
+                    isScrolled
+                      ? "border-gold-primary/30 bg-gold-primary/10 shadow-[0_10px_30px_rgba(201,169,110,0.12)]"
+                      : "border-white/12 bg-white/[0.06] shadow-[0_10px_30px_rgba(0,0,0,0.12)]"
+                  )}
+                >
+                  <div className="flex h-full w-full items-center justify-center font-display text-lg font-bold text-gold-primary">
+                    E
+                  </div>
+                </div>
+                <div>
+                  <span
+                    className={cn(
+                      "block font-display text-[1.45rem] font-bold tracking-[0.02em] transition-colors duration-500 md:text-[1.55rem]",
+                      isScrolled ? "text-charcoal" : "text-ivory"
+                    )}
+                  >
+                    Elysian
+                  </span>
+                  <span
+                    className={cn(
+                      "block font-accent text-[10px] uppercase tracking-[0.34em] transition-colors duration-500",
+                      isScrolled ? "text-gold-dark" : "text-gold-light"
+                    )}
+                  >
+                    Celebrations
+                  </span>
+                </div>
+              </div>
+            </Link>
+
+            <div className="relative z-10 hidden items-center gap-2 lg:flex">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={cn(
+                    "group relative rounded-full px-4 py-2 font-accent text-[11px] uppercase tracking-[0.18em] transition-all duration-300",
+                    isScrolled
+                      ? "text-charcoal/72 hover:bg-charcoal/[0.04] hover:text-charcoal"
+                      : "text-ivory/72 hover:bg-white/[0.06] hover:text-ivory"
+                  )}
+                >
+                  {link.label}
+                  <span className="absolute inset-x-4 bottom-1 h-px scale-x-0 bg-gold-primary transition-transform duration-300 group-hover:scale-x-100" />
+                </Link>
+              ))}
+            </div>
+
+            <div className="relative z-10 hidden items-center gap-4 lg:flex">
+              <div
                 className={cn(
-                  "font-accent text-xs uppercase tracking-[0.15em] relative group transition-colors duration-300 transition-opacity group-has-[a:hover]/nav:opacity-20 hover:!opacity-100",
+                  "hidden flex-col justify-center rounded-full border px-4 py-2 text-right xl:flex",
                   isScrolled
-                    ? "text-charcoal hover:text-gold-dark"
-                    : "text-ivory/80 hover:text-ivory"
+                    ? "border-charcoal/8 bg-white/70"
+                    : "border-white/10 bg-white/[0.05]"
                 )}
               >
-                {link.label}
-                <span className="absolute -bottom-1 left-0 h-[1px] w-0 bg-gold-primary transition-all duration-300 group-hover:w-full" />
-              </Link>
-            ))}
-          </div>
+                <span
+                  className={cn(
+                    "font-accent text-[9px] uppercase tracking-[0.26em]",
+                    isScrolled ? "text-slate" : "text-ivory/44"
+                  )}
+                >
+                  Premium planning stack
+                </span>
+                <span
+                  className={cn(
+                    "mt-1 font-heading text-[12px] leading-none",
+                    isScrolled ? "text-charcoal" : "text-ivory/78"
+                  )}
+                >
+                  Budget, vendors, events
+                </span>
+              </div>
 
-          {/* CTA */}
-          <div className="hidden lg:block">
-            <MagneticButton className="text-xs px-6 py-3">
-              Inquire
-            </MagneticButton>
-          </div>
+              <NavSignIn
+                className={cn(
+                  "font-accent text-[11px] uppercase tracking-[0.18em] transition-colors",
+                  isScrolled
+                    ? "text-charcoal/72 hover:text-gold-dark"
+                    : "text-ivory/74 hover:text-ivory"
+                )}
+              />
+              <MagneticButton href="/contact" className="px-6 py-3 text-xs shadow-[0_14px_40px_rgba(201,169,110,0.16)]">
+                Inquire
+              </MagneticButton>
+            </div>
 
-          {/* Mobile Toggle */}
-          <button
-            onClick={() => setIsMobileOpen(!isMobileOpen)}
-            className={cn(
-              "lg:hidden relative z-10 p-2 transition-colors",
-              isScrolled || isMobileOpen ? "text-charcoal" : "text-ivory"
-            )}
-            aria-label="Toggle menu"
-          >
-            {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
-        </nav>
+            <button
+              onClick={() => setIsMobileOpen((open) => !open)}
+              className={cn(
+                "relative z-10 p-2 transition-colors lg:hidden",
+                isScrolled || isMobileOpen ? "text-charcoal" : "text-ivory"
+              )}
+              aria-label="Toggle menu"
+            >
+              {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </nav>
+        </div>
       </motion.header>
 
-      {/* Mobile Menu */}
       <AnimatePresence>
-        {isMobileOpen && (
+        {isMobileOpen ? (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="fixed inset-0 z-40 bg-ivory"
+            transition={{ duration: 0.25 }}
+            className="fixed inset-0 z-[10030] bg-midnight/98 backdrop-blur-2xl"
           >
-            <motion.nav
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
-              transition={{ duration: 0.4, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-              className="flex flex-col items-center justify-center h-full gap-8"
+              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              className="flex h-full flex-col px-[var(--section-padding-x)] pb-10 pt-28"
             >
-              {navLinks.map((link, i) => (
-                <motion.div
-                  key={link.href}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.15 + i * 0.05 }}
-                >
-                  <Link
-                    href={link.href}
-                    onClick={() => setIsMobileOpen(false)}
-                    className="font-display text-3xl text-charcoal hover:text-gold-primary transition-colors"
-                  >
-                    {link.label}
-                  </Link>
-                </motion.div>
-              ))}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-                className="mt-4"
-              >
-                <MagneticButton onClick={() => setIsMobileOpen(false)}>
+              <div className="border-t border-white/10 pt-8">
+                <div className="flex items-center justify-between">
+                  <p className="font-accent text-[10px] uppercase tracking-[0.28em] text-gold-primary">
+                    Navigate
+                  </p>
+                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 font-accent text-[9px] uppercase tracking-[0.24em] text-ivory/54">
+                    Premium shell
+                  </span>
+                </div>
+                <div className="mt-6 flex flex-col gap-5">
+                  {navLinks.map((link, index) => (
+                    <motion.div
+                      key={link.href}
+                      initial={{ opacity: 0, y: 18 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.08 + index * 0.05 }}
+                    >
+                      <Link
+                        href={link.href}
+                        onClick={() => setIsMobileOpen(false)}
+                        className="font-display text-4xl leading-none text-ivory transition-colors hover:text-gold-primary"
+                      >
+                        {link.label}
+                      </Link>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-auto grid gap-5 border-t border-white/10 pt-8">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="border border-white/10 bg-white/[0.04] p-4">
+                    <p className="font-accent text-[9px] uppercase tracking-[0.22em] text-gold-primary">
+                      Destinations
+                    </p>
+                    <p className="mt-2 font-heading text-sm text-ivory/74">
+                      Editorial locations, not generic venue lists.
+                    </p>
+                  </div>
+                  <div className="border border-white/10 bg-white/[0.04] p-4">
+                    <p className="font-accent text-[9px] uppercase tracking-[0.22em] text-gold-primary">
+                      Budget layer
+                    </p>
+                    <p className="mt-2 font-heading text-sm text-ivory/74">
+                      Targets, quotes, actuals, and payables in one place.
+                    </p>
+                  </div>
+                </div>
+                <NavSignIn
+                  onNavigate={() => setIsMobileOpen(false)}
+                  className="font-accent text-[11px] uppercase tracking-[0.2em] text-ivory/72"
+                />
+                <MagneticButton href="/contact" onClick={() => setIsMobileOpen(false)}>
                   Inquire
                 </MagneticButton>
-              </motion.div>
-            </motion.nav>
+              </div>
+            </motion.div>
           </motion.div>
-        )}
+        ) : null}
       </AnimatePresence>
     </>
   );

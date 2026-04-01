@@ -1,27 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
-import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { fadeUp, staggerContainer } from "@/animations/variants";
-import { FloatingField } from "@/components/auth/floating-field";
-import { dashBtn, dashCard, dashLabel } from "@/lib/dashboard-styles";
-import { cn } from "@/lib/utils";
-
-const featuredDestinations = ["Udaipur", "Goa", "Jaipur", "Bali", "Santorini"];
+import { dashCard, dashLabel } from "@/lib/dashboard-styles";
 
 export default function AdminSettingsPage() {
-  const form = useForm({
-    defaultValues: {
-      platformName: "Elysian Celebrations",
-      contactEmail: "hello@elysian.test",
-      commission: "12",
-    },
-  });
-
-  const [featuredSaving, setFeaturedSaving] = useState(false);
-
   return (
     <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-10">
       <motion.div variants={fadeUp}>
@@ -30,65 +14,34 @@ export default function AdminSettingsPage() {
       </motion.div>
 
       <motion.section variants={fadeUp} className={dashCard}>
-        <h3 className="font-display text-lg text-charcoal">Platform</h3>
-        <form
-          onSubmit={form.handleSubmit(async () => {
-            try {
-              await new Promise((r) => setTimeout(r, 600));
-              toast.success("Platform settings saved");
-            } catch {
-              toast.error("Failed to save. Please try again.");
-            }
-          })}
-          className="mt-6 space-y-8"
-        >
-          <FloatingField id="plat-name" label="Platform name" {...form.register("platformName")} />
-          <FloatingField id="plat-email" label="Contact email" type="email" {...form.register("contactEmail")} />
-          <FloatingField
-            id="plat-comm"
-            label="Commission rate (%)"
-            type="number"
-            min={0}
-            max={100}
-            {...form.register("commission")}
-          />
-          <button type="submit" className={dashBtn} disabled={form.formState.isSubmitting}>
-            Save Changes
-          </button>
-        </form>
+        <h3 className="font-display text-lg text-charcoal">Platform configuration</h3>
+        <p className="font-heading mt-3 text-sm leading-relaxed text-slate">
+          Brand name, contact email, and commission rates are not stored in the application database. They are
+          typically set via your deployment environment, CMS, or operations runbook. This screen exists so admins
+          know where limits are—there is no hidden save here.
+        </p>
+        <p className="font-heading mt-4 text-sm leading-relaxed text-slate">
+          To change which destinations appear on marketing surfaces, use the destinations catalogue: visibility
+          is controlled per destination (active / inactive), not from this page.
+        </p>
+        <div className="mt-8 border border-charcoal/10 bg-cream/40 px-4 py-3">
+          <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-slate">Next step</p>
+          <Link
+            href="/admin/destinations"
+            className="mt-2 inline-block font-heading text-sm text-gold-primary underline-offset-4 hover:underline"
+          >
+            Manage destinations
+          </Link>
+        </div>
       </motion.section>
 
       <motion.section variants={fadeUp} className={dashCard}>
-        <h3 className="font-display text-lg text-charcoal">Featured destinations</h3>
-        <p className="font-heading mt-2 text-sm text-slate">Shown on marketing home and discovery modules.</p>
-        <ul className="mt-6 list-none space-y-2 pl-0">
-          {featuredDestinations.map((name) => (
-            <li key={name}>
-              <label className="flex cursor-pointer items-center justify-between border border-charcoal/10 px-4 py-3 transition-colors hover:border-charcoal/20">
-                <span className="font-heading text-sm text-charcoal">{name}</span>
-                <input type="checkbox" defaultChecked className="h-4 w-4 border border-charcoal/30 accent-gold-primary" />
-              </label>
-            </li>
-          ))}
-        </ul>
-        <button
-          type="button"
-          className={cn(dashBtn, "mt-8")}
-          disabled={featuredSaving}
-          onClick={async () => {
-            setFeaturedSaving(true);
-            try {
-              await new Promise((r) => setTimeout(r, 500));
-              toast.success("Featured destinations saved");
-            } catch {
-              toast.error("Failed to save. Please try again.");
-            } finally {
-              setFeaturedSaving(false);
-            }
-          }}
-        >
-          Save Changes
-        </button>
+        <h3 className="font-display text-lg text-charcoal">Featured &amp; discovery</h3>
+        <p className="font-heading mt-3 text-sm leading-relaxed text-slate">
+          Homepage and discovery modules read from the live <strong className="font-medium text-charcoal">destinations</strong>{" "}
+          catalogue. There is no separate &quot;featured&quot; list in the database—use sort order and active flags
+          in the destinations admin to control what surfaces where.
+        </p>
       </motion.section>
     </motion.div>
   );

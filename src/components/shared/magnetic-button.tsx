@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { motion } from "framer-motion";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 interface MagneticButtonProps {
@@ -19,11 +20,12 @@ export function MagneticButton({
   strength = 20,
   variant = "primary",
   onClick,
+  href,
 }: MagneticButtonProps) {
-  const ref = useRef<HTMLButtonElement>(null);
+  const ref = useRef<HTMLElement>(null);
   const [position, setPosition] = useState({ x: 0, y: 0 });
 
-  const handleMouse = (e: React.MouseEvent<HTMLButtonElement>) => {
+  const handleMouse = (e: React.MouseEvent) => {
     const { clientX, clientY } = e;
     const { left, top, width, height } = ref.current!.getBoundingClientRect();
     const centerX = left + width / 2;
@@ -57,21 +59,42 @@ export function MagneticButton({
     ),
   };
 
+  const sharedClassName = cn(
+    "relative inline-flex items-center justify-center",
+    "px-8 py-4",
+    "font-accent text-[11px] tracking-[0.25em] uppercase",
+    variants[variant],
+    className
+  );
+
+  const motionProps = {
+    onMouseMove: handleMouse,
+    onMouseLeave: handleMouseLeave,
+    animate: { x: position.x, y: position.y },
+    transition: { type: "spring" as const, stiffness: 200, damping: 20, mass: 0.5 },
+  };
+
+  if (href) {
+    return (
+      <motion.div {...motionProps} className="inline-block">
+        <Link
+          ref={ref as React.RefObject<HTMLAnchorElement>}
+          href={href}
+          onClick={onClick}
+          className={sharedClassName}
+        >
+          {children}
+        </Link>
+      </motion.div>
+    );
+  }
+
   return (
     <motion.button
-      ref={ref}
-      onMouseMove={handleMouse}
-      onMouseLeave={handleMouseLeave}
+      ref={ref as React.RefObject<HTMLButtonElement>}
       onClick={onClick}
-      animate={{ x: position.x, y: position.y }}
-      transition={{ type: "spring", stiffness: 200, damping: 20, mass: 0.5 }}
-      className={cn(
-        "relative inline-flex items-center justify-center",
-        "px-8 py-4",
-        "font-accent text-[11px] tracking-[0.25em] uppercase",
-        variants[variant],
-        className
-      )}
+      className={sharedClassName}
+      {...motionProps}
     >
       {children}
     </motion.button>

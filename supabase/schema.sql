@@ -3,7 +3,7 @@
 
 -- ─── Enums ───────────────────────────────────────────────────
 
-create type user_role as enum ('CLIENT', 'VENDOR', 'ADMIN');
+create type user_role as enum ('CLIENT', 'VENDOR', 'ADMIN', 'MANAGER');
 create type wedding_status as enum ('PLANNING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED');
 create type booking_status as enum ('INQUIRY', 'QUOTE_SENT', 'CONFIRMED', 'DEPOSIT_PAID', 'COMPLETED', 'CANCELLED');
 create type notification_type as enum ('BOOKING_UPDATE', 'MESSAGE', 'REVIEW', 'PAYMENT', 'SYSTEM');
@@ -219,6 +219,25 @@ create table bookings (
   updated_at timestamptz not null default now()
 );
 
+-- ─── Saved Vendors ───────────────────────────────────────────
+
+create table saved_vendors (
+  id uuid primary key default gen_random_uuid(),
+  client_profile_id uuid not null references client_profiles(id) on delete cascade,
+  vendor_profile_id uuid not null references vendor_profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (client_profile_id, vendor_profile_id)
+);
+
+-- ─── Vendor Profile Views ────────────────────────────────────
+
+create table vendor_profile_views (
+  id uuid primary key default gen_random_uuid(),
+  vendor_profile_id uuid not null references vendor_profiles(id) on delete cascade,
+  viewer_user_id text references users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
 -- ─── Reviews ─────────────────────────────────────────────────
 
 create table reviews (
@@ -307,10 +326,12 @@ create table mood_boards (
 create table mood_board_items (
   id uuid primary key default gen_random_uuid(),
   mood_board_id uuid not null references mood_boards(id) on delete cascade,
+  category text not null default 'Decor',
   image_url text not null,
   caption text,
   source_url text,
-  sort_order integer not null default 0
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now()
 );
 
 -- ─── Content ─────────────────────────────────────────────────
@@ -362,9 +383,14 @@ create index idx_vendor_profiles_featured on vendor_profiles(is_featured) where 
 create index idx_bookings_client on bookings(client_profile_id);
 create index idx_bookings_vendor on bookings(vendor_profile_id);
 create index idx_bookings_status on bookings(status);
+create index idx_saved_vendors_client on saved_vendors(client_profile_id);
+create index idx_saved_vendors_vendor on saved_vendors(vendor_profile_id);
+create index idx_vendor_profile_views_vendor on vendor_profile_views(vendor_profile_id);
+create index idx_vendor_profile_views_created_at on vendor_profile_views(created_at desc);
 create index idx_guests_list on guests(guest_list_id);
 create index idx_messages_booking on messages(booking_id);
 create index idx_notifications_user on notifications(user_id);
+create index idx_mood_board_items_board on mood_board_items(mood_board_id);
 create index idx_blog_posts_slug on blog_posts(slug);
 create index idx_destinations_slug on destinations(slug);
 

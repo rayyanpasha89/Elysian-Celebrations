@@ -1,47 +1,119 @@
 "use client";
 
 import Link from "next/link";
-import { Mail, Phone, MapPin } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { ArrowUpRight, Mail, MapPin, Phone } from "lucide-react";
 
 const footerLinks = {
   explore: [
-    { label: "Destinations", href: "#destinations" },
-    { label: "Packages", href: "#packages" },
-    { label: "Vendors", href: "#vendors" },
-    { label: "Gallery", href: "#gallery" },
+    { label: "Destinations", href: "/#destinations" },
+    { label: "Packages", href: "/#packages" },
+    { label: "Vendors", href: "/#vendors" },
+    { label: "Gallery", href: "/gallery" },
   ],
   company: [
-    { label: "About Us", href: "#about" },
-    { label: "How It Works", href: "#how-it-works" },
+    { label: "About Us", href: "/#about" },
+    { label: "How It Works", href: "/#how-it-works" },
     { label: "Blog", href: "/blog" },
-    { label: "Careers", href: "/careers" },
-  ],
-  support: [
-    { label: "Contact Us", href: "#contact" },
     { label: "FAQ", href: "/faq" },
-    { label: "Privacy Policy", href: "/privacy" },
-    { label: "Terms of Service", href: "/terms" },
+  ],
+  portals: [
+    { label: "Client Portal", href: "/client" },
+    { label: "Vendor Portal", href: "/vendor" },
+    { label: "Admin Console", href: "/admin" },
+    { label: "Contact", href: "/contact" },
+  ],
+  legal: [
+    { label: "Privacy Policy", href: "/privacy-policy" },
+    { label: "Terms of Service", href: "/terms-of-service" },
   ],
 };
 
-const socialLinks = [
-  { label: "Instagram", href: "#", svg: "M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z" },
-  { label: "Facebook", href: "#", svg: "M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" },
-  { label: "YouTube", href: "#", svg: "M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" },
+const quickActions = [
+  {
+    label: "Start an inquiry",
+    href: "/contact",
+    detail: "Tell us the destination, guest count, and mood.",
+  },
+  {
+    label: "Client dashboard",
+    href: "/client",
+    detail: "Track budget, guests, and bookings in one workspace.",
+  },
+  {
+    label: "Vendor partnership",
+    href: "/vendor",
+    detail: "Manage profile, services, and inquiries cleanly.",
+  },
 ];
 
 export function Footer() {
   return (
-    <footer className="noise-dark bg-midnight text-ivory/80">
-      <div className="mx-auto max-w-7xl px-[var(--section-padding-x)] py-16 lg:py-24 relative z-10">
-        {/* Top gold accent line */}
-        <div className="mb-16 h-[1px] bg-gradient-to-r from-transparent via-gold-primary/20 to-transparent" />
+    <footer className="noise-dark relative overflow-hidden bg-midnight text-ivory/80">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,169,110,0.14),transparent_30%),radial-gradient(circle_at_80%_20%,rgba(123,167,201,0.12),transparent_22%),linear-gradient(180deg,rgba(26,26,46,0.15),rgba(26,26,46,0.82))]" />
 
-        <div className="grid grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-5">
-          {/* Brand */}
-          <div className="lg:col-span-2">
-            <div className="mb-6">
+      <div className="relative z-10 mx-auto max-w-7xl px-[var(--section-padding-x)] py-18 lg:py-24">
+        <div className="mb-12 grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+          <div className="relative overflow-hidden border border-white/10 bg-white/[0.04] p-8 shadow-[0_24px_90px_rgba(0,0,0,0.18)] backdrop-blur-2xl">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(201,169,110,0.1),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(123,167,201,0.08),transparent_24%)]" />
+            <div className="relative">
+            <p className="font-accent text-[11px] uppercase tracking-[0.3em] text-gold-primary">
+              Elysian Celebrations
+            </p>
+            <h2 className="mt-4 max-w-2xl font-display text-4xl leading-tight text-ivory md:text-5xl">
+              Build the wedding with the same care as the celebration itself.
+            </h2>
+            <p className="mt-4 max-w-xl text-sm leading-relaxed text-ivory/62">
+              Destination planning, budget control, guest logistics, and curated
+              vendor intelligence in a single experience that feels considered from
+              the first inquiry onward.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <FooterAction href="/contact" label="Begin planning" />
+              <FooterAction href="/client" label="Open client workspace" />
+            </div>
+            <div className="mt-8 grid gap-3 sm:grid-cols-3">
+              {[
+                "Premium destination curation",
+                "Budget intelligence in one flow",
+                "Vendor, guest, and event orchestration",
+              ].map((value) => (
+                <div
+                  key={value}
+                  className="border border-white/10 bg-white/[0.03] px-4 py-4 text-sm text-ivory/68"
+                >
+                  {value}
+                </div>
+              ))}
+            </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4">
+            {quickActions.map((action) => (
+              <Link
+                key={action.label}
+                href={action.href}
+                className="group border border-white/10 bg-white/[0.03] p-5 transition-all duration-300 hover:-translate-y-1 hover:border-gold-primary/35 hover:bg-white/[0.05]"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="font-display text-xl text-ivory">
+                      {action.label}
+                    </p>
+                    <p className="mt-2 text-sm leading-relaxed text-ivory/58">
+                      {action.detail}
+                    </p>
+                  </div>
+                  <ArrowUpRight className="h-4 w-4 shrink-0 text-gold-light transition-transform duration-300 group-hover:translate-x-1 group-hover:-translate-y-1" />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid gap-10 border-t border-white/10 pt-10 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+          <div>
+            <div>
               <span className="font-display text-3xl font-bold text-ivory">
                 Elysian
               </span>
@@ -49,67 +121,79 @@ export function Footer() {
                 Celebrations
               </span>
             </div>
-            <p className="max-w-sm text-sm leading-relaxed text-ivory/60 mb-6">
-              Curated destination weddings powered by technology and
-              strengthened by hands-on planning. Your vision, our execution.
-            </p>
-            <div className="flex items-center gap-4">
-              {socialLinks.map(({ svg, href, label }) => (
-                <a
-                  key={label}
-                  href={href}
-                  aria-label={label}
-                  className="flex h-10 w-10 items-center justify-center border border-ivory/15 text-ivory/40 transition-all duration-300 hover:border-gold-primary/50 hover:text-gold-primary"
-                >
-                  <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4"><path d={svg} /></svg>
-                </a>
-              ))}
+
+            <div className="mt-6 space-y-3 text-sm text-ivory/58">
+              <a
+                href="mailto:hello@elysiancelebrations.com"
+                className="flex items-center gap-3 transition-colors hover:text-gold-light"
+              >
+                <Mail className="h-4 w-4 text-gold-primary" />
+                hello@elysiancelebrations.com
+              </a>
+              <a
+                href="tel:+919876543210"
+                className="flex items-center gap-3 transition-colors hover:text-gold-light"
+              >
+                <Phone className="h-4 w-4 text-gold-primary" />
+                +91 98765 43210
+              </a>
+              <div className="flex items-center gap-3">
+                <MapPin className="h-4 w-4 text-gold-primary" />
+                India
+              </div>
+              </div>
             </div>
+
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+            {Object.entries(footerLinks).map(([title, links]) => (
+              <div key={title} className="border border-white/8 bg-white/[0.02] p-5">
+                <h3 className="font-accent text-[11px] uppercase tracking-[0.22em] text-gold-primary">
+                  {title}
+                </h3>
+                <ul className="mt-5 space-y-3">
+                  {links.map((link) => (
+                    <li key={link.label}>
+                      <Link
+                        href={link.href}
+                        className="text-sm text-ivory/62 transition-colors duration-300 hover:text-ivory"
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
-
-          {/* Link Columns */}
-          {Object.entries(footerLinks).map(([title, links]) => (
-            <div key={title}>
-              <h3 className="font-accent text-xs uppercase tracking-[0.2em] text-gold-primary mb-6">
-                {title}
-              </h3>
-              <ul className="space-y-3">
-                {links.map((link) => (
-                  <li key={link.label}>
-                    <Link
-                      href={link.href}
-                      className="text-sm text-ivory/60 transition-colors duration-300 hover:text-ivory"
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
         </div>
 
-        {/* Contact Row */}
-        <div className="mt-12 flex flex-wrap items-center gap-6 border-t border-ivory/10 pt-8 text-sm text-ivory/50">
-          <a href="mailto:hello@elysiancelebrations.com" className="flex items-center gap-2 hover:text-gold-primary transition-colors">
-            <Mail size={14} />
-            hello@elysiancelebrations.com
-          </a>
-          <a href="tel:+919876543210" className="flex items-center gap-2 hover:text-gold-primary transition-colors">
-            <Phone size={14} />
-            +91 98765 43210
-          </a>
-          <span className="flex items-center gap-2">
-            <MapPin size={14} />
-            India
-          </span>
-        </div>
-
-        {/* Copyright */}
-        <div className="mt-8 border-t border-ivory/10 pt-8 text-center text-xs text-ivory/40">
-          <p>&copy; {new Date().getFullYear()} Elysian Celebrations. All rights reserved.</p>
+        <div className="mt-10 border-t border-white/10 pt-6 text-xs text-ivory/38">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <p>&copy; {new Date().getFullYear()} Elysian Celebrations. All rights reserved.</p>
+            <p className="font-accent uppercase tracking-[0.18em] text-ivory/28">
+              Destination wedding planning system
+            </p>
+          </div>
         </div>
       </div>
     </footer>
+  );
+}
+
+function FooterAction({
+  href,
+  label,
+}: {
+  href: string;
+  label: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="font-accent inline-flex items-center gap-2 border border-gold-primary/40 bg-gold-primary/8 px-4 py-2.5 text-[10px] uppercase tracking-[0.2em] text-gold-light transition-all duration-300 hover:bg-gold-primary hover:text-midnight"
+    >
+      {label}
+      <ArrowUpRight className="h-3.5 w-3.5" />
+    </Link>
   );
 }

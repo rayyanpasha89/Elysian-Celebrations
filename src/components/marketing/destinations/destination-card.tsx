@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { cn } from "@/lib/utils";
+import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
 interface DestinationCardProps {
+  slug: string;
   name: string;
   country: string;
   tagline: string;
@@ -13,9 +15,11 @@ interface DestinationCardProps {
   startingPrice: number;
   venueCount: number;
   index: number;
+  vibe?: string;
 }
 
 export function DestinationCard({
+  slug,
   name,
   country,
   tagline,
@@ -23,6 +27,7 @@ export function DestinationCard({
   startingPrice,
   venueCount,
   index,
+  vibe,
 }: DestinationCardProps) {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -30,102 +35,88 @@ export function DestinationCard({
     <motion.div
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="group relative h-[70vh] w-[400px] flex-shrink-0 cursor-pointer overflow-hidden md:w-[450px]"
+      className="group relative h-[76vh] min-h-[560px] w-[min(88vw,460px)] flex-shrink-0 cursor-pointer overflow-hidden border border-white/10 md:w-[460px]"
     >
-      {/* Background Image with Ken Burns */}
       <motion.div
-        animate={{ scale: isHovered ? 1.08 : 1 }}
-        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-        className="absolute inset-0"
-      >
-        {/* Rich placeholder gradient — replace with real images */}
-        <div
-          className="absolute inset-0"
-          style={{
-            background: `linear-gradient(${135 + index * 30}deg,
-              hsl(${30 + index * 40}, 35%, 22%) 0%,
-              hsl(${50 + index * 30}, 25%, 12%) 100%)`,
-          }}
-        />
-        {/* Diagonal texture overlay for visual interest */}
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage: "repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.5) 20px, rgba(255,255,255,0.5) 21px)",
-          }}
-        />
-        {/* Atmospheric light spot */}
-        <div
-          className="absolute inset-0 opacity-40"
-          style={{
-            backgroundImage: `radial-gradient(ellipse at ${30 + index * 10}% ${40 + index * 5}%, rgba(201,169,110,0.15) 0%, transparent 50%)`,
-          }}
-        />
-      </motion.div>
+        animate={{ scale: isHovered ? 1.06 : 1 }}
+        transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+        className="absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: `url(${heroImage})` }}
+      />
 
-      {/* Gradient Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-midnight via-midnight/30 to-transparent z-10" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,12,18,0.02)_0%,rgba(10,12,18,0.18)_32%,rgba(10,12,18,0.88)_100%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(201,169,110,0.18),transparent_28%)]" />
 
-      {/* Country Tag — top left */}
-      <div className="absolute top-6 left-6 z-20">
-        <span className="font-accent text-[9px] uppercase tracking-[0.3em] text-ivory/40">
-          {country}
-        </span>
-      </div>
-
-      {/* Index number — top right */}
-      <div className="absolute top-6 right-6 z-20">
-        <span className="font-display text-5xl font-bold text-ivory/[0.06]">
+      <div className="absolute left-6 right-6 top-6 z-20 flex items-start justify-between gap-4">
+        <div className="flex max-w-[70%] flex-wrap gap-2">
+          <div className="border border-white/12 bg-midnight/55 px-3 py-2 backdrop-blur-xl">
+            <span className="font-accent text-[9px] uppercase tracking-[0.28em] text-ivory/62">
+              {country}
+            </span>
+          </div>
+          {vibe ? (
+            <div className="hidden border border-gold-primary/18 bg-gold-primary/10 px-3 py-2 backdrop-blur-xl sm:block">
+              <span className="font-accent text-[9px] uppercase tracking-[0.28em] text-gold-light">
+                {vibe}
+              </span>
+            </div>
+          ) : null}
+        </div>
+        <span className="font-display text-5xl font-bold text-ivory/[0.08]">
           {String(index + 1).padStart(2, "0")}
         </span>
       </div>
 
-      {/* Content */}
-      <div className="absolute bottom-0 left-0 right-0 z-20 p-8">
-        {/* Gold accent line */}
+      <div className="absolute bottom-0 left-0 right-0 z-20 p-7">
         <motion.div
-          animate={{ scaleX: isHovered ? 1 : 0 }}
-          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          className="mb-4 h-[1px] w-12 origin-left bg-gold-primary"
+          animate={{ width: isHovered ? 76 : 40 }}
+          transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+          className="mb-5 h-px bg-gold-primary"
         />
 
-        <h3 className="font-display text-4xl font-bold text-ivory mb-2">
-          {name}
-        </h3>
-        <p className="font-heading text-base font-light text-ivory/50 mb-6 leading-relaxed">
+        <h3 className="font-display text-4xl font-bold text-ivory">{name}</h3>
+        <p className="mt-3 max-w-sm font-heading text-[0.98rem] font-light leading-relaxed text-ivory/70">
           {tagline}
         </p>
 
-        {/* Details row */}
-        <div className="flex items-center gap-6">
-          <span className="font-accent text-[10px] uppercase tracking-[0.15em] text-ivory/40">
-            {venueCount} Venues
-          </span>
-          <span className="h-3 w-[1px] bg-ivory/15" />
-          <span className="font-accent text-[10px] uppercase tracking-[0.15em] text-gold-primary/70">
-            From {formatCurrency(startingPrice)}
-          </span>
+        <div className="mt-8 grid grid-cols-2 gap-3">
+          <div className="border border-white/10 bg-white/[0.05] px-4 py-4 backdrop-blur-xl">
+            <p className="font-accent text-[9px] uppercase tracking-[0.2em] text-gold-light/84">
+              Venue depth
+            </p>
+            <p className="mt-2 font-display text-2xl text-ivory">{venueCount}+</p>
+          </div>
+          <div className="border border-white/10 bg-white/[0.05] px-4 py-4 backdrop-blur-xl">
+            <p className="font-accent text-[9px] uppercase tracking-[0.2em] text-gold-light/84">
+              Starting from
+            </p>
+            <p className="mt-2 font-display text-2xl text-ivory">
+              {formatCurrency(startingPrice)}
+            </p>
+          </div>
         </div>
 
-        {/* Hover CTA */}
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: isHovered ? 1 : 0, y: isHovered ? 0 : 10 }}
-          transition={{ duration: 0.3, ease: "easeOut" }}
-          className="mt-6"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: isHovered ? 1 : 0, y: isHovered ? 0 : 12 }}
+          transition={{ duration: 0.35, ease: "easeOut" }}
+          className="mt-6 inline-flex items-center gap-3 font-accent text-[10px] uppercase tracking-[0.22em] text-gold-primary"
         >
-          <span className="font-accent text-[10px] uppercase tracking-[0.2em] text-gold-primary">
-            Explore
-            <span className="ml-2 inline-block h-[1px] w-8 bg-gold-primary align-middle transition-all duration-500 group-hover:w-12" />
-          </span>
+          Explore the destination
+          <ArrowUpRight className="h-4 w-4" />
         </motion.div>
       </div>
 
-      {/* Hover border — sharp rectangle */}
+      <Link
+        href={`/destinations/${slug}`}
+        className="absolute inset-0 z-30"
+        aria-label={`Explore ${name}`}
+      />
+
       <motion.div
         animate={{ opacity: isHovered ? 1 : 0 }}
         transition={{ duration: 0.3 }}
-        className="absolute inset-0 z-30 pointer-events-none ring-1 ring-inset ring-gold-primary/20"
+        className="pointer-events-none absolute inset-0 z-20 ring-1 ring-inset ring-gold-primary/28"
       />
     </motion.div>
   );

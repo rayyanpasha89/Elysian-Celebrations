@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 import { fadeUp, staggerContainer, staggerItem } from "@/animations/variants";
+import { ListEmptyState } from "@/components/dashboard/list-empty-state";
 import { dashCard, dashLabel } from "@/lib/dashboard-styles";
 import { cn } from "@/lib/utils";
 
@@ -15,54 +17,115 @@ type Conv = {
   messages: { from: "vendor" | "client"; text: string; time: string }[];
 };
 
-const conversations: Conv[] = [
-  {
-    id: "1",
-    vendor: "Lens & Light Studios",
-    initials: "LL",
-    preview: "We can add a second shooter for the baraat.",
-    time: "2h ago",
-    messages: [
-      { from: "vendor", text: "Timeline for February looks strong—we suggest a scout morning on the 12th.", time: "Mon 10:12" },
-      { from: "client", text: "Yes, please lock the scout. Any fee for early entry?", time: "Mon 10:18" },
-      { from: "vendor", text: "We can add a second shooter for the baraat. Updated quote follows tomorrow.", time: "2h ago" },
-    ],
-  },
-  {
-    id: "2",
-    vendor: "Nova Decor House",
-    initials: "ND",
-    preview: "Mandap sketch v2 attached.",
-    time: "Yesterday",
-    messages: [
-      { from: "vendor", text: "Mandap sketch v2 attached.", time: "Yesterday" },
-      { from: "client", text: "Love the arch height—can we warm the linen tone?", time: "Yesterday" },
-    ],
-  },
-  {
-    id: "3",
-    vendor: "Spice Route Catering",
-    initials: "SR",
-    preview: "Tasting menu confirmed for 18 Jan.",
-    time: "3d ago",
-    messages: [
-      { from: "client", text: "Need Jain options for table 4.", time: "4d ago" },
-      { from: "vendor", text: "Tasting menu confirmed for 18 Jan.", time: "3d ago" },
-    ],
-  },
-  {
-    id: "4",
-    vendor: "Midnight Sound",
-    initials: "MS",
-    preview: "Sangeet set list draft.",
-    time: "5d ago",
-    messages: [{ from: "vendor", text: "Sangeet set list draft.", time: "5d ago" }],
-  },
-];
-
 export default function ClientMessagesPage() {
-  const [active, setActive] = useState(conversations[0]!.id);
-  const current = conversations.find((c) => c.id === active) ?? conversations[0]!;
+  const [loading, setLoading] = useState(true);
+  const [conversations, setConversations] = useState<Conv[]>([]);
+  const [active, setActive] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/messages");
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error);
+        const list = json.conversations ?? [];
+        if (!cancelled) {
+          setConversations(list);
+          if (list[0]?.id) setActive(list[0].id);
+        }
+      } catch {
+        if (!cancelled) {
+          setConversations([]);
+          setActive(null);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const current =
+    conversations.find((c) => c.id === active) ?? conversations[0] ?? null;
+
+  const sendMessage = async () => {
+    if (!current || !draft.trim()) return;
+
+    setSending(true);
+    try {
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bookingId: current.id,
+          content: draft.trim(),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+
+      const message = json.message as {
+        from: "vendor" | "client";
+        text: string;
+        time: string;
+      };
+
+      setConversations((list) => {
+        const updated = list.map((conversation) =>
+          conversation.id === current.id
+            ? {
+                ...conversation,
+                preview: message.text,
+                time: "Just now",
+                messages: [...conversation.messages, message],
+              }
+            : conversation
+        );
+        const index = updated.findIndex((conversation) => conversation.id === current.id);
+        if (index > 0) {
+          const [conversation] = updated.splice(index, 1);
+          updated.unshift(conversation);
+        }
+        return updated;
+      });
+      setDraft("");
+    } catch {
+      toast.error("Failed to send message");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="animate-pulse space-y-6">
+        <div className="h-10 w-48 bg-charcoal/10" />
+        <div className="grid min-h-[400px] gap-6 lg:grid-cols-[minmax(0,320px)_1fr]">
+          <div className="border border-charcoal/8 bg-charcoal/5" />
+          <div className="border border-charcoal/8 bg-charcoal/5" />
+        </div>
+      </div>
+    );
+  }
+
+  if (conversations.length === 0 || !current) {
+    return (
+      <motion.div variants={staggerContainer} initial="hidden" animate="visible">
+        <motion.div variants={fadeUp}>
+          <p className={dashLabel}>Inbox</p>
+          <h2 className="font-display mt-2 text-3xl font-semibold text-charcoal">Messages</h2>
+        </motion.div>
+        <div className="mt-12">
+          <ListEmptyState hint="Messages appear when you and vendors exchange notes on a booking." />
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div variants={staggerContainer} initial="hidden" animate="visible">
@@ -86,7 +149,7 @@ export default function ClientMessagesPage() {
                     onClick={() => setActive(c.id)}
                     className={cn(
                       "flex w-full gap-3 px-4 py-4 text-left transition-colors",
-                      on ? "bg-gold-primary/5" : "hover:bg-cream/80",
+                      on ? "bg-gold-primary/5" : "hover:bg-cream/80"
                     )}
                   >
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-charcoal/15 bg-midnight font-accent text-[10px] tracking-wider text-ivory">
@@ -127,7 +190,7 @@ export default function ClientMessagesPage() {
                     "max-w-[85%] border px-4 py-3",
                     m.from === "client"
                       ? "border-gold-primary/40 bg-gold-primary/5"
-                      : "border-charcoal/12 bg-cream/50",
+                      : "border-charcoal/12 bg-cream/50"
                   )}
                 >
                   <p className="font-heading text-sm leading-relaxed text-charcoal">{m.text}</p>
@@ -137,21 +200,30 @@ export default function ClientMessagesPage() {
             ))}
           </div>
 
-          <div className="border-t border-charcoal/8 p-4">
+          <form
+            className="border-t border-charcoal/8 p-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void sendMessage();
+            }}
+          >
             <div className="flex gap-2">
               <input
                 type="text"
                 placeholder="Type a message"
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
                 className="min-w-0 flex-1 border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm outline-none focus:border-gold-primary"
               />
               <button
-                type="button"
+                type="submit"
+                disabled={sending || !draft.trim()}
                 className="font-accent shrink-0 border border-gold-primary bg-transparent px-5 py-3 text-[11px] uppercase tracking-[0.2em] text-gold-primary transition-colors hover:bg-gold-primary hover:text-midnight"
               >
-                Send
+                {sending ? "Sending..." : "Send"}
               </button>
             </div>
-          </div>
+          </form>
         </div>
       </motion.div>
     </motion.div>

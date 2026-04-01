@@ -1,5 +1,10 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import {
+  BUDGET_CATEGORY_BLUEPRINTS,
+  budgetColorForCategory,
+  recommendedAllocation,
+} from "@/lib/budget-blueprint";
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -36,6 +41,12 @@ interface BudgetState {
   // Actions — Budget level
   setBudgetName: (name: string) => void;
   setTotalBudget: (amount: number) => void;
+  hydrateBudget: (budget: {
+    budgetName: string;
+    totalBudget: number;
+    categories: BudgetCategory[];
+  }) => void;
+  rebalanceAllocations: () => void;
 
   // Actions — Category level
   addCategory: (name: string, color?: string) => void;
@@ -48,7 +59,12 @@ interface BudgetState {
   addItem: (categoryId: string, item: Omit<BudgetItem, "id" | "sortOrder">) => void;
   removeItem: (categoryId: string, itemId: string) => void;
   updateItem: (categoryId: string, itemId: string, updates: Partial<BudgetItem>) => void;
-  moveItem: (fromCategoryId: string, toCategoryId: string, itemId: string) => void;
+  moveItem: (
+    fromCategoryId: string,
+    toCategoryId: string,
+    itemId: string,
+    targetIndex?: number
+  ) => void;
   reorderItems: (categoryId: string, fromIndex: number, toIndex: number) => void;
 
   // Actions — UI
@@ -76,18 +92,23 @@ function arrayMove<T>(arr: T[], from: number, to: number): T[] {
   return copy.map((el, i) => ({ ...el, sortOrder: i }));
 }
 
+function createDefaultCategories(totalBudget: number): BudgetCategory[] {
+  return BUDGET_CATEGORY_BLUEPRINTS.map((category, index) => ({
+    id: genId(),
+    name: category.name,
+    allocated: recommendedAllocation(category.name, totalBudget),
+    items: [],
+    sortOrder: index,
+    color: category.color,
+  }));
+}
+
 // ─── Default categories ──────────────────────────────────────
 
-const DEFAULT_CATEGORIES: BudgetCategory[] = [
-  { id: genId(), name: "Venue & Hospitality", allocated: 0, items: [], sortOrder: 0, color: "#C9A96E" },
-  { id: genId(), name: "Decor & Design", allocated: 0, items: [], sortOrder: 1, color: "#D4A0A0" },
-  { id: genId(), name: "Catering", allocated: 0, items: [], sortOrder: 2, color: "#9CAF88" },
-  { id: genId(), name: "Photography & Video", allocated: 0, items: [], sortOrder: 3, color: "#7BA7C9" },
-  { id: genId(), name: "Makeup & Styling", allocated: 0, items: [], sortOrder: 4, color: "#C4956A" },
-  { id: genId(), name: "Entertainment", allocated: 0, items: [], sortOrder: 5, color: "#D4A843" },
-  { id: genId(), name: "Travel & Logistics", allocated: 0, items: [], sortOrder: 6, color: "#8B7EC8" },
-  { id: genId(), name: "Miscellaneous", allocated: 0, items: [], sortOrder: 7, color: "#6B7280" },
-];
+const DEFAULT_TOTAL_BUDGET = 2500000;
+const DEFAULT_CATEGORIES: BudgetCategory[] = createDefaultCategories(
+  DEFAULT_TOTAL_BUDGET
+);
 
 // ─── Store ────────────────────────────────────────────────────
 
@@ -95,8 +116,8 @@ export const useBudgetStore = create<BudgetState>()(
   persist(
     (set) => ({
       // Initial state
-      budgetName: "My Wedding Budget",
-      totalBudget: 2500000,
+      budgetName: "Wedding Investment Plan",
+      totalBudget: DEFAULT_TOTAL_BUDGET,
       categories: DEFAULT_CATEGORIES,
       activeCategoryId: null,
       isDragging: false,
@@ -104,6 +125,31 @@ export const useBudgetStore = create<BudgetState>()(
       // Budget level
       setBudgetName: (name) => set({ budgetName: name }),
       setTotalBudget: (amount) => set({ totalBudget: amount }),
+      hydrateBudget: (budget) =>
+        set({
+          budgetName: budget.budgetName,
+          totalBudget: budget.totalBudget,
+          categories: budget.categories.map((category, index) => ({
+            ...category,
+            sortOrder: index,
+            color: category.color || budgetColorForCategory(category.name),
+            items: category.items
+              .slice()
+              .sort((a, b) => a.sortOrder - b.sortOrder)
+              .map((item, itemIndex) => ({
+                ...item,
+                sortOrder: itemIndex,
+              })),
+          })),
+          activeCategoryId: budget.categories[0]?.id ?? null,
+        }),
+      rebalanceAllocations: () =>
+        set((state) => ({
+          categories: state.categories.map((category) => ({
+            ...category,
+            allocated: recommendedAllocation(category.name, state.totalBudget),
+          })),
+        })),
 
       // Category level
       addCategory: (name, color = "#6B7280") =>
@@ -116,7 +162,7 @@ export const useBudgetStore = create<BudgetState>()(
               allocated: 0,
               items: [],
               sortOrder: state.categories.length,
-              color,
+              color: color || budgetColorForCategory(name),
             },
           ],
         })),
@@ -191,7 +237,7 @@ export const useBudgetStore = create<BudgetState>()(
           ),
         })),
 
-      moveItem: (fromCategoryId, toCategoryId, itemId) =>
+      moveItem: (fromCategoryId, toCategoryId, itemId, targetIndex) =>
         set((state) => {
           const fromCat = state.categories.find((c) => c.id === fromCategoryId);
           if (!fromCat) return state;
@@ -210,12 +256,21 @@ export const useBudgetStore = create<BudgetState>()(
                 };
               }
               if (c.id === toCategoryId) {
+                const insertAt = Math.max(
+                  0,
+                  Math.min(
+                    typeof targetIndex === "number" ? targetIndex : c.items.length,
+                    c.items.length
+                  )
+                );
+                const nextItems = [...c.items];
+                nextItems.splice(insertAt, 0, { ...item, sortOrder: insertAt });
                 return {
                   ...c,
-                  items: [
-                    ...c.items,
-                    { ...item, sortOrder: c.items.length },
-                  ],
+                  items: nextItems.map((entry, idx) => ({
+                    ...entry,
+                    sortOrder: idx,
+                  })),
                 };
               }
               return c;
@@ -246,9 +301,9 @@ export const useBudgetStore = create<BudgetState>()(
 
       reset: () =>
         set({
-          budgetName: "My Wedding Budget",
-          totalBudget: 2500000,
-          categories: DEFAULT_CATEGORIES,
+          budgetName: "Wedding Investment Plan",
+          totalBudget: DEFAULT_TOTAL_BUDGET,
+          categories: createDefaultCategories(DEFAULT_TOTAL_BUDGET),
           activeCategoryId: null,
           isDragging: false,
         }),

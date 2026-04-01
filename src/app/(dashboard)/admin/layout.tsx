@@ -1,7 +1,10 @@
 "use client";
 
+import { useUser } from "@clerk/nextjs";
 import { Sidebar, MobileSidebar, type NavGroup } from "@/components/dashboard/sidebar";
 import { Topbar } from "@/components/dashboard/topbar";
+import { PortalRoleGuard } from "@/components/dashboard/portal-role-guard";
+import { dashboardRoleLabel } from "@/lib/role-utils";
 
 const navGroups: NavGroup[] = [
   {
@@ -43,8 +46,11 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const { user } = useUser();
+
   return (
     <>
+      <PortalRoleGuard />
       <Sidebar
         groups={navGroups}
         portalName="Admin Portal"
@@ -56,7 +62,10 @@ export default function AdminLayout({
         portalHref="/admin"
       />
       <div className="lg:pl-64">
-        <Topbar userName="Deeksha" userRole="Admin" />
+        <Topbar
+          userName={user?.fullName ?? "Admin"}
+          userRole={dashboardRoleLabel(user?.publicMetadata?.role, "Admin")}
+        />
         <main className="px-6 py-8 lg:px-8">{children}</main>
       </div>
     </>

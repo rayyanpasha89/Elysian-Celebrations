@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useClerk } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +45,15 @@ const DASHBOARD_ROUTE_TITLES: Record<string, string> = {
   "/admin/venues": "Venues",
   "/admin/blog": "Blog Posts",
   "/admin/testimonials": "Testimonials",
+
+  "/manager": "Dashboard",
+  "/manager/inquiries": "Inquiries",
+  "/manager/bookings": "Bookings",
+  "/manager/clients": "Clients",
+  "/manager/vendors": "Vendors",
+  "/manager/configurator": "Event Configurator",
+  "/manager/destinations": "Destinations",
+  "/manager/settings": "Settings",
 };
 
 function normalizePath(pathname: string) {
@@ -82,9 +92,14 @@ export function Topbar({
   userRole = "Client",
 }: TopbarProps) {
   const pathname = usePathname();
+  const { signOut } = useClerk();
   const [showDropdown, setShowDropdown] = useState(false);
 
   const displayTitle = resolveDashboardTitle(pathname ?? "", title);
+
+  // Derive settings route from the current portal context
+  const portalRoot = (pathname ?? "").split("/").filter(Boolean)[0] ?? "client";
+  const settingsHref = `/${portalRoot}/settings`;
 
   const initials = userName
     .split(" ")
@@ -106,6 +121,7 @@ export function Topbar({
         <div className="flex items-center gap-4">
           <button
             type="button"
+            onClick={() => { /* Notification panel — planned feature */ }}
             className="relative flex h-9 w-9 items-center justify-center border border-charcoal/10 text-charcoal/60 transition-colors hover:border-gold-primary hover:text-gold-primary"
             aria-label="Notifications"
           >
@@ -116,7 +132,6 @@ export function Topbar({
                 strokeWidth="1.2"
               />
             </svg>
-            <span className="absolute -right-1 -top-1 h-2 w-2 bg-gold-primary" />
           </button>
 
           <div className="relative">
@@ -150,10 +165,19 @@ export function Topbar({
                       <p className="font-accent text-[10px] uppercase tracking-[0.15em] text-slate">{userRole}</p>
                     </div>
                     <div className="py-1">
-                      <DropdownItem label="Settings" href="/dashboard/settings" />
+                      <DropdownItem label="Settings" href={settingsHref} />
                       <DropdownItem label="Back to Site" href="/" />
                       <div className="my-1 h-px bg-charcoal/8" />
-                      <DropdownItem label="Sign Out" href="/login" danger />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowDropdown(false);
+                          void signOut({ redirectUrl: "/" });
+                        }}
+                        className="block w-full px-4 py-2 text-left font-accent text-[11px] uppercase tracking-[0.15em] text-red-600/70 transition-colors hover:bg-red-50 hover:text-red-700"
+                      >
+                        Sign Out
+                      </button>
                     </div>
                   </motion.div>
                 </>

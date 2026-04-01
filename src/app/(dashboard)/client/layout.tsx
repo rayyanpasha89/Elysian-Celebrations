@@ -1,7 +1,10 @@
 "use client";
 
+import { useUser } from "@clerk/nextjs";
 import { Sidebar, MobileSidebar, type NavGroup } from "@/components/dashboard/sidebar";
 import { Topbar } from "@/components/dashboard/topbar";
+import { PortalRoleGuard } from "@/components/dashboard/portal-role-guard";
+import { dashboardRoleLabel } from "@/lib/role-utils";
 
 const navGroups: NavGroup[] = [
   {
@@ -41,8 +44,11 @@ export default function ClientLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const { user } = useUser();
+
   return (
     <>
+      <PortalRoleGuard />
       <Sidebar
         groups={navGroups}
         portalName="Client Portal"
@@ -54,7 +60,10 @@ export default function ClientLayout({
         portalHref="/client"
       />
       <div className="lg:pl-64">
-        <Topbar userName="Priya & Arjun" userRole="Couple" />
+        <Topbar
+          userName={user?.fullName ?? "Client"}
+          userRole={dashboardRoleLabel(user?.publicMetadata?.role, "Couple")}
+        />
         <main className="px-6 py-8 lg:px-8">{children}</main>
       </div>
     </>

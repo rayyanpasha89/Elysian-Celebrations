@@ -37,6 +37,7 @@ export function PackageFaq() {
 
   return (
     <section
+      id="faq"
       className="border-t border-gold-light/40 bg-cream/50 px-[var(--section-padding-x)] py-[var(--section-padding-y)]"
       aria-labelledby="faq-heading"
     >

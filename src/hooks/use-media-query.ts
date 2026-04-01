@@ -1,20 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useSyncExternalStore } from "react";
 
 export function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(false);
-
-  useEffect(() => {
-    const media = window.matchMedia(query);
-    setMatches(media.matches);
-
-    const listener = (event: MediaQueryListEvent) => setMatches(event.matches);
-    media.addEventListener("change", listener);
-    return () => media.removeEventListener("change", listener);
-  }, [query]);
-
-  return matches;
+  return useSyncExternalStore(
+    (onChange) => {
+      const media = window.matchMedia(query);
+      const listener = () => onChange();
+      media.addEventListener("change", listener);
+      return () => media.removeEventListener("change", listener);
+    },
+    () => window.matchMedia(query).matches,
+    () => false
+  );
 }
 
 export function usePrefersReducedMotion(): boolean {

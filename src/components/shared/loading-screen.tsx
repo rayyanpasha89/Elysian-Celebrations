@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import {
+  startTransition,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 const STORAGE_KEY = "elysian-loading-screen-done";
@@ -22,19 +28,31 @@ const letterItem = {
 };
 
 export function LoadingScreen({ onComplete }: { onComplete?: () => void }) {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
   const [show, setShow] = useState(false);
   const onCompleteRef = useRef(onComplete);
-  onCompleteRef.current = onComplete;
 
   useEffect(() => {
-    setMounted(true);
-    if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(STORAGE_KEY)) {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    try {
+      if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(STORAGE_KEY)) {
+        onCompleteRef.current?.();
+        return;
+      }
+    } catch {
       onCompleteRef.current?.();
       return;
     }
-    setShow(true);
-  }, []);
+    startTransition(() => setShow(true));
+  }, [mounted]);
 
   useEffect(() => {
     if (!show) return;
@@ -49,8 +67,12 @@ export function LoadingScreen({ onComplete }: { onComplete?: () => void }) {
   return (
     <AnimatePresence
       onExitComplete={() => {
-        if (typeof sessionStorage !== "undefined") {
-          sessionStorage.setItem(STORAGE_KEY, "1");
+        try {
+          if (typeof sessionStorage !== "undefined") {
+            sessionStorage.setItem(STORAGE_KEY, "1");
+          }
+        } catch {
+          // sessionStorage blocked — ignore
         }
         onCompleteRef.current?.();
       }}
@@ -58,7 +80,7 @@ export function LoadingScreen({ onComplete }: { onComplete?: () => void }) {
       {show && (
         <motion.div
           key="loading-screen"
-          className="fixed inset-0 z-[10000] flex flex-col items-center justify-center bg-ivory"
+          className="pointer-events-none fixed inset-0 z-[9990] flex flex-col items-center justify-center bg-ivory"
           initial={{ y: 0 }}
           exit={{ y: "-100%" }}
           transition={{ duration: 0.75, ease: [0.16, 1, 0.3, 1] as const }}

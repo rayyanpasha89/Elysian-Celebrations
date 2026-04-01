@@ -1,7 +1,7 @@
 // Auth types are now provided by @clerk/nextjs
 // User metadata (role) is stored in Clerk's publicMetadata.
 
-export type UserRole = "client" | "vendor" | "admin";
+export type UserRole = "client" | "vendor" | "admin" | "manager";
 
 export interface ClerkPublicMetadata {
   role?: UserRole;
@@ -10,6 +10,7 @@ export interface ClerkPublicMetadata {
 
 declare global {
   interface CustomJwtSessionClaims {
-    metadata: ClerkPublicMetadata;
+    metadata?: ClerkPublicMetadata;
+    publicMetadata?: ClerkPublicMetadata;
   }
 }

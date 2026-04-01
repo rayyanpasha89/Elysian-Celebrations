@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useInView } from "framer-motion";
-import { X } from "lucide-react";
+import { Camera, Image as ImageIcon, X } from "lucide-react";
 import { useRef } from "react";
 import { cn } from "@/lib/utils";
 
@@ -23,10 +23,17 @@ function MasonryItem({
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, amount: 0.3 });
   const aspectClass = aspectCycle[index % aspectCycle.length];
+  const isWideFrame = index % 4 === 1;
 
   return (
     <div ref={ref} className="mb-4 break-inside-avoid">
-      <div className={cn("relative w-full overflow-hidden rounded-xl bg-cream", aspectClass)}>
+      <div
+        className={cn(
+          "relative w-full overflow-hidden border border-charcoal/8 bg-cream shadow-[0_18px_55px_rgba(26,26,46,0.08)]",
+          aspectClass,
+          isWideFrame && "md:scale-[1.01]"
+        )}
+      >
         <button
           type="button"
           onClick={() => onOpen(item)}
@@ -37,9 +44,24 @@ function MasonryItem({
             src={item.src}
             alt={item.alt}
             fill
-            className="object-cover transition duration-500 group-hover:scale-[1.03]"
+            className="object-cover transition duration-700 ease-out group-hover:scale-[1.06]"
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
           />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(17,24,39,0.02),rgba(17,24,39,0.05)_42%,rgba(17,24,39,0.78)_100%)] opacity-70 transition-opacity duration-500 group-hover:opacity-100" />
+          <div className="absolute left-4 top-4 inline-flex items-center gap-2 border border-ivory/14 bg-midnight/42 px-3 py-2 text-[9px] uppercase tracking-[0.18em] text-ivory/78 backdrop-blur-md">
+            <Camera className="h-3.5 w-3.5 text-gold-light" />
+            {item.alt.split(" — ")[0]}
+          </div>
+          <div className="absolute bottom-0 left-0 right-0 p-4">
+            <div className="flex items-end justify-between gap-4">
+              <p className="max-w-[75%] text-left text-sm leading-relaxed text-ivory/84 transition-transform duration-500 group-hover:-translate-y-0.5">
+                {item.alt}
+              </p>
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center border border-ivory/14 bg-midnight/40 text-ivory/72 backdrop-blur-md transition-all duration-500 group-hover:border-gold-primary/35 group-hover:bg-gold-primary/12 group-hover:text-gold-light">
+                <ImageIcon className="h-4 w-4" />
+              </span>
+            </div>
+          </div>
           <motion.div
             className="pointer-events-none absolute inset-0 origin-right bg-gold-primary"
             initial={{ scaleX: 1 }}
@@ -76,6 +98,34 @@ export function GalleryMasonry({ images }: { images: GalleryImage[] }) {
 
   return (
     <>
+      <div className="mb-6 grid gap-4 border border-charcoal/8 bg-ivory/70 p-4 md:grid-cols-3">
+        <div className="border border-charcoal/8 bg-white/80 p-4">
+          <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-gold-primary">
+            Portfolio
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-slate">
+            A visual archive of atmosphere, composition, and the kind of detail that makes a
+            celebration feel directed rather than decorated.
+          </p>
+        </div>
+        <div className="border border-charcoal/8 bg-white/80 p-4">
+          <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-gold-primary">
+            Curation
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-slate">
+            Each frame should feel like part of a story, not a random image dump.
+          </p>
+        </div>
+        <div className="border border-charcoal/8 bg-white/80 p-4">
+          <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-gold-primary">
+            Interaction
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-slate">
+            Tap any card to open a larger preview and inspect the mood in detail.
+          </p>
+        </div>
+      </div>
+
       <div className="columns-2 gap-4 md:columns-3 lg:columns-4" role="list">
         {images.map((item, index) => (
           <MasonryItem key={item.src} item={item} index={index} onOpen={setActive} />
@@ -124,10 +174,13 @@ export function GalleryMasonry({ images }: { images: GalleryImage[] }) {
                   alt={active.alt}
                   width={1600}
                   height={1200}
-                  className="max-h-[85vh] w-auto max-w-full rounded-lg object-contain shadow-2xl"
+                  className="max-h-[85vh] w-auto max-w-full rounded-lg border border-white/10 object-contain shadow-2xl"
                 />
               </div>
-              <p className="font-heading mt-4 text-center text-sm text-ivory/80">{active.alt}</p>
+              <div className="mt-4 flex items-center justify-center gap-2 text-sm text-ivory/80">
+                <ImageIcon className="h-4 w-4 text-gold-light" />
+                <p className="font-heading">{active.alt}</p>
+              </div>
             </motion.div>
           </motion.div>
         )}

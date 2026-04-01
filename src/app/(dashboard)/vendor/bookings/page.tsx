@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { fadeUp, staggerContainer, staggerItem } from "@/animations/variants";
 import { ListEmptyState } from "@/components/dashboard/list-empty-state";
@@ -8,45 +9,23 @@ import { dashBtn, dashCard, dashLabel, statusBadgeBase } from "@/lib/dashboard-s
 import { cn } from "@/lib/utils";
 
 type Tab = "All" | "Inquiry" | "Confirmed" | "Completed";
+
 type UiStatus = "INQUIRY" | "CONFIRMED" | "COMPLETED";
 
-const bookings: {
+function mapStatus(raw: string): UiStatus {
+  if (raw === "COMPLETED") return "COMPLETED";
+  if (raw === "CONFIRMED" || raw === "DEPOSIT_PAID") return "CONFIRMED";
+  return "INQUIRY";
+}
+
+type ApiBooking = {
   id: string;
-  couple: string;
-  destination: string;
-  eventDate: string;
-  service: string;
-  amount: number;
-  status: UiStatus;
-}[] = [
-  {
-    id: "1",
-    couple: "Priya & Arjun",
-    destination: "Udaipur",
-    eventDate: "2026-02-14",
-    service: "Full wedding day coverage",
-    amount: 285000,
-    status: "INQUIRY",
-  },
-  {
-    id: "2",
-    couple: "Meera & Rohan",
-    destination: "Goa",
-    eventDate: "2025-12-18",
-    service: "Pre-wedding session",
-    amount: 65000,
-    status: "CONFIRMED",
-  },
-  {
-    id: "3",
-    couple: "Sofia & James",
-    destination: "Santorini",
-    eventDate: "2025-06-22",
-    service: "Full wedding day coverage",
-    amount: 420000,
-    status: "COMPLETED",
-  },
-];
+  status: string;
+  event_date: string | null;
+  total_amount: number | null;
+  client: { partner_name?: string } | null;
+  service: { name?: string } | null;
+};
 
 function statusClass(s: UiStatus) {
   if (s === "INQUIRY") return "border-gold-primary/70 text-gold-dark";
@@ -58,13 +37,61 @@ const tabs: Tab[] = ["All", "Inquiry", "Confirmed", "Completed"];
 
 export default function VendorBookingsPage() {
   const [tab, setTab] = useState<Tab>("All");
+  const [loading, setLoading] = useState(true);
+  const [rows, setRows] = useState<ApiBooking[]>([]);
+  const router = useRouter();
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/bookings");
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error);
+        if (!cancelled) setRows(json.bookings ?? []);
+      } catch {
+        if (!cancelled) setRows([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const list = useMemo(() => {
+    return rows.map((b) => {
+      const c = b.client;
+      const s = b.service;
+      const ui = mapStatus(b.status);
+      return {
+        id: b.id,
+        couple: c?.partner_name ?? "Couple",
+        destination: "—",
+        eventDate: b.event_date ?? new Date().toISOString(),
+        service: s?.name ?? "Service",
+        amount: b.total_amount ?? 0,
+        status: ui,
+      };
+    });
+  }, [rows]);
 
   const filtered = useMemo(() => {
-    if (tab === "All") return bookings;
-    if (tab === "Inquiry") return bookings.filter((b) => b.status === "INQUIRY");
-    if (tab === "Confirmed") return bookings.filter((b) => b.status === "CONFIRMED");
-    return bookings.filter((b) => b.status === "COMPLETED");
-  }, [tab]);
+    if (tab === "All") return list;
+    if (tab === "Inquiry") return list.filter((b) => b.status === "INQUIRY");
+    if (tab === "Confirmed") return list.filter((b) => b.status === "CONFIRMED");
+    return list.filter((b) => b.status === "COMPLETED");
+  }, [tab, list]);
+
+  if (loading) {
+    return (
+      <div className="animate-pulse space-y-6">
+        <div className="h-10 w-48 bg-charcoal/10" />
+        <div className="h-32 border border-charcoal/8 bg-charcoal/5" />
+      </div>
+    );
+  }
 
   return (
     <motion.div variants={staggerContainer} initial="hidden" animate="visible">
@@ -86,7 +113,7 @@ export default function VendorBookingsPage() {
                   "font-accent border-b-2 px-4 py-3 text-[11px] uppercase tracking-[0.2em] transition-colors",
                   active
                     ? "-mb-px border-gold-primary text-charcoal"
-                    : "border-transparent text-slate hover:text-charcoal",
+                    : "border-transparent text-slate hover:text-charcoal"
                 )}
               >
                 {t}
@@ -97,7 +124,7 @@ export default function VendorBookingsPage() {
       </motion.div>
 
       {filtered.length === 0 ? (
-        <ListEmptyState />
+        <ListEmptyState hint="New inquiries will appear here when couples reach out." />
       ) : (
         <ul className="mt-8 list-none space-y-6 pl-0">
           {filtered.map((b) => (
@@ -131,7 +158,11 @@ export default function VendorBookingsPage() {
               </div>
               {b.status === "INQUIRY" && (
                 <div className="mt-6">
-                  <button type="button" className={dashBtn}>
+                  <button
+                    type="button"
+                    className={dashBtn}
+                    onClick={() => router.push(`/vendor/messages?bookingId=${b.id}`)}
+                  >
                     Respond
                   </button>
                 </div>
