@@ -1339,17 +1339,6 @@ async function resetFixtureData(
   vendorProfileIds: string[],
   inquiryEmails: string[]
 ) {
-  if (vendorProfileIds.length > 0) {
-    await ensureSuccess(
-      "Clearing vendor services",
-      supabase.from("vendor_services").delete().in("vendor_profile_id", vendorProfileIds)
-    );
-    await ensureSuccess(
-      "Clearing vendor destinations",
-      supabase.from("vendor_destinations").delete().in("vendor_profile_id", vendorProfileIds)
-    );
-  }
-
   if (clientProfileIds.length > 0) {
     const { data: bookingRows, error: bookingLoadError } = await supabase
       .from("bookings")
@@ -1376,6 +1365,10 @@ async function resetFixtureData(
       supabase.from("reviews").delete().in("client_profile_id", clientProfileIds)
     );
     await ensureSuccess(
+      "Clearing saved vendors",
+      supabase.from("saved_vendors").delete().in("client_profile_id", clientProfileIds)
+    );
+    await ensureSuccess(
       "Clearing weddings",
       supabase.from("weddings").delete().in("client_profile_id", clientProfileIds)
     );
@@ -1390,6 +1383,21 @@ async function resetFixtureData(
     await ensureSuccess(
       "Clearing mood boards",
       supabase.from("mood_boards").delete().in("client_profile_id", clientProfileIds)
+    );
+  }
+
+  if (vendorProfileIds.length > 0) {
+    await ensureSuccess(
+      "Clearing vendor profile views",
+      supabase.from("vendor_profile_views").delete().in("vendor_profile_id", vendorProfileIds)
+    );
+    await ensureSuccess(
+      "Clearing vendor services",
+      supabase.from("vendor_services").delete().in("vendor_profile_id", vendorProfileIds)
+    );
+    await ensureSuccess(
+      "Clearing vendor destinations",
+      supabase.from("vendor_destinations").delete().in("vendor_profile_id", vendorProfileIds)
     );
   }
 
