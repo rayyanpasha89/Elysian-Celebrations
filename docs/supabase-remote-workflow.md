@@ -18,6 +18,7 @@ Notes:
 - `SUPABASE_PROJECT_ID` is the project ref, not the display name.
 - `SUPABASE_DB_URL` should be the direct Postgres connection string from Supabase.
 - `SUPABASE_ACCESS_TOKEN` is used by the Supabase CLI for linked-project operations. If you prefer, you can also run `npx supabase login` once locally.
+- If you already have a valid `SUPABASE_DB_URL`, the helper commands can use `--db-url` directly for pull, push, and migration list without requiring `SUPABASE_ACCESS_TOKEN`.
 
 ## Everyday commands
 
@@ -26,6 +27,8 @@ Link the repo to the remote project:
 ```bash
 npm run db:link
 ```
+
+This step still requires either `SUPABASE_ACCESS_TOKEN` or an interactive `supabase login`.
 
 List local vs remote migrations:
 

@@ -26,6 +26,19 @@ function runSupabase(args: string[]) {
   });
 }
 
+function getOptionalEnv(name: string) {
+  return process.env[name]?.trim();
+}
+
+function getDbUrlArgs() {
+  const dbUrl = getOptionalEnv("SUPABASE_DB_URL");
+  return dbUrl ? ["--db-url", dbUrl] : [];
+}
+
+function hasAccessToken() {
+  return Boolean(getOptionalEnv("SUPABASE_ACCESS_TOKEN"));
+}
+
 function ensureLinkedProject() {
   runSupabase([
     "link",
@@ -53,11 +66,17 @@ function queryInput(args: string[]) {
 async function runQuery(args: string[]) {
   const sql = queryInput(args);
   const connectionString = env("SUPABASE_DB_URL");
+  const parsedUrl = new URL(connectionString);
   const client = new Client({
-    connectionString,
-    ssl: connectionString.includes("sslmode=disable")
-      ? undefined
-      : { rejectUnauthorized: false },
+    host: parsedUrl.hostname,
+    port: parsedUrl.port ? Number(parsedUrl.port) : 5432,
+    user: decodeURIComponent(parsedUrl.username),
+    password: decodeURIComponent(parsedUrl.password),
+    database: parsedUrl.pathname.replace(/^\//, "") || "postgres",
+    ssl:
+      parsedUrl.searchParams.get("sslmode") === "disable"
+        ? undefined
+        : { rejectUnauthorized: false },
   });
 
   await client.connect();
@@ -105,40 +124,60 @@ async function main() {
       ensureLinkedProject();
       return;
     case "push":
-      ensureLinkedProject();
-      runSupabase(["db", "push", "--linked", "--password", env("SUPABASE_DB_PASSWORD")]);
+      if (hasAccessToken()) {
+        ensureLinkedProject();
+        runSupabase(["db", "push", "--linked", "--password", env("SUPABASE_DB_PASSWORD")]);
+        return;
+      }
+
+      runSupabase(["db", "push", ...getDbUrlArgs()]);
       return;
     case "push:seed":
-      ensureLinkedProject();
-      runSupabase([
-        "db",
-        "push",
-        "--linked",
-        "--include-seed",
-        "--password",
-        env("SUPABASE_DB_PASSWORD"),
-      ]);
+      if (hasAccessToken()) {
+        ensureLinkedProject();
+        runSupabase([
+          "db",
+          "push",
+          "--linked",
+          "--include-seed",
+          "--password",
+          env("SUPABASE_DB_PASSWORD"),
+        ]);
+        return;
+      }
+
+      runSupabase(["db", "push", "--include-seed", ...getDbUrlArgs()]);
       return;
     case "pull":
-      ensureLinkedProject();
-      runSupabase([
-        "db",
-        "pull",
-        ...(args[0] ? [args[0]] : []),
-        "--linked",
-        "--password",
-        env("SUPABASE_DB_PASSWORD"),
-      ]);
+      if (hasAccessToken()) {
+        ensureLinkedProject();
+        runSupabase([
+          "db",
+          "pull",
+          ...(args[0] ? [args[0]] : []),
+          "--linked",
+          "--password",
+          env("SUPABASE_DB_PASSWORD"),
+        ]);
+        return;
+      }
+
+      runSupabase(["db", "pull", ...(args[0] ? [args[0]] : []), ...getDbUrlArgs()]);
       return;
     case "list":
-      ensureLinkedProject();
-      runSupabase([
-        "migration",
-        "list",
-        "--linked",
-        "--password",
-        env("SUPABASE_DB_PASSWORD"),
-      ]);
+      if (hasAccessToken()) {
+        ensureLinkedProject();
+        runSupabase([
+          "migration",
+          "list",
+          "--linked",
+          "--password",
+          env("SUPABASE_DB_PASSWORD"),
+        ]);
+        return;
+      }
+
+      runSupabase(["migration", "list", ...getDbUrlArgs()]);
       return;
     case "query":
       await runQuery(args);
