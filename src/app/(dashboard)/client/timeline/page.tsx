@@ -64,8 +64,40 @@ export default function ClientTimelinePage() {
     };
   }, []);
 
-  const toggle = (id: string) => {
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+  const toggle = async (id: string, current: boolean) => {
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, done: !current } : t)));
+    try {
+      const res = await fetch(`/api/timeline/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isCompleted: !current }),
+      });
+      if (!res.ok) {
+        setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, done: current } : t)));
+        toast.error("Could not update task");
+      }
+    } catch {
+      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, done: current } : t)));
+      toast.error("Could not update task");
+    }
+  };
+
+  const deleteTask = async (id: string) => {
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+    try {
+      const res = await fetch(`/api/timeline/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const refreshed = await loadTasks();
+        setTasks(refreshed);
+        toast.error("Could not delete task");
+      } else {
+        toast.success("Task removed");
+      }
+    } catch {
+      const refreshed = await loadTasks();
+      setTasks(refreshed);
+      toast.error("Could not delete task");
+    }
   };
 
   const addTask = async () => {
@@ -193,7 +225,7 @@ export default function ClientTimelinePage() {
                     <input
                       type="checkbox"
                       checked={task.done}
-                      onChange={() => toggle(task.id)}
+                      onChange={() => void toggle(task.id, task.done)}
                       className="h-4 w-4 border border-charcoal/30 accent-gold-primary"
                       aria-label={`Mark ${task.title} complete`}
                     />
@@ -229,14 +261,23 @@ export default function ClientTimelinePage() {
                       >
                         {task.description || "—"}
                       </p>
-                      <p className="font-accent mt-4 text-[10px] uppercase tracking-[0.2em] text-slate">
-                        Due{" "}
-                        {new Date(task.due).toLocaleDateString("en-IN", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </p>
+                      <div className="mt-4 flex items-center justify-between gap-3">
+                        <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-slate">
+                          Due{" "}
+                          {new Date(task.due).toLocaleDateString("en-IN", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => void deleteTask(task.id)}
+                          className="font-accent text-[10px] uppercase tracking-[0.15em] text-slate/50 hover:text-error transition-colors"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </motion.li>

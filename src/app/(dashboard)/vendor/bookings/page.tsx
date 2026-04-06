@@ -23,7 +23,10 @@ type ApiBooking = {
   status: string;
   event_date: string | null;
   total_amount: number | null;
-  client: { partner_name?: string } | null;
+  client: {
+    partner_name?: string;
+    weddings?: { destination?: { name?: string } | null }[] | null;
+  } | null;
   service: { name?: string } | null;
 };
 
@@ -65,10 +68,11 @@ export default function VendorBookingsPage() {
       const c = b.client;
       const s = b.service;
       const ui = mapStatus(b.status);
+      const destName = c?.weddings?.[0]?.destination?.name ?? null;
       return {
         id: b.id,
         couple: c?.partner_name ?? "Couple",
-        destination: "—",
+        destination: destName ?? "—",
         eventDate: b.event_date ?? new Date().toISOString(),
         service: s?.name ?? "Service",
         amount: b.total_amount ?? 0,

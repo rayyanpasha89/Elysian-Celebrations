@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -111,16 +112,15 @@ export default function ClientOnboardingPage() {
       });
       const json = await res.json();
       if (res.status === 409) {
-        // Wedding already exists — just redirect to dashboard
+        // Wedding already exists — just go to dashboard
         router.replace("/client");
-        router.refresh();
         return;
       }
       if (!res.ok) throw new Error(json.error ?? "Could not save");
       router.replace("/client");
-      router.refresh();
     } catch (e) {
       console.error(e);
+      toast.error(e instanceof Error ? e.message : "Could not save. Please try again.");
       setLoading(false);
     }
   };

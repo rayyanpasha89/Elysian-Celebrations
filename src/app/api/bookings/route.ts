@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from("bookings")
       .select(
-        `*, client:client_profiles(id, user_id), vendor:vendor_profiles(business_name, slug, user_id), service:vendor_services(name, base_price)`
+        `*, client:client_profiles(id, user_id, partner_name, weddings(destination:destinations(name))), vendor:vendor_profiles(business_name, slug, user_id), service:vendor_services(name, base_price)`
       )
       .order("created_at", { ascending: false });
 

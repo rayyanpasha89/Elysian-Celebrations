@@ -87,30 +87,31 @@ export default function AdminUsersPage() {
     };
   }, [loadUsers]);
 
-  const patchUser = async (id: string, isActive: boolean) => {
+  const patchUser = async (id: string, updates: { isActive?: boolean; role?: string }) => {
     setUpdatingUserId(id);
     try {
       const res = await fetch(`/api/admin/users/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isActive }),
+        body: JSON.stringify(updates),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
 
-      setUsers((current) =>
-        current.map((user) =>
-          user.id === id ? { ...user, active: isActive } : user
-        )
-      );
+      const patch = {
+        ...(updates.isActive !== undefined ? { active: updates.isActive } : {}),
+        ...(updates.role !== undefined ? { role: updates.role as Role } : {}),
+      };
 
+      setUsers((current) =>
+        current.map((user) => user.id === id ? { ...user, ...patch } : user)
+      );
       if (selectedUser?.id === id) {
-        setSelectedUser((current) =>
-          current ? { ...current, active: isActive } : current
-        );
+        setSelectedUser((current) => current ? { ...current, ...patch } : current);
       }
 
-      toast.success(isActive ? "User reactivated" : "User suspended");
+      if (updates.role) toast.success(`Role changed to ${updates.role.toLowerCase()}`);
+      else toast.success(updates.isActive ? "User reactivated" : "User suspended");
     } catch {
       toast.error("Failed to update user");
     } finally {
@@ -213,7 +214,7 @@ export default function AdminUsersPage() {
                         <button
                           type="button"
                           disabled={updatingUserId === u.id}
-                          onClick={() => void patchUser(u.id, !u.active)}
+                          onClick={() => void patchUser(u.id, { isActive: !u.active })}
                           className="font-accent border border-charcoal/15 px-2 py-1 text-[10px] uppercase tracking-[0.15em] text-charcoal/70 transition-colors hover:border-error hover:text-error disabled:opacity-50"
                         >
                           {u.active ? "Suspend" : "Reactivate"}
@@ -236,7 +237,7 @@ export default function AdminUsersPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => void patchUser(selectedUser.id, !selectedUser.active)}
+                  onClick={() => void patchUser(selectedUser.id, { isActive: !selectedUser.active })}
                   className="font-accent border border-gold-primary px-3 py-2 text-[10px] uppercase tracking-[0.15em] text-gold-primary transition-colors hover:bg-gold-primary hover:text-midnight"
                 >
                   {selectedUser.active ? "Suspend user" : "Reactivate user"}
@@ -246,7 +247,16 @@ export default function AdminUsersPage() {
               <div className="mt-6 grid gap-4 md:grid-cols-3">
                 <div>
                   <p className={dashLabel}>Role</p>
-                  <p className="mt-2 text-sm text-charcoal">{selectedUser.role}</p>
+                  <select
+                    value={selectedUser.role}
+                    disabled={updatingUserId === selectedUser.id}
+                    onChange={(e) => void patchUser(selectedUser.id, { role: e.target.value })}
+                    className="mt-2 w-full border border-charcoal/15 bg-ivory px-3 py-2 font-heading text-sm text-charcoal outline-none focus:border-gold-primary disabled:opacity-50"
+                  >
+                    {(["CLIENT", "VENDOR", "MANAGER", "ADMIN"] as Role[]).map((r) => (
+                      <option key={r} value={r}>{r.charAt(0) + r.slice(1).toLowerCase()}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <p className={dashLabel}>Status</p>

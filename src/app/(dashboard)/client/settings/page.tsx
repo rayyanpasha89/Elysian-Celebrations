@@ -192,18 +192,6 @@ export default function ClientSettingsPage() {
       </motion.section>
 
       <motion.section variants={fadeUp} className={dashCard}>
-        <h3 className="font-display text-lg text-charcoal">Notifications</h3>
-        <p className="font-heading mt-2 text-sm text-slate">
-          Per-channel notification preferences are not stored in the database yet. You will still receive critical
-          booking and account email from the platform when events occur.
-        </p>
-        <div className="mt-6 space-y-3 border border-charcoal/10 bg-cream/30 px-4 py-3">
-          <p className="font-heading text-sm text-charcoal">Email · SMS · Push</p>
-          <p className="font-heading text-xs text-slate">Granular toggles will appear here once notification preferences are implemented.</p>
-        </div>
-      </motion.section>
-
-      <motion.section variants={fadeUp} className={dashCard}>
         <h3 className="font-display text-lg text-charcoal">Account security</h3>
         <p className="font-heading mt-2 text-sm text-slate">
           Password, email, and connected accounts are managed by Clerk. Use the profile panel below—changes apply

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { clerkClient } from "@clerk/nextjs/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import {
   getAuthSession,
@@ -102,6 +103,28 @@ export async function POST(request: NextRequest) {
       typeof budgetTotal === "number" && budgetTotal > 0
         ? Math.floor(budgetTotal)
         : 500000;
+
+    // Ensure the user exists in Supabase (in case the Clerk webhook hasn't fired yet)
+    try {
+      const clerk = await clerkClient();
+      const clerkUser = await clerk.users.getUser(session.userId);
+      const primaryEmail =
+        clerkUser.emailAddresses.find((e) => e.id === clerkUser.primaryEmailAddressId)
+          ?.emailAddress ??
+        clerkUser.emailAddresses[0]?.emailAddress ??
+        null;
+      const displayName =
+        [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ").trim() ||
+        primaryEmail?.split("@")[0] ||
+        "User";
+
+      await supabase.from("users").upsert(
+        { id: session.userId, email: primaryEmail, name: displayName, role: "CLIENT" },
+        { onConflict: "id" }
+      );
+    } catch (e) {
+      console.error("user upsert:", e);
+    }
 
     const { data: existingProfile, error: pErr } = await supabase
       .from("client_profiles")
