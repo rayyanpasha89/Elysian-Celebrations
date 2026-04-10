@@ -16,9 +16,37 @@ export async function GET() {
   try {
     const supabase = createAdminSupabaseClient();
 
-    const { data: usersByRole } = await supabase
-      .from("users")
-      .select("role");
+    const [
+      { data: usersByRole },
+      { count: weddingsCount },
+      { data: bookingRows },
+      { count: newInquiriesCount },
+      { data: pendingVendors },
+      { data: recentInquiries },
+    ] = await Promise.all([
+      supabase.from("users").select("role"),
+      supabase
+        .from("weddings")
+        .select("id", { count: "exact", head: true }),
+      supabase.from("bookings").select("status"),
+      supabase
+        .from("contact_inquiries")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "NEW"),
+      supabase
+        .from("vendor_profiles")
+        .select(
+          "id, business_name, created_at, category:vendor_categories(name)"
+        )
+        .eq("is_verified", false)
+        .order("created_at", { ascending: false })
+        .limit(10),
+      supabase
+        .from("contact_inquiries")
+        .select("id, name, email, destination, status, created_at, message")
+        .order("created_at", { ascending: false })
+        .limit(5),
+    ]);
 
     const roleCounts = { client: 0, vendor: 0, admin: 0 };
     for (const u of usersByRole ?? []) {
@@ -28,39 +56,11 @@ export async function GET() {
       else if (r === "ADMIN") roleCounts.admin++;
     }
 
-    const { count: weddingsCount } = await supabase
-      .from("weddings")
-      .select("id", { count: "exact", head: true });
-
-    const { data: bookingRows } = await supabase
-      .from("bookings")
-      .select("status");
-
     const bookingsByStatus: Record<string, number> = {};
     for (const b of bookingRows ?? []) {
       const s = b.status as string;
       bookingsByStatus[s] = (bookingsByStatus[s] ?? 0) + 1;
     }
-
-    const { count: newInquiriesCount } = await supabase
-      .from("contact_inquiries")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "NEW");
-
-    const { data: pendingVendors } = await supabase
-      .from("vendor_profiles")
-      .select(
-        "id, business_name, created_at, category:vendor_categories(name)"
-      )
-      .eq("is_verified", false)
-      .order("created_at", { ascending: false })
-      .limit(10);
-
-    const { data: recentInquiries } = await supabase
-      .from("contact_inquiries")
-      .select("id, name, email, destination, status, created_at, message")
-      .order("created_at", { ascending: false })
-      .limit(5);
 
     const pendingVendorList = (pendingVendors ?? []).map((v) => {
       const cat = v.category as { name?: string } | null;

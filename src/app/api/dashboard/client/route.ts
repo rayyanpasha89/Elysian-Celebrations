@@ -66,110 +66,110 @@ export async function GET() {
       });
     }
 
-    const { data: wedding } = await supabase
-      .from("weddings")
-      .select(
-        "id, name, date, status, destination:destinations(name)"
-      )
-      .eq("client_profile_id", profile.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const [
+      { data: wedding },
+      { data: distinctVendors },
+      { data: lists },
+      { data: budgetRow },
+      { data: notifs },
+    ] = await Promise.all([
+      supabase
+        .from("weddings")
+        .select("id, name, date, status, destination:destinations(name)")
+        .eq("client_profile_id", profile.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("bookings")
+        .select("vendor_profile_id")
+        .eq("client_profile_id", profile.id)
+        .in("status", ["CONFIRMED", "DEPOSIT_PAID", "COMPLETED"]),
+      supabase
+        .from("guest_lists")
+        .select("id")
+        .eq("client_profile_id", profile.id),
+      supabase
+        .from("budgets")
+        .select("id, total_budget")
+        .eq("client_profile_id", profile.id)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("notifications")
+        .select("id, title, message, created_at")
+        .eq("user_id", session.userId)
+        .order("created_at", { ascending: false })
+        .limit(5),
+    ]);
 
     const weddingDate =
       wedding?.date ?? profile.wedding_date ?? null;
-
-    const { data: distinctVendors } = await supabase
-      .from("bookings")
-      .select("vendor_profile_id")
-      .eq("client_profile_id", profile.id)
-      .in("status", ["CONFIRMED", "DEPOSIT_PAID", "COMPLETED"]);
 
     const vendorsBooked = new Set(
       (distinctVendors ?? []).map((r) => r.vendor_profile_id)
     ).size;
 
-    const { data: lists } = await supabase
-      .from("guest_lists")
-      .select("id")
-      .eq("client_profile_id", profile.id);
-
     const listIds = (lists ?? []).map((l) => l.id);
-    let guestsConfirmed = 0;
-    if (listIds.length) {
-      const { count } = await supabase
-        .from("guests")
-        .select("id", { count: "exact", head: true })
-        .in("guest_list_id", listIds)
-        .eq("rsvp_status", "CONFIRMED");
-      guestsConfirmed = count ?? 0;
-    }
+    const [
+      { count: guestsCount },
+      { data: budgetCategories },
+      { data: timelineItems },
+    ] = await Promise.all([
+      listIds.length
+        ? supabase
+            .from("guests")
+            .select("id", { count: "exact", head: true })
+            .in("guest_list_id", listIds)
+            .eq("rsvp_status", "CONFIRMED")
+        : Promise.resolve({ count: 0, data: null, error: null }),
+      budgetRow?.id
+        ? supabase
+            .from("budget_categories")
+            .select("id")
+            .eq("budget_id", budgetRow.id)
+        : Promise.resolve({ data: [], error: null }),
+      wedding?.id
+        ? supabase
+            .from("timeline_items")
+            .select("id, title, due_date, is_completed")
+            .eq("wedding_id", wedding.id)
+            .eq("is_completed", false)
+            .order("due_date", { ascending: true, nullsFirst: false })
+            .limit(5)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
 
-    const { data: budgetRow } = await supabase
-      .from("budgets")
-      .select("id, total_budget")
-      .eq("client_profile_id", profile.id)
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
+    const guestsConfirmed = guestsCount ?? 0;
+    const catIds = (budgetCategories ?? []).map((c) => c.id);
     let budgetPercent = 0;
-    if (budgetRow?.id && budgetRow.total_budget > 0) {
-      const { data: cats } = await supabase
-        .from("budget_categories")
-        .select("id")
-        .eq("budget_id", budgetRow.id);
-      const catIds = (cats ?? []).map((c) => c.id);
-      let spent = 0;
-      if (catIds.length) {
-        const { data: items } = await supabase
-          .from("budget_items")
-          .select("estimated_cost, quantity")
-          .in("budget_category_id", catIds);
-        spent = (items ?? []).reduce(
-          (s, i) => s + i.estimated_cost * (i.quantity ?? 1),
-          0
-        );
-      }
+    if (budgetRow?.id && budgetRow.total_budget > 0 && catIds.length) {
+      const { data: items } = await supabase
+        .from("budget_items")
+        .select("estimated_cost, quantity")
+        .in("budget_category_id", catIds);
+      const spent = (items ?? []).reduce(
+        (s, i) => s + i.estimated_cost * (i.quantity ?? 1),
+        0
+      );
       budgetPercent = Math.min(
         100,
         Math.round((spent / budgetRow.total_budget) * 100)
       );
     }
 
-    let tasks: {
-      id: string;
-      title: string;
-      due: string;
-      done: boolean;
-    }[] = [];
-    if (wedding?.id) {
-      const { data: ti } = await supabase
-        .from("timeline_items")
-        .select("id, title, due_date, is_completed")
-        .eq("wedding_id", wedding.id)
-        .eq("is_completed", false)
-        .order("due_date", { ascending: true, nullsFirst: false })
-        .limit(5);
-      tasks = (ti ?? []).map((t) => ({
-        id: t.id,
-        title: t.title,
-        due: t.due_date
-          ? new Date(t.due_date).toLocaleDateString("en-IN", {
-              month: "short",
-              day: "numeric",
-            })
-          : "—",
-        done: t.is_completed,
-      }));
-    }
-
-    const { data: notifs } = await supabase
-      .from("notifications")
-      .select("id, title, message, created_at")
-      .eq("user_id", session.userId)
-      .order("created_at", { ascending: false })
-      .limit(5);
+    const tasks = (timelineItems ?? []).map((t) => ({
+      id: t.id,
+      title: t.title,
+      due: t.due_date
+        ? new Date(t.due_date).toLocaleDateString("en-IN", {
+            month: "short",
+            day: "numeric",
+          })
+        : "—",
+      done: t.is_completed,
+    }));
 
     const recentNotifications = (notifs ?? []).map((n) => ({
       id: n.id,

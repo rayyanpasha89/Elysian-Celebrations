@@ -16,6 +16,10 @@ async function resolveRole(
   let role = roleFromSessionClaims(sessionClaims);
 
   if (!role) {
+    role = await fetchRoleFromSupabase(userId);
+  }
+
+  if (!role) {
     try {
       const client = await clerkClient();
       const user = await client.users.getUser(userId);
@@ -23,10 +27,6 @@ async function resolveRole(
     } catch {
       role = null;
     }
-  }
-
-  if (!role) {
-    role = await fetchRoleFromSupabase(userId);
   }
 
   return role ?? "client";
@@ -49,7 +49,7 @@ export async function getOptionalAuthSession(): Promise<AuthSession | null> {
 
 /**
  * Get the authenticated Clerk session or return a 401 response.
- * Role: JWT claims → Clerk publicMetadata → Supabase `users.role`.
+ * Role: JWT claims → Supabase `users.role` → Clerk publicMetadata.
  */
 export async function getAuthSession(): Promise<AuthSession | NextResponse> {
   const session = await getOptionalAuthSession();

@@ -49,27 +49,59 @@ export async function GET() {
       });
     }
 
-    const { count: totalBookings } = await supabase
-      .from("bookings")
-      .select("id", { count: "exact", head: true })
-      .eq("vendor_profile_id", vp.id);
-
-    const { count: pendingInquiryCount } = await supabase
-      .from("bookings")
-      .select("id", { count: "exact", head: true })
-      .eq("vendor_profile_id", vp.id)
-      .eq("status", "INQUIRY");
-
-    const { count: confirmedBookings } = await supabase
-      .from("bookings")
-      .select("id", { count: "exact", head: true })
-      .eq("vendor_profile_id", vp.id)
-      .in("status", ["CONFIRMED", "DEPOSIT_PAID", "COMPLETED"]);
-
-    const { data: revenueRows } = await supabase
-      .from("bookings")
-      .select("paid_amount, updated_at")
-      .eq("vendor_profile_id", vp.id);
+    const [
+      { count: totalBookings },
+      { count: pendingInquiryCount },
+      { count: confirmedBookings },
+      { data: revenueRows },
+      { data: reviews },
+      { data: inquiryRows },
+      { data: upcoming },
+    ] = await Promise.all([
+      supabase
+        .from("bookings")
+        .select("id", { count: "exact", head: true })
+        .eq("vendor_profile_id", vp.id),
+      supabase
+        .from("bookings")
+        .select("id", { count: "exact", head: true })
+        .eq("vendor_profile_id", vp.id)
+        .eq("status", "INQUIRY"),
+      supabase
+        .from("bookings")
+        .select("id", { count: "exact", head: true })
+        .eq("vendor_profile_id", vp.id)
+        .in("status", ["CONFIRMED", "DEPOSIT_PAID", "COMPLETED"]),
+      supabase
+        .from("bookings")
+        .select("paid_amount, updated_at")
+        .eq("vendor_profile_id", vp.id),
+      supabase
+        .from("reviews")
+        .select("rating")
+        .eq("vendor_profile_id", vp.id)
+        .eq("is_published", true),
+      supabase
+        .from("bookings")
+        .select(
+          "id, event_date, notes, client:client_profiles(partner_name, user_id)"
+        )
+        .eq("vendor_profile_id", vp.id)
+        .eq("status", "INQUIRY")
+        .order("created_at", { ascending: false })
+        .limit(5),
+      supabase
+        .from("bookings")
+        .select(
+          "event_date, client:client_profiles(partner_name), wedding_event:wedding_events(name)"
+        )
+        .eq("vendor_profile_id", vp.id)
+        .in("status", ["CONFIRMED", "DEPOSIT_PAID"])
+        .not("event_date", "is", null)
+        .gte("event_date", new Date().toISOString())
+        .order("event_date", { ascending: true })
+        .limit(5),
+    ]);
 
     const revenueMonth = (revenueRows ?? []).reduce((sum, row) => {
       if (!row.updated_at) return sum;
@@ -78,27 +110,11 @@ export async function GET() {
         : sum;
     }, 0);
 
-    const { data: reviews } = await supabase
-      .from("reviews")
-      .select("rating")
-      .eq("vendor_profile_id", vp.id)
-      .eq("is_published", true);
-
     const ratings = reviews ?? [];
     const avgRating =
       ratings.length > 0
         ? ratings.reduce((s, r) => s + r.rating, 0) / ratings.length
         : vp.rating ?? 0;
-
-    const { data: inquiryRows } = await supabase
-      .from("bookings")
-      .select(
-        "id, event_date, notes, client:client_profiles(partner_name, user_id)"
-      )
-      .eq("vendor_profile_id", vp.id)
-      .eq("status", "INQUIRY")
-      .order("created_at", { ascending: false })
-      .limit(5);
 
     const inquiryList = (inquiryRows ?? []).map((row) => {
       const c = row.client as { partner_name?: string; user_id?: string } | null;
@@ -116,18 +132,6 @@ export async function GET() {
         service: "Booking inquiry",
       };
     });
-
-    const { data: upcoming } = await supabase
-      .from("bookings")
-      .select(
-        "event_date, client:client_profiles(partner_name), wedding_event:wedding_events(name)"
-      )
-      .eq("vendor_profile_id", vp.id)
-      .in("status", ["CONFIRMED", "DEPOSIT_PAID"])
-      .not("event_date", "is", null)
-      .gte("event_date", new Date().toISOString())
-      .order("event_date", { ascending: true })
-      .limit(5);
 
     const upcomingEvents = (upcoming ?? []).map((u) => {
       const c = u.client as { partner_name?: string } | null;

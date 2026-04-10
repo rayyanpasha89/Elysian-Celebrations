@@ -16,7 +16,23 @@ export async function GET() {
   try {
     const supabase = createAdminSupabaseClient();
 
-    const { data: usersByRole } = await supabase.from("users").select("role");
+    const [
+      { data: usersByRole },
+      { count: weddings },
+      { data: bookingRows },
+      { count: newInquiries },
+    ] = await Promise.all([
+      supabase.from("users").select("role"),
+      supabase
+        .from("weddings")
+        .select("id", { count: "exact", head: true }),
+      supabase.from("bookings").select("status"),
+      supabase
+        .from("contact_inquiries")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "NEW"),
+    ]);
+
     const roleCounts = { client: 0, vendor: 0, admin: 0 };
     for (const u of usersByRole ?? []) {
       const r = String(u.role ?? "").toUpperCase();
@@ -25,21 +41,11 @@ export async function GET() {
       else if (r === "ADMIN") roleCounts.admin++;
     }
 
-    const { count: weddings } = await supabase
-      .from("weddings")
-      .select("id", { count: "exact", head: true });
-
-    const { data: bookingRows } = await supabase.from("bookings").select("status");
     const bookingsByStatus: Record<string, number> = {};
     for (const b of bookingRows ?? []) {
       const s = b.status as string;
       bookingsByStatus[s] = (bookingsByStatus[s] ?? 0) + 1;
     }
-
-    const { count: newInquiries } = await supabase
-      .from("contact_inquiries")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "NEW");
 
     return apiSuccess({
       usersByRole: roleCounts,

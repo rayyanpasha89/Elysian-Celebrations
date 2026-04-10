@@ -76,7 +76,7 @@ const PIPELINE_STATUSES = [
 ];
 
 export default function ManagerDashboard() {
-  const { user, isLoaded } = useUser();
+  const { user } = useUser();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ManagerDashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -98,7 +98,7 @@ export default function ManagerDashboard() {
     return () => { cancelled = true; };
   }, []);
 
-  if (!isLoaded || loading) return <DashboardSkeleton />;
+  if (loading) return <DashboardSkeleton />;
   if (error) return (
     <div className="mx-auto max-w-6xl border border-rose/20 bg-ivory p-6 text-charcoal">
       <p className="text-sm">{error}</p>

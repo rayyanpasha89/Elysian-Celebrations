@@ -16,38 +16,42 @@ export async function GET() {
   try {
     const supabase = createAdminSupabaseClient();
 
-    const { count: activeWeddings } = await supabase
-      .from("weddings")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "PLANNING");
-
-    const { count: pendingInquiries } = await supabase
-      .from("contact_inquiries")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "NEW");
-
-    const { count: confirmedBookings } = await supabase
-      .from("bookings")
-      .select("id", { count: "exact", head: true })
-      .in("status", ["CONFIRMED", "DEPOSIT_PAID"]);
-
-    const { count: vendorsAvailable } = await supabase
-      .from("vendor_profiles")
-      .select("id", { count: "exact", head: true })
-      .eq("is_verified", true);
-
-    const { data: recentInquiries } = await supabase
-      .from("contact_inquiries")
-      .select("id, name, email, destination, status, created_at")
-      .order("created_at", { ascending: false })
-      .limit(5);
-
-    const { data: upcomingWeddings } = await supabase
-      .from("weddings")
-      .select("id, name, date, status, destination:destinations(name)")
-      .eq("status", "PLANNING")
-      .order("date", { ascending: true, nullsFirst: false })
-      .limit(5);
+    const [
+      { count: activeWeddings },
+      { count: pendingInquiries },
+      { count: confirmedBookings },
+      { count: vendorsAvailable },
+      { data: recentInquiries },
+      { data: upcomingWeddings },
+    ] = await Promise.all([
+      supabase
+        .from("weddings")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "PLANNING"),
+      supabase
+        .from("contact_inquiries")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "NEW"),
+      supabase
+        .from("bookings")
+        .select("id", { count: "exact", head: true })
+        .in("status", ["CONFIRMED", "DEPOSIT_PAID"]),
+      supabase
+        .from("vendor_profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("is_verified", true),
+      supabase
+        .from("contact_inquiries")
+        .select("id, name, email, destination, status, created_at")
+        .order("created_at", { ascending: false })
+        .limit(5),
+      supabase
+        .from("weddings")
+        .select("id, name, date, status, destination:destinations(name)")
+        .eq("status", "PLANNING")
+        .order("date", { ascending: true, nullsFirst: false })
+        .limit(5),
+    ]);
 
     const inquiryList = (recentInquiries ?? []).map((q) => ({
       id: q.id,

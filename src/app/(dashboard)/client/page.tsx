@@ -57,7 +57,7 @@ const quickActions = [
 ];
 
 export default function ClientDashboard() {
-  const { user, isLoaded: userLoaded } = useUser();
+  const { user } = useUser();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ClientDashboardPayload | null>(null);
@@ -85,7 +85,7 @@ export default function ClientDashboard() {
     if (data.needsOnboarding || data.needsProfile) router.replace("/client/onboarding");
   }, [loading, data, router]);
 
-  if (!userLoaded || loading) return <DashboardSkeleton />;
+  if (loading) return <DashboardSkeleton />;
   if (error) return (
     <div className="mx-auto max-w-6xl border border-rose/20 bg-ivory p-6 text-charcoal">
       <p className="text-sm">{error}</p>
