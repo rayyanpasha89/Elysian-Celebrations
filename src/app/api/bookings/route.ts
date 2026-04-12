@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from("bookings")
       .select(
-        `*, client:client_profiles(id, user_id, partner_name, weddings(destination:destinations(name))), vendor:vendor_profiles(business_name, slug, user_id), service:vendor_services(name, base_price)`
+        `*, client:client_profiles(id, user_id, partner_name, weddings(destination:destinations(name))), vendor:vendor_profiles(business_name, slug, user_id), service:vendor_services(id, name, description, base_price, max_price, unit), event:wedding_events(name, wedding_day:wedding_days(name))`
       )
       .order("created_at", { ascending: false });
 
@@ -91,6 +91,14 @@ export async function POST(request: NextRequest) {
       return apiError("Vendor profile ID is required");
     }
 
+    if (vendorServiceId && typeof vendorServiceId !== "string") {
+      return apiError("Vendor service ID is invalid", 400);
+    }
+
+    if (weddingEventId && typeof weddingEventId !== "string") {
+      return apiError("Wedding event ID is invalid", 400);
+    }
+
     const { data: clientProfile, error: cpErr } = await supabase
       .from("client_profiles")
       .select("id")
@@ -103,6 +111,73 @@ export async function POST(request: NextRequest) {
     }
     if (!clientProfile) {
       return apiError("Client profile not found", 404);
+    }
+
+    const { data: vendorProfile, error: vendorProfileError } = await supabase
+      .from("vendor_profiles")
+      .select("id")
+      .eq("id", vendorProfileId)
+      .maybeSingle();
+
+    if (vendorProfileError) {
+      console.error("Vendor profile lookup error:", vendorProfileError);
+      return apiError("Failed to validate vendor", 500);
+    }
+
+    if (!vendorProfile) {
+      return apiError("Vendor not found", 404);
+    }
+
+    if (vendorServiceId) {
+      const { data: service, error: serviceError } = await supabase
+        .from("vendor_services")
+        .select("id, vendor_profile_id")
+        .eq("id", vendorServiceId)
+        .maybeSingle();
+
+      if (serviceError) {
+        console.error("Vendor service lookup error:", serviceError);
+        return apiError("Failed to validate vendor service", 500);
+      }
+
+      if (!service || service.vendor_profile_id !== vendorProfileId) {
+        return apiError("Selected service does not belong to this vendor", 400);
+      }
+    }
+
+    if (weddingEventId) {
+      const { data: wedding, error: weddingError } = await supabase
+        .from("weddings")
+        .select("id")
+        .eq("client_profile_id", clientProfile.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (weddingError) {
+        console.error("Wedding lookup error:", weddingError);
+        return apiError("Failed to validate booking event", 500);
+      }
+
+      if (!wedding) {
+        return apiError("Wedding not found", 404);
+      }
+
+      const { data: linkedEvent, error: linkedEventError } = await supabase
+        .from("wedding_events")
+        .select("id")
+        .eq("id", weddingEventId)
+        .eq("wedding_id", wedding.id)
+        .maybeSingle();
+
+      if (linkedEventError) {
+        console.error("Wedding event lookup error:", linkedEventError);
+        return apiError("Failed to validate booking event", 500);
+      }
+
+      if (!linkedEvent) {
+        return apiError("Event not found for this wedding", 404);
+      }
     }
 
     const { data: booking, error } = await supabase

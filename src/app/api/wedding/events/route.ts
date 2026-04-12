@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabaseClient } from "@/lib/supabase/server";
+import { getClientWeddingContext, ensureWeddingDays } from "@/lib/wedding-plan.server";
 import {
   apiError,
   apiSuccess,
@@ -7,36 +7,21 @@ import {
   requireRole,
 } from "@/lib/api-utils";
 
-async function getClientProfileId(userId: string) {
-  const supabase = createAdminSupabaseClient();
-  const { data: profile, error } = await supabase
-    .from("client_profiles")
-    .select("id")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  return profile?.id ?? null;
+function toOptionalString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-async function getLatestWeddingId(profileId: string) {
-  const supabase = createAdminSupabaseClient();
-  const { data: wedding, error } = await supabase
-    .from("weddings")
-    .select("id")
-    .eq("client_profile_id", profileId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+function toOptionalInt(value: unknown) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  const parsed = Math.round(value);
+  return parsed > 0 ? parsed : null;
+}
 
-  if (error) {
-    throw error;
-  }
-
-  return wedding?.id ?? null;
+function toOptionalStringArray(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+    .map((entry) => entry.trim());
 }
 
 export async function POST(request: NextRequest) {
@@ -48,62 +33,79 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as Record<string, unknown>;
     const name = typeof body.name === "string" ? body.name.trim() : "";
+    const weddingDayId = toOptionalString(body.weddingDayId);
     const parsedDate =
       typeof body.date === "string" && body.date ? new Date(body.date) : null;
     const date =
       parsedDate && !Number.isNaN(parsedDate.getTime())
         ? parsedDate.toISOString()
         : null;
-    const venue =
-      typeof body.venue === "string" && body.venue.trim()
-        ? body.venue.trim()
-        : null;
-    const notes =
-      typeof body.notes === "string" && body.notes.trim()
-        ? body.notes.trim()
-        : null;
 
     if (!name) {
       return apiError("Event name is required", 400);
     }
 
-    const supabase = createAdminSupabaseClient();
-    const profileId = await getClientProfileId(session.userId);
-    if (!profileId) {
-      return apiError("Client profile not found", 404);
-    }
-
-    const weddingId = await getLatestWeddingId(profileId);
-    if (!weddingId) {
+    const { supabase, wedding } = await getClientWeddingContext(session.userId);
+    if (!wedding) {
       return apiError("Wedding not found", 404);
     }
 
-    const { data: lastEvent, error: lastErr } = await supabase
+    const { data: existingEvents, error: existingEventsError } = await supabase
       .from("wedding_events")
-      .select("sort_order")
-      .eq("wedding_id", weddingId)
-      .order("sort_order", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .select("id, date, wedding_day_id, sort_order")
+      .eq("wedding_id", wedding.id)
+      .order("sort_order", { ascending: true });
 
-    if (lastErr) {
-      console.error("wedding_events lookup:", lastErr);
+    if (existingEventsError) {
+      console.error("wedding_events lookup:", existingEventsError);
       return apiError("Failed to load events", 500);
     }
 
-    const nextSortOrder = (lastEvent?.sort_order ?? -1) + 1;
+    const days = await ensureWeddingDays(
+      supabase,
+      { id: wedding.id, date: wedding.date },
+      (existingEvents ?? []).map((event) => ({
+        id: event.id,
+        date: event.date,
+        wedding_day_id: event.wedding_day_id,
+      }))
+    );
+
+    const targetDayId = weddingDayId ?? days[0]?.id ?? null;
+    if (!targetDayId) {
+      return apiError("Add a wedding day before creating events", 409);
+    }
+
+    const nextSortOrder =
+      (existingEvents ?? [])
+        .filter((event) => event.wedding_day_id === targetDayId)
+        .reduce((max, event) => Math.max(max, event.sort_order), -1) + 1;
 
     const { data: event, error } = await supabase
       .from("wedding_events")
       .insert({
-        wedding_id: weddingId,
+        wedding_id: wedding.id,
+        wedding_day_id: targetDayId,
         name,
+        event_type: toOptionalString(body.eventType),
         date,
-        venue,
-        notes,
+        start_time: toOptionalString(body.startTime),
+        end_time: toOptionalString(body.endTime),
+        venue: toOptionalString(body.venue),
+        guest_count: toOptionalInt(body.guestCount),
+        estimated_budget: toOptionalInt(body.estimatedBudget),
+        food_style: toOptionalString(body.foodStyle),
+        food_preferences: toOptionalStringArray(body.foodPreferences),
+        menu_notes: toOptionalString(body.menuNotes),
+        decor_style: toOptionalString(body.decorStyle),
+        decor_notes: toOptionalString(body.decorNotes),
+        attire_notes: toOptionalString(body.attireNotes),
+        notes: toOptionalString(body.notes),
         sort_order: nextSortOrder,
       })
-      .select("id, name, date, venue, notes, sort_order")
+      .select(
+        "id, wedding_day_id, name, event_type, date, start_time, end_time, venue, guest_count, estimated_budget, food_style, food_preferences, menu_notes, decor_style, decor_notes, attire_notes, notes, sort_order"
+      )
       .single();
 
     if (error) {

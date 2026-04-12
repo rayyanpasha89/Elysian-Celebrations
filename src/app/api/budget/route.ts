@@ -49,6 +49,122 @@ async function getClientProfileId(userId: string) {
   return profile?.id ?? null;
 }
 
+type EventPlanSpendDay = {
+  id: string;
+  name: string;
+  date: string | null;
+  sortOrder: number;
+  estimatedSpend: number;
+  eventCount: number;
+};
+
+type EventPlanSpendSummary = {
+  weddingName: string;
+  totalEstimated: number;
+  eventCount: number;
+  days: EventPlanSpendDay[];
+};
+
+async function getEventPlanSpendSummary(
+  profileId: string
+): Promise<EventPlanSpendSummary | null> {
+  const supabase = createAdminSupabaseClient();
+
+  const { data: wedding, error: weddingError } = await supabase
+    .from("weddings")
+    .select("id, name")
+    .eq("client_profile_id", profileId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (weddingError) {
+    console.error("getEventPlanSpendSummary wedding:", weddingError);
+    return null;
+  }
+
+  if (!wedding) {
+    return null;
+  }
+
+  const [{ data: dayRows, error: daysError }, { data: eventRows, error: eventsError }] =
+    await Promise.all([
+      supabase
+        .from("wedding_days")
+        .select("id, name, date, sort_order")
+        .eq("wedding_id", wedding.id)
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("wedding_events")
+        .select("id, wedding_day_id, estimated_budget")
+        .eq("wedding_id", wedding.id),
+    ]);
+
+  if (daysError || eventsError) {
+    console.error("getEventPlanSpendSummary days/events:", daysError ?? eventsError);
+    return null;
+  }
+
+  const days = dayRows ?? [];
+  const events = eventRows ?? [];
+
+  const byDay = new Map<string, { spend: number; count: number }>();
+  for (const day of days) {
+    byDay.set(day.id, { spend: 0, count: 0 });
+  }
+
+  let unassignedSpend = 0;
+  let unassignedCount = 0;
+
+  for (const event of events) {
+    const amount = event.estimated_budget ?? 0;
+    const dayId = event.wedding_day_id;
+    if (dayId && byDay.has(dayId)) {
+      const bucket = byDay.get(dayId)!;
+      bucket.spend += amount;
+      bucket.count += 1;
+    } else {
+      unassignedSpend += amount;
+      unassignedCount += 1;
+    }
+  }
+
+  const daySummaries: EventPlanSpendDay[] = days.map((day, index) => {
+    const bucket = byDay.get(day.id) ?? { spend: 0, count: 0 };
+    return {
+      id: day.id,
+      name: day.name,
+      date: day.date,
+      sortOrder: day.sort_order ?? index,
+      estimatedSpend: bucket.spend,
+      eventCount: bucket.count,
+    };
+  });
+
+  if (unassignedCount > 0) {
+    daySummaries.push({
+      id: "__unassigned__",
+      name: "Unassigned events",
+      date: null,
+      sortOrder: 9999,
+      estimatedSpend: unassignedSpend,
+      eventCount: unassignedCount,
+    });
+  }
+
+  const totalEstimated = events.reduce(
+    (sum, event) => sum + (event.estimated_budget ?? 0),
+    0
+  );
+
+  return {
+    weddingName: wedding.name,
+    totalEstimated,
+    eventCount: events.length,
+    days: daySummaries,
+  };
+}
+
 async function getOrCreateBudget(profileId: string) {
   const supabase = createAdminSupabaseClient();
   const { data: existing, error } = await supabase
@@ -198,8 +314,11 @@ export async function GET() {
       return apiSuccess({ needsOnboarding: true, budget: null });
     }
 
-    const budget = await loadBudgetPayload(profileId);
-    return apiSuccess({ needsOnboarding: false, budget });
+    const [budget, eventPlanSpend] = await Promise.all([
+      loadBudgetPayload(profileId),
+      getEventPlanSpendSummary(profileId),
+    ]);
+    return apiSuccess({ needsOnboarding: false, budget, eventPlanSpend });
   } catch (error) {
     console.error("GET /api/budget", error);
     return apiError("Failed to load budget", 500);
@@ -318,8 +437,11 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    const refreshed = await loadBudgetPayload(profileId);
-    return apiSuccess({ budget: refreshed });
+    const [refreshed, eventPlanSpend] = await Promise.all([
+      loadBudgetPayload(profileId),
+      getEventPlanSpendSummary(profileId),
+    ]);
+    return apiSuccess({ budget: refreshed, eventPlanSpend });
   } catch (error) {
     console.error("PUT /api/budget", error);
     return apiError("Failed to save budget", 500);

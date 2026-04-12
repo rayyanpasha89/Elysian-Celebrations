@@ -117,6 +117,7 @@ model Wedding {
   clientProfile ClientProfile  @relation(fields: [clientProfileId], references: [id], onDelete: Cascade)
   destination   Destination?   @relation(fields: [destinationId], references: [id])
   packageTier   PackageTier?   @relation(fields: [packageTierId], references: [id])
+  days          WeddingDay[]
   events        WeddingEvent[]
   timeline      TimelineItem[]
 
@@ -131,18 +132,46 @@ enum WeddingStatus {
   CANCELLED
 }
 
-model WeddingEvent {
+model WeddingDay {
   id        String   @id @default(cuid())
   weddingId String
   name      String
   date      DateTime?
-  venue     String?
   notes     String?
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
 
-  wedding  Wedding   @relation(fields: [weddingId], references: [id], onDelete: Cascade)
-  bookings Booking[]
+  wedding Wedding       @relation(fields: [weddingId], references: [id], onDelete: Cascade)
+  events  WeddingEvent[]
+
+  @@map("wedding_days")
+}
+
+model WeddingEvent {
+  id              String   @id @default(cuid())
+  weddingId       String
+  weddingDayId    String?
+  name            String
+  eventType       String?
+  date            DateTime?
+  startTime       String?
+  endTime         String?
+  venue           String?
+  guestCount      Int?
+  estimatedBudget Int?
+  foodStyle       String?
+  foodPreferences String[] @default([])
+  menuNotes       String?
+  decorStyle      String?
+  decorNotes      String?
+  attireNotes     String?
+  notes           String?
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  wedding    Wedding     @relation(fields: [weddingId], references: [id], onDelete: Cascade)
+  weddingDay WeddingDay? @relation(fields: [weddingDayId], references: [id], onDelete: SetNull)
+  bookings   Booking[]
 
   @@map("wedding_events")
 }

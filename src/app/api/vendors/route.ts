@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from("vendor_profiles")
       .select(
-        `*, category:vendor_categories(name, slug), services:vendor_services(name, base_price)`,
+        `*, category:vendor_categories(name, slug), services:vendor_services(id, name, description, base_price, max_price, unit)`,
         { count: "exact" }
       )
       .order("is_featured", { ascending: false })

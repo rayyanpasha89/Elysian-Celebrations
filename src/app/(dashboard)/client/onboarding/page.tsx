@@ -9,11 +9,13 @@ import { z } from "zod";
 import { motion } from "framer-motion";
 import { fadeUp, staggerContainer } from "@/animations/variants";
 import { dashBtn, dashCard, dashLabel } from "@/lib/dashboard-styles";
+import { buildDefaultCelebrationPlan } from "@/lib/wedding-plan";
 import { cn } from "@/lib/utils";
 
 const schema = z.object({
   coupleName: z.string().min(2, "Enter both names"),
   weddingDate: z.string().min(1, "Pick a date"),
+  dayCount: z.number().min(1).max(7),
   guestCount: z.number().min(1, "At least 1 guest"),
   destinationId: z.string().optional(),
   budgetTotal: z.number().min(50000, "Minimum ₹50,000"),
@@ -24,6 +26,7 @@ type FormValues = z.infer<typeof schema>;
 const steps = [
   "Names",
   "Date",
+  "Celebration",
   "Guests",
   "Destination",
   "Budget",
@@ -42,12 +45,14 @@ export default function ClientOnboardingPage() {
     register,
     handleSubmit,
     trigger,
+    watch,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       coupleName: "",
       weddingDate: "",
+      dayCount: 3,
       guestCount: 120,
       destinationId: "",
       budgetTotal: 800000,
@@ -83,8 +88,9 @@ export default function ClientOnboardingPage() {
   const fieldsForStep = (): (keyof FormValues)[] => {
     if (step === 0) return ["coupleName"];
     if (step === 1) return ["weddingDate"];
-    if (step === 2) return ["guestCount"];
-    if (step === 3) return [];
+    if (step === 2) return ["dayCount"];
+    if (step === 3) return ["guestCount"];
+    if (step === 4) return [];
     return ["budgetTotal"];
   };
 
@@ -105,6 +111,7 @@ export default function ClientOnboardingPage() {
         body: JSON.stringify({
           coupleName: values.coupleName,
           weddingDate: values.weddingDate,
+          dayCount: values.dayCount,
           guestCount: values.guestCount,
           destinationId: values.destinationId || undefined,
           budgetTotal: values.budgetTotal,
@@ -124,6 +131,12 @@ export default function ClientOnboardingPage() {
       setLoading(false);
     }
   };
+
+  const weddingDate = watch("weddingDate");
+  const celebrationPreview = buildDefaultCelebrationPlan(
+    watch("dayCount"),
+    weddingDate || null
+  );
 
   return (
     <motion.div
@@ -190,6 +203,69 @@ export default function ClientOnboardingPage() {
           )}
 
           {step === 2 && (
+            <div className="space-y-5">
+              <div>
+                <label htmlFor="dayCount" className={dashLabel}>
+                  How many celebration days?
+                </label>
+                <input
+                  id="dayCount"
+                  type="number"
+                  min={1}
+                  max={7}
+                  {...register("dayCount", { valueAsNumber: true })}
+                  className="mt-3 w-full border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm outline-none focus:border-gold-primary"
+                />
+                <p className="mt-2 text-xs text-slate">
+                  We will create a day-wise planning board with starter events you can
+                  rename, expand, and customize after setup.
+                </p>
+                {errors.dayCount && (
+                  <p className="mt-2 text-xs text-rose">{errors.dayCount.message}</p>
+                )}
+              </div>
+
+              <div className="border border-charcoal/10 bg-cream/45 p-4">
+                <p className={dashLabel}>Initial celebration plan</p>
+                <div className="mt-4 space-y-4">
+                  {celebrationPreview.map((day) => (
+                    <div key={`${day.sortOrder}-${day.name}`} className="border border-charcoal/10 bg-ivory/80 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="font-display text-lg text-charcoal">{day.name}</p>
+                          <p className="font-heading text-xs text-slate">
+                            {day.date
+                              ? new Date(day.date).toLocaleDateString("en-IN", {
+                                  weekday: "short",
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                })
+                              : "Date follows your final wedding schedule"}
+                          </p>
+                        </div>
+                        <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-gold-dark">
+                          Day {day.sortOrder + 1}
+                        </p>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {day.events.map((event) => (
+                          <span
+                            key={`${day.name}-${event.name}`}
+                            className="border border-charcoal/10 px-3 py-2 font-heading text-xs text-charcoal"
+                          >
+                            {event.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {step === 3 && (
             <div>
               <label htmlFor="guestCount" className={dashLabel}>
                 Estimated guest count
@@ -207,7 +283,7 @@ export default function ClientOnboardingPage() {
             </div>
           )}
 
-          {step === 3 && (
+          {step === 4 && (
             <div>
               <p className={dashLabel}>Destination preference</p>
               {destLoading ? (
@@ -228,7 +304,7 @@ export default function ClientOnboardingPage() {
             </div>
           )}
 
-          {step === 4 && (
+          {step === 5 && (
             <div>
               <label htmlFor="budgetTotal" className={dashLabel}>
                 Total budget (INR)

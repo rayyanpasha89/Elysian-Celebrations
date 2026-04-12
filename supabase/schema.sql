@@ -162,12 +162,34 @@ create table weddings (
 
 -- ─── Wedding Events ──────────────────────────────────────────
 
-create table wedding_events (
+create table wedding_days (
   id uuid primary key default gen_random_uuid(),
   wedding_id uuid not null references weddings(id) on delete cascade,
   name text not null,
   date timestamptz,
+  notes text,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table wedding_events (
+  id uuid primary key default gen_random_uuid(),
+  wedding_id uuid not null references weddings(id) on delete cascade,
+  wedding_day_id uuid references wedding_days(id) on delete set null,
+  name text not null,
+  event_type text,
+  date timestamptz,
+  start_time text,
+  end_time text,
   venue text,
+  guest_count integer,
+  estimated_budget integer,
+  food_style text,
+  food_preferences text[] not null default '{}',
+  menu_notes text,
+  decor_style text,
+  decor_notes text,
+  attire_notes text,
   notes text,
   sort_order integer not null default 0,
   created_at timestamptz not null default now()
@@ -387,6 +409,8 @@ create index idx_bookings_vendor on bookings(vendor_profile_id);
 create index idx_bookings_status on bookings(status);
 create index idx_saved_vendors_client on saved_vendors(client_profile_id);
 create index idx_saved_vendors_vendor on saved_vendors(vendor_profile_id);
+create index idx_wedding_days_wedding on wedding_days(wedding_id);
+create index idx_wedding_events_day on wedding_events(wedding_day_id);
 create index idx_vendor_profile_views_vendor on vendor_profile_views(vendor_profile_id);
 create index idx_vendor_profile_views_created_at on vendor_profile_views(created_at desc);
 create index idx_guests_list on guests(guest_list_id);

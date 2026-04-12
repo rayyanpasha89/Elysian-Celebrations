@@ -7,7 +7,7 @@ import { BudgetCanvas } from "@/components/dashboard/budget/budget-canvas";
 import { BudgetItemPalette } from "@/components/dashboard/budget/budget-item-palette";
 import { BudgetSummary } from "@/components/dashboard/budget/budget-summary";
 import { useBudgetHydrated } from "@/hooks/use-budget-hydrated";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { useBudgetStore, type BudgetCategory } from "@/stores/budget-store";
 
 type MobileTab = "palette" | "canvas" | "summary";
@@ -16,6 +16,22 @@ type BudgetApiPayload = {
   budgetName: string;
   totalBudget: number;
   categories: BudgetCategory[];
+};
+
+type EventPlanSpendDay = {
+  id: string;
+  name: string;
+  date: string | null;
+  sortOrder: number;
+  estimatedSpend: number;
+  eventCount: number;
+};
+
+type EventPlanSpendSummary = {
+  weddingName: string;
+  totalEstimated: number;
+  eventCount: number;
+  days: EventPlanSpendDay[];
 };
 
 function snapshotBudget(budget: BudgetApiPayload) {
@@ -63,6 +79,9 @@ export default function BudgetPage() {
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [lastSavedSnapshot, setLastSavedSnapshot] = useState<string | null>(null);
   const [budgetTitleDraft, setBudgetTitleDraft] = useState("");
+  const [eventPlanSpend, setEventPlanSpend] = useState<EventPlanSpendSummary | null>(
+    null
+  );
 
   useEffect(() => {
     if (!hydrated) return;
@@ -82,6 +101,7 @@ export default function BudgetPage() {
         if (json.needsOnboarding) {
           setNeedsOnboarding(true);
           setLastSavedSnapshot(null);
+          setEventPlanSpend(null);
           return;
         }
 
@@ -91,6 +111,10 @@ export default function BudgetPage() {
           setBudgetTitleDraft(budget.budgetName);
           setLastSavedSnapshot(snapshotBudget(budget));
         }
+
+        setEventPlanSpend(
+          (json.eventPlanSpend as EventPlanSpendSummary | null | undefined) ?? null
+        );
       } catch (error) {
         if (!cancelled) {
           toast.error(
@@ -160,6 +184,11 @@ export default function BudgetPage() {
       hydrateBudget(savedBudget);
       setLastSavedSnapshot(snapshotBudget(savedBudget));
       setBudgetTitleDraft(savedBudget.budgetName);
+      if (json.eventPlanSpend !== undefined) {
+        setEventPlanSpend(
+          (json.eventPlanSpend as EventPlanSpendSummary | null) ?? null
+        );
+      }
       toast.success("Budget plan saved");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to save budget");
@@ -337,6 +366,13 @@ export default function BudgetPage() {
         </div>
       </div>
 
+      {eventPlanSpend ? (
+        <EventPlanSpendCallout
+          summary={eventPlanSpend}
+          budgetCap={totalBudget}
+        />
+      ) : null}
+
       <div className="flex gap-1 border border-charcoal/8 p-1 lg:hidden">
         {(
           [
@@ -384,6 +420,110 @@ export default function BudgetPage() {
             <BudgetSummary />
           </div>
         ) : null}
+      </div>
+    </div>
+  );
+}
+
+function EventPlanSpendCallout({
+  summary,
+  budgetCap,
+}: {
+  summary: EventPlanSpendSummary;
+  budgetCap: number;
+}) {
+  const overCap = budgetCap > 0 && summary.totalEstimated > budgetCap;
+  const gap = budgetCap > 0 ? budgetCap - summary.totalEstimated : null;
+  const daysWithActivity = summary.days.filter(
+    (day) => day.eventCount > 0 || day.estimatedSpend > 0
+  );
+
+  return (
+    <div
+      className={cn(
+        "border bg-ivory p-6",
+        overCap ? "border-gold-primary/40" : "border-charcoal/8"
+      )}
+    >
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-2xl">
+          <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-slate">
+            Wedding operating plan
+          </p>
+          <h2 className="mt-2 font-display text-2xl text-charcoal">
+            {summary.weddingName}
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-slate">
+            Event-level estimates from your day-by-day planner. They stay separate
+            from category line items here, so you can compare the two views.
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-end lg:flex-col lg:items-end">
+          <div className="text-right">
+            <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
+              Planner total
+            </p>
+            <p className="mt-1 font-display text-2xl text-charcoal">
+              {formatCurrency(summary.totalEstimated)}
+            </p>
+            <p className="mt-1 text-xs text-slate">
+              Across {summary.eventCount}{" "}
+              {summary.eventCount === 1 ? "event" : "events"}
+            </p>
+          </div>
+          {budgetCap > 0 ? (
+            <div className="text-right">
+              <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
+                Versus budget cap
+              </p>
+              <p
+                className={cn(
+                  "mt-1 font-heading text-sm",
+                  overCap ? "text-gold-dark" : "text-sage"
+                )}
+              >
+                {overCap
+                  ? `${formatCurrency(summary.totalEstimated - budgetCap)} over cap`
+                  : gap !== null
+                    ? `${formatCurrency(gap)} headroom`
+                    : ""}
+              </p>
+            </div>
+          ) : null}
+          <Link
+            href="/client/wedding"
+            className="font-accent inline-flex items-center justify-center border border-charcoal/15 px-5 py-2.5 text-[10px] uppercase tracking-[0.2em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark"
+          >
+            Edit wedding plan
+          </Link>
+        </div>
+      </div>
+
+      <div className="mt-6 border-t border-charcoal/8 pt-5">
+        <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-slate">
+          By celebration day
+        </p>
+        {daysWithActivity.length > 0 ? (
+          <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {daysWithActivity.map((day) => (
+              <li
+                key={day.id}
+                className="border border-charcoal/8 bg-cream/30 px-4 py-3"
+              >
+                <p className="font-display text-sm text-charcoal">{day.name}</p>
+                <p className="mt-2 font-accent text-[10px] uppercase tracking-[0.15em] text-slate">
+                  {formatCurrency(day.estimatedSpend)} · {day.eventCount}{" "}
+                  {day.eventCount === 1 ? "event" : "events"}
+                </p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-4 text-sm leading-relaxed text-slate">
+            No per-event estimates yet. Open your wedding plan and set estimated
+            spend on each function to roll it up here.
+          </p>
+        )}
       </div>
     </div>
   );
