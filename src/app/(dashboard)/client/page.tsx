@@ -3,9 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { useUser } from "@clerk/nextjs";
-import { fadeUp, staggerContainer, staggerItem } from "@/animations/variants";
 import { dashLabel } from "@/lib/dashboard-styles";
 import { cn } from "@/lib/utils";
 
@@ -30,31 +28,47 @@ type ClientDashboardPayload = {
   subtitle?: string;
 };
 
+const quickActions = [
+  { label: "Wedding plan", href: "/client/wedding" },
+  { label: "Vendors", href: "/client/vendors" },
+  { label: "Guests", href: "/client/guests" },
+  { label: "Timeline", href: "/client/timeline" },
+  { label: "Bookings", href: "/client/bookings" },
+  { label: "Messages", href: "/client/messages" },
+  { label: "Mood board", href: "/client/mood-board" },
+];
+
 function DashboardSkeleton() {
   return (
-    <div className="mx-auto max-w-6xl animate-pulse space-y-8">
-      <div className="h-48 border border-charcoal/8 bg-charcoal/5" />
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="space-y-6 animate-pulse">
+      <div className="border border-charcoal/8 bg-cream/40 p-6">
+        <div className="h-3 w-24 bg-charcoal/10" />
+        <div className="mt-4 h-10 max-w-xs bg-charcoal/10" />
+        <div className="mt-3 h-4 max-w-lg bg-charcoal/10" />
+        <div className="mt-6 flex flex-wrap gap-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-9 w-24 border border-charcoal/8 bg-ivory/50" />
+          ))}
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-28 border border-charcoal/8 bg-charcoal/5" />
+          <div key={i} className="h-28 border border-charcoal/8 bg-ivory/80" />
         ))}
       </div>
       <div className="grid gap-6 lg:grid-cols-5">
-        <div className="lg:col-span-3 h-72 border border-charcoal/8 bg-charcoal/5" />
-        <div className="lg:col-span-2 h-72 border border-charcoal/8 bg-charcoal/5" />
+        <div className="lg:col-span-3 h-72 border border-charcoal/8 bg-ivory/50" />
+        <div className="lg:col-span-2 h-72 border border-charcoal/8 bg-ivory/50" />
       </div>
     </div>
   );
 }
 
-const quickActions = [
-  { label: "Browse Vendors", href: "/client/vendors" },
-  { label: "Manage Budget", href: "/client/budget" },
-  { label: "Guest List", href: "/client/guests" },
-  { label: "Messages", href: "/client/messages" },
-  { label: "Timeline", href: "/client/timeline" },
-  { label: "Mood Board", href: "/client/mood-board" },
-];
+const actionLinkClass =
+  "font-accent inline-flex items-center justify-center border border-charcoal/15 px-4 py-2.5 text-[10px] uppercase tracking-[0.2em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark";
+
+const sectionEyebrowClass =
+  "font-accent text-[10px] uppercase tracking-[0.2em] text-slate";
 
 export default function ClientDashboard() {
   const { user } = useUser();
@@ -72,150 +86,181 @@ export default function ClientDashboard() {
         if (!res.ok) throw new Error(json.error ?? "Failed to load dashboard");
         if (!cancelled) setData(json);
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Something went wrong");
+        if (!cancelled)
+          setError(e instanceof Error ? e.message : "Something went wrong");
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
     if (loading || !data) return;
-    if (data.needsOnboarding || data.needsProfile) router.replace("/client/onboarding");
+    if (data.needsOnboarding || data.needsProfile)
+      router.replace("/client/onboarding");
   }, [loading, data, router]);
 
   if (loading) return <DashboardSkeleton />;
-  if (error) return (
-    <div className="mx-auto max-w-6xl border border-rose/20 bg-ivory p-6 text-charcoal">
-      <p className="text-sm">{error}</p>
-    </div>
-  );
-  if (!data || data.needsOnboarding || data.needsProfile) return <DashboardSkeleton />;
+  if (error)
+    return (
+      <div className="border border-charcoal/8 bg-ivory p-8">
+        <p className={sectionEyebrowClass}>Dashboard</p>
+        <h1 className="mt-2 font-display text-2xl text-charcoal">
+          Something went wrong
+        </h1>
+        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate">
+          {error}
+        </p>
+      </div>
+    );
+  if (!data || data.needsOnboarding || data.needsProfile)
+    return <DashboardSkeleton />;
 
   const firstName = user?.firstName ?? "there";
   const { stats, tasks, recentNotifications, wedding } = data;
   const doneTasks = tasks.filter((t) => t.done).length;
-  const taskProgress = tasks.length > 0 ? Math.round((doneTasks / tasks.length) * 100) : 0;
+  const taskProgress =
+    tasks.length > 0 ? Math.round((doneTasks / tasks.length) * 100) : 0;
   const weddingDate = wedding?.date ? new Date(wedding.date) : null;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
-
-      {/* Hero — countdown + wedding identity */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-        className="relative overflow-hidden border border-charcoal/8 bg-[radial-gradient(ellipse_at_top_right,rgba(201,169,110,0.12),transparent_50%),radial-gradient(ellipse_at_bottom_left,rgba(201,169,110,0.06),transparent_40%)] p-8 lg:p-10"
-      >
-        <div className="pointer-events-none absolute right-0 top-0 h-px w-1/2 bg-gradient-to-l from-transparent via-gold-primary/30 to-transparent" />
-        <div className="grid gap-8 lg:grid-cols-[1fr_auto]">
-          <div>
-            <p className={dashLabel}>Welcome back</p>
-            <h1 className="font-display mt-3 text-4xl font-semibold text-charcoal lg:text-5xl">
+    <div className="space-y-6">
+      {/* Strategy header — aligned with /client/budget top strip */}
+      <div className="border border-charcoal/8 bg-cream/40 p-6">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <div className="min-w-0 max-w-3xl">
+            <p className={sectionEyebrowClass}>Planning hub</p>
+            <h1 className="mt-2 font-display text-3xl text-charcoal md:text-4xl">
               {firstName}
             </h1>
             {wedding ? (
-              <p className="font-heading mt-2 text-lg font-light text-slate">
-                {wedding.name}
-                {wedding.destinationName && (
-                  <span className="text-gold-dark"> · {wedding.destinationName}</span>
-                )}
+              <p className="font-heading mt-2 text-sm text-slate">
+                <span className="text-charcoal">{wedding.name}</span>
+                {wedding.destinationName ? (
+                  <span className="text-gold-dark">
+                    {" "}
+                    · {wedding.destinationName}
+                  </span>
+                ) : null}
               </p>
             ) : (
-              <p className="font-heading mt-2 text-base text-slate">Complete onboarding to unlock your planning workspace.</p>
+              <p className="font-heading mt-2 text-sm text-slate">
+                Complete onboarding to unlock your full workspace.
+              </p>
             )}
-
-            {/* Quick actions */}
-            <div className="mt-6 flex flex-wrap gap-2">
-              {quickActions.map((a) => (
-                <Link
-                  key={a.href}
-                  href={a.href}
-                  className="font-accent border border-charcoal/15 px-4 py-2 text-[10px] uppercase tracking-[0.18em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark"
-                >
-                  {a.label}
-                </Link>
-              ))}
-            </div>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate">
+              This is your command center—jump into the budget planner, day-by-day
+              wedding plan, vendors, and guest flow from one place. Shortcuts below
+              mirror how the budget screen keeps tools one click away.
+            </p>
           </div>
 
-          {/* Countdown */}
-          {stats.daysUntil > 0 && (
-            <div className="flex flex-col items-center justify-center border border-gold-primary/20 bg-cream/40 px-8 py-6 text-center">
-              <p className={dashLabel}>Days to go</p>
-              <p className="font-display mt-2 text-6xl font-semibold text-charcoal lg:text-7xl">
-                {stats.daysUntil}
-              </p>
-              {weddingDate && (
-                <p className="font-heading mt-2 text-xs text-slate">
-                  {weddingDate.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
+          <div className="grid shrink-0 gap-3 sm:grid-cols-2 xl:w-[min(100%,380px)]">
+            {stats.daysUntil > 0 ? (
+              <div className="border border-charcoal/8 bg-ivory/80 p-4 sm:col-span-2">
+                <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
+                  Days to go
                 </p>
-              )}
-            </div>
-          )}
+                <p className="mt-2 font-display text-4xl text-charcoal xl:text-5xl">
+                  {stats.daysUntil}
+                </p>
+                {weddingDate ? (
+                  <p className="mt-2 font-heading text-xs text-slate">
+                    {weddingDate.toLocaleDateString("en-IN", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <div className="border border-charcoal/8 bg-ivory/80 p-4 sm:col-span-2">
+                <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
+                  Countdown
+                </p>
+                <p className="mt-2 font-display text-xl text-charcoal">
+                  Set your date in onboarding or the wedding plan.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
-      </motion.div>
 
-      {/* Stat strip */}
-      <motion.div
-        variants={staggerContainer}
-        initial="hidden"
-        animate="visible"
-        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
-      >
-        {[
-          { label: "Budget Used", value: `${stats.budgetPercent}%`, sub: "of total budget", accent: stats.budgetPercent > 80 },
-          { label: "Vendors Booked", value: stats.vendorsBooked, sub: "confirmed vendors" },
-          { label: "Guests Confirmed", value: stats.guestsConfirmed, sub: "on your list" },
-          { label: "Tasks Done", value: `${doneTasks} / ${tasks.length}`, sub: `${taskProgress}% complete` },
-        ].map((s) => (
-          <motion.div
-            key={s.label}
-            variants={staggerItem}
-            className={cn(
-              "border bg-ivory p-6 transition-colors hover:border-gold-primary/40",
-              s.accent ? "border-gold-primary/40" : "border-charcoal/8"
-            )}
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <Link
+            href="/client/budget"
+            className="font-accent inline-flex items-center justify-center border border-gold-primary px-5 py-2.5 text-[10px] uppercase tracking-[0.2em] text-gold-primary transition-all duration-500 hover:bg-gold-primary hover:text-midnight"
           >
-            <p className={dashLabel}>{s.label}</p>
-            <p className="font-display mt-3 text-3xl font-semibold text-charcoal">{s.value}</p>
-            <p className="font-heading mt-1 text-xs text-slate">{s.sub}</p>
-            {s.label === "Budget Used" && (
-              <div className="mt-3 h-1 border border-charcoal/10 bg-cream">
-                <div
-                  className={cn("h-full transition-all duration-700", stats.budgetPercent > 80 ? "bg-gold-primary" : "bg-gold-primary/60")}
-                  style={{ width: `${Math.min(stats.budgetPercent, 100)}%` }}
-                />
-              </div>
-            )}
-            {s.label === "Tasks Done" && tasks.length > 0 && (
-              <div className="mt-3 h-1 border border-charcoal/10 bg-cream">
-                <div className="h-full bg-sage/60 transition-all duration-700" style={{ width: `${taskProgress}%` }} />
-              </div>
-            )}
-          </motion.div>
-        ))}
-      </motion.div>
+            Open budget planner
+          </Link>
+          <Link href="/client/wedding" className={actionLinkClass}>
+            Edit wedding plan
+          </Link>
+        </div>
 
-      {/* Main content grid */}
+        <div className="mt-5 flex flex-wrap gap-2 border-t border-charcoal/8 pt-5">
+          {quickActions.map((a) => (
+            <Link key={a.href} href={a.href} className={actionLinkClass}>
+              {a.label}
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* Quick stats — same card language as budget QuickStat */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <DashboardQuickStat
+          label="Budget allocated"
+          value={`${stats.budgetPercent}%`}
+          hint="Of your total budget cap"
+          tone={stats.budgetPercent > 80 ? "warning" : "neutral"}
+          progress={Math.min(stats.budgetPercent, 100)}
+          progressClassName={
+            stats.budgetPercent > 80 ? "bg-gold-primary" : "bg-gold-primary/60"
+          }
+        />
+        <DashboardQuickStat
+          label="Vendors booked"
+          value={stats.vendorsBooked}
+          hint="Confirmed on your plan"
+        />
+        <DashboardQuickStat
+          label="Guests confirmed"
+          value={stats.guestsConfirmed}
+          hint="On your primary list"
+        />
+        <DashboardQuickStat
+          label="Tasks progress"
+          value={`${doneTasks} / ${tasks.length}`}
+          hint={`${taskProgress}% complete`}
+          tone={taskProgress === 100 ? "healthy" : "neutral"}
+          progress={tasks.length > 0 ? taskProgress : undefined}
+          progressClassName="bg-sage/60"
+        />
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-5">
-
-        {/* Tasks */}
-        <motion.div
-          variants={fadeUp}
-          initial="hidden"
-          animate="visible"
-          className="lg:col-span-3 space-y-6"
-        >
+        <div className="lg:col-span-3 space-y-6">
           <div className="border border-charcoal/8 bg-ivory p-6">
-            <div className="mb-6 flex items-center justify-between">
+            <div className="mb-6 flex items-start justify-between gap-4">
               <div>
-                <h3 className="font-display text-xl text-charcoal">Upcoming Tasks</h3>
-                <p className="font-heading mt-1 text-xs text-slate">{tasks.filter((t) => !t.done).length} remaining · {doneTasks} completed</p>
+                <p className={sectionEyebrowClass}>Timeline</p>
+                <h2 className="mt-2 font-display text-xl text-charcoal">
+                  Upcoming tasks
+                </h2>
+                <p className="font-heading mt-1 text-xs text-slate">
+                  {tasks.filter((t) => !t.done).length} remaining · {doneTasks}{" "}
+                  completed
+                </p>
               </div>
-              <Link href="/client/timeline" className={cn(dashLabel, "hover:text-gold-dark transition-colors")}>
+              <Link
+                href="/client/timeline"
+                className={cn(dashLabel, "shrink-0 hover:text-gold-dark")}
+              >
                 View all
               </Link>
             </div>
@@ -223,135 +268,285 @@ export default function ClientDashboard() {
             {tasks.length === 0 ? (
               <div className="border border-dashed border-charcoal/12 bg-cream/30 px-5 py-8 text-center">
                 <p className="font-heading text-sm text-slate">No tasks yet.</p>
-                <Link href="/client/timeline" className="mt-3 inline-block font-accent text-[10px] uppercase tracking-[0.18em] text-gold-primary">
+                <Link
+                  href="/client/timeline"
+                  className="mt-3 inline-block font-accent text-[10px] uppercase tracking-[0.18em] text-gold-primary"
+                >
                   Add your first task
                 </Link>
               </div>
             ) : (
               <ul className="divide-y divide-charcoal/5">
                 {tasks.slice(0, 6).map((task) => (
-                  <li key={task.id} className="flex items-center justify-between py-3.5">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className={cn(
-                        "flex h-4 w-4 flex-shrink-0 items-center justify-center border transition-colors",
-                        task.done ? "border-gold-primary/60 bg-gold-primary/10" : "border-charcoal/20"
-                      )}>
-                        {task.done && <div className="h-2 w-2 bg-gold-primary" />}
+                  <li
+                    key={task.id}
+                    className="flex items-center justify-between py-3.5"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div
+                        className={cn(
+                          "flex h-4 w-4 shrink-0 items-center justify-center border transition-colors",
+                          task.done
+                            ? "border-gold-primary/60 bg-gold-primary/10"
+                            : "border-charcoal/20"
+                        )}
+                      >
+                        {task.done && (
+                          <div className="h-2 w-2 bg-gold-primary" />
+                        )}
                       </div>
-                      <span className={cn("font-heading text-sm truncate", task.done ? "text-slate line-through" : "text-charcoal")}>
+                      <span
+                        className={cn(
+                          "truncate font-heading text-sm",
+                          task.done
+                            ? "text-slate line-through"
+                            : "text-charcoal"
+                        )}
+                      >
                         {task.title}
                       </span>
                     </div>
-                    <span className="flex-shrink-0 ml-4 font-accent text-[10px] uppercase tracking-[0.15em] text-slate">{task.due}</span>
+                    <span className="ml-4 shrink-0 font-accent text-[10px] uppercase tracking-[0.15em] text-slate">
+                      {task.due}
+                    </span>
                   </li>
                 ))}
               </ul>
             )}
           </div>
 
-          {/* Wedding summary */}
-          {wedding && (
+          {wedding ? (
             <div className="border border-charcoal/8 bg-ivory p-6">
-              <div className="mb-5 flex items-center justify-between">
-                <h3 className="font-display text-xl text-charcoal">Wedding Overview</h3>
-                <Link href="/client/wedding" className={cn(dashLabel, "hover:text-gold-dark transition-colors")}>Manage</Link>
+              <div className="mb-5 flex items-start justify-between gap-4">
+                <div>
+                  <p className={sectionEyebrowClass}>Wedding operating plan</p>
+                  <h2 className="mt-2 font-display text-xl text-charcoal">
+                    Overview
+                  </h2>
+                </div>
+                <Link
+                  href="/client/wedding"
+                  className={cn(dashLabel, "shrink-0 hover:text-gold-dark")}
+                >
+                  Manage
+                </Link>
               </div>
-              <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
                 {[
                   { label: "Wedding name", value: wedding.name },
-                  { label: "Destination", value: wedding.destinationName ?? "TBD" },
+                  {
+                    label: "Destination",
+                    value: wedding.destinationName ?? "TBD",
+                  },
                   { label: "Status", value: wedding.status },
-                  { label: "Wedding date", value: weddingDate?.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) ?? "TBD" },
-                  { label: "Days away", value: stats.daysUntil > 0 ? `${stats.daysUntil} days` : "Today!" },
+                  {
+                    label: "Wedding date",
+                    value:
+                      weddingDate?.toLocaleDateString("en-IN", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      }) ?? "TBD",
+                  },
+                  {
+                    label: "Days away",
+                    value:
+                      stats.daysUntil > 0
+                        ? `${stats.daysUntil} days`
+                        : "Today or TBD",
+                  },
                 ].map((item) => (
-                  <div key={item.label} className="border border-charcoal/8 bg-cream/30 p-4">
-                    <p className={dashLabel}>{item.label}</p>
-                    <p className="font-heading mt-2 text-sm text-charcoal">{item.value}</p>
+                  <div
+                    key={item.label}
+                    className="border border-charcoal/8 bg-cream/30 px-4 py-3"
+                  >
+                    <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
+                      {item.label}
+                    </p>
+                    <p className="font-heading mt-2 text-sm text-charcoal">
+                      {item.value}
+                    </p>
                   </div>
                 ))}
               </div>
             </div>
-          )}
-        </motion.div>
+          ) : null}
+        </div>
 
-        {/* Right column */}
-        <motion.div
-          variants={fadeUp}
-          initial="hidden"
-          animate="visible"
-          transition={{ delay: 0.1 }}
-          className="lg:col-span-2 space-y-6"
-        >
-          {/* Budget ring visual */}
+        <div className="lg:col-span-2 space-y-6">
           <div className="border border-charcoal/8 bg-ivory p-6">
-            <div className="mb-5 flex items-center justify-between">
-              <h3 className="font-display text-xl text-charcoal">Budget</h3>
-              <Link href="/client/budget" className={cn(dashLabel, "hover:text-gold-dark transition-colors")}>Details</Link>
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <p className={sectionEyebrowClass}>Investment plan</p>
+                <h2 className="mt-2 font-display text-xl text-charcoal">
+                  Budget at a glance
+                </h2>
+              </div>
+              <Link
+                href="/client/budget"
+                className={cn(dashLabel, "shrink-0 hover:text-gold-dark")}
+              >
+                Details
+              </Link>
             </div>
             <div className="flex items-center gap-6">
-              <div className="relative flex h-24 w-24 flex-shrink-0 items-center justify-center">
-                <svg className="absolute inset-0 -rotate-90" viewBox="0 0 100 100">
-                  <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="8" className="text-charcoal/8" />
+              <div className="relative flex h-24 w-24 shrink-0 items-center justify-center">
+                <svg
+                  className="absolute inset-0 -rotate-90"
+                  viewBox="0 0 100 100"
+                >
                   <circle
-                    cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="8"
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="8"
+                    className="text-charcoal/8"
+                  />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="8"
                     strokeDasharray={`${2 * Math.PI * 40}`}
                     strokeDashoffset={`${2 * Math.PI * 40 * (1 - stats.budgetPercent / 100)}`}
                     strokeLinecap="square"
                     className="text-gold-primary transition-all duration-700"
                   />
                 </svg>
-                <span className="font-display text-lg font-semibold text-charcoal">{stats.budgetPercent}%</span>
+                <span className="font-display text-lg font-semibold text-charcoal">
+                  {stats.budgetPercent}%
+                </span>
               </div>
               <div>
-                <p className="font-heading text-sm text-charcoal">of budget allocated</p>
-                <p className="font-heading mt-1 text-xs text-slate">
-                  {100 - stats.budgetPercent}% remaining
+                <p className="font-heading text-sm text-charcoal">
+                  Of budget allocated to categories
                 </p>
-                <Link href="/client/budget" className="mt-3 inline-block font-accent text-[10px] uppercase tracking-[0.18em] text-gold-primary">
-                  Manage budget
+                <p className="font-heading mt-1 text-xs text-slate">
+                  {100 - stats.budgetPercent}% headroom in the planner
+                </p>
+                <Link
+                  href="/client/budget"
+                  className="mt-4 inline-flex font-accent text-[10px] uppercase tracking-[0.2em] text-gold-primary"
+                >
+                  Manage budget →
                 </Link>
               </div>
             </div>
           </div>
 
-          {/* Recent activity */}
           <div className="border border-charcoal/8 bg-ivory p-6">
-            <h3 className="font-display mb-5 text-xl text-charcoal">Recent Activity</h3>
-            {recentNotifications.length === 0 ? (
-              <div className="border border-dashed border-charcoal/12 bg-cream/30 px-4 py-6 text-center">
-                <p className="font-heading text-sm text-slate">No activity yet.</p>
-              </div>
-            ) : (
-              <ul className="space-y-4">
-                {recentNotifications.map((item) => (
-                  <li key={item.id} className="border-l-2 border-gold-primary/25 pl-4">
-                    <p className="font-heading text-sm leading-snug text-charcoal">{item.text}</p>
-                    <p className="mt-1 font-accent text-[10px] uppercase tracking-[0.15em] text-slate">{item.time}</p>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <p className={sectionEyebrowClass}>Activity</p>
+            <h2 className="mt-2 font-display text-xl text-charcoal">
+              Recent updates
+            </h2>
+            <div className="mt-5">
+              {recentNotifications.length === 0 ? (
+                <div className="border border-dashed border-charcoal/12 bg-cream/30 px-4 py-6 text-center">
+                  <p className="font-heading text-sm text-slate">
+                    No activity yet.
+                  </p>
+                </div>
+              ) : (
+                <ul className="space-y-4">
+                  {recentNotifications.map((item) => (
+                    <li
+                      key={item.id}
+                      className="border-l-2 border-gold-primary/25 pl-4"
+                    >
+                      <p className="font-heading text-sm leading-snug text-charcoal">
+                        {item.text}
+                      </p>
+                      <p className="mt-1 font-accent text-[10px] uppercase tracking-[0.15em] text-slate">
+                        {item.time}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
 
-          {/* Vendors shortcut */}
           <div className="border border-charcoal/8 bg-ivory p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-display text-xl text-charcoal">Vendors</h3>
-              <Link href="/client/vendors" className={cn(dashLabel, "hover:text-gold-dark transition-colors")}>Browse</Link>
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <p className={sectionEyebrowClass}>Suppliers</p>
+                <h2 className="mt-2 font-display text-xl text-charcoal">
+                  Vendors
+                </h2>
+              </div>
+              <Link
+                href="/client/vendors"
+                className={cn(dashLabel, "shrink-0 hover:text-gold-dark")}
+              >
+                Browse
+              </Link>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="border border-charcoal/8 bg-cream/40 p-4 text-center">
-                <p className="font-display text-2xl text-charcoal">{stats.vendorsBooked}</p>
+                <p className="font-display text-2xl text-charcoal">
+                  {stats.vendorsBooked}
+                </p>
                 <p className={cn(dashLabel, "mt-1")}>Booked</p>
               </div>
-              <Link href="/client/vendors" className="border border-charcoal/8 bg-cream/40 p-4 text-center transition-colors hover:border-gold-primary/40">
+              <Link
+                href="/client/vendors"
+                className="border border-charcoal/8 bg-cream/40 p-4 text-center transition-colors hover:border-gold-primary/40"
+              >
                 <p className="font-display text-2xl text-gold-dark">+</p>
                 <p className={cn(dashLabel, "mt-1")}>Add vendor</p>
               </Link>
             </div>
           </div>
-        </motion.div>
+        </div>
       </div>
+    </div>
+  );
+}
+
+function DashboardQuickStat({
+  label,
+  value,
+  hint,
+  tone = "neutral",
+  progress,
+  progressClassName = "bg-gold-primary/60",
+}: {
+  label: string;
+  value: string | number;
+  hint: string;
+  tone?: "neutral" | "warning" | "healthy";
+  progress?: number;
+  progressClassName?: string;
+}) {
+  const display = typeof value === "number" ? String(value) : value;
+  return (
+    <div className="border border-charcoal/8 bg-ivory/80 p-4">
+      <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
+        {label}
+      </p>
+      <p
+        className={cn(
+          "mt-2 font-display text-xl",
+          tone === "warning" && "text-gold-dark",
+          tone === "healthy" && "text-sage",
+          tone === "neutral" && "text-charcoal"
+        )}
+      >
+        {display}
+      </p>
+      <p className="mt-1 text-xs text-slate">{hint}</p>
+      {progress !== undefined ? (
+        <div className="mt-3 h-1 border border-charcoal/10 bg-cream">
+          <div
+            className={cn("h-full transition-all duration-700", progressClassName)}
+            style={{ width: `${Math.min(Math.max(progress, 0), 100)}%` }}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
