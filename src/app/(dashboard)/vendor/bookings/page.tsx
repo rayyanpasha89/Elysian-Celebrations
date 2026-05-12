@@ -28,6 +28,24 @@ type ApiBooking = {
     weddings?: { destination?: { name?: string } | null }[] | null;
   } | null;
   service: { name?: string } | null;
+  event_context: BookingEventContext | null;
+};
+
+type BookingEventContext = {
+  name: string;
+  date: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  venue: string | null;
+  guestCount: number | null;
+  day: { name: string | null; date: string | null } | null;
+  logistics: {
+    guestArrivalTime: string | null;
+    vendorLoadInTime: string | null;
+    familyCallTime: string | null;
+    transportNotes: string | null;
+    weatherPlan: string | null;
+  } | null;
 };
 
 function statusClass(s: UiStatus) {
@@ -37,6 +55,16 @@ function statusClass(s: UiStatus) {
 }
 
 const tabs: Tab[] = ["All", "Inquiry", "Confirmed", "Completed"];
+
+function formatDate(value: string | null) {
+  return value
+    ? new Date(value).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : "Date TBD";
+}
 
 export default function VendorBookingsPage() {
   const [tab, setTab] = useState<Tab>("All");
@@ -73,7 +101,12 @@ export default function VendorBookingsPage() {
         id: b.id,
         couple: c?.partner_name ?? "Couple",
         destination: destName ?? "—",
-        eventDate: b.event_date ?? new Date().toISOString(),
+        eventDate: b.event_date,
+        eventName: b.event_context?.name ?? "Event TBD",
+        eventDay: b.event_context?.day?.name ?? "Wedding plan",
+        venue: b.event_context?.venue ?? null,
+        guestCount: b.event_context?.guestCount ?? null,
+        vendorLoadInTime: b.event_context?.logistics?.vendorLoadInTime ?? null,
         service: s?.name ?? "Service",
         amount: b.total_amount ?? 0,
         status: ui,
@@ -144,21 +177,39 @@ export default function VendorBookingsPage() {
               </div>
               <div className="mt-4 grid gap-2 font-heading text-sm text-slate sm:grid-cols-2">
                 <p>
+                  <span className={dashLabel}>Event </span>
+                  {b.eventName}
+                </p>
+                <p>
+                  <span className={dashLabel}>Day </span>
+                  {b.eventDay}
+                </p>
+                <p>
                   <span className={dashLabel}>Date </span>
-                  {new Date(b.eventDate).toLocaleDateString("en-IN", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
+                  {formatDate(b.eventDate)}
                 </p>
                 <p>
                   <span className={dashLabel}>Service </span>
                   {b.service}
                 </p>
+                <p>
+                  <span className={dashLabel}>Venue </span>
+                  {b.venue ?? "Venue TBD"}
+                </p>
+                <p>
+                  <span className={dashLabel}>Guest count </span>
+                  {b.guestCount ?? "TBD"}
+                </p>
                 <p className="sm:col-span-2">
                   <span className={dashLabel}>Amount </span>
                   ₹{b.amount.toLocaleString("en-IN")}
                 </p>
+                {b.vendorLoadInTime ? (
+                  <p className="sm:col-span-2">
+                    <span className={dashLabel}>Vendor load-in </span>
+                    {b.vendorLoadInTime}
+                  </p>
+                ) : null}
               </div>
               {b.status === "INQUIRY" && (
                 <div className="mt-6">

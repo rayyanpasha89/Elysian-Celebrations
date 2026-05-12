@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import {
   apiError,
   apiSuccess,
   getAuthSession,
   requireRole,
 } from "@/lib/api-utils";
-import { removeSavedVendorSlug } from "@/lib/saved-vendors";
+import { SavedVendorError, removeSavedVendorSlug } from "@/lib/saved-vendors";
 
 export async function DELETE(
   _request: NextRequest,
@@ -26,30 +25,18 @@ export async function DELETE(
       return apiError("Vendor slug is required");
     }
 
-    const supabase = createAdminSupabaseClient();
-    const { data: vendor, error: vendorErr } = await supabase
-      .from("vendor_profiles")
-      .select("id, slug")
-      .eq("slug", normalizedSlug)
-      .maybeSingle();
-
-    if (vendorErr) {
-      console.error("Vendor lookup error:", vendorErr);
-      return apiError("Failed to remove saved vendor", 500);
-    }
-    if (!vendor?.id || !vendor.slug) {
-      return apiError("Vendor not found", 404);
-    }
-
-    const savedSlugs = await removeSavedVendorSlug(session.userId, vendor.slug);
+    const savedSlugs = await removeSavedVendorSlug(session.userId, normalizedSlug);
 
     return apiSuccess({
       saved: false,
-      slug: vendor.slug,
+      slug: normalizedSlug,
       savedSlugs,
     });
   } catch (error) {
     console.error("Saved vendors delete error:", error);
+    if (error instanceof SavedVendorError) {
+      return apiError(error.message, error.status);
+    }
     return apiError("Internal server error", 500);
   }
 }

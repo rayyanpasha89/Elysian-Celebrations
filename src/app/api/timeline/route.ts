@@ -37,6 +37,10 @@ async function getClientWedding(
   return wedding;
 }
 
+function eventTaskId(id: string) {
+  return `event-task:${id}`;
+}
+
 export async function GET() {
   const session = await getAuthSession();
   if (session instanceof NextResponse) return session;
@@ -51,20 +55,115 @@ export async function GET() {
       return apiSuccess({ wedding: null, items: [] });
     }
 
-    const { data: items, error } = await supabase
-      .from("timeline_items")
-      .select("id, title, description, due_date, is_completed, sort_order")
-      .eq("wedding_id", wedding.id)
-      .order("sort_order", { ascending: true });
+    const [
+      { data: items, error },
+      { data: events, error: eventsError },
+    ] = await Promise.all([
+      supabase
+        .from("timeline_items")
+        .select("id, title, description, due_date, is_completed, sort_order")
+        .eq("wedding_id", wedding.id)
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("wedding_events")
+        .select("id, name, date, wedding_day:wedding_days(name)")
+        .eq("wedding_id", wedding.id),
+    ]);
 
     if (error) {
       console.error("timeline_items:", error);
       return apiError("Failed to load timeline", 500);
     }
 
+    if (eventsError) {
+      console.error("wedding_events timeline:", eventsError);
+      return apiError("Failed to load event tasks", 500);
+    }
+
+    const eventRows = events ?? [];
+    const eventIds = eventRows.map((event) => event.id);
+    const eventById = new Map(
+      eventRows.map((event) => {
+        const day = Array.isArray(event.wedding_day)
+          ? event.wedding_day[0]
+          : event.wedding_day;
+        return [
+          event.id,
+          {
+            name: event.name,
+            date: event.date,
+            dayName: day?.name ?? null,
+          },
+        ];
+      })
+    );
+
+    let eventTasks:
+      | {
+          id: string;
+          wedding_event_id: string;
+          title: string;
+          owner: string | null;
+          status: string;
+          due_date: string | null;
+          sort_order: number | null;
+        }[]
+      | null = null;
+
+    if (eventIds.length > 0) {
+      const { data: taskRows, error: taskError } = await supabase
+        .from("wedding_event_tasks")
+        .select("id, wedding_event_id, title, owner, status, due_date, sort_order")
+        .in("wedding_event_id", eventIds)
+        .order("due_date", { ascending: true, nullsFirst: false });
+
+      if (taskError) {
+        console.error("wedding_event_tasks timeline:", taskError);
+        return apiError("Failed to load event tasks", 500);
+      }
+
+      eventTasks = taskRows ?? [];
+    }
+
+    const timelineItems = (items ?? []).map((item) => ({
+      ...item,
+      source: "timeline" as const,
+      event_name: null,
+      event_day_name: null,
+      owner: null,
+    }));
+
+    const eventTaskItems = (eventTasks ?? []).map((task) => {
+      const event = eventById.get(task.wedding_event_id);
+      return {
+        id: eventTaskId(task.id),
+        title: task.title,
+        description: task.owner ? `Owner: ${task.owner}` : null,
+        due_date: task.due_date ?? event?.date ?? null,
+        is_completed: task.status === "DONE",
+        sort_order: task.sort_order ?? 0,
+        source: "event" as const,
+        event_name: event?.name ?? "Wedding event",
+        event_day_name: event?.dayName ?? null,
+        owner: task.owner,
+      };
+    });
+
+    const combinedItems = [...timelineItems, ...eventTaskItems].sort((left, right) => {
+      if (left.is_completed !== right.is_completed) {
+        return left.is_completed ? 1 : -1;
+      }
+
+      const leftTime = left.due_date ? new Date(left.due_date).getTime() : Infinity;
+      const rightTime = right.due_date ? new Date(right.due_date).getTime() : Infinity;
+      if (leftTime !== rightTime) return leftTime - rightTime;
+
+      return (left.sort_order ?? 0) - (right.sort_order ?? 0);
+    });
+
     return apiSuccess({
       wedding: { id: wedding.id, name: wedding.name },
-      items: items ?? [],
+      items: combinedItems,
     });
   } catch (e) {
     console.error("GET /api/timeline", e);

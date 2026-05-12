@@ -12,9 +12,23 @@ type Task = {
   id: string;
   title: string;
   description: string;
-  due: string;
+  due: string | null;
   done: boolean;
+  source: "timeline" | "event";
+  eventName: string | null;
+  eventDayName: string | null;
+  owner: string | null;
 };
+
+function formatDueDate(value: string | null) {
+  return value
+    ? new Date(value).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : "No due date";
+}
 
 export default function ClientTimelinePage() {
   const [loading, setLoading] = useState(true);
@@ -37,12 +51,20 @@ export default function ClientTimelinePage() {
         description: string | null;
         due_date: string | null;
         is_completed: boolean;
+        source?: "timeline" | "event";
+        event_name?: string | null;
+        event_day_name?: string | null;
+        owner?: string | null;
       }) => ({
         id: t.id,
         title: t.title,
         description: t.description ?? "",
-        due: t.due_date ?? new Date().toISOString(),
+        due: t.due_date ?? null,
         done: t.is_completed,
+        source: t.source ?? "timeline",
+        eventName: t.event_name ?? null,
+        eventDayName: t.event_day_name ?? null,
+        owner: t.owner ?? null,
       })
     );
   };
@@ -252,7 +274,18 @@ export default function ClientTimelinePage() {
                             Done
                           </span>
                         )}
+                        {task.source === "event" ? (
+                          <span className="border border-sage/50 px-2 py-1 font-accent text-[10px] uppercase tracking-[0.15em] text-sage">
+                            Event task
+                          </span>
+                        ) : null}
                       </div>
+                      {task.eventName ? (
+                        <p className="mt-3 font-accent text-[10px] uppercase tracking-[0.18em] text-gold-dark">
+                          {task.eventDayName ? `${task.eventDayName} · ` : ""}
+                          {task.eventName}
+                        </p>
+                      ) : null}
                       <p
                         className={cn(
                           "font-heading mt-4 text-sm font-light leading-relaxed",
@@ -263,12 +296,7 @@ export default function ClientTimelinePage() {
                       </p>
                       <div className="mt-4 flex items-center justify-between gap-3">
                         <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-slate">
-                          Due{" "}
-                          {new Date(task.due).toLocaleDateString("en-IN", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })}
+                          Due {formatDueDate(task.due)}
                         </p>
                         <button
                           type="button"

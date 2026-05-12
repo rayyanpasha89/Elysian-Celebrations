@@ -116,6 +116,7 @@ export async function GET() {
       { count: guestsCount },
       { data: budgetCategories },
       { data: timelineItems },
+      { data: weddingEvents },
     ] = await Promise.all([
       listIds.length
         ? supabase
@@ -139,6 +140,12 @@ export async function GET() {
             .order("due_date", { ascending: true, nullsFirst: false })
             .limit(5)
         : Promise.resolve({ data: [], error: null }),
+      wedding?.id
+        ? supabase
+            .from("wedding_events")
+            .select("id, name, date, wedding_day:wedding_days(name)")
+            .eq("wedding_id", wedding.id)
+        : Promise.resolve({ data: [], error: null }),
     ]);
 
     const guestsConfirmed = guestsCount ?? 0;
@@ -159,9 +166,49 @@ export async function GET() {
       );
     }
 
-    const tasks = (timelineItems ?? []).map((t) => ({
+    const eventRows = weddingEvents ?? [];
+    const eventById = new Map(
+      eventRows.map((event) => {
+        const day = Array.isArray(event.wedding_day)
+          ? event.wedding_day[0]
+          : event.wedding_day;
+        return [
+          event.id,
+          {
+            name: event.name,
+            date: event.date,
+            dayName: day?.name ?? null,
+          },
+        ];
+      })
+    );
+    let eventTaskRows:
+      | {
+          id: string;
+          wedding_event_id: string;
+          title: string;
+          status: string;
+          due_date: string | null;
+        }[]
+      | null = null;
+
+    const eventIds = eventRows.map((event) => event.id);
+    if (eventIds.length > 0) {
+      const { data } = await supabase
+        .from("wedding_event_tasks")
+        .select("id, wedding_event_id, title, status, due_date")
+        .in("wedding_event_id", eventIds)
+        .neq("status", "DONE")
+        .order("due_date", { ascending: true, nullsFirst: false })
+        .limit(5);
+
+      eventTaskRows = data ?? [];
+    }
+
+    const timelineTasks = (timelineItems ?? []).map((t) => ({
       id: t.id,
       title: t.title,
+      source: "timeline",
       due: t.due_date
         ? new Date(t.due_date).toLocaleDateString("en-IN", {
             month: "short",
@@ -170,6 +217,22 @@ export async function GET() {
         : "—",
       done: t.is_completed,
     }));
+    const eventTasks = (eventTaskRows ?? []).map((task) => {
+      const event = eventById.get(task.wedding_event_id);
+      return {
+        id: `event-task:${task.id}`,
+        title: `${task.title}${event?.name ? ` · ${event.name}` : ""}`,
+        source: "event",
+        due: (task.due_date ?? event?.date)
+          ? new Date(task.due_date ?? event?.date ?? "").toLocaleDateString("en-IN", {
+              month: "short",
+              day: "numeric",
+            })
+          : "—",
+        done: task.status === "DONE",
+      };
+    });
+    const tasks = [...timelineTasks, ...eventTasks].slice(0, 5);
 
     const recentNotifications = (notifs ?? []).map((n) => ({
       id: n.id,

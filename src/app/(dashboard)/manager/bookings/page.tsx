@@ -19,6 +19,17 @@ type BookingRow = {
   client: { partner_name?: string } | null;
   vendor: { business_name?: string } | null;
   service: { name?: string } | null;
+  event_context: BookingEventContext | null;
+};
+
+type BookingEventContext = {
+  name: string;
+  date: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  venue: string | null;
+  guestCount: number | null;
+  day: { name: string | null; date: string | null } | null;
 };
 
 const tabs: Tab[] = ["All", "INQUIRY", "CONFIRMED", "COMPLETED"];
@@ -34,6 +45,16 @@ function uiStatus(raw: string): string {
   if (raw === "COMPLETED") return "COMPLETED";
   if (raw === "CONFIRMED" || raw === "DEPOSIT_PAID") return "CONFIRMED";
   return "INQUIRY";
+}
+
+function formatDate(value: string | null) {
+  return value
+    ? new Date(value).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : "TBD";
 }
 
 export default function ManagerBookingsPage() {
@@ -142,18 +163,28 @@ export default function ManagerBookingsPage() {
                 </div>
                 <div className="mt-4 grid gap-2 font-heading text-sm text-slate sm:grid-cols-2">
                   <p>
+                    <span className={dashLabel}>Event </span>
+                    {b.event_context?.name ?? "Event TBD"}
+                  </p>
+                  <p>
+                    <span className={dashLabel}>Day </span>
+                    {b.event_context?.day?.name ?? "Wedding plan"}
+                  </p>
+                  <p>
                     <span className={dashLabel}>Date </span>
-                    {b.event_date
-                      ? new Date(b.event_date).toLocaleDateString("en-IN", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })
-                      : "TBD"}
+                    {formatDate(b.event_date)}
                   </p>
                   <p>
                     <span className={dashLabel}>Amount </span>
                     ₹{(b.total_amount ?? 0).toLocaleString("en-IN")}
+                  </p>
+                  <p>
+                    <span className={dashLabel}>Venue </span>
+                    {b.event_context?.venue ?? "Venue TBD"}
+                  </p>
+                  <p>
+                    <span className={dashLabel}>Guests </span>
+                    {b.event_context?.guestCount ?? "TBD"}
                   </p>
                 </div>
                 {b.notes && (

@@ -25,6 +25,33 @@ type BookingRow = {
   notes: string | null;
   vendor: { business_name?: string; slug?: string } | null;
   service: { name?: string } | null;
+  event_context: BookingEventContext | null;
+};
+
+type BookingEventContext = {
+  id: string;
+  name: string;
+  eventType: string | null;
+  date: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  venue: string | null;
+  guestCount: number | null;
+  day: { name: string | null; date: string | null } | null;
+  logistics: {
+    guestArrivalTime: string | null;
+    vendorLoadInTime: string | null;
+    familyCallTime: string | null;
+    transportNotes: string | null;
+    weatherPlan: string | null;
+  } | null;
+  menus: {
+    id: string;
+    name: string;
+    mealPeriod: string | null;
+    serviceStyle: string | null;
+    items: { id: string; name: string; course: string | null }[];
+  }[];
 };
 
 const tabs: Tab[] = ["All", "PENDING", "CONFIRMED", "COMPLETED"];
@@ -40,6 +67,16 @@ function statusClass(s: UiStatus) {
 
 function formatCurrency(amount: number) {
   return `₹${amount.toLocaleString("en-IN")}`;
+}
+
+function formatDate(value: string | null) {
+  return value
+    ? new Date(value).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : "Date TBD";
 }
 
 export default function ClientBookingsPage() {
@@ -215,14 +252,16 @@ export default function ClientBookingsPage() {
 
                   <div className="mt-4 grid gap-3 font-heading text-sm text-charcoal sm:grid-cols-2">
                     <p>
+                      <span className={dashLabel}>Event </span>
+                      {booking.event_context?.name ?? "Event TBD"}
+                    </p>
+                    <p>
+                      <span className={dashLabel}>Day </span>
+                      {booking.event_context?.day?.name ?? "Wedding plan"}
+                    </p>
+                    <p>
                       <span className={dashLabel}>Date </span>
-                      {booking.event_date
-                        ? new Date(booking.event_date).toLocaleDateString("en-IN", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })
-                        : "Date TBD"}
+                      {formatDate(booking.event_date)}
                     </p>
                     <p>
                       <span className={dashLabel}>Amount </span>
@@ -268,14 +307,78 @@ export default function ClientBookingsPage() {
                   <p className="mt-1 text-sm text-ivory/70">
                     {selectedBooking.serviceName}
                   </p>
+                  {selectedBooking.event_context ? (
+                    <p className="mt-3 font-accent text-[10px] uppercase tracking-[0.18em] text-gold-light">
+                      {selectedBooking.event_context.day?.name ?? "Wedding plan"} ·{" "}
+                      {selectedBooking.event_context.name}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <DetailMetric label="Event date" value={selectedBooking.event_date ? new Date(selectedBooking.event_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "Date TBD"} />
+                  <DetailMetric label="Event date" value={formatDate(selectedBooking.event_date)} />
                   <DetailMetric label="Total" value={formatCurrency(selectedBooking.total_amount ?? 0)} />
                   <DetailMetric label="Paid" value={formatCurrency(selectedBooking.paid_amount ?? 0)} />
                   <DetailMetric label="Remaining" value={formatCurrency(Math.max(0, (selectedBooking.total_amount ?? 0) - (selectedBooking.paid_amount ?? 0)))} />
                 </div>
+
+                {selectedBooking.event_context ? (
+                  <div className="border border-charcoal/8 bg-cream/40 p-4">
+                    <p className={dashLabel}>Event run-of-show</p>
+                    <div className="mt-3 grid gap-2 text-sm text-slate">
+                      <p>
+                        <span className="text-charcoal">Venue:</span>{" "}
+                        {selectedBooking.event_context.venue ?? "Venue TBD"}
+                      </p>
+                      <p>
+                        <span className="text-charcoal">Timing:</span>{" "}
+                        {selectedBooking.event_context.startTime ?? "Start TBD"}
+                        {selectedBooking.event_context.endTime
+                          ? ` - ${selectedBooking.event_context.endTime}`
+                          : ""}
+                      </p>
+                      <p>
+                        <span className="text-charcoal">Guests:</span>{" "}
+                        {selectedBooking.event_context.guestCount ?? "Guest count TBD"}
+                      </p>
+                    </div>
+                    {selectedBooking.event_context.logistics ? (
+                      <div className="mt-4 border-t border-charcoal/8 pt-3">
+                        <p className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
+                          Logistics
+                        </p>
+                        <p className="mt-2 text-sm leading-relaxed text-slate">
+                          Vendor load-in{" "}
+                          {selectedBooking.event_context.logistics.vendorLoadInTime ??
+                            "TBD"}
+                          {selectedBooking.event_context.logistics.weatherPlan
+                            ? ` · Backup: ${selectedBooking.event_context.logistics.weatherPlan}`
+                            : ""}
+                        </p>
+                      </div>
+                    ) : null}
+                    {selectedBooking.event_context.menus.length > 0 ? (
+                      <div className="mt-4 border-t border-charcoal/8 pt-3">
+                        <p className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
+                          Menu context
+                        </p>
+                        <ul className="mt-2 list-none space-y-2 pl-0 text-sm text-slate">
+                          {selectedBooking.event_context.menus.slice(0, 2).map((menu) => (
+                            <li key={menu.id}>
+                              <span className="text-charcoal">{menu.name}</span>
+                              {menu.items.length > 0
+                                ? ` · ${menu.items
+                                    .slice(0, 3)
+                                    .map((item) => item.name)
+                                    .join(", ")}`
+                                : ""}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 <div>
                   <p className={dashLabel}>Notes</p>

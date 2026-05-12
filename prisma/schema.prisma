@@ -91,14 +91,15 @@ model ClientProfile {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  weddings   Wedding[]
-  budgets    Budget[]
-  guestLists GuestList[]
-  bookings   Booking[]
-  reviews    Review[]
-  inquiries  ContactInquiry[]
-  moodBoards MoodBoard[]
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weddings     Wedding[]
+  budgets      Budget[]
+  guestLists   GuestList[]
+  bookings     Booking[]
+  reviews      Review[]
+  savedVendors SavedVendor[]
+  inquiries    ContactInquiry[]
+  moodBoards   MoodBoard[]
 
   @@map("client_profiles")
 }
@@ -273,6 +274,7 @@ model VendorProfile {
   services     VendorService[]
   reviews      Review[]
   bookings     Booking[]
+  savedBy      SavedVendor[]
   destinations VendorDestination[]
 
   @@map("vendor_profiles")
@@ -456,6 +458,21 @@ enum BookingStatus {
   DEPOSIT_PAID
   COMPLETED
   CANCELLED
+}
+
+// ─── Saved Vendors ────────────────────────────────────────────
+
+model SavedVendor {
+  id              String   @id @default(cuid())
+  clientProfileId String
+  vendorProfileId String
+  createdAt       DateTime @default(now())
+
+  clientProfile ClientProfile @relation(fields: [clientProfileId], references: [id], onDelete: Cascade)
+  vendorProfile VendorProfile @relation(fields: [vendorProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([clientProfileId, vendorProfileId])
+  @@map("saved_vendors")
 }
 
 // ─── Reviews ──────────────────────────────────────────────────
