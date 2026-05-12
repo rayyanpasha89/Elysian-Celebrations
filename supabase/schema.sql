@@ -195,6 +195,54 @@ create table wedding_events (
   created_at timestamptz not null default now()
 );
 
+create table wedding_event_menus (
+  id uuid primary key default gen_random_uuid(),
+  wedding_event_id uuid not null references wedding_events(id) on delete cascade,
+  name text not null default 'Primary menu',
+  meal_period text,
+  service_style text,
+  notes text,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table wedding_event_menu_items (
+  id uuid primary key default gen_random_uuid(),
+  menu_id uuid not null references wedding_event_menus(id) on delete cascade,
+  name text not null,
+  course text,
+  dietary_tags text[] not null default '{}',
+  notes text,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table wedding_event_logistics (
+  id uuid primary key default gen_random_uuid(),
+  wedding_event_id uuid not null unique references wedding_events(id) on delete cascade,
+  guest_arrival_time text,
+  vendor_load_in_time text,
+  family_call_time text,
+  transport_notes text,
+  rooming_notes text,
+  weather_plan text,
+  ceremony_notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table wedding_event_tasks (
+  id uuid primary key default gen_random_uuid(),
+  wedding_event_id uuid not null references wedding_events(id) on delete cascade,
+  title text not null,
+  owner text,
+  status text not null default 'OPEN',
+  due_date timestamptz,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
 -- ─── Budgets ─────────────────────────────────────────────────
 
 create table budgets (
@@ -217,6 +265,7 @@ create table budget_categories (
 create table budget_items (
   id uuid primary key default gen_random_uuid(),
   budget_category_id uuid not null references budget_categories(id) on delete cascade,
+  wedding_event_id uuid references wedding_events(id) on delete set null,
   name text not null,
   estimated_cost integer not null default 0,
   actual_cost integer,
@@ -411,6 +460,10 @@ create index idx_saved_vendors_client on saved_vendors(client_profile_id);
 create index idx_saved_vendors_vendor on saved_vendors(vendor_profile_id);
 create index idx_wedding_days_wedding on wedding_days(wedding_id);
 create index idx_wedding_events_day on wedding_events(wedding_day_id);
+create index idx_wedding_event_menus_event on wedding_event_menus(wedding_event_id, sort_order);
+create index idx_wedding_event_menu_items_menu on wedding_event_menu_items(menu_id, sort_order);
+create index idx_wedding_event_tasks_event on wedding_event_tasks(wedding_event_id, sort_order);
+create index idx_budget_items_wedding_event on budget_items(wedding_event_id);
 create index idx_vendor_profile_views_vendor on vendor_profile_views(vendor_profile_id);
 create index idx_vendor_profile_views_created_at on vendor_profile_views(created_at desc);
 create index idx_guests_list on guests(guest_list_id);

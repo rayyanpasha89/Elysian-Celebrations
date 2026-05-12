@@ -39,6 +39,7 @@ export function BudgetItemPalette() {
     if (!targetCategory) return;
 
     addItem(targetCategory.id, {
+      eventId: null,
       name: item.name,
       estimatedCost: item.estimatedCost,
       actualCost: null,

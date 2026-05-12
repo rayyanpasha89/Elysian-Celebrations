@@ -16,24 +16,24 @@ enum UserRole {
 }
 
 model User {
-  id             String    @id @default(cuid())
-  email          String    @unique
-  emailVerified  DateTime?
-  passwordHash   String?
-  name           String
-  phone          String?
-  avatar         String?
-  role           UserRole  @default(CLIENT)
-  isActive       Boolean   @default(true)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  passwordHash  String?
+  name          String
+  phone         String?
+  avatar        String?
+  role          UserRole  @default(CLIENT)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  clientProfile  ClientProfile?
-  vendorProfile  VendorProfile?
-  accounts       Account[]
-  sessions       Session[]
-  sentMessages   Message[]      @relation("SentMessages")
-  notifications  Notification[]
+  clientProfile ClientProfile?
+  vendorProfile VendorProfile?
+  accounts      Account[]
+  sessions      Session[]
+  sentMessages  Message[]      @relation("SentMessages")
+  notifications Notification[]
 
   @@map("users")
 }
@@ -81,17 +81,17 @@ model VerificationToken {
 // ─── Client ───────────────────────────────────────────────────
 
 model ClientProfile {
-  id              String   @id @default(cuid())
-  userId          String   @unique
+  id              String    @id @default(cuid())
+  userId          String    @unique
   partnerName     String?
   weddingDate     DateTime?
   estimatedBudget Int?
   guestCount      Int?
   notes           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   weddings   Wedding[]
   budgets    Budget[]
   guestLists GuestList[]
@@ -133,22 +133,22 @@ enum WeddingStatus {
 }
 
 model WeddingDay {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   weddingId String
   name      String
   date      DateTime?
   notes     String?
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
 
-  wedding Wedding       @relation(fields: [weddingId], references: [id], onDelete: Cascade)
+  wedding Wedding        @relation(fields: [weddingId], references: [id], onDelete: Cascade)
   events  WeddingEvent[]
 
   @@map("wedding_days")
 }
 
 model WeddingEvent {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   weddingId       String
   weddingDayId    String?
   name            String
@@ -160,61 +160,130 @@ model WeddingEvent {
   guestCount      Int?
   estimatedBudget Int?
   foodStyle       String?
-  foodPreferences String[] @default([])
+  foodPreferences String[]  @default([])
   menuNotes       String?
   decorStyle      String?
   decorNotes      String?
   attireNotes     String?
   notes           String?
-  sortOrder       Int      @default(0)
-  createdAt       DateTime @default(now())
+  sortOrder       Int       @default(0)
+  createdAt       DateTime  @default(now())
 
-  wedding    Wedding     @relation(fields: [weddingId], references: [id], onDelete: Cascade)
-  weddingDay WeddingDay? @relation(fields: [weddingDayId], references: [id], onDelete: SetNull)
-  bookings   Booking[]
+  wedding     Wedding                @relation(fields: [weddingId], references: [id], onDelete: Cascade)
+  weddingDay  WeddingDay?            @relation(fields: [weddingDayId], references: [id], onDelete: SetNull)
+  bookings    Booking[]
+  budgetItems BudgetItem[]
+  menus       WeddingEventMenu[]
+  logistics   WeddingEventLogistics?
+  tasks       WeddingEventTask[]
 
   @@map("wedding_events")
+}
+
+model WeddingEventMenu {
+  id             String   @id @default(cuid())
+  weddingEventId String
+  name           String   @default("Primary menu")
+  mealPeriod     String?
+  serviceStyle   String?
+  notes          String?
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  weddingEvent WeddingEvent           @relation(fields: [weddingEventId], references: [id], onDelete: Cascade)
+  items        WeddingEventMenuItem[]
+
+  @@map("wedding_event_menus")
+}
+
+model WeddingEventMenuItem {
+  id          String   @id @default(cuid())
+  menuId      String
+  name        String
+  course      String?
+  dietaryTags String[] @default([])
+  notes       String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  menu WeddingEventMenu @relation(fields: [menuId], references: [id], onDelete: Cascade)
+
+  @@map("wedding_event_menu_items")
+}
+
+model WeddingEventLogistics {
+  id               String   @id @default(cuid())
+  weddingEventId   String   @unique
+  guestArrivalTime String?
+  vendorLoadInTime String?
+  familyCallTime   String?
+  transportNotes   String?
+  roomingNotes     String?
+  weatherPlan      String?
+  ceremonyNotes    String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  weddingEvent WeddingEvent @relation(fields: [weddingEventId], references: [id], onDelete: Cascade)
+
+  @@map("wedding_event_logistics")
+}
+
+model WeddingEventTask {
+  id             String    @id @default(cuid())
+  weddingEventId String
+  title          String
+  owner          String?
+  status         String    @default("OPEN")
+  dueDate        DateTime?
+  sortOrder      Int       @default(0)
+  createdAt      DateTime  @default(now())
+
+  weddingEvent WeddingEvent @relation(fields: [weddingEventId], references: [id], onDelete: Cascade)
+
+  @@map("wedding_event_tasks")
 }
 
 // ─── Vendors ──────────────────────────────────────────────────
 
 model VendorProfile {
-  id            String   @id @default(cuid())
-  userId        String   @unique
-  businessName  String
-  slug          String   @unique
-  categoryId    String
-  description   String?
-  shortBio      String?
-  coverImage    String?
-  portfolio     String[] @default([])
-  city          String?
-  state         String?
-  country       String   @default("India")
-  experience    Int?
-  isVerified    Boolean  @default(false)
-  isFeatured    Boolean  @default(false)
-  rating        Float    @default(0)
-  reviewCount   Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  businessName String
+  slug         String   @unique
+  categoryId   String
+  description  String?
+  shortBio     String?
+  coverImage   String?
+  portfolio    String[] @default([])
+  city         String?
+  state        String?
+  country      String   @default("India")
+  experience   Int?
+  isVerified   Boolean  @default(false)
+  isFeatured   Boolean  @default(false)
+  rating       Float    @default(0)
+  reviewCount  Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category       VendorCategory   @relation(fields: [categoryId], references: [id])
-  services       VendorService[]
-  reviews        Review[]
-  bookings       Booking[]
-  destinations   VendorDestination[]
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category     VendorCategory      @relation(fields: [categoryId], references: [id])
+  services     VendorService[]
+  reviews      Review[]
+  bookings     Booking[]
+  destinations VendorDestination[]
 
   @@map("vendor_profiles")
 }
 
 model VendorCategory {
-  id          String @id @default(cuid())
-  name        String @unique
-  slug        String @unique
+  id          String  @id @default(cuid())
+  name        String  @unique
+  slug        String  @unique
   description String?
-  sortOrder   Int    @default(0)
+  sortOrder   Int     @default(0)
 
   vendors VendorProfile[]
 
@@ -274,10 +343,10 @@ model Destination {
 }
 
 model Venue {
-  id            String  @id @default(cuid())
+  id            String   @id @default(cuid())
   destinationId String
   name          String
-  slug          String  @unique
+  slug          String   @unique
   description   String?
   address       String?
   capacity      Int?
@@ -325,11 +394,11 @@ model Budget {
 }
 
 model BudgetCategory {
-  id         String @id @default(cuid())
-  budgetId   String
-  name       String
-  allocated  Int    @default(0)
-  sortOrder  Int    @default(0)
+  id        String @id @default(cuid())
+  budgetId  String
+  name      String
+  allocated Int    @default(0)
+  sortOrder Int    @default(0)
 
   budget Budget       @relation(fields: [budgetId], references: [id], onDelete: Cascade)
   items  BudgetItem[]
@@ -340,6 +409,7 @@ model BudgetCategory {
 model BudgetItem {
   id               String  @id @default(cuid())
   budgetCategoryId String
+  weddingEventId   String?
   name             String
   estimatedCost    Int     @default(0)
   actualCost       Int?
@@ -349,6 +419,7 @@ model BudgetItem {
   sortOrder        Int     @default(0)
 
   budgetCategory BudgetCategory @relation(fields: [budgetCategoryId], references: [id], onDelete: Cascade)
+  weddingEvent   WeddingEvent?  @relation(fields: [weddingEventId], references: [id], onDelete: SetNull)
 
   @@map("budget_items")
 }
@@ -463,15 +534,15 @@ model GuestList {
 }
 
 model Guest {
-  id          String      @id @default(cuid())
+  id          String     @id @default(cuid())
   guestListId String
   name        String
   email       String?
   phone       String?
-  side        GuestSide   @default(COUPLE)
-  rsvpStatus  RsvpStatus  @default(PENDING)
+  side        GuestSide  @default(COUPLE)
+  rsvpStatus  RsvpStatus @default(PENDING)
   mealPref    String?
-  plusOne      Boolean     @default(false)
+  plusOne     Boolean    @default(false)
   tableNumber Int?
   notes       String?
 
@@ -497,14 +568,14 @@ enum RsvpStatus {
 // ─── Timeline ─────────────────────────────────────────────────
 
 model TimelineItem {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   weddingId   String
   title       String
   description String?
   dueDate     DateTime?
-  isCompleted Boolean  @default(false)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
+  isCompleted Boolean   @default(false)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
 
   wedding Wedding @relation(fields: [weddingId], references: [id], onDelete: Cascade)
 
@@ -542,18 +613,18 @@ model MoodBoardItem {
 // ─── Content ──────────────────────────────────────────────────
 
 model BlogPost {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   title       String
-  slug        String   @unique
+  slug        String    @unique
   excerpt     String?
   content     String
   coverImage  String?
   author      String
-  tags        String[] @default([])
-  isPublished Boolean  @default(false)
+  tags        String[]  @default([])
+  isPublished Boolean   @default(false)
   publishedAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@map("blog_posts")
 }
@@ -571,7 +642,7 @@ model Testimonial {
 }
 
 model ContactInquiry {
-  id              String   @id @default(cuid())
+  id              String        @id @default(cuid())
   clientProfileId String?
   name            String
   email           String

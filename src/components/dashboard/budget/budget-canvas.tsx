@@ -33,7 +33,21 @@ type PaletteBudgetItem = {
   estimatedCost: number;
 };
 
-export function BudgetCanvas() {
+export type BudgetEventOption = {
+  id: string;
+  name: string;
+  dayName: string;
+  date: string | null;
+  eventType: string | null;
+  startTime: string | null;
+  estimatedSpend: number;
+};
+
+export function BudgetCanvas({
+  eventOptions = [],
+}: {
+  eventOptions?: BudgetEventOption[];
+}) {
   const categories = useBudgetStore((state) => state.categories);
   const activeCategoryId = useBudgetStore((state) => state.activeCategoryId);
   const setActiveCategoryId = useBudgetStore((state) => state.setActiveCategoryId);
@@ -134,6 +148,7 @@ export function BudgetCanvas() {
       if (!payload?.name) return;
 
       addItem(categoryId, {
+        eventId: null,
         name: payload.name,
         estimatedCost: payload.estimatedCost ?? 0,
         actualCost: null,
@@ -174,6 +189,7 @@ export function BudgetCanvas() {
             category={category}
             isExpanded={activeCategoryId === category.id}
             isNativeDropActive={nativeDropCategoryId === category.id}
+            eventOptions={eventOptions}
             onToggle={() =>
               setActiveCategoryId(
                 activeCategoryId === category.id ? null : category.id
@@ -201,6 +217,7 @@ function CategorySection({
   category,
   isExpanded,
   isNativeDropActive,
+  eventOptions,
   onToggle,
   onNativeDragOver,
   onNativeDrop,
@@ -209,6 +226,7 @@ function CategorySection({
   category: BudgetCategory;
   isExpanded: boolean;
   isNativeDropActive: boolean;
+  eventOptions: BudgetEventOption[];
   onToggle: () => void;
   onNativeDragOver: (event: NativeDragEvent) => void;
   onNativeDrop: (event: NativeDragEvent) => void;
@@ -362,6 +380,7 @@ function CategorySection({
                         <SortableBudgetItem
                           key={item.id}
                           item={item}
+                          eventOptions={eventOptions}
                           onUpdate={(updates) =>
                             updateItem(category.id, item.id, updates)
                           }
@@ -382,10 +401,12 @@ function CategorySection({
 
 function SortableBudgetItem({
   item,
+  eventOptions,
   onUpdate,
   onRemove,
 }: {
   item: BudgetItem;
+  eventOptions: BudgetEventOption[];
   onUpdate: (updates: Partial<BudgetItem>) => void;
   onRemove: () => void;
 }) {
@@ -408,6 +429,7 @@ function SortableBudgetItem({
   const quotedTotal = item.estimatedCost * item.quantity;
   const actualTotal =
     item.actualCost == null ? null : item.actualCost * item.quantity;
+  const assignedEvent = eventOptions.find((event) => event.id === item.eventId);
 
   return (
     <div
@@ -470,6 +492,11 @@ function SortableBudgetItem({
             {actualTotal != null ? ` • Actual ${formatCurrency(actualTotal)}` : ""}
             {item.quantity > 1 ? ` • Qty ${item.quantity}` : ""}
           </p>
+          {assignedEvent ? (
+            <p className="mt-1 truncate font-accent text-[10px] uppercase tracking-[0.15em] text-sage">
+              {assignedEvent.dayName} · {assignedEvent.name}
+            </p>
+          ) : null}
         </button>
 
         <button
@@ -517,6 +544,29 @@ function SortableBudgetItem({
                 min={1}
                 onCommit={(value) => onUpdate({ quantity: Math.max(1, value) })}
               />
+              <div className="md:col-span-3">
+                <label className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
+                  Wedding event
+                </label>
+                <select
+                  value={item.eventId ?? ""}
+                  onChange={(event) =>
+                    onUpdate({ eventId: event.target.value || null })
+                  }
+                  className="mt-2 w-full border border-charcoal/12 bg-ivory px-3 py-3 text-sm text-charcoal outline-none transition-colors focus:border-gold-primary"
+                >
+                  <option value="">Unassigned budget line</option>
+                  {eventOptions.map((event) => (
+                    <option key={event.id} value={event.id}>
+                      {event.dayName} - {event.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-slate">
+                  Tie spend to the actual Haldi, Sangeet, ceremony, reception, or
+                  custom event it belongs to.
+                </p>
+              </div>
               <div className="md:col-span-3">
                 <label className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
                   Notes

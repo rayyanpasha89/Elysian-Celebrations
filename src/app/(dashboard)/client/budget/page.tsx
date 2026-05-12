@@ -25,6 +25,16 @@ type EventPlanSpendDay = {
   sortOrder: number;
   estimatedSpend: number;
   eventCount: number;
+  events: EventPlanSpendEvent[];
+};
+
+type EventPlanSpendEvent = {
+  id: string;
+  name: string;
+  eventType: string | null;
+  date: string | null;
+  startTime: string | null;
+  estimatedSpend: number;
 };
 
 type EventPlanSpendSummary = {
@@ -46,6 +56,7 @@ function snapshotBudget(budget: BudgetApiPayload) {
       color: category.color,
       items: category.items.map((item) => ({
         id: item.id,
+        eventId: item.eventId ?? null,
         name: item.name,
         estimatedCost: item.estimatedCost,
         actualCost: item.actualCost,
@@ -161,6 +172,22 @@ export default function BudgetPage() {
         0
       ),
     [categories]
+  );
+
+  const eventOptions = useMemo(
+    () =>
+      eventPlanSpend?.days.flatMap((day) =>
+        (day.events ?? []).map((event) => ({
+          id: event.id,
+          name: event.name,
+          dayName: day.name,
+          date: event.date ?? day.date,
+          eventType: event.eventType,
+          startTime: event.startTime,
+          estimatedSpend: event.estimatedSpend,
+        }))
+      ) ?? [],
+    [eventPlanSpend]
   );
 
   const saveBudget = async () => {
@@ -370,6 +397,7 @@ export default function BudgetPage() {
         <EventPlanSpendCallout
           summary={eventPlanSpend}
           budgetCap={totalBudget}
+          categories={categories}
         />
       ) : null}
 
@@ -401,7 +429,7 @@ export default function BudgetPage() {
           <BudgetItemPalette />
         </div>
         <div>
-          <BudgetCanvas />
+          <BudgetCanvas eventOptions={eventOptions} />
         </div>
         <div className="border border-charcoal/8 bg-ivory p-4">
           <BudgetSummary />
@@ -414,7 +442,9 @@ export default function BudgetPage() {
             <BudgetItemPalette />
           </div>
         ) : null}
-        {mobileTab === "canvas" ? <BudgetCanvas /> : null}
+        {mobileTab === "canvas" ? (
+          <BudgetCanvas eventOptions={eventOptions} />
+        ) : null}
         {mobileTab === "summary" ? (
           <div className="border border-charcoal/8 bg-ivory p-4">
             <BudgetSummary />
@@ -428,15 +458,30 @@ export default function BudgetPage() {
 function EventPlanSpendCallout({
   summary,
   budgetCap,
+  categories,
 }: {
   summary: EventPlanSpendSummary;
   budgetCap: number;
+  categories: BudgetCategory[];
 }) {
   const overCap = budgetCap > 0 && summary.totalEstimated > budgetCap;
   const gap = budgetCap > 0 ? budgetCap - summary.totalEstimated : null;
   const daysWithActivity = summary.days.filter(
     (day) => day.eventCount > 0 || day.estimatedSpend > 0
   );
+  const assignedByEvent = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const category of categories) {
+      for (const item of category.items) {
+        if (!item.eventId) continue;
+        totals.set(
+          item.eventId,
+          (totals.get(item.eventId) ?? 0) + item.estimatedCost * item.quantity
+        );
+      }
+    }
+    return totals;
+  }, [categories]);
 
   return (
     <div
@@ -515,6 +560,36 @@ function EventPlanSpendCallout({
                   {formatCurrency(day.estimatedSpend)} · {day.eventCount}{" "}
                   {day.eventCount === 1 ? "event" : "events"}
                 </p>
+                {(day.events ?? []).length > 0 ? (
+                  <div className="mt-3 space-y-2 border-t border-charcoal/8 pt-3">
+                    {(day.events ?? []).map((event) => {
+                      const assigned = assignedByEvent.get(event.id) ?? 0;
+                      return (
+                        <div
+                          key={event.id}
+                          className="flex items-start justify-between gap-3 text-xs"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-charcoal">{event.name}</p>
+                            <p className="mt-0.5 text-slate">
+                              Plan {formatCurrency(event.estimatedSpend)}
+                            </p>
+                          </div>
+                          <span
+                            className={cn(
+                              "shrink-0 font-accent text-[9px] uppercase tracking-[0.14em]",
+                              assigned > 0 ? "text-sage" : "text-slate"
+                            )}
+                          >
+                            {assigned > 0
+                              ? formatCurrency(assigned)
+                              : "No lines"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>

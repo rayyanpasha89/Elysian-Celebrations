@@ -23,6 +23,7 @@ type BudgetPayload = {
     color: string;
     items: {
       id: string;
+      eventId: string | null;
       name: string;
       estimatedCost: number;
       actualCost: number | null;
@@ -56,6 +57,16 @@ type EventPlanSpendDay = {
   sortOrder: number;
   estimatedSpend: number;
   eventCount: number;
+  events: EventPlanSpendEvent[];
+};
+
+type EventPlanSpendEvent = {
+  id: string;
+  name: string;
+  eventType: string | null;
+  date: string | null;
+  startTime: string | null;
+  estimatedSpend: number;
 };
 
 type EventPlanSpendSummary = {
@@ -96,8 +107,11 @@ async function getEventPlanSpendSummary(
         .order("sort_order", { ascending: true }),
       supabase
         .from("wedding_events")
-        .select("id, wedding_day_id, estimated_budget")
-        .eq("wedding_id", wedding.id),
+        .select(
+          "id, wedding_day_id, name, event_type, date, start_time, estimated_budget, sort_order"
+        )
+        .eq("wedding_id", wedding.id)
+        .order("sort_order", { ascending: true }),
     ]);
 
   if (daysError || eventsError) {
@@ -108,29 +122,43 @@ async function getEventPlanSpendSummary(
   const days = dayRows ?? [];
   const events = eventRows ?? [];
 
-  const byDay = new Map<string, { spend: number; count: number }>();
+  const byDay = new Map<
+    string,
+    { spend: number; count: number; events: EventPlanSpendEvent[] }
+  >();
   for (const day of days) {
-    byDay.set(day.id, { spend: 0, count: 0 });
+    byDay.set(day.id, { spend: 0, count: 0, events: [] });
   }
 
   let unassignedSpend = 0;
   let unassignedCount = 0;
+  const unassignedEvents: EventPlanSpendEvent[] = [];
 
   for (const event of events) {
     const amount = event.estimated_budget ?? 0;
+    const eventSummary: EventPlanSpendEvent = {
+      id: event.id,
+      name: event.name,
+      eventType: event.event_type,
+      date: event.date,
+      startTime: event.start_time,
+      estimatedSpend: amount,
+    };
     const dayId = event.wedding_day_id;
     if (dayId && byDay.has(dayId)) {
       const bucket = byDay.get(dayId)!;
       bucket.spend += amount;
       bucket.count += 1;
+      bucket.events.push(eventSummary);
     } else {
       unassignedSpend += amount;
       unassignedCount += 1;
+      unassignedEvents.push(eventSummary);
     }
   }
 
   const daySummaries: EventPlanSpendDay[] = days.map((day, index) => {
-    const bucket = byDay.get(day.id) ?? { spend: 0, count: 0 };
+    const bucket = byDay.get(day.id) ?? { spend: 0, count: 0, events: [] };
     return {
       id: day.id,
       name: day.name,
@@ -138,6 +166,7 @@ async function getEventPlanSpendSummary(
       sortOrder: day.sort_order ?? index,
       estimatedSpend: bucket.spend,
       eventCount: bucket.count,
+      events: bucket.events,
     };
   });
 
@@ -149,6 +178,7 @@ async function getEventPlanSpendSummary(
       sortOrder: 9999,
       estimatedSpend: unassignedSpend,
       eventCount: unassignedCount,
+      events: unassignedEvents,
     });
   }
 
@@ -163,6 +193,36 @@ async function getEventPlanSpendSummary(
     eventCount: events.length,
     days: daySummaries,
   };
+}
+
+async function getAllowedWeddingEventIds(profileId: string) {
+  const supabase = createAdminSupabaseClient();
+  const { data: wedding, error: weddingError } = await supabase
+    .from("weddings")
+    .select("id")
+    .eq("client_profile_id", profileId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (weddingError) {
+    throw weddingError;
+  }
+
+  if (!wedding) {
+    return new Set<string>();
+  }
+
+  const { data: events, error: eventError } = await supabase
+    .from("wedding_events")
+    .select("id")
+    .eq("wedding_id", wedding.id);
+
+  if (eventError) {
+    throw eventError;
+  }
+
+  return new Set((events ?? []).map((event) => event.id));
 }
 
 async function getOrCreateBudget(profileId: string) {
@@ -251,6 +311,7 @@ async function loadBudgetPayload(profileId: string): Promise<BudgetPayload> {
     | {
         id: string;
         budget_category_id: string;
+        wedding_event_id: string | null;
         name: string;
         estimated_cost: number;
         actual_cost: number | null;
@@ -265,7 +326,7 @@ async function loadBudgetPayload(profileId: string): Promise<BudgetPayload> {
     const { data: itemRows, error: itemErr } = await supabase
       .from("budget_items")
       .select(
-        "id, budget_category_id, name, estimated_cost, actual_cost, quantity, is_paid, notes, sort_order"
+        "id, budget_category_id, wedding_event_id, name, estimated_cost, actual_cost, quantity, is_paid, notes, sort_order"
       )
       .in("budget_category_id", categoryIds)
       .order("sort_order", { ascending: true });
@@ -290,6 +351,7 @@ async function loadBudgetPayload(profileId: string): Promise<BudgetPayload> {
         .filter((item) => item.budget_category_id === category.id)
         .map((item, itemIndex) => ({
           id: item.id,
+          eventId: item.wedding_event_id ?? null,
           name: item.name,
           estimatedCost: item.estimated_cost ?? 0,
           actualCost: item.actual_cost ?? null,
@@ -350,6 +412,7 @@ export async function PUT(request: NextRequest) {
 
     const supabase = createAdminSupabaseClient();
     const budget = await getOrCreateBudget(profileId);
+    const allowedEventIds = await getAllowedWeddingEventIds(profileId);
 
     const { error: budgetErr } = await supabase
       .from("budgets")
@@ -363,14 +426,40 @@ export async function PUT(request: NextRequest) {
       throw budgetErr;
     }
 
-    const { error: deleteErr } = await supabase
-      .from("budget_categories")
-      .delete()
-      .eq("budget_id", budget.id);
+    const { data: existingCategories, error: existingCategoryErr } =
+      await supabase
+        .from("budget_categories")
+        .select("id")
+        .eq("budget_id", budget.id);
 
-    if (deleteErr) {
-      throw deleteErr;
+    if (existingCategoryErr) {
+      throw existingCategoryErr;
     }
+
+    const existingCategoryIds = new Set(
+      (existingCategories ?? []).map((category) => category.id)
+    );
+    const existingCategoryIdList = Array.from(existingCategoryIds);
+    let existingItems:
+      | { id: string; budget_category_id: string }[]
+      | null = null;
+
+    if (existingCategoryIdList.length > 0) {
+      const { data: itemRows, error: existingItemsErr } = await supabase
+        .from("budget_items")
+        .select("id, budget_category_id")
+        .in("budget_category_id", existingCategoryIdList);
+
+      if (existingItemsErr) {
+        throw existingItemsErr;
+      }
+
+      existingItems = itemRows ?? [];
+    }
+
+    const existingItemIds = new Set((existingItems ?? []).map((item) => item.id));
+    const seenCategoryIds = new Set<string>();
+    const seenItemIds = new Set<string>();
 
     for (const [categoryIndex, category] of categories.entries()) {
       const categoryName =
@@ -382,58 +471,150 @@ export async function PUT(request: NextRequest) {
           ? Math.max(0, Math.floor(category.allocated))
           : 0;
 
-      const { data: insertedCategory, error: categoryInsertErr } = await supabase
-        .from("budget_categories")
-        .insert({
-          budget_id: budget.id,
-          name: categoryName,
-          allocated,
-          sort_order: categoryIndex,
-        })
-        .select("id")
-        .single();
+      let categoryId =
+        typeof category?.id === "string" && existingCategoryIds.has(category.id)
+          ? category.id
+          : null;
 
-      if (categoryInsertErr || !insertedCategory) {
-        throw categoryInsertErr ?? new Error("Could not insert category");
+      if (categoryId) {
+        const { error: categoryUpdateErr } = await supabase
+          .from("budget_categories")
+          .update({
+            name: categoryName,
+            allocated,
+            sort_order: categoryIndex,
+          })
+          .eq("id", categoryId)
+          .eq("budget_id", budget.id);
+
+        if (categoryUpdateErr) {
+          throw categoryUpdateErr;
+        }
+      } else {
+        const { data: insertedCategory, error: categoryInsertErr } =
+          await supabase
+            .from("budget_categories")
+            .insert({
+              budget_id: budget.id,
+              name: categoryName,
+              allocated,
+              sort_order: categoryIndex,
+            })
+            .select("id")
+            .single();
+
+        if (categoryInsertErr || !insertedCategory) {
+          throw categoryInsertErr ?? new Error("Could not insert category");
+        }
+
+        categoryId = insertedCategory.id;
       }
+
+      if (!categoryId) {
+        throw new Error("Could not resolve category");
+      }
+
+      const resolvedCategoryId = categoryId;
+      seenCategoryIds.add(resolvedCategoryId);
 
       const items = Array.isArray(category?.items) ? category.items : [];
       if (items.length === 0) {
         continue;
       }
 
-      const payload = items
-        .filter((item) => typeof item?.name === "string" && item.name.trim())
-        .map((item, itemIndex) => ({
-          budget_category_id: insertedCategory.id,
-          name: item.name.trim(),
-          estimated_cost:
-            typeof item.estimatedCost === "number" && Number.isFinite(item.estimatedCost)
-              ? Math.max(0, Math.floor(item.estimatedCost))
-              : 0,
-          actual_cost:
-            typeof item.actualCost === "number" && Number.isFinite(item.actualCost)
-              ? Math.max(0, Math.floor(item.actualCost))
-              : null,
-          quantity:
-            typeof item.quantity === "number" && Number.isFinite(item.quantity)
-              ? Math.max(1, Math.floor(item.quantity))
-              : 1,
-          is_paid: Boolean(item.isPaid),
-          notes: typeof item.notes === "string" ? item.notes : null,
-          sort_order: itemIndex,
-        }));
+      const validItems = items.filter(
+        (item) => typeof item?.name === "string" && item.name.trim()
+      );
+      const payload = validItems.map((item, itemIndex) => {
+          const eventId =
+            typeof item.eventId === "string" && allowedEventIds.has(item.eventId)
+              ? item.eventId
+              : null;
 
-      if (payload.length === 0) {
-        continue;
+          return {
+            budget_category_id: resolvedCategoryId,
+            wedding_event_id: eventId,
+            name: item.name.trim(),
+            estimated_cost:
+              typeof item.estimatedCost === "number" &&
+              Number.isFinite(item.estimatedCost)
+                ? Math.max(0, Math.floor(item.estimatedCost))
+                : 0,
+            actual_cost:
+              typeof item.actualCost === "number" &&
+              Number.isFinite(item.actualCost)
+                ? Math.max(0, Math.floor(item.actualCost))
+                : null,
+            quantity:
+              typeof item.quantity === "number" && Number.isFinite(item.quantity)
+                ? Math.max(1, Math.floor(item.quantity))
+                : 1,
+            is_paid: Boolean(item.isPaid),
+            notes: typeof item.notes === "string" ? item.notes : null,
+            sort_order: itemIndex,
+          };
+        });
+
+      for (const [itemIndex, itemPayload] of payload.entries()) {
+        const sourceItem = validItems[itemIndex];
+        const itemId =
+          typeof sourceItem?.id === "string" && existingItemIds.has(sourceItem.id)
+            ? sourceItem.id
+            : null;
+
+        if (itemId) {
+          const { error: itemUpdateErr } = await supabase
+            .from("budget_items")
+            .update(itemPayload)
+            .eq("id", itemId)
+            .in("budget_category_id", existingCategoryIdList);
+
+          if (itemUpdateErr) {
+            throw itemUpdateErr;
+          }
+
+          seenItemIds.add(itemId);
+        } else {
+          const { error: itemInsertErr } = await supabase
+            .from("budget_items")
+            .insert(itemPayload);
+
+          if (itemInsertErr) {
+            throw itemInsertErr;
+          }
+        }
       }
+    }
 
-      const { error: itemInsertErr } = await supabase
+    const removedItemIds = Array.from(existingItemIds).filter(
+      (itemId) => !seenItemIds.has(itemId)
+    );
+
+    if (removedItemIds.length > 0) {
+      const { error: itemDeleteErr } = await supabase
         .from("budget_items")
-        .insert(payload);
+        .delete()
+        .in("id", removedItemIds)
+        .in("budget_category_id", existingCategoryIdList);
 
-      if (itemInsertErr) {
-        throw itemInsertErr;
+      if (itemDeleteErr) {
+        throw itemDeleteErr;
+      }
+    }
+
+    const removedCategoryIds = existingCategoryIdList.filter(
+      (categoryId) => !seenCategoryIds.has(categoryId)
+    );
+
+    if (removedCategoryIds.length > 0) {
+      const { error: categoryDeleteErr } = await supabase
+        .from("budget_categories")
+        .delete()
+        .eq("budget_id", budget.id)
+        .in("id", removedCategoryIds);
+
+      if (categoryDeleteErr) {
+        throw categoryDeleteErr;
       }
     }
 

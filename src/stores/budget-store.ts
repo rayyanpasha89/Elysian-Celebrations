@@ -10,6 +10,7 @@ import {
 
 export interface BudgetItem {
   id: string;
+  eventId: string | null;
   name: string;
   estimatedCost: number;
   actualCost: number | null;
@@ -138,6 +139,7 @@ export const useBudgetStore = create<BudgetState>()(
               .sort((a, b) => a.sortOrder - b.sortOrder)
               .map((item, itemIndex) => ({
                 ...item,
+                eventId: item.eventId ?? null,
                 sortOrder: itemIndex,
               })),
           })),
@@ -202,7 +204,12 @@ export const useBudgetStore = create<BudgetState>()(
                   ...c,
                   items: [
                     ...c.items,
-                    { ...item, id: genId(), sortOrder: c.items.length },
+                    {
+                      ...item,
+                      eventId: item.eventId ?? null,
+                      id: genId(),
+                      sortOrder: c.items.length,
+                    },
                   ],
                 }
               : c

@@ -8,9 +8,12 @@ import { ListEmptyState } from "@/components/dashboard/list-empty-state";
 import { dashBtn, dashCard, dashLabel } from "@/lib/dashboard-styles";
 import {
   DECOR_STYLE_OPTIONS,
+  EVENT_TASK_STATUS_OPTIONS,
   EVENT_TYPE_OPTIONS,
   FOOD_PREFERENCE_OPTIONS,
   FOOD_STYLE_OPTIONS,
+  MEAL_PERIOD_OPTIONS,
+  MENU_COURSE_OPTIONS,
   PLANNER_VENDOR_CATEGORIES,
   type PlannerVendorCategoryKey,
 } from "@/lib/wedding-plan";
@@ -51,6 +54,45 @@ type EventVendorSelection = {
   } | null;
 };
 
+type EventMenuItem = {
+  id: string;
+  name: string;
+  course: string | null;
+  dietaryTags: string[];
+  notes: string | null;
+  sortOrder: number;
+};
+
+type EventMenu = {
+  id: string;
+  name: string;
+  mealPeriod: string | null;
+  serviceStyle: string | null;
+  notes: string | null;
+  sortOrder: number;
+  items: EventMenuItem[];
+};
+
+type EventLogistics = {
+  id: string;
+  guestArrivalTime: string | null;
+  vendorLoadInTime: string | null;
+  familyCallTime: string | null;
+  transportNotes: string | null;
+  roomingNotes: string | null;
+  weatherPlan: string | null;
+  ceremonyNotes: string | null;
+};
+
+type EventTask = {
+  id: string;
+  title: string;
+  owner: string | null;
+  status: string;
+  dueDate: string | null;
+  sortOrder: number;
+};
+
 type WeddingEvent = {
   id: string;
   wedding_day_id: string | null;
@@ -70,6 +112,9 @@ type WeddingEvent = {
   attire_notes: string | null;
   notes: string | null;
   sort_order: number;
+  menus: EventMenu[];
+  logistics: EventLogistics | null;
+  tasks: EventTask[];
   vendorSelections: EventVendorSelection[];
 };
 
@@ -119,6 +164,44 @@ type VendorDraftSelection = {
   vendorServiceId: string;
 };
 
+type MenuItemDraft = {
+  clientId: string;
+  id: string | null;
+  name: string;
+  course: string;
+  dietaryTags: string[];
+  notes: string;
+};
+
+type MenuDraft = {
+  clientId: string;
+  id: string | null;
+  name: string;
+  mealPeriod: string;
+  serviceStyle: string;
+  notes: string;
+  items: MenuItemDraft[];
+};
+
+type LogisticsDraft = {
+  guestArrivalTime: string;
+  vendorLoadInTime: string;
+  familyCallTime: string;
+  transportNotes: string;
+  roomingNotes: string;
+  weatherPlan: string;
+  ceremonyNotes: string;
+};
+
+type EventTaskDraft = {
+  clientId: string;
+  id: string | null;
+  title: string;
+  owner: string;
+  status: string;
+  dueDate: string;
+};
+
 type EventDetailDraft = {
   weddingDayId: string;
   name: string;
@@ -136,8 +219,61 @@ type EventDetailDraft = {
   decorNotes: string;
   attireNotes: string;
   notes: string;
+  menus: MenuDraft[];
+  logistics: LogisticsDraft;
+  tasks: EventTaskDraft[];
   vendorSelections: Record<PlannerVendorCategoryKey, VendorDraftSelection | null>;
 };
+
+function draftId(prefix: string) {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createMenuItemDraft(): MenuItemDraft {
+  return {
+    clientId: draftId("menu_item"),
+    id: null,
+    name: "",
+    course: "",
+    dietaryTags: [],
+    notes: "",
+  };
+}
+
+function createMenuDraft(serviceStyle = ""): MenuDraft {
+  return {
+    clientId: draftId("menu"),
+    id: null,
+    name: "Primary menu",
+    mealPeriod: "",
+    serviceStyle,
+    notes: "",
+    items: [createMenuItemDraft()],
+  };
+}
+
+function emptyLogisticsDraft(): LogisticsDraft {
+  return {
+    guestArrivalTime: "",
+    vendorLoadInTime: "",
+    familyCallTime: "",
+    transportNotes: "",
+    roomingNotes: "",
+    weatherPlan: "",
+    ceremonyNotes: "",
+  };
+}
+
+function createTaskDraft(): EventTaskDraft {
+  return {
+    clientId: draftId("event_task"),
+    id: null,
+    title: "",
+    owner: "",
+    status: "OPEN",
+    dueDate: "",
+  };
+}
 
 function emptyVendorSelections(): Record<
   PlannerVendorCategoryKey,
@@ -189,7 +325,86 @@ function buildDetailDraft(event: WeddingEvent): EventDetailDraft {
     decorNotes: event.decor_notes ?? "",
     attireNotes: event.attire_notes ?? "",
     notes: event.notes ?? "",
+    menus:
+      event.menus.length > 0
+        ? event.menus.map((menu) => ({
+            clientId: menu.id,
+            id: menu.id,
+            name: menu.name,
+            mealPeriod: menu.mealPeriod ?? "",
+            serviceStyle: menu.serviceStyle ?? "",
+            notes: menu.notes ?? "",
+            items: menu.items.length
+              ? menu.items.map((item) => ({
+                  clientId: item.id,
+                  id: item.id,
+                  name: item.name,
+                  course: item.course ?? "",
+                  dietaryTags: item.dietaryTags ?? [],
+                  notes: item.notes ?? "",
+                }))
+              : [createMenuItemDraft()],
+          }))
+        : [createMenuDraft(event.food_style ?? "")],
+    logistics: event.logistics
+      ? {
+          guestArrivalTime: event.logistics.guestArrivalTime ?? "",
+          vendorLoadInTime: event.logistics.vendorLoadInTime ?? "",
+          familyCallTime: event.logistics.familyCallTime ?? "",
+          transportNotes: event.logistics.transportNotes ?? "",
+          roomingNotes: event.logistics.roomingNotes ?? "",
+          weatherPlan: event.logistics.weatherPlan ?? "",
+          ceremonyNotes: event.logistics.ceremonyNotes ?? "",
+        }
+      : emptyLogisticsDraft(),
+    tasks:
+      event.tasks.length > 0
+        ? event.tasks.map((task) => ({
+            clientId: task.id,
+            id: task.id,
+            title: task.title,
+            owner: task.owner ?? "",
+            status: task.status || "OPEN",
+            dueDate: task.dueDate ? task.dueDate.slice(0, 10) : "",
+          }))
+        : [
+            {
+              ...createTaskDraft(),
+              title: "Confirm final run of show",
+              owner: "Planner",
+            },
+          ],
     vendorSelections,
+  };
+}
+
+function planningPayloadFromDraft(draft: EventDetailDraft) {
+  return {
+    menus: draft.menus
+      .filter((menu) => menu.name.trim() || menu.items.some((item) => item.name.trim()))
+      .map((menu) => ({
+        name: menu.name,
+        mealPeriod: menu.mealPeriod || null,
+        serviceStyle: menu.serviceStyle || null,
+        notes: menu.notes || null,
+        items: menu.items
+          .filter((item) => item.name.trim())
+          .map((item) => ({
+            name: item.name,
+            course: item.course || null,
+            dietaryTags: item.dietaryTags,
+            notes: item.notes || null,
+          })),
+      })),
+    logistics: draft.logistics,
+    tasks: draft.tasks
+      .filter((task) => task.title.trim())
+      .map((task) => ({
+        title: task.title,
+        owner: task.owner || null,
+        status: task.status,
+        dueDate: task.dueDate || null,
+      })),
   };
 }
 
@@ -750,6 +965,19 @@ export default function ClientWeddingPage() {
         throw new Error(json.error ?? "Failed to save event");
       }
 
+      const planningResponse = await fetch(
+        `/api/wedding/events/${selectedEvent.id}/planning`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(planningPayloadFromDraft(detailDraft)),
+        }
+      );
+      const planningJson = await planningResponse.json();
+      if (!planningResponse.ok) {
+        throw new Error(planningJson.error ?? "Failed to save event planning");
+      }
+
       await syncVendorSelections(selectedEvent, detailDraft);
       await refreshWedding();
       toast.success("Event plan saved");
@@ -878,6 +1106,192 @@ export default function ClientWeddingPage() {
     } finally {
       setDraggedEventId(null);
     }
+  };
+
+  const updateLogisticsDraft = (updates: Partial<LogisticsDraft>) => {
+    setDetailDraft((current) =>
+      current
+        ? {
+            ...current,
+            logistics: { ...current.logistics, ...updates },
+          }
+        : current
+    );
+  };
+
+  const addMenu = () => {
+    setDetailDraft((current) =>
+      current
+        ? {
+            ...current,
+            menus: [...current.menus, createMenuDraft(current.foodStyle)],
+          }
+        : current
+    );
+  };
+
+  const updateMenuDraft = (
+    menuClientId: string,
+    updates: Partial<Omit<MenuDraft, "items" | "clientId">>
+  ) => {
+    setDetailDraft((current) =>
+      current
+        ? {
+            ...current,
+            menus: current.menus.map((menu) =>
+              menu.clientId === menuClientId ? { ...menu, ...updates } : menu
+            ),
+          }
+        : current
+    );
+  };
+
+  const removeMenu = (menuClientId: string) => {
+    setDetailDraft((current) =>
+      current
+        ? {
+            ...current,
+            menus:
+              current.menus.length > 1
+                ? current.menus.filter((menu) => menu.clientId !== menuClientId)
+                : current.menus,
+          }
+        : current
+    );
+  };
+
+  const addMenuItem = (menuClientId: string) => {
+    setDetailDraft((current) =>
+      current
+        ? {
+            ...current,
+            menus: current.menus.map((menu) =>
+              menu.clientId === menuClientId
+                ? { ...menu, items: [...menu.items, createMenuItemDraft()] }
+                : menu
+            ),
+          }
+        : current
+    );
+  };
+
+  const updateMenuItem = (
+    menuClientId: string,
+    itemClientId: string,
+    updates: Partial<Omit<MenuItemDraft, "clientId">>
+  ) => {
+    setDetailDraft((current) =>
+      current
+        ? {
+            ...current,
+            menus: current.menus.map((menu) =>
+              menu.clientId === menuClientId
+                ? {
+                    ...menu,
+                    items: menu.items.map((item) =>
+                      item.clientId === itemClientId
+                        ? { ...item, ...updates }
+                        : item
+                    ),
+                  }
+                : menu
+            ),
+          }
+        : current
+    );
+  };
+
+  const removeMenuItem = (menuClientId: string, itemClientId: string) => {
+    setDetailDraft((current) =>
+      current
+        ? {
+            ...current,
+            menus: current.menus.map((menu) =>
+              menu.clientId === menuClientId
+                ? {
+                    ...menu,
+                    items:
+                      menu.items.length > 1
+                        ? menu.items.filter((item) => item.clientId !== itemClientId)
+                        : menu.items,
+                  }
+                : menu
+            ),
+          }
+        : current
+    );
+  };
+
+  const toggleMenuItemTag = (
+    menuClientId: string,
+    itemClientId: string,
+    tag: string
+  ) => {
+    setDetailDraft((current) =>
+      current
+        ? {
+            ...current,
+            menus: current.menus.map((menu) =>
+              menu.clientId === menuClientId
+                ? {
+                    ...menu,
+                    items: menu.items.map((item) => {
+                      if (item.clientId !== itemClientId) return item;
+                      const active = item.dietaryTags.includes(tag);
+                      return {
+                        ...item,
+                        dietaryTags: active
+                          ? item.dietaryTags.filter((entry) => entry !== tag)
+                          : [...item.dietaryTags, tag],
+                      };
+                    }),
+                  }
+                : menu
+            ),
+          }
+        : current
+    );
+  };
+
+  const addTask = () => {
+    setDetailDraft((current) =>
+      current
+        ? {
+            ...current,
+            tasks: [...current.tasks, createTaskDraft()],
+          }
+        : current
+    );
+  };
+
+  const updateTask = (
+    taskClientId: string,
+    updates: Partial<Omit<EventTaskDraft, "clientId">>
+  ) => {
+    setDetailDraft((current) =>
+      current
+        ? {
+            ...current,
+            tasks: current.tasks.map((task) =>
+              task.clientId === taskClientId ? { ...task, ...updates } : task
+            ),
+          }
+        : current
+    );
+  };
+
+  const removeTask = (taskClientId: string) => {
+    setDetailDraft((current) =>
+      current
+        ? {
+            ...current,
+            tasks:
+              current.tasks.length > 1
+                ? current.tasks.filter((task) => task.clientId !== taskClientId)
+                : current.tasks,
+          }
+        : current
+    );
   };
 
   if (loading) {
@@ -1644,6 +2058,198 @@ export default function ClientWeddingPage() {
                       placeholder="Cuisine mix, guest diet needs, signature counters, late-night snacks..."
                     />
                   </Field>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className={dashLabel}>Menus</p>
+                      <button
+                        type="button"
+                        className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal"
+                        onClick={addMenu}
+                      >
+                        Add menu
+                      </button>
+                    </div>
+
+                    {detailDraft.menus.map((menu, menuIndex) => (
+                      <div
+                        key={menu.clientId}
+                        className="space-y-3 border border-charcoal/10 bg-cream/30 p-4"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="font-display text-lg text-charcoal">
+                            Menu {menuIndex + 1}
+                          </p>
+                          <button
+                            type="button"
+                            className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal"
+                            onClick={() => removeMenu(menu.clientId)}
+                            disabled={detailDraft.menus.length === 1}
+                          >
+                            Remove
+                          </button>
+                        </div>
+
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <Field label="Menu name">
+                            <input
+                              type="text"
+                              value={menu.name}
+                              onChange={(event) =>
+                                updateMenuDraft(menu.clientId, {
+                                  name: event.target.value,
+                                })
+                              }
+                              className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                            />
+                          </Field>
+                          <Field label="Meal">
+                            <select
+                              value={menu.mealPeriod}
+                              onChange={(event) =>
+                                updateMenuDraft(menu.clientId, {
+                                  mealPeriod: event.target.value,
+                                })
+                              }
+                              className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                            >
+                              <option value="">Choose meal</option>
+                              {MEAL_PERIOD_OPTIONS.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                          </Field>
+                          <Field label="Service style" className="md:col-span-2">
+                            <input
+                              type="text"
+                              value={menu.serviceStyle}
+                              onChange={(event) =>
+                                updateMenuDraft(menu.clientId, {
+                                  serviceStyle: event.target.value,
+                                })
+                              }
+                              className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                              placeholder="Buffet, plated, live counters, family style..."
+                            />
+                          </Field>
+                        </div>
+
+                        <Field label="Menu brief">
+                          <textarea
+                            value={menu.notes}
+                            onChange={(event) =>
+                              updateMenuDraft(menu.clientId, {
+                                notes: event.target.value,
+                              })
+                            }
+                            className="min-h-[80px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                            placeholder="Menu story, cuisines, service pacing, chef notes..."
+                          />
+                        </Field>
+
+                        <div className="space-y-3 border-t border-charcoal/8 pt-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className={dashLabel}>Dishes and counters</p>
+                            <button
+                              type="button"
+                              className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal"
+                              onClick={() => addMenuItem(menu.clientId)}
+                            >
+                              Add item
+                            </button>
+                          </div>
+
+                          {menu.items.map((item) => (
+                            <div
+                              key={item.clientId}
+                              className="space-y-3 border border-charcoal/10 bg-ivory/70 p-3"
+                            >
+                              <div className="grid gap-3 md:grid-cols-2">
+                                <input
+                                  type="text"
+                                  value={item.name}
+                                  onChange={(event) =>
+                                    updateMenuItem(menu.clientId, item.clientId, {
+                                      name: event.target.value,
+                                    })
+                                  }
+                                  className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                                  placeholder="Dish, counter, drink, or station"
+                                />
+                                <select
+                                  value={item.course}
+                                  onChange={(event) =>
+                                    updateMenuItem(menu.clientId, item.clientId, {
+                                      course: event.target.value,
+                                    })
+                                  }
+                                  className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                                >
+                                  <option value="">Course</option>
+                                  {MENU_COURSE_OPTIONS.map((option) => (
+                                    <option key={option} value={option}>
+                                      {option}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div className="flex flex-wrap gap-2">
+                                {FOOD_PREFERENCE_OPTIONS.slice(0, 5).map((tag) => {
+                                  const active = item.dietaryTags.includes(tag);
+                                  return (
+                                    <button
+                                      key={`${item.clientId}-${tag}`}
+                                      type="button"
+                                      onClick={() =>
+                                        toggleMenuItemTag(
+                                          menu.clientId,
+                                          item.clientId,
+                                          tag
+                                        )
+                                      }
+                                      className={cn(
+                                        "border px-2 py-1 font-heading text-[11px] transition-colors",
+                                        active
+                                          ? "border-gold-primary bg-gold-primary/10 text-charcoal"
+                                          : "border-charcoal/15 text-slate"
+                                      )}
+                                    >
+                                      {tag}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+
+                              <textarea
+                                value={item.notes}
+                                onChange={(event) =>
+                                  updateMenuItem(menu.clientId, item.clientId, {
+                                    notes: event.target.value,
+                                  })
+                                }
+                                className="min-h-[64px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                                placeholder="Spice level, serving notes, substitutions, allergies..."
+                              />
+
+                              <button
+                                type="button"
+                                className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal"
+                                onClick={() =>
+                                  removeMenuItem(menu.clientId, item.clientId)
+                                }
+                                disabled={menu.items.length === 1}
+                              >
+                                Remove item
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="space-y-4 border-t border-charcoal/8 pt-5">
@@ -1862,6 +2468,193 @@ export default function ClientWeddingPage() {
                       </div>
                     );
                   })}
+                </div>
+
+                <div className="space-y-4 border-t border-charcoal/8 pt-5">
+                  <div>
+                    <p className={dashLabel}>Logistics</p>
+                    <p className="mt-1 text-sm text-slate">
+                      Keep guest movement, vendor access, and family timing tied
+                      to this event.
+                    </p>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <Field label="Guest arrival">
+                      <input
+                        type="time"
+                        value={detailDraft.logistics.guestArrivalTime}
+                        onChange={(event) =>
+                          updateLogisticsDraft({
+                            guestArrivalTime: event.target.value,
+                          })
+                        }
+                        className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                      />
+                    </Field>
+                    <Field label="Vendor load-in">
+                      <input
+                        type="time"
+                        value={detailDraft.logistics.vendorLoadInTime}
+                        onChange={(event) =>
+                          updateLogisticsDraft({
+                            vendorLoadInTime: event.target.value,
+                          })
+                        }
+                        className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                      />
+                    </Field>
+                    <Field label="Family call">
+                      <input
+                        type="time"
+                        value={detailDraft.logistics.familyCallTime}
+                        onChange={(event) =>
+                          updateLogisticsDraft({
+                            familyCallTime: event.target.value,
+                          })
+                        }
+                        className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                      />
+                    </Field>
+                  </div>
+
+                  <Field label="Transport plan">
+                    <textarea
+                      value={detailDraft.logistics.transportNotes}
+                      onChange={(event) =>
+                        updateLogisticsDraft({
+                          transportNotes: event.target.value,
+                        })
+                      }
+                      className="min-h-[76px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                      placeholder="Pickups, shuttle loops, valet, driver holding area..."
+                    />
+                  </Field>
+
+                  <Field label="Rooms and family movement">
+                    <textarea
+                      value={detailDraft.logistics.roomingNotes}
+                      onChange={(event) =>
+                        updateLogisticsDraft({
+                          roomingNotes: event.target.value,
+                        })
+                      }
+                      className="min-h-[76px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                      placeholder="Getting-ready rooms, family holding rooms, elder access..."
+                    />
+                  </Field>
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <Field label="Weather backup">
+                      <textarea
+                        value={detailDraft.logistics.weatherPlan}
+                        onChange={(event) =>
+                          updateLogisticsDraft({
+                            weatherPlan: event.target.value,
+                          })
+                        }
+                        className="min-h-[88px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                        placeholder="Indoor move, tenting, heat/rain plan..."
+                      />
+                    </Field>
+                    <Field label="Ceremony or sequence notes">
+                      <textarea
+                        value={detailDraft.logistics.ceremonyNotes}
+                        onChange={(event) =>
+                          updateLogisticsDraft({
+                            ceremonyNotes: event.target.value,
+                          })
+                        }
+                        className="min-h-[88px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                        placeholder="Procession order, cue points, family moments..."
+                      />
+                    </Field>
+                  </div>
+                </div>
+
+                <div className="space-y-4 border-t border-charcoal/8 pt-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className={dashLabel}>Event tasks</p>
+                      <p className="mt-1 text-sm text-slate">
+                        Track the action items that belong specifically to this function.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal"
+                      onClick={addTask}
+                    >
+                      Add task
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {detailDraft.tasks.map((task) => (
+                      <div
+                        key={task.clientId}
+                        className="space-y-3 border border-charcoal/10 bg-cream/30 p-3"
+                      >
+                        <input
+                          type="text"
+                          value={task.title}
+                          onChange={(event) =>
+                            updateTask(task.clientId, {
+                              title: event.target.value,
+                            })
+                          }
+                          className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                          placeholder="Task title"
+                        />
+                        <div className="grid gap-3 md:grid-cols-3">
+                          <input
+                            type="text"
+                            value={task.owner}
+                            onChange={(event) =>
+                              updateTask(task.clientId, {
+                                owner: event.target.value,
+                              })
+                            }
+                            className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                            placeholder="Owner"
+                          />
+                          <select
+                            value={task.status}
+                            onChange={(event) =>
+                              updateTask(task.clientId, {
+                                status: event.target.value,
+                              })
+                            }
+                            className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                          >
+                            {EVENT_TASK_STATUS_OPTIONS.map((option) => (
+                              <option key={option} value={option}>
+                                {option.replace("_", " ")}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="date"
+                            value={task.dueDate}
+                            onChange={(event) =>
+                              updateTask(task.clientId, {
+                                dueDate: event.target.value,
+                              })
+                            }
+                            className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal"
+                          onClick={() => removeTask(task.clientId)}
+                          disabled={detailDraft.tasks.length === 1}
+                        >
+                          Remove task
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <Field label="Planning notes">

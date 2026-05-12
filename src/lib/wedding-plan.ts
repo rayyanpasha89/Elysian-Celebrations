@@ -31,6 +31,32 @@ export const FOOD_PREFERENCE_OPTIONS = [
   "Regional specialties",
 ] as const;
 
+export const MEAL_PERIOD_OPTIONS = [
+  "Breakfast",
+  "Brunch",
+  "Lunch",
+  "High tea",
+  "Cocktail",
+  "Dinner",
+  "Late night",
+] as const;
+
+export const MENU_COURSE_OPTIONS = [
+  "Welcome drink",
+  "Starter",
+  "Live counter",
+  "Main",
+  "Dessert",
+  "Late-night snack",
+  "Beverage",
+] as const;
+
+export const EVENT_TASK_STATUS_OPTIONS = [
+  "OPEN",
+  "IN_PROGRESS",
+  "DONE",
+] as const;
+
 export const DECOR_STYLE_OPTIONS = [
   "Royal heritage",
   "Floral garden",
