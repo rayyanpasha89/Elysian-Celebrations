@@ -28,6 +28,218 @@ function formatMessageTimestamp(iso: string): string {
   });
 }
 
+function initialsFor(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function statusLabel(raw: string | null | undefined) {
+  if (!raw) return "Inquiry";
+  return raw
+    .toLowerCase()
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+type SingleOrArray<T> = T | T[] | null | undefined;
+
+function pickOne<T>(value: SingleOrArray<T>): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+type BookingRow = {
+  id: string;
+  status: string | null;
+  event_date: string | null;
+  notes: string | null;
+  client: SingleOrArray<{ user_id: string | null; partner_name: string | null }>;
+  vendor: SingleOrArray<{
+    user_id: string | null;
+    business_name: string | null;
+    slug: string | null;
+  }>;
+  service: SingleOrArray<{
+    id: string;
+    name: string | null;
+    service_scope: string | null;
+  }>;
+  wedding_event: SingleOrArray<{
+    id: string;
+    name: string | null;
+    event_type: string | null;
+    date: string | null;
+    start_time: string | null;
+    venue: string | null;
+    wedding_day: SingleOrArray<{
+      id: string;
+      name: string | null;
+      date: string | null;
+    }>;
+  }>;
+};
+
+type MessageRow = {
+  id: string;
+  booking_id: string;
+  sender_id: string;
+  content: string;
+  created_at: string;
+};
+
+type ConversationMessage = {
+  id: string;
+  from: "vendor" | "client";
+  text: string;
+  time: string;
+  createdAt: string;
+};
+
+type BookingContext = {
+  status: string;
+  statusLabel: string;
+  eventDate: string | null;
+  notes: string | null;
+  service: { name: string; scope: string | null } | null;
+  weddingEvent: {
+    name: string;
+    eventType: string | null;
+    date: string | null;
+    startTime: string | null;
+    venue: string | null;
+  } | null;
+  weddingDay: { name: string; date: string | null } | null;
+};
+
+type Conversation = {
+  id: string;
+  vendor: string;
+  initials: string;
+  preview: string;
+  time: string;
+  createdAt: string | null;
+  counterpartyName: string;
+  counterpartyRole: "vendor" | "client";
+  hasMessages: boolean;
+  unread: boolean;
+  booking: BookingContext;
+  messages: { id: string; from: "vendor" | "client"; text: string; time: string }[];
+};
+
+const BOOKING_SELECT =
+  "id, status, event_date, notes, client:client_profiles(user_id, partner_name), vendor:vendor_profiles(user_id, business_name, slug), service:vendor_services(id, name, service_scope), wedding_event:wedding_events(id, name, event_type, date, start_time, venue, wedding_day:wedding_days(id, name, date))";
+
+function deriveBookingContext(booking: BookingRow): BookingContext {
+  const service = pickOne(booking.service);
+  const weddingEvent = pickOne(booking.wedding_event);
+  const weddingDay = weddingEvent ? pickOne(weddingEvent.wedding_day) : null;
+  return {
+    status: booking.status ?? "INQUIRY",
+    statusLabel: statusLabel(booking.status),
+    eventDate: booking.event_date,
+    notes: booking.notes,
+    service: service
+      ? {
+          name: service.name ?? "Service",
+          scope: service.service_scope ?? null,
+        }
+      : null,
+    weddingEvent: weddingEvent
+      ? {
+          name: weddingEvent.name ?? "Event",
+          eventType: weddingEvent.event_type,
+          date: weddingEvent.date,
+          startTime: weddingEvent.start_time,
+          venue: weddingEvent.venue,
+        }
+      : null,
+    weddingDay: weddingDay
+      ? {
+          name: weddingDay.name ?? "Day",
+          date: weddingDay.date,
+        }
+      : null,
+  };
+}
+
+function buildConversation(
+  booking: BookingRow,
+  counterpartyRole: "vendor" | "client",
+  myUserId: string,
+  messages: MessageRow[]
+): Conversation {
+  const vendor = pickOne(booking.vendor);
+  const client = pickOne(booking.client);
+  const counterpartyName =
+    counterpartyRole === "vendor"
+      ? vendor?.business_name?.trim() || "Vendor"
+      : client?.partner_name?.trim() || "Client";
+
+  const projected: ConversationMessage[] = messages.map((m) => ({
+    id: m.id,
+    from:
+      m.sender_id === myUserId
+        ? counterpartyRole === "vendor"
+          ? "client"
+          : "vendor"
+        : counterpartyRole,
+    text: m.content,
+    time: formatMessageTimestamp(m.created_at),
+    createdAt: m.created_at,
+  }));
+
+  const last = projected[projected.length - 1] ?? null;
+  const context = deriveBookingContext(booking);
+  const fallbackPreview =
+    booking.notes?.trim() ||
+    context.service?.name ||
+    context.weddingEvent?.name ||
+    "Inquiry waiting on a first message";
+
+  const selfRole = counterpartyRole === "vendor" ? "client" : "vendor";
+  const unread = last ? last.from !== selfRole : context.status === "INQUIRY";
+
+  return {
+    id: booking.id,
+    vendor: counterpartyName,
+    initials: initialsFor(counterpartyName),
+    preview: last?.text ?? fallbackPreview,
+    time: last ? relTime(last.createdAt) : statusLabel(context.status),
+    createdAt: last?.createdAt ?? null,
+    counterpartyName,
+    counterpartyRole,
+    hasMessages: projected.length > 0,
+    unread,
+    booking: context,
+    messages: projected.map((m) => ({
+      id: m.id,
+      from: m.from,
+      text: m.text,
+      time: m.time,
+    })),
+  };
+}
+
+function sortConversations(list: Conversation[]) {
+  return list.sort((a, b) => {
+    if (a.hasMessages !== b.hasMessages) {
+      return a.hasMessages ? -1 : 1;
+    }
+    if (a.createdAt && b.createdAt) {
+      return b.createdAt.localeCompare(a.createdAt);
+    }
+    if (a.createdAt) return -1;
+    if (b.createdAt) return 1;
+    return a.vendor.localeCompare(b.vendor);
+  });
+}
+
 export async function GET() {
   const session = await getAuthSession();
   if (session instanceof NextResponse) return session;
@@ -48,100 +260,51 @@ export async function GET() {
         return apiError("Failed to load profile", 500);
       }
       if (!profile) {
-        return apiSuccess({ conversations: [] });
+        return apiSuccess({ conversations: [], needsOnboarding: true });
       }
 
       const { data: bookings, error: bErr } = await supabase
         .from("bookings")
-        .select("id, vendor:vendor_profiles(business_name)")
-        .eq("client_profile_id", profile.id);
+        .select(BOOKING_SELECT)
+        .eq("client_profile_id", profile.id)
+        .order("created_at", { ascending: false });
       if (bErr) {
         console.error("bookings:", bErr);
         return apiError("Failed to load bookings", 500);
       }
 
-      const bookingIds = (bookings ?? []).map((b) => b.id);
-      if (bookingIds.length === 0) {
-        return apiSuccess({ conversations: [] });
-      }
-
-      const { data: msgs, error: mErr } = await supabase
-        .from("messages")
-        .select("id, booking_id, sender_id, content, created_at")
-        .in("booking_id", bookingIds)
-        .order("created_at", { ascending: true });
-
-      if (mErr) {
-        console.error("messages:", mErr);
-        return apiError("Failed to load messages", 500);
-      }
-
-      const byBooking = new Map<
-        string,
-        {
-          bookingId: string;
-          vendorName: string;
-          messages: {
-            id: string;
-            from: "vendor" | "client";
-            text: string;
-            time: string;
-            createdAt: string;
-          }[];
+      const bookingRows = (bookings ?? []) as BookingRow[];
+      const bookingIds = bookingRows.map((b) => b.id);
+      const messagesByBooking = new Map<string, MessageRow[]>();
+      if (bookingIds.length > 0) {
+        const { data: msgs, error: mErr } = await supabase
+          .from("messages")
+          .select("id, booking_id, sender_id, content, created_at")
+          .in("booking_id", bookingIds)
+          .order("created_at", { ascending: true });
+        if (mErr) {
+          console.error("messages:", mErr);
+          return apiError("Failed to load messages", 500);
         }
-      >();
-
-      for (const b of bookings ?? []) {
-        const v = b.vendor as { business_name?: string } | null;
-        byBooking.set(b.id, {
-          bookingId: b.id,
-          vendorName: v?.business_name ?? "Vendor",
-          messages: [],
-        });
+        for (const m of (msgs ?? []) as MessageRow[]) {
+          const bucket = messagesByBooking.get(m.booking_id);
+          if (bucket) bucket.push(m);
+          else messagesByBooking.set(m.booking_id, [m]);
+        }
       }
 
-      for (const m of msgs ?? []) {
-        const conv = byBooking.get(m.booking_id);
-        if (!conv) continue;
-        conv.messages.push({
-          id: m.id,
-          from: m.sender_id === session.userId ? "client" : "vendor",
-          text: m.content,
-          time: new Date(m.created_at).toLocaleString("en-IN", {
-            weekday: "short",
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-          createdAt: m.created_at,
-        });
-      }
+      const conversations = sortConversations(
+        bookingRows.map((booking) =>
+          buildConversation(
+            booking,
+            "vendor",
+            session.userId,
+            messagesByBooking.get(booking.id) ?? []
+          )
+        )
+      );
 
-      const conversations = [...byBooking.values()]
-        .filter((c) => c.messages.length > 0)
-        .map((c) => {
-          const last = c.messages[c.messages.length - 1]!;
-          const initials = c.vendorName
-            .split(/\s+/)
-            .map((w) => w[0])
-            .join("")
-            .slice(0, 2)
-            .toUpperCase();
-          return {
-            id: c.bookingId,
-            vendor: c.vendorName,
-            initials,
-            preview: last.text,
-            time: relTime(last.createdAt),
-            messages: c.messages.map((message) => ({
-              id: message.id,
-              from: message.from,
-              text: message.text,
-              time: message.time,
-            })),
-          };
-        });
-
-      return apiSuccess({ conversations });
+      return apiSuccess({ conversations, needsOnboarding: false });
     }
 
     if (session.role === "vendor") {
@@ -155,100 +318,51 @@ export async function GET() {
         return apiError("Failed to load vendor", 500);
       }
       if (!vp) {
-        return apiSuccess({ conversations: [] });
+        return apiSuccess({ conversations: [], needsProfile: true });
       }
 
       const { data: bookings, error: bErr } = await supabase
         .from("bookings")
-        .select("id, client:client_profiles(partner_name)")
-        .eq("vendor_profile_id", vp.id);
+        .select(BOOKING_SELECT)
+        .eq("vendor_profile_id", vp.id)
+        .order("created_at", { ascending: false });
       if (bErr) {
         console.error("bookings:", bErr);
         return apiError("Failed to load bookings", 500);
       }
 
-      const bookingIds = (bookings ?? []).map((b) => b.id);
-      if (bookingIds.length === 0) {
-        return apiSuccess({ conversations: [] });
-      }
-
-      const { data: msgs, error: mErr } = await supabase
-        .from("messages")
-        .select("id, booking_id, sender_id, content, created_at")
-        .in("booking_id", bookingIds)
-        .order("created_at", { ascending: true });
-
-      if (mErr) {
-        console.error("messages:", mErr);
-        return apiError("Failed to load messages", 500);
-      }
-
-      const byBooking = new Map<
-        string,
-        {
-          bookingId: string;
-          label: string;
-          messages: {
-            id: string;
-            from: "vendor" | "client";
-            text: string;
-            time: string;
-            createdAt: string;
-          }[];
+      const bookingRows = (bookings ?? []) as BookingRow[];
+      const bookingIds = bookingRows.map((b) => b.id);
+      const messagesByBooking = new Map<string, MessageRow[]>();
+      if (bookingIds.length > 0) {
+        const { data: msgs, error: mErr } = await supabase
+          .from("messages")
+          .select("id, booking_id, sender_id, content, created_at")
+          .in("booking_id", bookingIds)
+          .order("created_at", { ascending: true });
+        if (mErr) {
+          console.error("messages:", mErr);
+          return apiError("Failed to load messages", 500);
         }
-      >();
-
-      for (const b of bookings ?? []) {
-        const cl = b.client as { partner_name?: string } | null;
-        byBooking.set(b.id, {
-          bookingId: b.id,
-          label: cl?.partner_name ?? "Client",
-          messages: [],
-        });
+        for (const m of (msgs ?? []) as MessageRow[]) {
+          const bucket = messagesByBooking.get(m.booking_id);
+          if (bucket) bucket.push(m);
+          else messagesByBooking.set(m.booking_id, [m]);
+        }
       }
 
-      for (const m of msgs ?? []) {
-        const conv = byBooking.get(m.booking_id);
-        if (!conv) continue;
-        conv.messages.push({
-          id: m.id,
-          from: m.sender_id === session.userId ? "vendor" : "client",
-          text: m.content,
-          time: new Date(m.created_at).toLocaleString("en-IN", {
-            weekday: "short",
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-          createdAt: m.created_at,
-        });
-      }
+      const conversations = sortConversations(
+        bookingRows.map((booking) =>
+          buildConversation(
+            booking,
+            "client",
+            session.userId,
+            messagesByBooking.get(booking.id) ?? []
+          )
+        )
+      );
 
-      const conversations = [...byBooking.values()]
-        .filter((c) => c.messages.length > 0)
-        .map((c) => {
-          const last = c.messages[c.messages.length - 1]!;
-          const initials = c.label
-            .split(/\s+/)
-            .map((w) => w[0])
-            .join("")
-            .slice(0, 2)
-            .toUpperCase();
-          return {
-            id: c.bookingId,
-            vendor: c.label,
-            initials,
-            preview: last.text,
-            time: relTime(last.createdAt),
-            messages: c.messages.map((message) => ({
-              id: message.id,
-              from: message.from,
-              text: message.text,
-              time: message.time,
-            })),
-          };
-        });
-
-      return apiSuccess({ conversations });
+      return apiSuccess({ conversations, needsProfile: false });
     }
 
     return apiSuccess({ conversations: [] });
@@ -279,6 +393,9 @@ export async function POST(request: Request) {
     }
     if (!content) {
       return apiError("Message cannot be empty");
+    }
+    if (content.length > 4000) {
+      return apiError("Message is too long (max 4000 characters)");
     }
 
     const supabase = createAdminSupabaseClient();

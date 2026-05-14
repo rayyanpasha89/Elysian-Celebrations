@@ -1,122 +1,55 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer, staggerItem } from "@/animations/variants";
 import { ListEmptyState } from "@/components/dashboard/list-empty-state";
 import { dashCard, dashLabel, statusBadgeBase } from "@/lib/dashboard-styles";
+import {
+  firstMessageSuggestionsForVendor,
+  formatBookingDate,
+  statusTone,
+  type Conversation,
+  vendorPlaceholder,
+} from "@/lib/messages-shared";
 import { cn } from "@/lib/utils";
-
-type Conv = {
-  id: string;
-  couple: string;
-  initials: string;
-  preview: string;
-  time: string;
-  unread?: boolean;
-  messages: { from: "vendor" | "client"; text: string; time: string }[];
-};
-
-type BookingRow = {
-  id: string;
-  status: string;
-  event_date: string | null;
-  notes?: string | null;
-  client: { partner_name?: string } | null;
-  service: { name?: string } | null;
-};
-
-function initialsFor(name: string) {
-  return name
-    .split(/\s+/)
-    .map((word) => word[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-}
-
-function bookingToConversation(booking: BookingRow): Conv {
-  const name = booking.client?.partner_name ?? "Client";
-  return {
-    id: booking.id,
-    couple: name,
-    initials: initialsFor(name),
-    preview:
-      booking.notes?.trim() ||
-      booking.service?.name ||
-      "Inquiry waiting for your reply",
-    time: booking.event_date
-      ? new Date(booking.event_date).toLocaleDateString("en-IN", {
-          weekday: "short",
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      : "New inquiry",
-    unread: booking.status === "INQUIRY",
-    messages: [],
-  };
-}
 
 export default function VendorMessagesPage() {
   const searchParams = useSearchParams();
   const bookingIdParam = searchParams.get("bookingId");
+
   const [loading, setLoading] = useState(true);
-  const [conversations, setConversations] = useState<Conv[]>([]);
-  const [bookings, setBookings] = useState<BookingRow[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [active, setActive] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [needsProfile, setNeedsProfile] = useState(false);
+  const messagesScrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [messagesRes, bookingsRes] = await Promise.all([
-          fetch("/api/messages"),
-          fetch("/api/bookings"),
-        ]);
-        const messagesJson = await messagesRes.json();
-        const bookingsJson = await bookingsRes.json();
-        if (!messagesRes.ok) throw new Error(messagesJson.error);
-        if (!bookingsRes.ok) throw new Error(bookingsJson.error);
+        const res = await fetch("/api/messages");
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error);
 
-        const raw = messagesJson.conversations ?? [];
-        const mapped: Conv[] = raw.map(
-          (c: {
-            id: string;
-            vendor: string;
-            initials: string;
-            preview: string;
-            time: string;
-            messages: { from: "vendor" | "client"; text: string; time: string }[];
-          }) => ({
-            id: c.id,
-            couple: c.vendor,
-            initials: c.initials,
-            preview: c.preview,
-            time: c.time,
-            messages: c.messages,
-          })
-        );
-
-        const bookingRows = (bookingsJson.bookings ?? []) as BookingRow[];
+        const list = (json.conversations ?? []) as Conversation[];
         if (!cancelled) {
-          setConversations(mapped);
-          setBookings(bookingRows);
-          if (bookingIdParam) {
-            setActive(bookingIdParam);
-          } else if (mapped[0]?.id) {
-            setActive(mapped[0].id);
-          } else if (bookingRows[0]?.id) {
-            setActive(bookingRows[0].id);
-          }
+          setConversations(list);
+          setNeedsProfile(Boolean(json.needsProfile));
+          const initial =
+            (bookingIdParam && list.find((c) => c.id === bookingIdParam)?.id) ||
+            list[0]?.id ||
+            null;
+          setActive(initial);
         }
       } catch {
         if (!cancelled) {
           setConversations([]);
-          setBookings([]);
           setActive(null);
         }
       } finally {
@@ -129,46 +62,36 @@ export default function VendorMessagesPage() {
   }, [bookingIdParam]);
 
   useEffect(() => {
-    if (bookingIdParam) {
-      setActive(bookingIdParam);
-    }
+    if (bookingIdParam) setActive(bookingIdParam);
   }, [bookingIdParam]);
 
-  const selectedId =
-    active ?? bookingIdParam ?? conversations[0]?.id ?? bookings[0]?.id ?? null;
+  const current = useMemo(
+    () => conversations.find((c) => c.id === active) ?? null,
+    [conversations, active]
+  );
 
-  const current = useMemo(() => {
-    if (!selectedId) return null;
-    const existing = conversations.find((c) => c.id === selectedId);
-    if (existing) return existing;
-    const booking = bookings.find((b) => b.id === selectedId);
-    return booking ? bookingToConversation(booking) : null;
-  }, [bookings, conversations, selectedId]);
-
-  const displayConversations = useMemo(() => {
-    if (!current) return conversations;
-    const exists = conversations.some((conversation) => conversation.id === current.id);
-    if (exists) return conversations;
-    return [current, ...conversations];
-  }, [conversations, current]);
+  useEffect(() => {
+    if (!messagesScrollRef.current) return;
+    messagesScrollRef.current.scrollTop = messagesScrollRef.current.scrollHeight;
+  }, [current?.id, current?.messages.length]);
 
   const sendMessage = async () => {
-    if (!current || !draft.trim()) return;
+    if (!current) return;
+    const trimmed = draft.trim();
+    if (!trimmed || sending) return;
 
     setSending(true);
     try {
       const res = await fetch("/api/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          bookingId: current.id,
-          content: draft.trim(),
-        }),
+        body: JSON.stringify({ bookingId: current.id, content: trimmed }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
 
       const message = json.message as {
+        id: string;
         from: "vendor" | "client";
         text: string;
         time: string;
@@ -181,27 +104,31 @@ export default function VendorMessagesPage() {
                 ...conversation,
                 preview: message.text,
                 time: "Just now",
-                messages: [...conversation.messages, message],
+                createdAt: new Date().toISOString(),
+                hasMessages: true,
+                unread: false,
+                messages: [
+                  ...conversation.messages,
+                  {
+                    id: message.id,
+                    from: message.from,
+                    text: message.text,
+                    time: message.time,
+                  },
+                ],
               }
             : conversation
         );
-        const index = updated.findIndex((conversation) => conversation.id === current.id);
+        const index = updated.findIndex((c) => c.id === current.id);
         if (index > 0) {
           const [conversation] = updated.splice(index, 1);
           updated.unshift(conversation);
-        } else if (index === -1) {
-          updated.unshift({
-            ...current,
-            preview: message.text,
-            time: "Just now",
-            messages: [message],
-          });
         }
         return updated;
       });
       setDraft("");
-    } catch {
-      toast.error("Failed to send reply");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to send reply");
     } finally {
       setSending(false);
     }
@@ -211,24 +138,75 @@ export default function VendorMessagesPage() {
     return (
       <div className="animate-pulse space-y-6">
         <div className="h-10 w-48 bg-charcoal/10" />
-        <div className="grid min-h-[400px] gap-6 lg:grid-cols-[minmax(0,320px)_1fr]">
+        <div className="grid min-h-[520px] gap-6 lg:grid-cols-[minmax(0,320px)_1fr_minmax(0,300px)]">
           <div className="border border-charcoal/8 bg-charcoal/5" />
           <div className="border border-charcoal/8 bg-charcoal/5" />
+          <div className="hidden border border-charcoal/8 bg-charcoal/5 lg:block" />
         </div>
       </div>
     );
   }
 
-  if (!current) {
+  if (needsProfile) {
     return (
       <motion.div variants={staggerContainer} initial="hidden" animate="visible">
         <motion.div variants={fadeUp}>
           <p className={dashLabel}>Inbox</p>
-          <h2 className="font-display mt-2 text-3xl font-semibold text-charcoal">Messages</h2>
+          <h2 className="font-display mt-2 text-3xl font-semibold text-charcoal">
+            Messages
+          </h2>
         </motion.div>
-        <div className="mt-12">
-          <ListEmptyState hint="Client messages appear here when there is activity on a booking." />
-        </div>
+        <motion.div
+          variants={fadeUp}
+          className="mt-12 border border-charcoal/8 bg-cream/30 p-8"
+        >
+          <p className={dashLabel}>Complete your vendor profile</p>
+          <h3 className="font-display mt-2 text-2xl text-charcoal">
+            Publish your business profile to receive booking conversations
+          </h3>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate">
+            Messages are tied to real client bookings. Finish your vendor profile
+            so inquiries can attach to your services and event commitments.
+          </p>
+          <Link
+            href="/vendor/profile"
+            className="font-accent mt-6 inline-flex items-center justify-center border border-gold-primary px-6 py-3 text-[11px] uppercase tracking-[0.2em] text-gold-primary transition-colors hover:bg-gold-primary hover:text-midnight"
+          >
+            Complete profile
+          </Link>
+        </motion.div>
+      </motion.div>
+    );
+  }
+
+  if (conversations.length === 0) {
+    return (
+      <motion.div variants={staggerContainer} initial="hidden" animate="visible">
+        <motion.div variants={fadeUp}>
+          <p className={dashLabel}>Inbox</p>
+          <h2 className="font-display mt-2 text-3xl font-semibold text-charcoal">
+            Messages
+          </h2>
+        </motion.div>
+        <motion.div
+          variants={fadeUp}
+          className="mt-12 border border-charcoal/8 bg-cream/30 p-8"
+        >
+          <p className={dashLabel}>No booking threads yet</p>
+          <h3 className="font-display mt-2 text-2xl text-charcoal">
+            Client conversations will appear here after an inquiry
+          </h3>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate">
+            Every thread is linked to a booking, event, date, venue, and service
+            so your team can reply with context instead of hunting through pages.
+          </p>
+          <Link
+            href="/vendor/bookings"
+            className="font-accent mt-6 inline-flex items-center justify-center border border-charcoal/15 px-6 py-3 text-[11px] uppercase tracking-[0.2em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark"
+          >
+            View bookings
+          </Link>
+        </motion.div>
       </motion.div>
     );
   }
@@ -237,108 +215,367 @@ export default function VendorMessagesPage() {
     <motion.div variants={staggerContainer} initial="hidden" animate="visible">
       <motion.div variants={fadeUp}>
         <p className={dashLabel}>Inbox</p>
-        <h2 className="font-display mt-2 text-3xl font-semibold text-charcoal">Messages</h2>
+        <h2 className="font-display mt-2 text-3xl font-semibold text-charcoal">
+          Messages
+        </h2>
+        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate">
+          Reply to clients with the booking, wedding event, service scope, date,
+          venue, and notes visible beside the conversation.
+        </p>
       </motion.div>
 
-      <motion.div variants={fadeUp} className="mt-10 grid min-h-[480px] grid-cols-1 gap-6 lg:grid-cols-[minmax(0,320px)_1fr]">
-        <div className={cn(dashCard, "flex flex-col p-0")}>
-          <div className="border-b border-charcoal/8 px-4 py-3">
-            <p className={dashLabel}>Conversations</p>
-          </div>
-          <ul className="list-none divide-y divide-charcoal/8 pl-0">
-            {displayConversations.map((c) => {
-              const on = c.id === selectedId;
-              return (
-                <li key={c.id}>
-                  <button
-                    type="button"
-                    onClick={() => setActive(c.id)}
-                    className={cn(
-                      "flex w-full gap-3 px-4 py-4 text-left transition-colors",
-                      on ? "bg-gold-primary/5" : "hover:bg-cream/80"
-                    )}
-                  >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-charcoal/15 bg-midnight font-accent text-[10px] tracking-wider text-ivory">
-                      {c.initials}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="font-display text-sm text-charcoal">{c.couple}</p>
-                        {c.unread ? (
-                          <span className={cn(statusBadgeBase, "border-gold-primary/60 text-gold-dark")}>
-                            Inquiry
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="font-heading mt-1 line-clamp-1 text-xs text-slate">{c.preview}</p>
-                      <p className="font-accent mt-1 text-[9px] uppercase tracking-[0.15em] text-slate">{c.time}</p>
-                    </div>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
+      <motion.div
+        variants={fadeUp}
+        className="mt-10 grid min-h-[520px] grid-cols-1 gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)_minmax(0,300px)]"
+      >
+        <ConversationList
+          conversations={conversations}
+          activeId={current?.id ?? null}
+          onSelect={setActive}
+        />
 
-        <div className={cn(dashCard, "flex flex-col p-0")}>
-          <div className="flex items-center gap-3 border-b border-charcoal/8 px-6 py-4">
-            <div className="flex h-11 w-11 items-center justify-center border border-charcoal/15 bg-midnight font-accent text-[11px] text-ivory">
-              {current.initials}
-            </div>
-            <div>
-              <p className="font-display text-lg text-charcoal">{current.couple}</p>
-              <p className={dashLabel}>{current.unread ? "Inquiry" : "Client"}</p>
-            </div>
-          </div>
+        <ConversationPane
+          conversation={current}
+          draft={draft}
+          onDraftChange={setDraft}
+          onSend={() => void sendMessage()}
+          sending={sending}
+          messagesScrollRef={messagesScrollRef}
+          placeholder={vendorPlaceholder(current)}
+          firstMessageTips={
+            current && !current.hasMessages
+              ? firstMessageSuggestionsForVendor(current)
+              : []
+          }
+          onUseTip={(tip) => setDraft(tip)}
+        />
 
-          <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-6 py-6">
-            {current.messages.map((m, i) => (
-              <motion.div
-                key={`${current.id}-${i}`}
-                variants={staggerItem}
-                className={cn("flex", m.from === "vendor" ? "justify-end" : "justify-start")}
-              >
-                <div
-                  className={cn(
-                    "max-w-[85%] border px-4 py-3",
-                    m.from === "vendor"
-                      ? "border-gold-primary/40 bg-gold-primary/5"
-                      : "border-charcoal/12 bg-cream/50"
-                  )}
-                >
-                  <p className="font-heading text-sm leading-relaxed text-charcoal">{m.text}</p>
-                  <p className="font-accent mt-2 text-[9px] uppercase tracking-[0.15em] text-slate">{m.time}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-
-          <form
-            className="border-t border-charcoal/8 p-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void sendMessage();
-            }}
-          >
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Type a reply"
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                className="min-w-0 flex-1 border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm outline-none focus:border-gold-primary"
-              />
-              <button
-                type="submit"
-                disabled={sending || !draft.trim()}
-                className="font-accent shrink-0 border border-gold-primary bg-transparent px-5 py-3 text-[11px] uppercase tracking-[0.2em] text-gold-primary transition-colors hover:bg-gold-primary hover:text-midnight"
-              >
-                {sending ? "Sending..." : "Send"}
-              </button>
-            </div>
-          </form>
-        </div>
+        <ContextPanel conversation={current} />
       </motion.div>
     </motion.div>
+  );
+}
+
+function ConversationList({
+  conversations,
+  activeId,
+  onSelect,
+}: {
+  conversations: Conversation[];
+  activeId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <div className={cn(dashCard, "flex flex-col p-0")}>
+      <div className="border-b border-charcoal/8 px-4 py-3">
+        <p className={dashLabel}>Client threads</p>
+        <p className="mt-1 text-xs text-slate">
+          {conversations.length}{" "}
+          {conversations.length === 1 ? "booking" : "bookings"} ·{" "}
+          {conversations.filter((c) => c.hasMessages).length} active
+        </p>
+      </div>
+      <ul className="list-none divide-y divide-charcoal/8 pl-0">
+        {conversations.map((conversation) => {
+          const active = conversation.id === activeId;
+          const tone = statusTone(conversation.booking.status);
+          return (
+            <li key={conversation.id}>
+              <button
+                type="button"
+                onClick={() => onSelect(conversation.id)}
+                className={cn(
+                  "flex w-full gap-3 px-4 py-4 text-left transition-colors",
+                  active ? "bg-gold-primary/5" : "hover:bg-cream/80"
+                )}
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-charcoal/15 bg-midnight font-accent text-[10px] tracking-wider text-ivory">
+                  {conversation.initials}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-display text-sm text-charcoal">
+                      {conversation.counterpartyName}
+                    </p>
+                    <span
+                      className={cn(
+                        statusBadgeBase,
+                        tone === "inquiry" && "border-gold-primary/60 text-gold-dark",
+                        tone === "active" && "border-sage/40 text-sage",
+                        tone === "settled" && "border-charcoal/20 text-slate"
+                      )}
+                    >
+                      {conversation.booking.statusLabel}
+                    </span>
+                  </div>
+                  <p className="font-accent mt-1 line-clamp-1 text-[10px] uppercase tracking-[0.14em] text-slate">
+                    {conversation.booking.service?.name ||
+                      conversation.booking.weddingEvent?.name ||
+                      "Booking"}
+                  </p>
+                  <p className="font-heading mt-1 line-clamp-1 text-xs text-slate">
+                    {conversation.preview}
+                  </p>
+                  <p className="font-accent mt-1 text-[9px] uppercase tracking-[0.15em] text-slate">
+                    {conversation.time}
+                  </p>
+                </div>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function ConversationPane({
+  conversation,
+  draft,
+  onDraftChange,
+  onSend,
+  sending,
+  messagesScrollRef,
+  placeholder,
+  firstMessageTips,
+  onUseTip,
+}: {
+  conversation: Conversation | null;
+  draft: string;
+  onDraftChange: (value: string) => void;
+  onSend: () => void;
+  sending: boolean;
+  messagesScrollRef: React.RefObject<HTMLDivElement | null>;
+  placeholder: string;
+  firstMessageTips: string[];
+  onUseTip: (tip: string) => void;
+}) {
+  if (!conversation) {
+    return (
+      <div className={cn(dashCard, "flex items-center justify-center p-10")}>
+        <ListEmptyState
+          title="Pick a booking"
+          hint="Select a client thread to see its messages and context."
+        />
+      </div>
+    );
+  }
+
+  const canSend = draft.trim().length > 0 && !sending;
+
+  return (
+    <div className={cn(dashCard, "flex flex-col p-0")}>
+      <div className="flex items-center gap-3 border-b border-charcoal/8 px-6 py-4">
+        <div className="flex h-11 w-11 items-center justify-center border border-charcoal/15 bg-midnight font-accent text-[11px] text-ivory">
+          {conversation.initials}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-display text-lg text-charcoal">
+            {conversation.counterpartyName}
+          </p>
+          <p className={dashLabel}>
+            {conversation.booking.statusLabel} ·{" "}
+            {conversation.booking.service?.name ||
+              conversation.booking.weddingEvent?.name ||
+              "Booking"}
+          </p>
+        </div>
+      </div>
+
+      <div
+        ref={messagesScrollRef}
+        className="flex flex-1 flex-col gap-4 overflow-y-auto px-6 py-6"
+      >
+        {conversation.messages.length === 0 ? (
+          <div className="flex flex-1 flex-col items-start justify-center gap-3 border border-dashed border-charcoal/15 bg-cream/30 p-6">
+            <p className={dashLabel}>Reply with context</p>
+            <p className="text-sm leading-relaxed text-slate">
+              Start the thread for {conversation.counterpartyName}. The client
+              will see your reply attached to this exact booking.
+            </p>
+            {firstMessageTips.length > 0 ? (
+              <div className="flex flex-col gap-2">
+                <p className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
+                  Suggested replies
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {firstMessageTips.map((tip) => (
+                    <button
+                      key={tip}
+                      type="button"
+                      onClick={() => onUseTip(tip)}
+                      className="border border-charcoal/15 bg-ivory px-3 py-2 text-left font-heading text-xs leading-snug text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark"
+                    >
+                      {tip}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          conversation.messages.map((message, index) => (
+            <motion.div
+              key={message.id ?? `${conversation.id}-${index}`}
+              variants={staggerItem}
+              className={cn(
+                "flex",
+                message.from === "vendor" ? "justify-end" : "justify-start"
+              )}
+            >
+              <div
+                className={cn(
+                  "max-w-[85%] border px-4 py-3",
+                  message.from === "vendor"
+                    ? "border-gold-primary/40 bg-gold-primary/5"
+                    : "border-charcoal/12 bg-cream/50"
+                )}
+              >
+                <p className="font-heading text-sm leading-relaxed text-charcoal">
+                  {message.text}
+                </p>
+                <p className="font-accent mt-2 text-[9px] uppercase tracking-[0.15em] text-slate">
+                  {message.time}
+                </p>
+              </div>
+            </motion.div>
+          ))
+        )}
+      </div>
+
+      <form
+        className="border-t border-charcoal/8 p-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (canSend) onSend();
+        }}
+      >
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder={placeholder}
+            value={draft}
+            onChange={(event) => onDraftChange(event.target.value)}
+            disabled={sending}
+            className="min-w-0 flex-1 border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm outline-none transition-colors focus:border-gold-primary disabled:opacity-60"
+          />
+          <button
+            type="submit"
+            disabled={!canSend}
+            className={cn(
+              "font-accent shrink-0 border px-5 py-3 text-[11px] uppercase tracking-[0.2em] transition-colors",
+              canSend
+                ? "border-gold-primary bg-transparent text-gold-primary hover:bg-gold-primary hover:text-midnight"
+                : "cursor-not-allowed border-charcoal/15 text-slate"
+            )}
+          >
+            {sending ? "Sending..." : "Send"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function ContextPanel({ conversation }: { conversation: Conversation | null }) {
+  if (!conversation) {
+    return (
+      <aside className={cn(dashCard, "hidden flex-col gap-3 p-5 lg:flex")}>
+        <p className={dashLabel}>Booking context</p>
+        <p className="text-sm leading-relaxed text-slate">
+          Select a thread to see the linked booking, event, and venue.
+        </p>
+      </aside>
+    );
+  }
+
+  const { booking } = conversation;
+  const eventDateLabel =
+    formatBookingDate(booking.eventDate) ??
+    formatBookingDate(booking.weddingEvent?.date ?? null);
+
+  return (
+    <aside className={cn(dashCard, "hidden flex-col gap-5 p-5 lg:flex")}>
+      <div>
+        <p className={dashLabel}>Booking context</p>
+        <h3 className="font-display mt-2 text-lg text-charcoal">
+          {conversation.counterpartyName}
+        </h3>
+        <p className="font-accent mt-1 text-[10px] uppercase tracking-[0.18em] text-slate">
+          Client · {booking.statusLabel}
+        </p>
+      </div>
+
+      <ContextRow label="Service" value={booking.service?.name ?? null} />
+      <ContextRow label="Service scope" value={booking.service?.scope ?? null} />
+      <ContextRow
+        label="Wedding event"
+        value={booking.weddingEvent?.name ?? null}
+        secondary={booking.weddingEvent?.eventType ?? null}
+      />
+      <ContextRow
+        label="Wedding day"
+        value={booking.weddingDay?.name ?? null}
+        secondary={formatBookingDate(booking.weddingDay?.date ?? null)}
+      />
+      <ContextRow label="Event date" value={eventDateLabel} />
+      <ContextRow label="Start time" value={booking.weddingEvent?.startTime ?? null} />
+      <ContextRow label="Venue" value={booking.weddingEvent?.venue ?? null} />
+
+      {booking.notes ? (
+        <div>
+          <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
+            Booking notes
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-charcoal">
+            {booking.notes}
+          </p>
+        </div>
+      ) : null}
+
+      <div className="mt-auto flex flex-col gap-2 border-t border-charcoal/8 pt-4">
+        <Link
+          href={`/vendor/bookings?bookingId=${conversation.id}`}
+          className="font-accent inline-flex items-center justify-center border border-charcoal/15 px-4 py-2.5 text-[10px] uppercase tracking-[0.18em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark"
+        >
+          Open booking
+        </Link>
+      </div>
+    </aside>
+  );
+}
+
+function ContextRow({
+  label,
+  value,
+  secondary,
+}: {
+  label: string;
+  value: string | null;
+  secondary?: string | null;
+}) {
+  if (!value && !secondary) {
+    return (
+      <div>
+        <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
+          {label}
+        </p>
+        <p className="mt-1 text-sm text-slate/70">Not set yet</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
+        {label}
+      </p>
+      {value ? (
+        <p className="mt-1 text-sm leading-relaxed text-charcoal">{value}</p>
+      ) : null}
+      {secondary ? (
+        <p className="mt-0.5 text-xs leading-relaxed text-slate">{secondary}</p>
+      ) : null}
+    </div>
   );
 }
