@@ -36,9 +36,9 @@ export function Sidebar({ groups, portalName, portalHref }: SidebarProps) {
       <div className="pointer-events-none absolute -top-28 left-1/2 h-56 w-56 -translate-x-1/2 bg-gold-primary/20 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-20 right-0 h-40 w-40 bg-sage/10 blur-3xl" />
 
-      <div className="relative px-5 pb-4 pt-6 text-center">
+      <div className="relative px-5 pb-2.5 pt-4 text-center">
         <Link href="/" className="group block">
-          <span className="mx-auto mb-3 block h-px w-14 bg-gradient-to-r from-transparent via-gold-primary/70 to-transparent transition-all duration-300 group-hover:w-20" />
+          <span className="mx-auto mb-2 block h-px w-14 bg-gradient-to-r from-transparent via-gold-primary/70 to-transparent transition-all duration-300 group-hover:w-20" />
           <span className="font-display text-2xl font-bold leading-none text-ivory">
             Elysian
           </span>
@@ -48,7 +48,7 @@ export function Sidebar({ groups, portalName, portalHref }: SidebarProps) {
         </Link>
         <Link
           href={portalHref}
-          className="mx-auto mt-4 inline-flex max-w-full items-center justify-center border border-gold-primary/25 bg-gold-primary/10 px-3 py-2 font-accent text-[9px] uppercase tracking-[0.18em] text-gold-primary transition-colors hover:border-gold-primary/50 hover:bg-gold-primary/15"
+          className="mx-auto mt-2.5 inline-flex max-w-full items-center justify-center border border-gold-primary/25 bg-gold-primary/10 px-3 py-1 font-accent text-[9px] uppercase tracking-[0.18em] text-gold-primary transition-colors hover:border-gold-primary/50 hover:bg-gold-primary/15"
         >
           <span className="truncate">{portalName}</span>
         </Link>
@@ -58,10 +58,10 @@ export function Sidebar({ groups, portalName, portalHref }: SidebarProps) {
         <NavSections groups={groups} pathname={pathname} layoutId="sidebar-active" />
       </nav>
 
-      <div className="relative px-4 pb-4 pt-3">
+      <div className="relative px-4 pb-3 pt-2">
         <Link
           href="/"
-          className="block border border-ivory/10 bg-ivory/[0.03] px-4 py-3 text-center font-accent text-[9px] uppercase tracking-[0.2em] text-ivory/45 transition-colors hover:border-gold-primary/35 hover:text-gold-primary"
+          className="block border border-ivory/10 bg-ivory/[0.03] px-4 py-1.5 text-center font-accent text-[9px] uppercase tracking-[0.2em] text-ivory/45 transition-colors hover:border-gold-primary/35 hover:text-gold-primary"
         >
           Back to Site
         </Link>
@@ -160,13 +160,13 @@ function NavSections({
   onNavigate?: () => void;
 }) {
   return (
-    <div className="flex min-h-full w-full flex-col justify-center gap-3 py-4">
+    <div className="flex min-h-full w-full flex-col justify-center gap-2 py-2">
       {groups.map((group, groupIndex) => (
         <section
           key={group.title}
-          className="border border-ivory/[0.07] bg-ivory/[0.035] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+          className="border border-ivory/[0.07] bg-ivory/[0.035] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
         >
-          <div className="mb-2 flex items-center justify-between gap-3 px-2">
+          <div className="mb-1 flex items-center justify-between gap-3 px-2">
             <p className="truncate font-accent text-[9px] uppercase tracking-[0.22em] text-ivory/34">
               {group.title}
             </p>
@@ -183,7 +183,7 @@ function NavSections({
                     href={item.href}
                     onClick={onNavigate}
                     className={cn(
-                      "group relative isolate flex items-center justify-between overflow-hidden px-3 py-2.5 font-heading text-[12px] transition-all duration-300",
+                      "group relative isolate flex items-center justify-between overflow-hidden px-3 py-1.5 font-heading text-[12px] transition-all duration-300",
                       isActive
                         ? "text-ivory"
                         : "text-ivory/58 hover:bg-ivory/[0.04] hover:text-ivory"

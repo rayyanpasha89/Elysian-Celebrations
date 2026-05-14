@@ -34,6 +34,7 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
 
 ## Shipped Recently
 
+- Added vendor catalogue media: new `vendor_service_items.image_urls text[]` and `reference_url text` columns (migration `20260601000100_add_vendor_service_item_media.sql`), with the vendor offering normalizer enforcing http/https-only URLs, a six-image cap, and per-URL length caps. Vendor editor exposes a paste-URL + remove media flow per row, and both the client vendor preview and the Event Editor's `ServiceOfferingPreview` render thumbnails + optional moodboard link. Fallback is graceful — rows without images render exactly as before. No Supabase Storage upload helper added in this slice; URLs can be pasted from any public CDN/Storage public bucket.
 - Fixed Vercel build failure caused by Clerk hooks rendering during prerender.
 - Added a remote-first Supabase workflow so migrations and ad-hoc SQL can run from repo scripts.
 - Added cloud testing bootstrap docs and seed workflow for realistic Clerk plus Supabase test data.
@@ -61,7 +62,7 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
 - Added a manager Message Command surface at `/manager/messages`, with all booking conversations, unread/status metrics, client-vendor thread inspection, booking context rail, and manager-safe read tracking.
 - Made message unread state fully per-user for the active inbox surfaces, so manager/admin oversight no longer mutates a global read flag that could affect client or vendor unread state.
 - Wired the dashboard notification bell to real Supabase notifications through `/api/notifications`, with unread counts, linked notification rows, empty/loading states, and per-user mark-read/mark-all-read actions.
-- Reworked the shared dashboard sidebar into a floating centered editorial nav card with grouped panels, stronger active states, ambient depth, and a matching premium mobile drawer.
+- Reworked the shared dashboard shell/sidebar into a floating centered editorial nav card with grouped panels, stronger active states, ambient depth, a less monotonous gradient/grid dashboard background, translucent topbar treatment, and a matching premium mobile drawer.
 - Reworked event-planning saves for menus, menu items, and tasks so the API updates/inserts/removes nested rows instead of deleting and recreating every row on each save. Existing row IDs are preserved by explicit ID when available, with stable key/order matching for the current client payload.
 - Polished the client Event Editor into a guided step flow with horizontal section pills, previous/next controls, richer vendor/service empty states, and category-aware grouped catalogue previews that show real offering rows before importing them into an event plan.
 - Reduced Event Editor DOM work by rendering only the active guided section, added show-all catalogue rows for deep vendor offerings, and upgraded the client payload to send existing menu/item/task IDs explicitly.

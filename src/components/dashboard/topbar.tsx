@@ -194,7 +194,7 @@ export function Topbar({
   }
 
   return (
-    <header className="sticky top-0 z-30 border-b border-charcoal/8 bg-ivory/95 backdrop-blur-md">
+    <header className="sticky top-0 z-30 border-b border-charcoal/8 bg-cream/78 shadow-[0_16px_48px_rgba(24,24,20,0.04)] backdrop-blur-xl">
       <div className="flex items-center justify-between px-6 py-4 lg:px-8">
         <div className="pl-12 lg:pl-0">
           <h1 className="font-display text-xl font-semibold text-charcoal">{displayTitle}</h1>
