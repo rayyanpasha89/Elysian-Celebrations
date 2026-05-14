@@ -15,6 +15,22 @@ function relationUserId(relation: BookingUserRelation) {
   return relation?.user_id ?? null;
 }
 
+const BOOKING_STATUSES = new Set([
+  "INQUIRY",
+  "QUOTE_SENT",
+  "CONFIRMED",
+  "DEPOSIT_PAID",
+  "COMPLETED",
+  "CANCELLED",
+]);
+
+function normalizeMoney(value: unknown) {
+  if (value === null) return null;
+  const amount = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(amount) || amount < 0) return undefined;
+  return Math.floor(amount);
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -44,17 +60,36 @@ export async function PATCH(
     const isOwner =
       relationUserId(booking.client) === session.userId ||
       relationUserId(booking.vendor) === session.userId ||
-      session.role === "admin";
+      session.role === "admin" ||
+      session.role === "manager";
 
     if (!isOwner) {
       return apiError("Not authorized to update this booking", 403);
     }
 
     const allowedFields: Record<string, unknown> = {};
-    if (body.status) allowedFields.status = body.status;
-    if (body.totalAmount !== undefined) allowedFields.total_amount = body.totalAmount;
-    if (body.paidAmount !== undefined) allowedFields.paid_amount = body.paidAmount;
-    if (body.notes !== undefined) allowedFields.notes = body.notes;
+    if (body.status !== undefined) {
+      if (typeof body.status !== "string" || !BOOKING_STATUSES.has(body.status)) {
+        return apiError("Invalid booking status", 400);
+      }
+      allowedFields.status = body.status;
+    }
+    if (body.totalAmount !== undefined) {
+      const totalAmount = normalizeMoney(body.totalAmount);
+      if (totalAmount === undefined) return apiError("Invalid total amount", 400);
+      allowedFields.total_amount = totalAmount;
+    }
+    if (body.paidAmount !== undefined) {
+      const paidAmount = normalizeMoney(body.paidAmount);
+      if (paidAmount === undefined) return apiError("Invalid paid amount", 400);
+      allowedFields.paid_amount = paidAmount;
+    }
+    if (body.notes !== undefined) {
+      allowedFields.notes =
+        typeof body.notes === "string" && body.notes.trim()
+          ? body.notes.trim().slice(0, 1200)
+          : null;
+    }
 
     const { data: updated, error } = await supabase
       .from("bookings")
