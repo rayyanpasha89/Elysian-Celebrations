@@ -17,6 +17,7 @@ import {
   PLANNER_VENDOR_CATEGORIES,
   type PlannerVendorCategoryKey,
 } from "@/lib/wedding-plan";
+import { categoryCopy } from "@/lib/vendor-offering";
 import { cn, formatCurrency } from "@/lib/utils";
 
 type Destination = {
@@ -2100,8 +2101,20 @@ export default function ClientWeddingPage() {
                 </div>
 
                 <div className="border border-charcoal/10 bg-cream/30 p-3">
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                    {EDITOR_SECTIONS.map((section) => {
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
+                      Step{" "}
+                      {EDITOR_SECTIONS.findIndex(
+                        (entry) => entry.key === editorSection
+                      ) + 1}{" "}
+                      of {EDITOR_SECTIONS.length}
+                    </p>
+                    <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-gold-dark">
+                      {activeEditorSection.label}
+                    </p>
+                  </div>
+                  <div className="mt-3 -mx-1 flex gap-1.5 overflow-x-auto pb-1">
+                    {EDITOR_SECTIONS.map((section, index) => {
                       const active = editorSection === section.key;
                       return (
                         <button
@@ -2109,15 +2122,23 @@ export default function ClientWeddingPage() {
                           type="button"
                           onClick={() => setEditorSection(section.key)}
                           className={cn(
-                            "border px-3 py-2 text-left transition-colors",
+                            "group inline-flex shrink-0 items-center gap-2 border px-3 py-2 font-accent text-[10px] uppercase tracking-[0.16em] transition-colors",
                             active
                               ? "border-gold-primary bg-gold-primary/10 text-charcoal"
-                              : "border-charcoal/10 bg-ivory/70 text-slate hover:border-gold-primary/50"
+                              : "border-charcoal/10 bg-ivory/70 text-slate hover:border-gold-primary/50 hover:text-charcoal"
                           )}
                         >
-                          <span className="font-accent text-[10px] uppercase tracking-[0.16em]">
-                            {section.label}
+                          <span
+                            className={cn(
+                              "flex h-5 w-5 items-center justify-center border text-[10px]",
+                              active
+                                ? "border-gold-primary bg-gold-primary text-midnight"
+                                : "border-charcoal/15 text-slate"
+                            )}
+                          >
+                            {index + 1}
                           </span>
+                          {section.label}
                         </button>
                       );
                     })}
@@ -2718,15 +2739,25 @@ export default function ClientWeddingPage() {
                           {selectedVendor ? (
                             <>
                               <div className="border border-charcoal/10 bg-cream/35 p-3">
-                                <p className="font-heading text-sm text-charcoal">
-                                  {selectedVendor.business_name}
-                                </p>
-                                <p className="mt-1 text-xs text-slate">
-                                  {selectedVendor.city ?? "Destination ready"}
-                                  {selectedVendor.rating
-                                    ? ` · ${selectedVendor.rating.toFixed(1)} rating`
-                                    : ""}
-                                </p>
+                                <div className="flex flex-wrap items-start justify-between gap-2">
+                                  <div className="min-w-0">
+                                    <p className="font-heading text-sm text-charcoal">
+                                      {selectedVendor.business_name}
+                                    </p>
+                                    <p className="mt-1 text-xs text-slate">
+                                      {selectedVendor.city ?? "Destination ready"}
+                                      {selectedVendor.rating
+                                        ? ` · ${selectedVendor.rating.toFixed(1)} rating`
+                                        : ""}
+                                    </p>
+                                  </div>
+                                  <span className="font-accent border border-gold-primary/40 bg-gold-primary/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-gold-dark">
+                                    {selectedVendor.services.length}{" "}
+                                    {selectedVendor.services.length === 1
+                                      ? "service"
+                                      : "services"}
+                                  </span>
+                                </div>
                                 {currentBookingSelection ? (
                                   <p className="mt-2 text-xs text-slate">
                                     Current booking status:{" "}
@@ -2793,12 +2824,30 @@ export default function ClientWeddingPage() {
                                       />
                                     ))}
                                 </div>
-                              ) : null}
+                              ) : (
+                                <div className="border border-dashed border-charcoal/15 bg-cream/25 p-3">
+                                  <p className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
+                                    Pick a service
+                                  </p>
+                                  <p className="mt-1 text-xs leading-relaxed text-slate">
+                                    Choose a package above to see {selectedVendor.business_name}&apos;s scope,
+                                    inclusions, deliverables, and itemized rows
+                                    you can pull into this event.
+                                  </p>
+                                </div>
+                              )}
                             </>
                           ) : (
-                            <p className="text-sm text-slate">
-                              No vendor selected yet.
-                            </p>
+                            <div className="border border-dashed border-charcoal/15 bg-cream/25 p-4">
+                              <p className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
+                                No vendor picked yet
+                              </p>
+                              <p className="mt-2 text-xs leading-relaxed text-slate">
+                                {category.hint} Once selected, their real
+                                catalogue rows can be imported into this event
+                                plan.
+                              </p>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -3020,6 +3069,55 @@ export default function ClientWeddingPage() {
                   </Field>
                 </div>
 
+                <div className="flex items-center justify-between gap-2 border-t border-charcoal/8 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const index = EDITOR_SECTIONS.findIndex(
+                        (entry) => entry.key === editorSection
+                      );
+                      const prev = EDITOR_SECTIONS[Math.max(0, index - 1)];
+                      if (prev) setEditorSection(prev.key);
+                    }}
+                    disabled={
+                      EDITOR_SECTIONS.findIndex(
+                        (entry) => entry.key === editorSection
+                      ) === 0
+                    }
+                    className="font-accent inline-flex items-center justify-center border border-charcoal/15 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-charcoal/15 disabled:hover:text-charcoal"
+                  >
+                    ← Prev
+                  </button>
+                  <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
+                    {EDITOR_SECTIONS.findIndex(
+                      (entry) => entry.key === editorSection
+                    ) + 1}{" "}
+                    / {EDITOR_SECTIONS.length}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const index = EDITOR_SECTIONS.findIndex(
+                        (entry) => entry.key === editorSection
+                      );
+                      const next =
+                        EDITOR_SECTIONS[
+                          Math.min(EDITOR_SECTIONS.length - 1, index + 1)
+                        ];
+                      if (next) setEditorSection(next.key);
+                    }}
+                    disabled={
+                      EDITOR_SECTIONS.findIndex(
+                        (entry) => entry.key === editorSection
+                      ) ===
+                      EDITOR_SECTIONS.length - 1
+                    }
+                    className="font-accent inline-flex items-center justify-center border border-charcoal/15 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-charcoal/15 disabled:hover:text-charcoal"
+                  >
+                    Next →
+                  </button>
+                </div>
+
                 <div className="flex flex-wrap gap-3 border-t border-charcoal/8 pt-4">
                   <button
                     type="button"
@@ -3077,14 +3175,30 @@ function ServiceOfferingPreview({
   service: VendorPlannerService;
   onUseSelection: (selectedItemIds: string[]) => void;
 }) {
+  const copy = useMemo(() => categoryCopy(categoryKey), [categoryKey]);
   const catalogueItems = useMemo(
     () =>
       (service.items ?? [])
         .slice()
         .sort((left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0))
-        .slice(0, 6),
+        .slice(0, 8),
     [service.items]
   );
+  const groupedCatalogue = useMemo(() => {
+    const buckets = new Map<string, VendorPlannerServiceItem[]>();
+    for (const item of catalogueItems) {
+      const key = item.item_type || "inclusion";
+      const bucket = buckets.get(key);
+      if (bucket) bucket.push(item);
+      else buckets.set(key, [item]);
+    }
+    return Array.from(buckets.entries()).map(([itemType, list]) => ({
+      itemType,
+      heading:
+        copy.groupHeadings[itemType] ?? serviceItemTypeLabel(itemType),
+      items: list,
+    }));
+  }, [catalogueItems, copy.groupHeadings]);
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>(() =>
     catalogueItems.map((item) => item.id)
   );
@@ -3097,13 +3211,22 @@ function ServiceOfferingPreview({
     );
   };
 
+  const selectedCount = selectedItemIds.filter((id) =>
+    catalogueItems.some((item) => item.id === id)
+  ).length;
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="font-heading text-sm text-charcoal">{service.name}</p>
+          <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
+            {copy.catalogueLabel}
+          </p>
+          <p className="mt-1 font-heading text-sm text-charcoal">
+            {service.name}
+          </p>
           <p className="mt-1 text-xs text-slate">
-            {service.description ?? "Service details will appear here."}
+            {service.description ?? `${vendorName} package details.`}
           </p>
         </div>
         <p className="font-accent text-[10px] uppercase tracking-[0.14em] text-gold-dark">
@@ -3129,7 +3252,12 @@ function ServiceOfferingPreview({
       {catalogueItems.length > 0 ? (
         <div className="border-t border-charcoal/8 pt-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className={dashLabel}>Selectable catalogue rows</p>
+            <div>
+              <p className={dashLabel}>{copy.catalogueLabel}</p>
+              <p className="mt-1 text-[11px] text-slate">
+                {selectedCount} of {catalogueItems.length} selected
+              </p>
+            </div>
             <button
               type="button"
               className="font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark"
@@ -3146,55 +3274,63 @@ function ServiceOfferingPreview({
                 : "Select all"}
             </button>
           </div>
-          <div className="mt-2 space-y-2">
-            {catalogueItems.map((item) => (
-              <label
-                key={item.id}
-                className="flex cursor-pointer gap-3 border border-charcoal/8 bg-cream/25 p-2 transition-colors hover:border-gold-primary/40"
+          <div className="mt-2 space-y-3">
+            {groupedCatalogue.map((group) => (
+              <div
+                key={group.itemType}
+                className="border border-charcoal/8 bg-cream/25 p-2"
               >
-                <input
-                  type="checkbox"
-                  checked={selectedItemIds.includes(item.id)}
-                  onChange={() => toggleItem(item.id)}
-                  className="mt-1 h-3.5 w-3.5 shrink-0 border border-charcoal/30 accent-gold-primary"
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-heading text-xs text-charcoal">
-                      {item.name}
-                    </span>
-                    <span className="font-accent text-[9px] uppercase tracking-[0.14em] text-gold-dark">
-                      {serviceItemTypeLabel(item.item_type)}
-                    </span>
-                  </span>
-                  {item.description ? (
-                    <span className="mt-1 block text-[11px] leading-relaxed text-slate">
-                      {item.description}
-                    </span>
-                  ) : null}
-                  {item.dietary_tags?.length ? (
-                    <span className="mt-1 block text-[11px] text-sage">
-                      {item.dietary_tags.join(", ")}
-                    </span>
-                  ) : null}
-                </span>
-              </label>
+                <p className="font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark">
+                  {group.heading}
+                </p>
+                <ul className="mt-2 list-none space-y-2 pl-0">
+                  {group.items.map((item) => (
+                    <li key={item.id}>
+                      <label className="flex cursor-pointer gap-3 border border-charcoal/8 bg-ivory/70 p-2 transition-colors hover:border-gold-primary/40">
+                        <input
+                          type="checkbox"
+                          checked={selectedItemIds.includes(item.id)}
+                          onChange={() => toggleItem(item.id)}
+                          className="mt-1 h-3.5 w-3.5 shrink-0 border border-charcoal/30 accent-gold-primary"
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="font-heading text-xs text-charcoal">
+                            {item.name}
+                          </span>
+                          {item.description ? (
+                            <span className="mt-1 block text-[11px] leading-relaxed text-slate">
+                              {item.description}
+                            </span>
+                          ) : null}
+                          {item.dietary_tags?.length ? (
+                            <span className="mt-1 block text-[11px] text-sage">
+                              {item.dietary_tags.join(", ")}
+                            </span>
+                          ) : null}
+                        </span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ))}
           </div>
         </div>
       ) : (
-        <div className="border-t border-charcoal/8 pt-3">
-          <p className="text-xs leading-relaxed text-slate">
-            {vendorName} has not itemized this package yet, but you can still use
-            the package scope and deliverables in this event plan.
+        <div className="border border-dashed border-charcoal/15 bg-cream/25 p-3">
+          <p className={dashLabel}>{copy.catalogueLabel}</p>
+          <p className="mt-2 text-xs leading-relaxed text-slate">
+            {vendorName} has not itemized this package yet. You can still use the
+            scope, inclusions, and deliverables above in this event plan.
           </p>
         </div>
       )}
 
       <button
         type="button"
-        className="font-accent w-full border border-gold-primary/45 bg-gold-primary/10 px-3 py-2.5 text-[10px] uppercase tracking-[0.18em] text-gold-dark transition-colors hover:bg-gold-primary/15"
+        className="font-accent w-full border border-gold-primary/45 bg-gold-primary/10 px-3 py-2.5 text-[10px] uppercase tracking-[0.18em] text-gold-dark transition-colors hover:bg-gold-primary/15 disabled:cursor-not-allowed disabled:opacity-50"
         onClick={() => onUseSelection(selectedItemIds)}
+        disabled={catalogueItems.length > 0 && selectedCount === 0}
       >
         {importActionLabel(categoryKey, catalogueItems.length > 0)}
       </button>
