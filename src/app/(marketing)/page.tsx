@@ -14,6 +14,7 @@ export default function HomePage() {
   return (
     <>
       <HeroSection />
+      <AssuranceStrip />
       <PlanningManifesto />
 
       <div className="relative z-10">
@@ -161,16 +162,20 @@ function AtmosphereGallery() {
         </div>
 
         <div className="grid gap-5 md:grid-cols-[1fr_0.8fr_1fr]">
-          {moments.map((moment) => (
+          {moments.map((moment, index) => (
             <div key={moment.title} className="group">
               <div
-                className={`relative overflow-hidden border border-charcoal/10 ${moment.height}`}
+                className={`relative overflow-hidden border border-charcoal/10 ${moment.height} transition-shadow duration-700 group-hover:shadow-[0_30px_90px_rgba(26,26,46,0.18)]`}
               >
                 <div
                   className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-[1.04]"
                   style={{ backgroundImage: `url(${moment.image})` }}
                 />
-                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(17,24,39,0.02)_0%,rgba(17,24,39,0.12)_38%,rgba(17,24,39,0.74)_100%)]" />
+                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(17,24,39,0.02)_0%,rgba(17,24,39,0.18)_38%,rgba(17,24,39,0.82)_100%)]" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(201,169,110,0.18),transparent_42%)] opacity-0 transition-opacity duration-700 group-hover:opacity-100" />
+                <span className="font-accent absolute right-5 top-5 text-[10px] uppercase tracking-[0.24em] text-ivory/35">
+                  {String(index + 1).padStart(2, "0")} / {String(moments.length).padStart(2, "0")}
+                </span>
                 <div className="absolute inset-x-0 bottom-0 p-6 text-ivory">
                   <p className="font-accent text-[10px] uppercase tracking-[0.22em] text-gold-light">
                     {moment.label}
@@ -179,6 +184,7 @@ function AtmosphereGallery() {
                   <p className="mt-3 max-w-sm text-sm leading-relaxed text-ivory/74">
                     {moment.copy}
                   </p>
+                  <div className="mt-4 h-px w-10 bg-gradient-to-r from-gold-primary/60 to-transparent transition-all duration-700 group-hover:w-24" />
                 </div>
               </div>
             </div>
@@ -190,15 +196,67 @@ function AtmosphereGallery() {
 }
 
 function SectionDivider({ variant }: { variant: "soft" | "gold" }) {
+  if (variant === "gold") {
+    return (
+      <div className="mx-[var(--section-padding-x)] py-4">
+        <div className="relative flex items-center">
+          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gold-primary/30 to-gold-primary/30" />
+          <span className="mx-3 inline-block h-1.5 w-1.5 rotate-45 bg-gold-primary/55" />
+          <div className="h-px flex-1 bg-gradient-to-l from-transparent via-gold-primary/30 to-gold-primary/30" />
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="mx-[var(--section-padding-x)] py-4">
-      <div
-        className={
-          variant === "gold"
-            ? "h-px bg-gradient-to-r from-transparent via-gold-primary/30 to-transparent"
-            : "h-px bg-gradient-to-r from-transparent via-charcoal/12 to-transparent"
-        }
-      />
+      <div className="h-px bg-gradient-to-r from-transparent via-charcoal/12 to-transparent" />
     </div>
+  );
+}
+
+function AssuranceStrip() {
+  const signals = [
+    {
+      eyebrow: "Concierge-only",
+      copy: "Every weekend on this platform is delivered with a senior planner inside the loop.",
+    },
+    {
+      eyebrow: "Curated vendor depth",
+      copy: "Catering, decor, photography, and entertainment partners vetted for chemistry, not just price.",
+    },
+    {
+      eyebrow: "Operations on the day",
+      copy: "A weekend-of team that keeps the run-of-show steady while families stay in the moment.",
+    },
+  ];
+
+  return (
+    <section className="relative overflow-hidden bg-midnight text-ivory">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_30%,rgba(201,169,110,0.14),transparent_28%),radial-gradient(circle_at_82%_30%,rgba(123,167,201,0.1),transparent_24%),linear-gradient(180deg,#10101b,#15172a)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:120px_120px] opacity-[0.10]" />
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold-primary/40 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-gold-primary/40 to-transparent" />
+      <div className="relative z-10 mx-auto max-w-7xl px-[var(--section-padding-x)] py-12 md:py-16">
+        <div className="grid gap-6 md:grid-cols-3">
+          {signals.map((signal, index) => (
+            <div
+              key={signal.eyebrow}
+              className="group relative border border-white/8 bg-white/[0.03] p-5 backdrop-blur-md transition-colors duration-500 hover:border-gold-primary/35"
+            >
+              <span className="font-accent absolute right-4 top-4 text-[10px] uppercase tracking-[0.22em] text-ivory/24">
+                {String(index + 1).padStart(2, "0")}
+              </span>
+              <p className="font-accent text-[10px] uppercase tracking-[0.24em] text-gold-light">
+                {signal.eyebrow}
+              </p>
+              <p className="mt-4 max-w-xs font-heading text-sm leading-relaxed text-ivory/80">
+                {signal.copy}
+              </p>
+              <div className="mt-5 h-px w-12 bg-gradient-to-r from-gold-primary/55 to-transparent transition-all duration-500 group-hover:w-24" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
