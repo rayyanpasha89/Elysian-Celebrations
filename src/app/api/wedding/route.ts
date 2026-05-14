@@ -89,14 +89,27 @@ type EventBookingRow = {
         category?: { name?: string; slug?: string } | null;
       }
     | null;
-  service:
+      service:
     | {
         id: string;
         name?: string;
         description?: string | null;
+        service_scope?: string | null;
         base_price?: number | null;
         max_price?: number | null;
         unit?: string | null;
+        event_type_fit?: string[] | null;
+        inclusions?: string[] | null;
+        deliverables?: string[] | null;
+        add_ons?: string[] | null;
+        items?: {
+          id: string;
+          item_type: string;
+          name: string;
+          description: string | null;
+          dietary_tags: string[] | null;
+          sort_order: number | null;
+        }[] | null;
       }
     | null;
 };
@@ -117,9 +130,22 @@ type RawEventBookingRow = Omit<EventBookingRow, "vendor" | "service"> & {
     id: string;
     name?: string | null;
     description?: string | null;
+    service_scope?: string | null;
     base_price?: number | null;
     max_price?: number | null;
     unit?: string | null;
+    event_type_fit?: string[] | null;
+    inclusions?: string[] | null;
+    deliverables?: string[] | null;
+    add_ons?: string[] | null;
+    items?: {
+      id: string;
+      item_type: string;
+      name: string;
+      description: string | null;
+      dietary_tags: string[] | null;
+      sort_order: number | null;
+    }[] | null;
   }>;
 };
 
@@ -157,9 +183,17 @@ function normalizeEventBookingRows(rows: RawEventBookingRow[]) {
             id: service.id,
             name: service.name ?? undefined,
             description: service.description ?? null,
+            service_scope: service.service_scope ?? null,
             base_price: service.base_price ?? null,
             max_price: service.max_price ?? null,
             unit: service.unit ?? null,
+            event_type_fit: service.event_type_fit ?? [],
+            inclusions: service.inclusions ?? [],
+            deliverables: service.deliverables ?? [],
+            add_ons: service.add_ons ?? [],
+            items: (service.items ?? [])
+              .slice()
+              .sort((left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0)),
           }
         : null,
     };
@@ -308,7 +342,7 @@ export async function GET() {
           .select(
             `id, wedding_event_id, status, event_date, notes, total_amount, paid_amount,
             vendor:vendor_profiles(id, business_name, slug, category:vendor_categories(name, slug)),
-            service:vendor_services(id, name, description, base_price, max_price, unit)`
+            service:vendor_services(id, name, description, service_scope, base_price, max_price, unit, event_type_fit, inclusions, deliverables, add_ons, items:vendor_service_items(id, item_type, name, description, dietary_tags, sort_order))`
           )
           .in("wedding_event_id", eventIds)
           .order("created_at", { ascending: true }),
@@ -463,12 +497,25 @@ export async function GET() {
                     id: booking.service.id,
                     name: booking.service.name ?? "Service",
                     description: booking.service.description ?? null,
+                    serviceScope: booking.service.service_scope ?? null,
                     basePrice: booking.service.base_price ?? null,
                     maxPrice: booking.service.max_price ?? null,
                     unit: booking.service.unit ?? null,
+                    eventTypeFit: booking.service.event_type_fit ?? [],
+                    inclusions: booking.service.inclusions ?? [],
+                    deliverables: booking.service.deliverables ?? [],
+                    addOns: booking.service.add_ons ?? [],
+                    items: (booking.service.items ?? []).map((item) => ({
+                      id: item.id,
+                      itemType: item.item_type,
+                      name: item.name,
+                      description: item.description,
+                      dietaryTags: item.dietary_tags ?? [],
+                      sortOrder: item.sort_order,
+                    })),
                   }
                 : null,
-            })),
+	            })),
           })),
       })),
     });

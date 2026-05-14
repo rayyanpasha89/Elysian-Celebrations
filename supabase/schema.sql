@@ -82,10 +82,26 @@ create table vendor_services (
   vendor_profile_id uuid not null references vendor_profiles(id) on delete cascade,
   name text not null,
   description text,
+  service_scope text,
   base_price integer not null,
   max_price integer,
   unit text,
+  event_type_fit text[] not null default '{}',
+  inclusions text[] not null default '{}',
+  deliverables text[] not null default '{}',
+  add_ons text[] not null default '{}',
   is_active boolean not null default true
+);
+
+create table vendor_service_items (
+  id uuid primary key default gen_random_uuid(),
+  vendor_service_id uuid not null references vendor_services(id) on delete cascade,
+  item_type text not null default 'inclusion',
+  name text not null,
+  description text,
+  dietary_tags text[] not null default '{}',
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now()
 );
 
 -- ─── Destinations ────────────────────────────────────────────
@@ -453,6 +469,7 @@ create table contact_inquiries (
 create index idx_vendor_profiles_category on vendor_profiles(category_id);
 create index idx_vendor_profiles_rating on vendor_profiles(rating desc);
 create index idx_vendor_profiles_featured on vendor_profiles(is_featured) where is_featured = true;
+create index idx_vendor_service_items_service on vendor_service_items(vendor_service_id, sort_order);
 create index idx_bookings_client on bookings(client_profile_id);
 create index idx_bookings_vendor on bookings(vendor_profile_id);
 create index idx_bookings_status on bookings(status);

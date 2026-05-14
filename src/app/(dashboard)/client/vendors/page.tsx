@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { fadeUp, staggerContainer, staggerItem } from "@/animations/variants";
 import { ListEmptyState } from "@/components/dashboard/list-empty-state";
 import { dashBtn, dashCard, dashLabel, statusBadgeBase } from "@/lib/dashboard-styles";
+import { categoryCopy } from "@/lib/vendor-offering";
 import { cn } from "@/lib/utils";
 
 const categories = [
@@ -29,6 +30,30 @@ const categoryApiSlug: Record<Exclude<Cat, "All">, string | null> = {
   Venues: null,
 };
 
+type VendorServiceItemApi = {
+  id: string;
+  item_type: string;
+  name: string;
+  description: string | null;
+  dietary_tags: string[] | null;
+  sort_order: number | null;
+};
+
+type VendorServiceApi = {
+  id?: string;
+  base_price?: number | null;
+  max_price?: number | null;
+  name?: string;
+  description?: string | null;
+  service_scope?: string | null;
+  unit?: string | null;
+  event_type_fit?: string[] | null;
+  inclusions?: string[] | null;
+  deliverables?: string[] | null;
+  add_ons?: string[] | null;
+  items?: VendorServiceItemApi[] | null;
+};
+
 type VendorCardApi = {
   id: string;
   slug: string;
@@ -42,7 +67,7 @@ type VendorCardApi = {
   is_featured?: boolean;
   experience?: number | null;
   category: { name?: string; slug?: string } | null;
-  services: { base_price?: number; name?: string }[] | null;
+  services: VendorServiceApi[] | null;
 };
 
 type VendorReviewApi = {
@@ -89,6 +114,237 @@ function sortReviews(reviews: VendorReviewApi[] | null | undefined) {
       (left, right) =>
         new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
     );
+}
+
+type VendorOfferingBlueprint = {
+  promise: string;
+  inclusions: string[];
+  deliverables: string[];
+  eventFit: string[];
+  questions: string[];
+};
+
+type VendorOffering = VendorOfferingBlueprint & {
+  addOns: string[];
+};
+
+const DEFAULT_OFFERING_BLUEPRINT: VendorOfferingBlueprint = {
+  promise:
+    "A complete wedding service scope with planning notes, pricing cues, and deliverables that can be matched to individual events.",
+  inclusions: [
+    "Pre-event consultation",
+    "Event-specific scope alignment",
+    "On-ground execution support",
+    "Final confirmation checklist",
+  ],
+  deliverables: [
+    "Service proposal",
+    "Package or quote breakdown",
+    "Timeline coordination notes",
+    "Final handover before event day",
+  ],
+  eventFit: ["Welcome dinner", "Haldi", "Sangeet", "Wedding", "Reception"],
+  questions: [
+    "What is included in the base quote?",
+    "What changes if guest count increases?",
+    "What setup time and access do you need?",
+  ],
+};
+
+const OFFERING_BLUEPRINTS: Record<string, VendorOfferingBlueprint> = {
+  catering: {
+    promise:
+      "Menus, service formats, guest flow, live counters, dietary handling, and final hospitality execution.",
+    inclusions: [
+      "Cuisine and meal-period planning",
+      "Veg, non-veg, Jain, vegan, and allergy notes",
+      "Live counters, beverage stations, and late-night snacks",
+      "Service staffing and buffet/plated flow",
+    ],
+    deliverables: [
+      "Menu proposal",
+      "Per-person or per-event pricing",
+      "Tasting and revision notes",
+      "Final service and setup checklist",
+    ],
+    eventFit: ["Welcome lunch", "Haldi brunch", "Sangeet dinner", "Wedding feast", "Reception"],
+    questions: [
+      "How many live counters are included?",
+      "Can menus vary by event day?",
+      "What staffing ratio is assumed?",
+    ],
+  },
+  decor: {
+    promise:
+      "Visual direction from moodboards into real event setups, floral work, stage, tables, lighting, entries, and installations.",
+    inclusions: [
+      "Theme and palette translation",
+      "Stage, mandap, entry, aisle, and table styling",
+      "Floral, props, signage, and lighting coordination",
+      "Setup, strike, and venue access planning",
+    ],
+    deliverables: [
+      "Decor concept deck",
+      "Area-wise inclusion list",
+      "Setup render or reference board",
+      "Production timeline",
+    ],
+    eventFit: ["Mehendi", "Haldi", "Sangeet", "Pheras", "Reception"],
+    questions: [
+      "Which areas are included in the quoted scope?",
+      "What is rented vs custom-built?",
+      "How many hours are needed for setup?",
+    ],
+  },
+  photography: {
+    promise:
+      "Coverage planning, team size, deliverables, edit timelines, and story-led documentation across the full wedding.",
+    inclusions: [
+      "Lead photographer and supporting team",
+      "Candid, traditional, and detail coverage",
+      "Drone, reel, teaser, or film options where available",
+      "Delivery timeline and album planning",
+    ],
+    deliverables: [
+      "Edited photo gallery",
+      "Highlight film or teaser options",
+      "Raw/archival policy",
+      "Album and print add-ons",
+    ],
+    eventFit: ["Pre-wedding", "Mehendi", "Sangeet", "Wedding", "Reception"],
+    questions: [
+      "How many shooters are included?",
+      "What is the editing and delivery timeline?",
+      "Are reels, drone, and albums included or add-ons?",
+    ],
+  },
+  entertainment: {
+    promise:
+      "Performance format, technical requirements, show flow, sound checks, emcee cues, and guest-energy planning.",
+    inclusions: [
+      "Artist, DJ, band, emcee, or choreographer scope",
+      "Set duration and performance flow",
+      "Sound, light, and tech coordination notes",
+      "Soundcheck and green-room requirements",
+    ],
+    deliverables: [
+      "Performance run sheet",
+      "Technical rider",
+      "Playlist or act direction",
+      "Setup and soundcheck schedule",
+    ],
+    eventFit: ["Welcome night", "Cocktail", "Sangeet", "After-party", "Reception"],
+    questions: [
+      "What equipment is included?",
+      "How long is the performance set?",
+      "What does the venue need to provide?",
+    ],
+  },
+  makeup: {
+    promise:
+      "Bridal, groom, family, and touch-up planning with timing, artist allocation, products, and look references.",
+    inclusions: [
+      "Bridal or groom look planning",
+      "Hair, makeup, draping, and touch-up options",
+      "Family artist allocation",
+      "Getting-ready room timing",
+    ],
+    deliverables: [
+      "Look reference plan",
+      "Trial or consultation notes",
+      "Day-wise styling schedule",
+      "Artist and assistant allocation",
+    ],
+    eventFit: ["Mehendi", "Haldi", "Wedding", "Reception", "After-party"],
+    questions: [
+      "Is a trial included?",
+      "How many family members can be covered?",
+      "How much time is needed per look?",
+    ],
+  },
+};
+
+function uniqueText(values: (string | null | undefined)[], fallback: string[]) {
+  const seen = new Set<string>();
+  const cleaned = values
+    .map((value) => value?.trim())
+    .filter((value): value is string => Boolean(value))
+    .filter((value) => {
+      const key = value.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+  return cleaned.length > 0 ? cleaned : fallback;
+}
+
+function offeringForVendor(vendor: VendorCardApi): VendorOffering {
+  const slug = vendor.category?.slug?.toLowerCase() ?? "";
+  const blueprint = OFFERING_BLUEPRINTS[slug] ?? DEFAULT_OFFERING_BLUEPRINT;
+  const services = vendor.services ?? [];
+  const serviceScope = services.find((service) => service.service_scope)?.service_scope;
+
+  return {
+    ...blueprint,
+    promise: serviceScope ?? blueprint.promise,
+    inclusions: uniqueText(
+      services.flatMap((service) => service.inclusions ?? []),
+      blueprint.inclusions
+    ),
+    deliverables: uniqueText(
+      services.flatMap((service) => service.deliverables ?? []),
+      blueprint.deliverables
+    ),
+    eventFit: uniqueText(
+      services.flatMap((service) => service.event_type_fit ?? []),
+      blueprint.eventFit
+    ),
+    addOns: uniqueText(services.flatMap((service) => service.add_ons ?? []), []),
+  };
+}
+
+function servicePriceLabel(service: {
+  base_price?: number | null;
+  max_price?: number | null;
+  unit?: string | null;
+}) {
+  const base = service.base_price ? priceLabel(service.base_price) : "On request";
+  const max = service.max_price ? ` to ${priceLabel(service.max_price)}` : "";
+  return `${base}${max}${service.unit ? ` · ${service.unit}` : ""}`;
+}
+
+function offeringLabel(value: string) {
+  return value
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+type CatalogueRow = VendorServiceItemApi & { serviceName: string };
+
+function catalogueItemsFromServices(services: VendorServiceApi[]): CatalogueRow[] {
+  return services
+    .flatMap((service) =>
+      (service.items ?? []).map((item) => ({
+        ...item,
+        serviceName: service.name ?? "Package",
+      }))
+    )
+    .sort((left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0));
+}
+
+function groupCatalogueItems(items: CatalogueRow[]) {
+  const buckets = new Map<string, CatalogueRow[]>();
+  for (const item of items) {
+    const key = item.item_type || "inclusion";
+    const bucket = buckets.get(key);
+    if (bucket) bucket.push(item);
+    else buckets.set(key, [item]);
+  }
+  return Array.from(buckets.entries()).map(([itemType, list]) => ({
+    itemType,
+    items: list,
+  }));
 }
 
 export default function ClientVendorsPage() {
@@ -349,6 +605,7 @@ export default function ClientVendorsPage() {
                 const catName = v.category?.name ?? "Vendor";
                 const isSaved = savedSlugs.includes(v.slug);
                 const isSelected = selectedSlug === v.slug;
+                const offering = offeringForVendor(v);
 
                 return (
                   <motion.article
@@ -382,6 +639,12 @@ export default function ClientVendorsPage() {
                     <p className="font-heading mt-3 line-clamp-2 text-sm text-slate">
                       {v.short_bio ?? "Open the profile for more detail and pricing context."}
                     </p>
+                    <div className="mt-4 border border-charcoal/8 bg-cream/35 p-3">
+                      <p className={dashLabel}>What they cover</p>
+                      <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate">
+                        {offering.promise}
+                      </p>
+                    </div>
                     <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                       <div className="border border-charcoal/8 bg-cream/40 p-3">
                         <p className={dashLabel}>Rating</p>
@@ -476,6 +739,8 @@ function VendorDetailPanel({
 }) {
   const reviews = sortReviews("reviews" in vendor ? vendor.reviews : null);
   const services = (vendor.services ?? []).slice(0, 6);
+  const offering = offeringForVendor(vendor);
+  const catalogueItems = catalogueItemsFromServices(services);
   const detailCopy =
     "description" in vendor
       ? vendor.description ?? vendor.short_bio ?? "Detailed profile available below."
@@ -505,6 +770,18 @@ function VendorDetailPanel({
       <p className="text-sm leading-relaxed text-slate">
         {detailCopy}
       </p>
+
+      <div className="border border-charcoal/10 bg-[radial-gradient(circle_at_top_left,rgba(201,169,110,0.2),transparent_34%),linear-gradient(145deg,#111827_0%,#1f2937_58%,#0b1220_100%)] p-4 text-ivory">
+        <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-gold-light">
+          Offering map
+        </p>
+        <h4 className="mt-2 font-display text-xl text-ivory">
+          What this vendor actually handles
+        </h4>
+        <p className="mt-2 text-sm leading-relaxed text-ivory/72">
+          {offering.promise}
+        </p>
+      </div>
 
       <div className="grid grid-cols-2 gap-3">
         <MetricCard label="Rating" value={ratingLabel(vendor.rating)} />
@@ -543,26 +820,162 @@ function VendorDetailPanel({
         </button>
       </div>
 
-      {services.length > 0 ? (
+      <div>
+        <p className={dashLabel}>Top-to-bottom scope</p>
+        <div className="mt-3 grid gap-3">
+          <OfferingBlock
+            title="Inclusions"
+            items={offering.inclusions}
+          />
+          <OfferingBlock
+            title="Deliverables"
+            items={offering.deliverables}
+          />
+          <OfferingBlock
+            title="Best fit events"
+            items={offering.eventFit}
+          />
+          {offering.addOns.length > 0 ? (
+            <OfferingBlock title="Add-ons and upgrades" items={offering.addOns} />
+          ) : null}
+        </div>
+      </div>
+
+      {catalogueItems.length > 0 ? (
         <div>
-          <p className={dashLabel}>Services</p>
-          <div className="mt-3 space-y-2">
-            {services.map((service, index) => (
-              <div
-                key={`${service.name ?? "service"}-${index}`}
-                className="flex items-center justify-between gap-3 border border-charcoal/8 bg-cream/40 px-3 py-3"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm text-charcoal">{service.name ?? "Service"}</p>
-                </div>
-                <p className="font-accent text-[10px] uppercase tracking-[0.15em] text-slate">
-                  {service.base_price ? priceLabel(service.base_price) : "On request"}
+          <div className="flex items-center justify-between gap-3">
+            <p className={dashLabel}>{categoryCopy(vendor.category?.slug).catalogueLabel}</p>
+            <span className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
+              {catalogueItems.length} listed
+            </span>
+          </div>
+          <div className="mt-3 space-y-4">
+            {groupCatalogueItems(catalogueItems).map((group) => (
+              <div key={group.itemType} className="border border-charcoal/8 bg-cream/35 p-3">
+                <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-gold-dark">
+                  {offeringLabel(group.itemType)}
                 </p>
+                <ul className="mt-3 list-none space-y-2 pl-0">
+                  {group.items.slice(0, 6).map((item) => (
+                    <li key={item.id} className="border-t border-charcoal/8 pt-2 first:border-t-0 first:pt-0">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-heading text-sm text-charcoal">
+                            {item.name}
+                          </p>
+                          <p className="mt-1 font-accent text-[10px] uppercase tracking-[0.14em] text-slate">
+                            {item.serviceName}
+                          </p>
+                        </div>
+                        {item.dietary_tags?.length ? (
+                          <span className="border border-sage/30 px-2 py-1 font-heading text-[11px] text-sage">
+                            {item.dietary_tags.slice(0, 2).join(", ")}
+                          </span>
+                        ) : null}
+                      </div>
+                      {item.description ? (
+                        <p className="mt-1 text-xs leading-relaxed text-slate">
+                          {item.description}
+                        </p>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
               </div>
             ))}
           </div>
         </div>
       ) : null}
+
+      <div>
+        <div className="flex items-center justify-between gap-3">
+          <p className={dashLabel}>Services and packages</p>
+          <span className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
+            {services.length} listed
+          </span>
+        </div>
+        {services.length > 0 ? (
+          <div className="mt-3 space-y-3">
+            {services.map((service, index) => (
+              <div
+                key={`${service.name ?? "service"}-${index}`}
+                className="border border-charcoal/8 bg-cream/40 p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm text-charcoal">{service.name ?? "Service"}</p>
+                    {service.service_scope ? (
+                      <p className="mt-2 text-xs leading-relaxed text-charcoal">
+                        {service.service_scope}
+                      </p>
+                    ) : null}
+                    {service.description ? (
+                      <p className="mt-2 text-xs leading-relaxed text-slate">
+                        {service.description}
+                      </p>
+                    ) : null}
+                  </div>
+                  <p className="shrink-0 text-right font-accent text-[10px] uppercase tracking-[0.15em] text-gold-dark">
+                    {servicePriceLabel(service)}
+                  </p>
+                </div>
+                <ServiceDetailTags
+                  label="Best for"
+                  items={service.event_type_fit ?? []}
+                />
+                <ServiceDetailTags
+                  label="Includes"
+                  items={service.inclusions ?? []}
+                />
+                <ServiceDetailTags
+                  label="Deliverables"
+                  items={service.deliverables ?? []}
+                />
+                <ServiceDetailTags
+                  label="Add-ons"
+                  items={service.add_ons ?? []}
+                />
+                {service.items?.length ? (
+                  <div className="mt-3 border-t border-charcoal/8 pt-3">
+                    <p className="font-accent text-[10px] uppercase tracking-[0.14em] text-slate">
+                      Selectable items
+                    </p>
+                    <div className="mt-2 space-y-2">
+                      {service.items.slice(0, 4).map((item) => (
+                        <div key={item.id} className="text-xs leading-relaxed text-slate">
+                          <span className="text-charcoal">{item.name}</span>
+                          <span> · {offeringLabel(item.item_type)}</span>
+                          {item.dietary_tags?.length ? (
+                            <span> · {item.dietary_tags.join(", ")}</span>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-3 border border-dashed border-charcoal/12 bg-cream/30 p-4">
+            <p className="text-sm text-slate">
+              Packages are not listed yet. Use the shortlist to request a full scope
+              and quote.
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="border border-charcoal/8 bg-cream/35 p-4">
+        <p className={dashLabel}>Ask before booking</p>
+        <ul className="mt-3 list-none space-y-2 pl-0">
+          {offering.questions.map((question) => (
+            <li key={question} className="text-sm leading-relaxed text-slate">
+              {question}
+            </li>
+          ))}
+        </ul>
+      </div>
 
       {reviews.length > 0 ? (
         <div>
@@ -595,6 +1008,61 @@ function VendorDetailPanel({
           <p className="text-sm text-slate">No published reviews yet.</p>
         </div>
       )}
+    </div>
+  );
+}
+
+function OfferingBlock({
+  title,
+  items,
+}: {
+  title: string;
+  items: string[];
+}) {
+  return (
+    <div className="border border-charcoal/8 bg-cream/35 p-4">
+      <p className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
+        {title}
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {items.map((item) => (
+          <span
+            key={item}
+            className="border border-charcoal/10 bg-ivory px-2.5 py-1.5 font-heading text-[11px] text-charcoal"
+          >
+            {item}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ServiceDetailTags({
+  label,
+  items,
+}: {
+  label: string;
+  items: string[];
+}) {
+  const visibleItems = items.filter(Boolean).slice(0, 5);
+  if (visibleItems.length === 0) return null;
+
+  return (
+    <div className="mt-3 border-t border-charcoal/8 pt-3">
+      <p className="font-accent text-[10px] uppercase tracking-[0.14em] text-slate">
+        {label}
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {visibleItems.map((item) => (
+          <span
+            key={`${label}-${item}`}
+            className="border border-charcoal/10 bg-ivory px-2 py-1 font-heading text-[11px] text-charcoal"
+          >
+            {item}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

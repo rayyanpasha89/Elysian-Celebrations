@@ -293,19 +293,40 @@ model VendorCategory {
 }
 
 model VendorService {
-  id              String  @id @default(cuid())
+  id              String   @id @default(cuid())
   vendorProfileId String
   name            String
   description     String?
+  serviceScope    String?
   basePrice       Int
   maxPrice        Int?
   unit            String? // "per event", "per day", "per person"
-  isActive        Boolean @default(true)
+  eventTypeFit    String[] @default([])
+  inclusions      String[] @default([])
+  deliverables    String[] @default([])
+  addOns          String[] @default([])
+  isActive        Boolean  @default(true)
 
   vendorProfile VendorProfile @relation(fields: [vendorProfileId], references: [id], onDelete: Cascade)
   bookings      Booking[]
+  items         VendorServiceItem[]
 
   @@map("vendor_services")
+}
+
+model VendorServiceItem {
+  id              String   @id @default(cuid())
+  vendorServiceId String
+  itemType        String   @default("inclusion")
+  name            String
+  description     String?
+  dietaryTags     String[] @default([])
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  vendorService VendorService @relation(fields: [vendorServiceId], references: [id], onDelete: Cascade)
+
+  @@map("vendor_service_items")
 }
 
 model VendorDestination {

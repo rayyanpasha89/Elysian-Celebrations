@@ -13,7 +13,7 @@ export async function GET(
     const { data: vendor, error } = await supabase
       .from("vendor_profiles")
       .select(
-        `*, category:vendor_categories(name, slug), services:vendor_services(*), reviews(*, client:client_profiles(user_id))`
+        `*, category:vendor_categories(name, slug), services:vendor_services(*, items:vendor_service_items(id, item_type, name, description, dietary_tags, sort_order)), reviews(*, client:client_profiles(user_id))`
       )
       .eq("slug", slug)
       .single();

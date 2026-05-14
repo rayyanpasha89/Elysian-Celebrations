@@ -48,9 +48,22 @@ type EventVendorSelection = {
     id: string;
     name: string;
     description: string | null;
+    serviceScope: string | null;
     basePrice: number | null;
     maxPrice: number | null;
     unit: string | null;
+    eventTypeFit: string[];
+    inclusions: string[];
+    deliverables: string[];
+    addOns: string[];
+    items: {
+      id: string;
+      itemType: string;
+      name: string;
+      description: string | null;
+      dietaryTags: string[];
+      sortOrder: number | null;
+    }[];
   } | null;
 };
 
@@ -152,9 +165,22 @@ type VendorPlannerOption = {
     id: string;
     name: string;
     description?: string | null;
+    service_scope?: string | null;
     base_price: number;
     max_price?: number | null;
     unit?: string | null;
+    event_type_fit?: string[] | null;
+    inclusions?: string[] | null;
+    deliverables?: string[] | null;
+    add_ons?: string[] | null;
+    items?: {
+      id: string;
+      item_type: string;
+      name: string;
+      description: string | null;
+      dietary_tags: string[] | null;
+      sort_order: number | null;
+    }[] | null;
   }[];
 };
 
@@ -224,6 +250,57 @@ type EventDetailDraft = {
   tasks: EventTaskDraft[];
   vendorSelections: Record<PlannerVendorCategoryKey, VendorDraftSelection | null>;
 };
+
+type EditorSectionKey =
+  | "basics"
+  | "food"
+  | "design"
+  | "vendors"
+  | "logistics"
+  | "tasks"
+  | "notes";
+
+const EDITOR_SECTIONS: {
+  key: EditorSectionKey;
+  label: string;
+  helper: string;
+}[] = [
+  {
+    key: "basics",
+    label: "Basics",
+    helper: "Name, day, time, venue, guests, and budget.",
+  },
+  {
+    key: "food",
+    label: "Food",
+    helper: "Menus, counters, dietary notes, and service style.",
+  },
+  {
+    key: "design",
+    label: "Design",
+    helper: "Decor direction, atmosphere, and styling cues.",
+  },
+  {
+    key: "vendors",
+    label: "Vendors",
+    helper: "Pick real vendors and packages for this event.",
+  },
+  {
+    key: "logistics",
+    label: "Logistics",
+    helper: "Guest movement, load-in, rooms, and backup plans.",
+  },
+  {
+    key: "tasks",
+    label: "Tasks",
+    helper: "Event-specific action items and owners.",
+  },
+  {
+    key: "notes",
+    label: "Notes",
+    helper: "Run-of-show notes and final planning reminders.",
+  },
+];
 
 function draftId(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -497,6 +574,7 @@ export default function ClientWeddingPage() {
     venue: "",
   });
   const [detailDraft, setDetailDraft] = useState<EventDetailDraft | null>(null);
+  const [editorSection, setEditorSection] = useState<EditorSectionKey>("basics");
   const [savingDay, setSavingDay] = useState(false);
   const [savingEvent, setSavingEvent] = useState(false);
   const [savingDetail, setSavingDetail] = useState(false);
@@ -584,6 +662,10 @@ export default function ClientWeddingPage() {
 
     setDetailDraft(buildDetailDraft(selectedEvent));
   }, [selectedEvent]);
+
+  useEffect(() => {
+    setEditorSection("basics");
+  }, [selectedEventId]);
 
   useEffect(() => {
     if (!wedding) return;
@@ -680,6 +762,10 @@ export default function ClientWeddingPage() {
       ),
     [days]
   );
+
+  const activeEditorSection =
+    EDITOR_SECTIONS.find((section) => section.key === editorSection) ??
+    EDITOR_SECTIONS[0];
 
   const createDay = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1834,7 +1920,61 @@ export default function ClientWeddingPage() {
                   </p>
                 </div>
 
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="border border-charcoal/10 bg-cream/30 p-3">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {EDITOR_SECTIONS.map((section) => {
+                      const active = editorSection === section.key;
+                      return (
+                        <button
+                          key={section.key}
+                          type="button"
+                          onClick={() => setEditorSection(section.key)}
+                          className={cn(
+                            "border px-3 py-2 text-left transition-colors",
+                            active
+                              ? "border-gold-primary bg-gold-primary/10 text-charcoal"
+                              : "border-charcoal/10 bg-ivory/70 text-slate hover:border-gold-primary/50"
+                          )}
+                        >
+                          <span className="font-accent text-[10px] uppercase tracking-[0.16em]">
+                            {section.label}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-3 text-xs leading-relaxed text-slate">
+                    {activeEditorSection.helper}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="border border-charcoal/8 bg-cream/35 p-3">
+                    <p className={dashLabel}>Menus</p>
+                    <p className="mt-1 font-display text-lg text-charcoal">
+                      {detailDraft.menus.length}
+                    </p>
+                  </div>
+                  <div className="border border-charcoal/8 bg-cream/35 p-3">
+                    <p className={dashLabel}>Vendors</p>
+                    <p className="mt-1 font-display text-lg text-charcoal">
+                      {Object.values(detailDraft.vendorSelections).filter(Boolean).length}
+                    </p>
+                  </div>
+                  <div className="border border-charcoal/8 bg-cream/35 p-3">
+                    <p className={dashLabel}>Tasks</p>
+                    <p className="mt-1 font-display text-lg text-charcoal">
+                      {detailDraft.tasks.length}
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  className={cn(
+                    "grid gap-3 md:grid-cols-2",
+                    editorSection !== "basics" && "hidden"
+                  )}
+                >
                   <Field label="Event name">
                     <input
                       type="text"
@@ -1979,7 +2119,12 @@ export default function ClientWeddingPage() {
                   </Field>
                 </div>
 
-                <div className="space-y-4 border-t border-charcoal/8 pt-5">
+                <div
+                  className={cn(
+                    "space-y-4 border-t border-charcoal/8 pt-5",
+                    editorSection !== "food" && "hidden"
+                  )}
+                >
                   <div>
                     <p className={dashLabel}>Food and menu</p>
                     <p className="mt-1 text-sm text-slate">
@@ -2252,7 +2397,12 @@ export default function ClientWeddingPage() {
                   </div>
                 </div>
 
-                <div className="space-y-4 border-t border-charcoal/8 pt-5">
+                <div
+                  className={cn(
+                    "space-y-4 border-t border-charcoal/8 pt-5",
+                    editorSection !== "design" && "hidden"
+                  )}
+                >
                   <div>
                     <p className={dashLabel}>Decor and atmosphere</p>
                     <p className="mt-1 text-sm text-slate">
@@ -2313,7 +2463,12 @@ export default function ClientWeddingPage() {
                   </Field>
                 </div>
 
-                <div className="space-y-4 border-t border-charcoal/8 pt-5">
+                <div
+                  className={cn(
+                    "space-y-4 border-t border-charcoal/8 pt-5",
+                    editorSection !== "vendors" && "hidden"
+                  )}
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className={dashLabel}>Vendor planning</p>
@@ -2435,29 +2590,21 @@ export default function ClientWeddingPage() {
                                 ))}
                               </select>
 
-                              {selection?.vendorServiceId ? (
-                                <div className="space-y-2 border border-charcoal/10 p-3">
-                                  {selectedVendor.services
-                                    .filter(
-                                      (service) =>
-                                        service.id === selection.vendorServiceId
-                                    )
-                                    .map((service) => (
-                                      <div key={service.id}>
-                                        <p className="font-heading text-sm text-charcoal">
-                                          {service.name}
-                                        </p>
-                                        <p className="mt-1 text-xs text-slate">
-                                          {service.description ?? "Service details will appear here."}
-                                        </p>
-                                        <p className="mt-2 text-xs text-gold-dark">
-                                          From {formatCurrency(service.base_price)}
-                                          {service.unit ? ` · ${service.unit}` : ""}
-                                        </p>
-                                      </div>
-                                    ))}
-                                </div>
-                              ) : null}
+	                              {selection?.vendorServiceId ? (
+	                                <div className="border border-charcoal/10 p-3">
+	                                  {selectedVendor.services
+	                                    .filter(
+	                                      (service) =>
+	                                        service.id === selection.vendorServiceId
+	                                    )
+	                                    .map((service) => (
+	                                      <ServiceOfferingPreview
+	                                        key={service.id}
+	                                        service={service}
+	                                      />
+	                                    ))}
+	                                </div>
+	                              ) : null}
                             </>
                           ) : (
                             <p className="text-sm text-slate">
@@ -2470,7 +2617,12 @@ export default function ClientWeddingPage() {
                   })}
                 </div>
 
-                <div className="space-y-4 border-t border-charcoal/8 pt-5">
+                <div
+                  className={cn(
+                    "space-y-4 border-t border-charcoal/8 pt-5",
+                    editorSection !== "logistics" && "hidden"
+                  )}
+                >
                   <div>
                     <p className={dashLabel}>Logistics</p>
                     <p className="mt-1 text-sm text-slate">
@@ -2572,7 +2724,12 @@ export default function ClientWeddingPage() {
                   </div>
                 </div>
 
-                <div className="space-y-4 border-t border-charcoal/8 pt-5">
+                <div
+                  className={cn(
+                    "space-y-4 border-t border-charcoal/8 pt-5",
+                    editorSection !== "tasks" && "hidden"
+                  )}
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className={dashLabel}>Event tasks</p>
@@ -2657,20 +2814,22 @@ export default function ClientWeddingPage() {
                   </div>
                 </div>
 
-                <Field label="Planning notes">
-                  <textarea
-                    value={detailDraft.notes}
-                    onChange={(event) =>
-                      setDetailDraft((current) =>
-                        current
-                          ? { ...current, notes: event.target.value }
-                          : current
-                      )
-                    }
-                    className="min-h-[96px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                    placeholder="Run-of-show reminders, family logistics, weather backups..."
-                  />
-                </Field>
+                <div className={cn(editorSection !== "notes" && "hidden")}>
+                  <Field label="Planning notes">
+                    <textarea
+                      value={detailDraft.notes}
+                      onChange={(event) =>
+                        setDetailDraft((current) =>
+                          current
+                            ? { ...current, notes: event.target.value }
+                            : current
+                        )
+                      }
+                      className="min-h-[180px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                      placeholder="Run-of-show reminders, family logistics, weather backups..."
+                    />
+                  </Field>
+                </div>
 
                 <div className="flex flex-wrap gap-3 border-t border-charcoal/8 pt-4">
                   <button
@@ -2716,6 +2875,101 @@ export default function ClientWeddingPage() {
       </div>
     </motion.div>
   );
+}
+
+type VendorPlannerService = VendorPlannerOption["services"][number];
+
+function ServiceOfferingPreview({ service }: { service: VendorPlannerService }) {
+  const catalogueItems = (service.items ?? [])
+    .slice()
+    .sort((left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0))
+    .slice(0, 6);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="font-heading text-sm text-charcoal">{service.name}</p>
+          <p className="mt-1 text-xs text-slate">
+            {service.description ?? "Service details will appear here."}
+          </p>
+        </div>
+        <p className="font-accent text-[10px] uppercase tracking-[0.14em] text-gold-dark">
+          From {formatCurrency(service.base_price)}
+          {service.unit ? ` · ${service.unit}` : ""}
+        </p>
+      </div>
+
+      {service.service_scope ? (
+        <div className="border border-charcoal/8 bg-cream/35 p-3">
+          <p className={dashLabel}>Scope</p>
+          <p className="mt-2 text-xs leading-relaxed text-charcoal">
+            {service.service_scope}
+          </p>
+        </div>
+      ) : null}
+
+      <ServiceChipRow label="Best for" items={service.event_type_fit ?? []} />
+      <ServiceChipRow label="Includes" items={service.inclusions ?? []} />
+      <ServiceChipRow label="Deliverables" items={service.deliverables ?? []} />
+      <ServiceChipRow label="Add-ons" items={service.add_ons ?? []} />
+
+      {catalogueItems.length > 0 ? (
+        <div className="border-t border-charcoal/8 pt-3">
+          <p className={dashLabel}>Catalogue items</p>
+          <div className="mt-2 space-y-2">
+            {catalogueItems.map((item) => (
+              <div key={item.id} className="border border-charcoal/8 bg-cream/25 p-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-heading text-xs text-charcoal">{item.name}</p>
+                  <p className="font-accent text-[9px] uppercase tracking-[0.14em] text-gold-dark">
+                    {serviceItemTypeLabel(item.item_type)}
+                  </p>
+                </div>
+                {item.description ? (
+                  <p className="mt-1 text-[11px] leading-relaxed text-slate">
+                    {item.description}
+                  </p>
+                ) : null}
+                {item.dietary_tags?.length ? (
+                  <p className="mt-1 text-[11px] text-sage">
+                    {item.dietary_tags.join(", ")}
+                  </p>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ServiceChipRow({ label, items }: { label: string; items: string[] }) {
+  const visibleItems = items.filter(Boolean).slice(0, 5);
+  if (visibleItems.length === 0) return null;
+
+  return (
+    <div>
+      <p className={dashLabel}>{label}</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {visibleItems.map((item) => (
+          <span
+            key={`${label}-${item}`}
+            className="border border-charcoal/10 bg-cream/35 px-2 py-1 font-heading text-[11px] text-charcoal"
+          >
+            {item}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function serviceItemTypeLabel(value: string) {
+  return value
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function Field({
