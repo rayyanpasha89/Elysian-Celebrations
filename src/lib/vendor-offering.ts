@@ -57,7 +57,10 @@ export function normalizeServiceItems(raw: unknown): VendorServiceItemInput[] {
   for (const candidate of raw) {
     if (!candidate || typeof candidate !== "object") continue;
     const entry = candidate as Record<string, unknown>;
-    const name = typeof entry.name === "string" ? entry.name.trim() : "";
+    const name =
+      typeof entry.name === "string"
+        ? entry.name.replace(/\s+/g, " ").trim()
+        : "";
     if (!name) continue;
     const itemTypeRaw =
       typeof entry.itemType === "string"
@@ -72,7 +75,9 @@ export function normalizeServiceItems(raw: unknown): VendorServiceItemInput[] {
         : null;
     const dietaryTags = toStringArray(entry.dietaryTags, 6, 40);
     const sortOrderRaw = Number(entry.sortOrder);
-    const sortOrder = Number.isFinite(sortOrderRaw) ? sortOrderRaw : null;
+    const sortOrder = Number.isFinite(sortOrderRaw)
+      ? Math.max(0, Math.min(9999, Math.floor(sortOrderRaw)))
+      : null;
     items.push({
       itemType,
       name: name.slice(0, 120),
@@ -104,6 +109,8 @@ export type CategoryCopy = {
   exampleDeliverables: string[];
   exampleAddOns: string[];
   exampleEventFit: string[];
+  exampleItemNames: string[];
+  groupHeadings: Record<string, string>;
   showDietary: boolean;
   itemNamePrompt: string;
 };
@@ -130,6 +137,16 @@ const FALLBACK_COPY: CategoryCopy = {
   exampleDeliverables: ["Proposal", "Quote breakdown", "Execution checklist"],
   exampleAddOns: ["Custom add-on", "Extended hours"],
   exampleEventFit: ["Welcome", "Main event", "Reception"],
+  exampleItemNames: ["Discovery call", "Scope sheet", "Execution day"],
+  groupHeadings: {
+    inclusion: "Inclusions",
+    deliverable: "Deliverables",
+    addon: "Add-ons",
+    menu: "Menu",
+    setup: "Setups",
+    performance: "Performance",
+    look: "Looks",
+  },
   showDietary: false,
   itemNamePrompt: "Offering name",
 };
@@ -173,6 +190,18 @@ const CATEGORY_COPY: Record<string, CategoryCopy> = {
       "Wedding feast",
       "Reception",
     ],
+    exampleItemNames: [
+      "Welcome beverage station",
+      "Live chaat counter",
+      "Main course spread",
+      "Dessert bar",
+    ],
+    groupHeadings: {
+      menu: "Menu sections",
+      addon: "Live counters and stations",
+      inclusion: "Service inclusions",
+      deliverable: "Deliverables",
+    },
     showDietary: true,
     itemNamePrompt: "Menu item or counter name",
   },
@@ -208,6 +237,18 @@ const CATEGORY_COPY: Record<string, CategoryCopy> = {
       "Candle upgrade",
     ],
     exampleEventFit: ["Mehendi", "Haldi", "Sangeet", "Wedding", "Reception"],
+    exampleItemNames: [
+      "Entry moment",
+      "Mandap or stage focal",
+      "Guest table styling",
+      "Lighting atmosphere",
+    ],
+    groupHeadings: {
+      setup: "Setup areas",
+      deliverable: "Deliverables",
+      addon: "Upgrades and installations",
+      inclusion: "Inclusions",
+    },
     showDietary: false,
     itemNamePrompt: "Setup area or feature",
   },
@@ -245,6 +286,17 @@ const CATEGORY_COPY: Record<string, CategoryCopy> = {
       "Wedding",
       "Reception",
     ],
+    exampleItemNames: [
+      "Candid event coverage",
+      "Portrait and detail set",
+      "Edited gallery",
+      "Highlight film",
+    ],
+    groupHeadings: {
+      deliverable: "Coverage and deliverables",
+      inclusion: "Team and inclusions",
+      addon: "Add-ons",
+    },
     showDietary: false,
     itemNamePrompt: "Coverage or deliverable",
   },
@@ -286,6 +338,17 @@ const CATEGORY_COPY: Record<string, CategoryCopy> = {
       "After-party",
       "Reception",
     ],
+    exampleItemNames: [
+      "Performance set",
+      "Soundcheck and rider",
+      "Emcee cue flow",
+      "After-party extension",
+    ],
+    groupHeadings: {
+      performance: "Performance sets",
+      inclusion: "Technical rider",
+      addon: "Add-ons",
+    },
     showDietary: false,
     itemNamePrompt: "Set, rider, or add-on",
   },
@@ -321,6 +384,17 @@ const CATEGORY_COPY: Record<string, CategoryCopy> = {
       "Extended touch-up",
     ],
     exampleEventFit: ["Mehendi", "Haldi", "Wedding", "Reception", "After-party"],
+    exampleItemNames: [
+      "Primary bridal look",
+      "Second change",
+      "Family styling block",
+      "Touch-up window",
+    ],
+    groupHeadings: {
+      look: "Looks and changes",
+      inclusion: "Inclusions",
+      addon: "Add-ons",
+    },
     showDietary: false,
     itemNamePrompt: "Look, change, or touch-up",
   },

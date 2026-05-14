@@ -22,6 +22,7 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
   - `20260412000100_add_wedding_days_and_event_planning.sql`
   - `20260512000100_deepen_event_planning.sql`
   - `20260512000200_link_budget_items_to_events.sql`
+  - `20260514000100_deepen_vendor_offerings.sql`
 - Remote table/column checks passed for:
   - `wedding_event_menus`
   - `wedding_event_menu_items`
@@ -50,6 +51,7 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
 - Rebuilt `/vendor/services` as a real offering editor with scope textarea, multi-line tag fields, and an itemized catalogue editor that swaps labels by category (catering shows dietary tag inputs, decor talks about setups, photography about coverage, entertainment about sets and tech, makeup about looks and touch-ups).
 - Refined the client vendor profile preview at `/client/vendors` to title the catalogue section by category ("Menu and counters", "Setups and areas", "Coverage and deliverables", "Sets and tech", "Looks and coverage") and group itemized offerings by type rather than mixing menus, setups, and deliverables into one stream.
 - Added `src/lib/vendor-offering.ts` to centralize array normalization, item-type whitelisting, and per-category copy (catalogue labels, scope prompt, example chips, item type options) shared by both the vendor editor and the client preview.
+- Connected vendor offerings back into the Event Editor. Clients can select catalogue rows from a chosen vendor service, add catering rows directly into the event menu, and append decor/photography/entertainment scope into the relevant event notes with a follow-up confirmation task.
 
 ## Verified Recently
 
@@ -77,5 +79,5 @@ Items 1, 2, and 3 are implemented in the follow-up slice and should be rechecked
 
 - Vercel auto-deploy is assumed from the connected GitHub project, but local CLI verification is blocked by missing Vercel credentials.
 - The current event-linked budget model supports one event per budget line item.
-- Event tasks and timeline items are still separate until the timeline integration is completed.
-- Saved vendors have a schema table available, but the older Clerk metadata persistence path still needs replacement.
+- Event planning menu/task saves still replace nested rows instead of preserving row IDs.
+- Vendor service catalogue rows do not yet support drag ordering or image/reference attachments.

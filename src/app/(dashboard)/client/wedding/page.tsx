@@ -184,6 +184,9 @@ type VendorPlannerOption = {
   }[];
 };
 
+type VendorPlannerService = VendorPlannerOption["services"][number];
+type VendorPlannerServiceItem = NonNullable<VendorPlannerService["items"]>[number];
+
 type VendorDraftSelection = {
   vendorProfileId: string;
   vendorSlug: string;
@@ -551,6 +554,98 @@ function summarizeDayPlan(day: WeddingDay) {
 
 function formatBookingStatus(status: string) {
   return status.toLowerCase().replaceAll("_", " ");
+}
+
+function uniqueList(values: string[]) {
+  const seen = new Set<string>();
+  return values
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .filter((value) => {
+      const key = value.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function appendPlanningBlock(current: string, title: string, lines: string[]) {
+  const cleanedLines = lines.map((line) => line.trim()).filter(Boolean);
+  if (cleanedLines.length === 0) return current;
+  const block = [title, ...cleanedLines.map((line) => `- ${line}`)].join("\n");
+  const trimmed = current.trim();
+  if (!trimmed) return block;
+  if (trimmed.includes(title)) return trimmed;
+  return `${trimmed}\n\n${block}`;
+}
+
+function servicePlanningLines(
+  service: VendorPlannerService,
+  selectedItems: VendorPlannerServiceItem[]
+) {
+  const lines: string[] = [];
+  if (service.service_scope) lines.push(`Scope: ${service.service_scope}`);
+  if (selectedItems.length > 0) {
+    lines.push(
+      `Selected catalogue rows: ${selectedItems.map((item) => item.name).join(", ")}`
+    );
+  }
+  if (service.inclusions?.length) {
+    lines.push(`Includes: ${service.inclusions.join(", ")}`);
+  }
+  if (service.deliverables?.length) {
+    lines.push(`Deliverables: ${service.deliverables.join(", ")}`);
+  }
+  if (service.add_ons?.length) {
+    lines.push(`Optional add-ons: ${service.add_ons.join(", ")}`);
+  }
+  return lines;
+}
+
+function courseFromVendorItem(itemType: string) {
+  switch (itemType) {
+    case "addon":
+      return "Live counter";
+    case "menu":
+      return "Main";
+    default:
+      return "";
+  }
+}
+
+function menuDraftFromVendorService({
+  vendorName,
+  service,
+  selectedItems,
+  foodStyle,
+}: {
+  vendorName: string;
+  service: VendorPlannerService;
+  selectedItems: VendorPlannerServiceItem[];
+  foodStyle: string;
+}): MenuDraft {
+  return {
+    clientId: draftId("menu"),
+    id: null,
+    name: `${vendorName}: ${service.name}`,
+    mealPeriod: "",
+    serviceStyle: foodStyle || service.unit || "",
+    notes: servicePlanningLines(service, selectedItems).join("\n"),
+    items: selectedItems.map((item) => ({
+      clientId: draftId("menu_item"),
+      id: null,
+      name: item.name,
+      course: courseFromVendorItem(item.item_type),
+      dietaryTags: item.dietary_tags ?? [],
+      notes: item.description ?? "",
+    })),
+  };
+}
+
+function importTargetSection(categoryKey: PlannerVendorCategoryKey): EditorSectionKey {
+  if (categoryKey === "catering") return "food";
+  if (categoryKey === "decor") return "design";
+  return "notes";
 }
 
 export default function ClientWeddingPage() {
@@ -1213,6 +1308,90 @@ export default function ClientWeddingPage() {
             menus: [...current.menus, createMenuDraft(current.foodStyle)],
           }
         : current
+    );
+  };
+
+  const applyVendorServiceToPlan = ({
+    categoryKey,
+    vendor,
+    service,
+    selectedItemIds,
+  }: {
+    categoryKey: PlannerVendorCategoryKey;
+    vendor: VendorPlannerOption;
+    service: VendorPlannerService;
+    selectedItemIds: string[];
+  }) => {
+    const catalogueItems = (service.items ?? []).slice().sort(
+      (left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0)
+    );
+    const selectedItems =
+      catalogueItems.length > 0
+        ? catalogueItems.filter((item) => selectedItemIds.includes(item.id))
+        : [];
+    const title = `${vendor.business_name}: ${service.name}`;
+    const lines = servicePlanningLines(service, selectedItems);
+    const taskTitle = `Confirm ${vendor.business_name} ${service.name} scope`;
+
+    setDetailDraft((current) => {
+      if (!current) return current;
+
+      const nextTasks = current.tasks.some((task) => task.title === taskTitle)
+        ? current.tasks
+        : [
+            ...current.tasks,
+            {
+              ...createTaskDraft(),
+              title: taskTitle,
+              owner: "Planner",
+            },
+          ];
+
+      if (categoryKey === "catering") {
+        const selectedDietaryTags = selectedItems.flatMap(
+          (item) => item.dietary_tags ?? []
+        );
+
+        return {
+          ...current,
+          menus: [
+            ...current.menus,
+            menuDraftFromVendorService({
+              vendorName: vendor.business_name,
+              service,
+              selectedItems,
+              foodStyle: current.foodStyle,
+            }),
+          ],
+          foodPreferences: uniqueList([
+            ...current.foodPreferences,
+            ...selectedDietaryTags,
+          ]),
+          menuNotes: appendPlanningBlock(current.menuNotes, title, lines),
+          tasks: nextTasks,
+        };
+      }
+
+      if (categoryKey === "decor") {
+        return {
+          ...current,
+          decorNotes: appendPlanningBlock(current.decorNotes, title, lines),
+          tasks: nextTasks,
+        };
+      }
+
+      return {
+        ...current,
+        notes: appendPlanningBlock(current.notes, title, lines),
+        tasks: nextTasks,
+      };
+    });
+
+    setEditorSection(importTargetSection(categoryKey));
+    toast.success(
+      categoryKey === "catering"
+        ? "Vendor catalogue added to the food plan"
+        : "Vendor offering added to the event plan"
     );
   };
 
@@ -2590,21 +2769,31 @@ export default function ClientWeddingPage() {
                                 ))}
                               </select>
 
-	                              {selection?.vendorServiceId ? (
-	                                <div className="border border-charcoal/10 p-3">
-	                                  {selectedVendor.services
-	                                    .filter(
-	                                      (service) =>
-	                                        service.id === selection.vendorServiceId
-	                                    )
-	                                    .map((service) => (
-	                                      <ServiceOfferingPreview
-	                                        key={service.id}
-	                                        service={service}
-	                                      />
-	                                    ))}
-	                                </div>
-	                              ) : null}
+                              {selection?.vendorServiceId ? (
+                                <div className="border border-charcoal/10 p-3">
+                                  {selectedVendor.services
+                                    .filter(
+                                      (service) =>
+                                        service.id === selection.vendorServiceId
+                                    )
+                                    .map((service) => (
+                                      <ServiceOfferingPreview
+                                        key={service.id}
+                                        categoryKey={category.key}
+                                        vendorName={selectedVendor.business_name}
+                                        service={service}
+                                        onUseSelection={(selectedItemIds) =>
+                                          applyVendorServiceToPlan({
+                                            categoryKey: category.key,
+                                            vendor: selectedVendor,
+                                            service,
+                                            selectedItemIds,
+                                          })
+                                        }
+                                      />
+                                    ))}
+                                </div>
+                              ) : null}
                             </>
                           ) : (
                             <p className="text-sm text-slate">
@@ -2877,13 +3066,36 @@ export default function ClientWeddingPage() {
   );
 }
 
-type VendorPlannerService = VendorPlannerOption["services"][number];
+function ServiceOfferingPreview({
+  categoryKey,
+  vendorName,
+  service,
+  onUseSelection,
+}: {
+  categoryKey: PlannerVendorCategoryKey;
+  vendorName: string;
+  service: VendorPlannerService;
+  onUseSelection: (selectedItemIds: string[]) => void;
+}) {
+  const catalogueItems = useMemo(
+    () =>
+      (service.items ?? [])
+        .slice()
+        .sort((left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0))
+        .slice(0, 6),
+    [service.items]
+  );
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>(() =>
+    catalogueItems.map((item) => item.id)
+  );
 
-function ServiceOfferingPreview({ service }: { service: VendorPlannerService }) {
-  const catalogueItems = (service.items ?? [])
-    .slice()
-    .sort((left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0))
-    .slice(0, 6);
+  const toggleItem = (itemId: string) => {
+    setSelectedItemIds((current) =>
+      current.includes(itemId)
+        ? current.filter((entry) => entry !== itemId)
+        : [...current, itemId]
+    );
+  };
 
   return (
     <div className="space-y-3">
@@ -2916,31 +3128,76 @@ function ServiceOfferingPreview({ service }: { service: VendorPlannerService }) 
 
       {catalogueItems.length > 0 ? (
         <div className="border-t border-charcoal/8 pt-3">
-          <p className={dashLabel}>Catalogue items</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className={dashLabel}>Selectable catalogue rows</p>
+            <button
+              type="button"
+              className="font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark"
+              onClick={() =>
+                setSelectedItemIds((current) =>
+                  current.length === catalogueItems.length
+                    ? []
+                    : catalogueItems.map((item) => item.id)
+                )
+              }
+            >
+              {selectedItemIds.length === catalogueItems.length
+                ? "Clear rows"
+                : "Select all"}
+            </button>
+          </div>
           <div className="mt-2 space-y-2">
             {catalogueItems.map((item) => (
-              <div key={item.id} className="border border-charcoal/8 bg-cream/25 p-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="font-heading text-xs text-charcoal">{item.name}</p>
-                  <p className="font-accent text-[9px] uppercase tracking-[0.14em] text-gold-dark">
-                    {serviceItemTypeLabel(item.item_type)}
-                  </p>
-                </div>
-                {item.description ? (
-                  <p className="mt-1 text-[11px] leading-relaxed text-slate">
-                    {item.description}
-                  </p>
-                ) : null}
-                {item.dietary_tags?.length ? (
-                  <p className="mt-1 text-[11px] text-sage">
-                    {item.dietary_tags.join(", ")}
-                  </p>
-                ) : null}
-              </div>
+              <label
+                key={item.id}
+                className="flex cursor-pointer gap-3 border border-charcoal/8 bg-cream/25 p-2 transition-colors hover:border-gold-primary/40"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedItemIds.includes(item.id)}
+                  onChange={() => toggleItem(item.id)}
+                  className="mt-1 h-3.5 w-3.5 shrink-0 border border-charcoal/30 accent-gold-primary"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-heading text-xs text-charcoal">
+                      {item.name}
+                    </span>
+                    <span className="font-accent text-[9px] uppercase tracking-[0.14em] text-gold-dark">
+                      {serviceItemTypeLabel(item.item_type)}
+                    </span>
+                  </span>
+                  {item.description ? (
+                    <span className="mt-1 block text-[11px] leading-relaxed text-slate">
+                      {item.description}
+                    </span>
+                  ) : null}
+                  {item.dietary_tags?.length ? (
+                    <span className="mt-1 block text-[11px] text-sage">
+                      {item.dietary_tags.join(", ")}
+                    </span>
+                  ) : null}
+                </span>
+              </label>
             ))}
           </div>
         </div>
-      ) : null}
+      ) : (
+        <div className="border-t border-charcoal/8 pt-3">
+          <p className="text-xs leading-relaxed text-slate">
+            {vendorName} has not itemized this package yet, but you can still use
+            the package scope and deliverables in this event plan.
+          </p>
+        </div>
+      )}
+
+      <button
+        type="button"
+        className="font-accent w-full border border-gold-primary/45 bg-gold-primary/10 px-3 py-2.5 text-[10px] uppercase tracking-[0.18em] text-gold-dark transition-colors hover:bg-gold-primary/15"
+        onClick={() => onUseSelection(selectedItemIds)}
+      >
+        {importActionLabel(categoryKey, catalogueItems.length > 0)}
+      </button>
     </div>
   );
 }
@@ -2964,6 +3221,17 @@ function ServiceChipRow({ label, items }: { label: string; items: string[] }) {
       </div>
     </div>
   );
+}
+
+function importActionLabel(
+  categoryKey: PlannerVendorCategoryKey,
+  hasCatalogueItems: boolean
+) {
+  if (!hasCatalogueItems) return "Use package summary";
+  if (categoryKey === "catering") return "Add selected rows to menu";
+  if (categoryKey === "decor") return "Add selected setups to design";
+  if (categoryKey === "photography") return "Add selected coverage to notes";
+  return "Add selected sets to notes";
 }
 
 function serviceItemTypeLabel(value: string) {

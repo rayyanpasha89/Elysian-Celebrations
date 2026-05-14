@@ -553,6 +553,38 @@ function ServiceEditor({
     });
   };
 
+  const moveItem = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= draft.items.length) return;
+    const next = [...draft.items];
+    [next[index], next[target]] = [next[target], next[index]];
+    onChange({
+      ...draft,
+      items: next.map((item, i) => ({ ...item, sortOrder: i })),
+    });
+  };
+
+  const duplicateItem = (index: number) => {
+    const source = draft.items[index];
+    if (!source) return;
+    const copy: ServiceItem = {
+      itemType: source.itemType,
+      name: source.name ? `${source.name} (copy)` : "",
+      description: source.description,
+      dietaryTags: [...source.dietaryTags],
+      sortOrder: index + 1,
+    };
+    const next = [
+      ...draft.items.slice(0, index + 1),
+      copy,
+      ...draft.items.slice(index + 1),
+    ];
+    onChange({
+      ...draft,
+      items: next.map((item, i) => ({ ...item, sortOrder: i })),
+    });
+  };
+
   return (
     <div className="space-y-5">
       <div className="grid gap-4 md:grid-cols-2">
@@ -668,6 +700,9 @@ function ServiceEditor({
           <div>
             <p className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
               {copy.catalogueLabel}
+              {draft.items.length > 0 ? (
+                <span className="ml-2 text-charcoal/60">({draft.items.length})</span>
+              ) : null}
             </p>
             <p className="mt-1 text-xs leading-relaxed text-slate">
               {copy.catalogueHint}
@@ -683,9 +718,26 @@ function ServiceEditor({
         </div>
 
         {draft.items.length === 0 ? (
-          <p className="mt-4 text-xs text-slate">
-            No itemized rows yet. Couples will only see your package summary.
-          </p>
+          <div className="mt-4 border border-dashed border-charcoal/15 bg-ivory/60 p-4">
+            <p className="font-heading text-sm text-charcoal">
+              No itemized rows yet
+            </p>
+            <p className="mt-2 text-xs leading-relaxed text-slate">
+              Couples currently only see your package summary. Add rows for what
+              clients actually receive — e.g.{" "}
+              <span className="text-charcoal">
+                {copy.exampleItemNames.join(", ")}
+              </span>
+              . Each row can have a short description{copy.showDietary ? " and dietary tags" : ""}.
+            </p>
+            <button
+              type="button"
+              onClick={addItem}
+              className="mt-3 font-accent border border-gold-primary/40 bg-ivory px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-gold-dark hover:bg-gold-primary/10"
+            >
+              Add first row
+            </button>
+          </div>
         ) : (
           <ul className="mt-4 list-none space-y-3 pl-0">
             {draft.items.map((item, index) => (
@@ -693,7 +745,46 @@ function ServiceEditor({
                 key={index}
                 className="border border-charcoal/10 bg-ivory p-3"
               >
-                <div className="grid gap-3 md:grid-cols-[160px_1fr_auto]">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
+                    Row {index + 1} of {draft.items.length}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => moveItem(index, -1)}
+                      disabled={index === 0}
+                      aria-label="Move row up"
+                      className="font-accent border border-charcoal/15 px-2 py-1 text-[10px] tracking-[0.16em] text-charcoal hover:border-gold-primary hover:text-gold-dark disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-charcoal/15 disabled:hover:text-charcoal"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveItem(index, 1)}
+                      disabled={index === draft.items.length - 1}
+                      aria-label="Move row down"
+                      className="font-accent border border-charcoal/15 px-2 py-1 text-[10px] tracking-[0.16em] text-charcoal hover:border-gold-primary hover:text-gold-dark disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-charcoal/15 disabled:hover:text-charcoal"
+                    >
+                      ↓
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => duplicateItem(index)}
+                      className="font-accent border border-charcoal/15 px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-charcoal hover:border-gold-primary hover:text-gold-dark"
+                    >
+                      Duplicate
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeItem(index)}
+                      className="font-accent border border-charcoal/15 px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-charcoal/60 hover:border-error hover:text-error"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-3 grid gap-3 md:grid-cols-[160px_1fr]">
                   <select
                     className={cn(inputBase, "py-2")}
                     value={item.itemType || copy.defaultItemType}
@@ -713,13 +804,6 @@ function ServiceEditor({
                     value={item.name}
                     onChange={(e) => updateItem(index, { name: e.target.value })}
                   />
-                  <button
-                    type="button"
-                    onClick={() => removeItem(index)}
-                    className="font-accent border border-charcoal/15 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-charcoal/60 hover:border-error hover:text-error"
-                  >
-                    Remove
-                  </button>
                 </div>
                 <textarea
                   className={cn(textareaBase, "mt-3 min-h-[64px]")}

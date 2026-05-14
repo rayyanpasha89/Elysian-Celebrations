@@ -126,6 +126,13 @@ type VendorOfferingBlueprint = {
 
 type VendorOffering = VendorOfferingBlueprint & {
   addOns: string[];
+  sources: {
+    promise: "vendor" | "suggested";
+    inclusions: "vendor" | "suggested";
+    deliverables: "vendor" | "suggested";
+    eventFit: "vendor" | "suggested";
+    addOns: "vendor" | "suggested";
+  };
 };
 
 const DEFAULT_OFFERING_BLUEPRINT: VendorOfferingBlueprint = {
@@ -264,7 +271,10 @@ const OFFERING_BLUEPRINTS: Record<string, VendorOfferingBlueprint> = {
   },
 };
 
-function uniqueText(values: (string | null | undefined)[], fallback: string[]) {
+function uniqueText(
+  values: (string | null | undefined)[],
+  fallback: string[]
+): { values: string[]; source: "vendor" | "suggested" } {
   const seen = new Set<string>();
   const cleaned = values
     .map((value) => value?.trim())
@@ -276,7 +286,8 @@ function uniqueText(values: (string | null | undefined)[], fallback: string[]) {
       return true;
     });
 
-  return cleaned.length > 0 ? cleaned : fallback;
+  if (cleaned.length > 0) return { values: cleaned, source: "vendor" };
+  return { values: fallback, source: "suggested" };
 }
 
 function offeringForVendor(vendor: VendorCardApi): VendorOffering {
@@ -284,23 +295,37 @@ function offeringForVendor(vendor: VendorCardApi): VendorOffering {
   const blueprint = OFFERING_BLUEPRINTS[slug] ?? DEFAULT_OFFERING_BLUEPRINT;
   const services = vendor.services ?? [];
   const serviceScope = services.find((service) => service.service_scope)?.service_scope;
+  const inclusions = uniqueText(
+    services.flatMap((service) => service.inclusions ?? []),
+    blueprint.inclusions
+  );
+  const deliverables = uniqueText(
+    services.flatMap((service) => service.deliverables ?? []),
+    blueprint.deliverables
+  );
+  const eventFit = uniqueText(
+    services.flatMap((service) => service.event_type_fit ?? []),
+    blueprint.eventFit
+  );
+  const addOns = uniqueText(
+    services.flatMap((service) => service.add_ons ?? []),
+    []
+  );
 
   return {
     ...blueprint,
     promise: serviceScope ?? blueprint.promise,
-    inclusions: uniqueText(
-      services.flatMap((service) => service.inclusions ?? []),
-      blueprint.inclusions
-    ),
-    deliverables: uniqueText(
-      services.flatMap((service) => service.deliverables ?? []),
-      blueprint.deliverables
-    ),
-    eventFit: uniqueText(
-      services.flatMap((service) => service.event_type_fit ?? []),
-      blueprint.eventFit
-    ),
-    addOns: uniqueText(services.flatMap((service) => service.add_ons ?? []), []),
+    inclusions: inclusions.values,
+    deliverables: deliverables.values,
+    eventFit: eventFit.values,
+    addOns: addOns.values,
+    sources: {
+      promise: serviceScope ? "vendor" : "suggested",
+      inclusions: inclusions.source,
+      deliverables: deliverables.source,
+      eventFit: eventFit.source,
+      addOns: addOns.source,
+    },
   };
 }
 
@@ -772,11 +797,22 @@ function VendorDetailPanel({
       </p>
 
       <div className="border border-charcoal/10 bg-[radial-gradient(circle_at_top_left,rgba(201,169,110,0.2),transparent_34%),linear-gradient(145deg,#111827_0%,#1f2937_58%,#0b1220_100%)] p-4 text-ivory">
-        <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-gold-light">
-          Offering map
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-gold-light">
+            {offering.sources.promise === "vendor"
+              ? "Offering map"
+              : "Offering map — generic outline"}
+          </p>
+          {offering.sources.promise === "suggested" ? (
+            <span className="font-accent border border-ivory/25 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-ivory/70">
+              Vendor scope pending
+            </span>
+          ) : null}
+        </div>
         <h4 className="mt-2 font-display text-xl text-ivory">
-          What this vendor actually handles
+          {offering.sources.promise === "vendor"
+            ? "What this vendor actually handles"
+            : "What a vendor like this typically handles"}
         </h4>
         <p className="mt-2 text-sm leading-relaxed text-ivory/72">
           {offering.promise}
@@ -826,35 +862,48 @@ function VendorDetailPanel({
           <OfferingBlock
             title="Inclusions"
             items={offering.inclusions}
+            source={offering.sources.inclusions}
           />
           <OfferingBlock
             title="Deliverables"
             items={offering.deliverables}
+            source={offering.sources.deliverables}
           />
           <OfferingBlock
             title="Best fit events"
             items={offering.eventFit}
+            source={offering.sources.eventFit}
           />
           {offering.addOns.length > 0 ? (
-            <OfferingBlock title="Add-ons and upgrades" items={offering.addOns} />
+            <OfferingBlock
+              title="Add-ons and upgrades"
+              items={offering.addOns}
+              source={offering.sources.addOns}
+            />
           ) : null}
         </div>
       </div>
 
       {catalogueItems.length > 0 ? (
         <div>
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <p className={dashLabel}>{categoryCopy(vendor.category?.slug).catalogueLabel}</p>
-            <span className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
-              {catalogueItems.length} listed
+            <span className="font-accent border border-gold-primary/40 bg-gold-primary/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-gold-dark">
+              {catalogueItems.length} listed by vendor
             </span>
           </div>
           <div className="mt-3 space-y-4">
             {groupCatalogueItems(catalogueItems).map((group) => (
               <div key={group.itemType} className="border border-charcoal/8 bg-cream/35 p-3">
-                <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-gold-dark">
-                  {offeringLabel(group.itemType)}
-                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-gold-dark">
+                    {categoryCopy(vendor.category?.slug).groupHeadings[group.itemType] ??
+                      offeringLabel(group.itemType)}
+                  </p>
+                  <span className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
+                    {group.items.length}
+                  </span>
+                </div>
                 <ul className="mt-3 list-none space-y-2 pl-0">
                   {group.items.slice(0, 6).map((item) => (
                     <li key={item.id} className="border-t border-charcoal/8 pt-2 first:border-t-0 first:pt-0">
@@ -885,7 +934,32 @@ function VendorDetailPanel({
             ))}
           </div>
         </div>
-      ) : null}
+      ) : (
+        <div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className={dashLabel}>{categoryCopy(vendor.category?.slug).catalogueLabel}</p>
+            <span className="font-accent border border-charcoal/15 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-slate">
+              Not itemized yet
+            </span>
+          </div>
+          <div className="mt-3 border border-dashed border-charcoal/15 bg-cream/30 p-4">
+            <p className="text-sm leading-relaxed text-slate">
+              This vendor has not published itemized rows yet. Use these prompts when
+              you reach out:
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {categoryCopy(vendor.category?.slug).exampleItemNames.map((name) => (
+                <span
+                  key={name}
+                  className="border border-charcoal/12 bg-ivory px-2.5 py-1.5 font-heading text-[11px] text-charcoal/80"
+                >
+                  {name}?
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div>
         <div className="flex items-center justify-between gap-3">
@@ -1015,20 +1089,53 @@ function VendorDetailPanel({
 function OfferingBlock({
   title,
   items,
+  source = "vendor",
 }: {
   title: string;
   items: string[];
+  source?: "vendor" | "suggested";
 }) {
+  const isSuggested = source === "suggested";
   return (
-    <div className="border border-charcoal/8 bg-cream/35 p-4">
-      <p className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
-        {title}
-      </p>
+    <div
+      className={cn(
+        "border p-4",
+        isSuggested
+          ? "border-dashed border-charcoal/15 bg-ivory/60"
+          : "border-charcoal/8 bg-cream/35"
+      )}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
+          {isSuggested ? `${title} — talking points` : title}
+        </p>
+        <span
+          className={cn(
+            "font-accent px-2 py-0.5 text-[10px] uppercase tracking-[0.16em]",
+            isSuggested
+              ? "border border-charcoal/15 text-slate"
+              : "border border-gold-primary/40 bg-gold-primary/8 text-gold-dark"
+          )}
+        >
+          {isSuggested ? "Suggested" : `${items.length} listed`}
+        </span>
+      </div>
+      {isSuggested ? (
+        <p className="mt-2 text-xs leading-relaxed text-slate">
+          The vendor has not confirmed this yet — use these as questions when you
+          shortlist them.
+        </p>
+      ) : null}
       <div className="mt-3 flex flex-wrap gap-2">
         {items.map((item) => (
           <span
             key={item}
-            className="border border-charcoal/10 bg-ivory px-2.5 py-1.5 font-heading text-[11px] text-charcoal"
+            className={cn(
+              "px-2.5 py-1.5 font-heading text-[11px]",
+              isSuggested
+                ? "border border-dashed border-charcoal/20 bg-ivory text-charcoal/70"
+                : "border border-charcoal/10 bg-ivory text-charcoal"
+            )}
           >
             {item}
           </span>
