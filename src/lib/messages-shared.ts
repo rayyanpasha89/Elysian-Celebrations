@@ -28,6 +28,8 @@ export type Conversation = {
   preview: string;
   time: string;
   createdAt: string | null;
+  clientName: string;
+  vendorName: string;
   counterpartyName: string;
   counterpartyRole: "vendor" | "client";
   hasMessages: boolean;

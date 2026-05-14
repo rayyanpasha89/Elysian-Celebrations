@@ -464,6 +464,7 @@ function planningPayloadFromDraft(draft: EventDetailDraft) {
     menus: draft.menus
       .filter((menu) => menu.name.trim() || menu.items.some((item) => item.name.trim()))
       .map((menu) => ({
+        ...(menu.id ? { id: menu.id } : {}),
         name: menu.name,
         mealPeriod: menu.mealPeriod || null,
         serviceStyle: menu.serviceStyle || null,
@@ -471,6 +472,7 @@ function planningPayloadFromDraft(draft: EventDetailDraft) {
         items: menu.items
           .filter((item) => item.name.trim())
           .map((item) => ({
+            ...(item.id ? { id: item.id } : {}),
             name: item.name,
             course: item.course || null,
             dietaryTags: item.dietaryTags,
@@ -481,6 +483,7 @@ function planningPayloadFromDraft(draft: EventDetailDraft) {
     tasks: draft.tasks
       .filter((task) => task.title.trim())
       .map((task) => ({
+        ...(task.id ? { id: task.id } : {}),
         title: task.title,
         owner: task.owner || null,
         status: task.status,
@@ -2169,12 +2172,8 @@ export default function ClientWeddingPage() {
                   </div>
                 </div>
 
-                <div
-                  className={cn(
-                    "grid gap-3 md:grid-cols-2",
-                    editorSection !== "basics" && "hidden"
-                  )}
-                >
+                {editorSection === "basics" ? (
+                <div className="grid gap-3 md:grid-cols-2">
                   <Field label="Event name">
                     <input
                       type="text"
@@ -2319,12 +2318,10 @@ export default function ClientWeddingPage() {
                   </Field>
                 </div>
 
-                <div
-                  className={cn(
-                    "space-y-4 border-t border-charcoal/8 pt-5",
-                    editorSection !== "food" && "hidden"
-                  )}
-                >
+                ) : null}
+
+                {editorSection === "food" ? (
+                <div className="space-y-4 border-t border-charcoal/8 pt-5">
                   <div>
                     <p className={dashLabel}>Food and menu</p>
                     <p className="mt-1 text-sm text-slate">
@@ -2597,12 +2594,10 @@ export default function ClientWeddingPage() {
                   </div>
                 </div>
 
-                <div
-                  className={cn(
-                    "space-y-4 border-t border-charcoal/8 pt-5",
-                    editorSection !== "design" && "hidden"
-                  )}
-                >
+                ) : null}
+
+                {editorSection === "design" ? (
+                <div className="space-y-4 border-t border-charcoal/8 pt-5">
                   <div>
                     <p className={dashLabel}>Decor and atmosphere</p>
                     <p className="mt-1 text-sm text-slate">
@@ -2663,12 +2658,10 @@ export default function ClientWeddingPage() {
                   </Field>
                 </div>
 
-                <div
-                  className={cn(
-                    "space-y-4 border-t border-charcoal/8 pt-5",
-                    editorSection !== "vendors" && "hidden"
-                  )}
-                >
+                ) : null}
+
+                {editorSection === "vendors" ? (
+                <div className="space-y-4 border-t border-charcoal/8 pt-5">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className={dashLabel}>Vendor planning</p>
@@ -2855,12 +2848,10 @@ export default function ClientWeddingPage() {
                   })}
                 </div>
 
-                <div
-                  className={cn(
-                    "space-y-4 border-t border-charcoal/8 pt-5",
-                    editorSection !== "logistics" && "hidden"
-                  )}
-                >
+                ) : null}
+
+                {editorSection === "logistics" ? (
+                <div className="space-y-4 border-t border-charcoal/8 pt-5">
                   <div>
                     <p className={dashLabel}>Logistics</p>
                     <p className="mt-1 text-sm text-slate">
@@ -2962,12 +2953,10 @@ export default function ClientWeddingPage() {
                   </div>
                 </div>
 
-                <div
-                  className={cn(
-                    "space-y-4 border-t border-charcoal/8 pt-5",
-                    editorSection !== "tasks" && "hidden"
-                  )}
-                >
+                ) : null}
+
+                {editorSection === "tasks" ? (
+                <div className="space-y-4 border-t border-charcoal/8 pt-5">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className={dashLabel}>Event tasks</p>
@@ -3052,22 +3041,26 @@ export default function ClientWeddingPage() {
                   </div>
                 </div>
 
-                <div className={cn(editorSection !== "notes" && "hidden")}>
-                  <Field label="Planning notes">
-                    <textarea
-                      value={detailDraft.notes}
-                      onChange={(event) =>
-                        setDetailDraft((current) =>
-                          current
-                            ? { ...current, notes: event.target.value }
-                            : current
-                        )
-                      }
-                      className="min-h-[180px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                      placeholder="Run-of-show reminders, family logistics, weather backups..."
-                    />
-                  </Field>
-                </div>
+                ) : null}
+
+                {editorSection === "notes" ? (
+                  <div>
+                    <Field label="Planning notes">
+                      <textarea
+                        value={detailDraft.notes}
+                        onChange={(event) =>
+                          setDetailDraft((current) =>
+                            current
+                              ? { ...current, notes: event.target.value }
+                              : current
+                          )
+                        }
+                        className="min-h-[180px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                        placeholder="Run-of-show reminders, family logistics, weather backups..."
+                      />
+                    </Field>
+                  </div>
+                ) : null}
 
                 <div className="flex items-center justify-between gap-2 border-t border-charcoal/8 pt-4">
                   <button
@@ -3176,13 +3169,22 @@ function ServiceOfferingPreview({
   onUseSelection: (selectedItemIds: string[]) => void;
 }) {
   const copy = useMemo(() => categoryCopy(categoryKey), [categoryKey]);
-  const catalogueItems = useMemo(
+  const allCatalogueItems = useMemo(
     () =>
       (service.items ?? [])
         .slice()
-        .sort((left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0))
-        .slice(0, 8),
+        .sort((left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0)),
     [service.items]
+  );
+  const COLLAPSED_LIMIT = 8;
+  const [showAllItems, setShowAllItems] = useState(false);
+  const hasMoreItems = allCatalogueItems.length > COLLAPSED_LIMIT;
+  const catalogueItems = useMemo(
+    () =>
+      showAllItems
+        ? allCatalogueItems
+        : allCatalogueItems.slice(0, COLLAPSED_LIMIT),
+    [allCatalogueItems, showAllItems]
   );
   const groupedCatalogue = useMemo(() => {
     const buckets = new Map<string, VendorPlannerServiceItem[]>();
@@ -3200,7 +3202,7 @@ function ServiceOfferingPreview({
     }));
   }, [catalogueItems, copy.groupHeadings]);
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>(() =>
-    catalogueItems.map((item) => item.id)
+    allCatalogueItems.map((item) => item.id)
   );
 
   const toggleItem = (itemId: string) => {
@@ -3212,7 +3214,7 @@ function ServiceOfferingPreview({
   };
 
   const selectedCount = selectedItemIds.filter((id) =>
-    catalogueItems.some((item) => item.id === id)
+    allCatalogueItems.some((item) => item.id === id)
   ).length;
 
   return (
@@ -3255,7 +3257,10 @@ function ServiceOfferingPreview({
             <div>
               <p className={dashLabel}>{copy.catalogueLabel}</p>
               <p className="mt-1 text-[11px] text-slate">
-                {selectedCount} of {catalogueItems.length} selected
+                {selectedCount} of {allCatalogueItems.length} selected
+                {hasMoreItems && !showAllItems
+                  ? ` · ${allCatalogueItems.length} total`
+                  : ""}
               </p>
             </div>
             <button
@@ -3263,13 +3268,13 @@ function ServiceOfferingPreview({
               className="font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark"
               onClick={() =>
                 setSelectedItemIds((current) =>
-                  current.length === catalogueItems.length
+                  current.length === allCatalogueItems.length
                     ? []
-                    : catalogueItems.map((item) => item.id)
+                    : allCatalogueItems.map((item) => item.id)
                 )
               }
             >
-              {selectedItemIds.length === catalogueItems.length
+              {selectedItemIds.length === allCatalogueItems.length
                 ? "Clear rows"
                 : "Select all"}
             </button>
@@ -3315,6 +3320,17 @@ function ServiceOfferingPreview({
               </div>
             ))}
           </div>
+          {hasMoreItems ? (
+            <button
+              type="button"
+              onClick={() => setShowAllItems((current) => !current)}
+              className="font-accent mt-3 inline-flex items-center gap-2 border border-charcoal/15 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark"
+            >
+              {showAllItems
+                ? `Show fewer rows`
+                : `Show all ${allCatalogueItems.length} rows`}
+            </button>
+          ) : null}
         </div>
       ) : (
         <div className="border border-dashed border-charcoal/15 bg-cream/25 p-3">
@@ -3330,9 +3346,9 @@ function ServiceOfferingPreview({
         type="button"
         className="font-accent w-full border border-gold-primary/45 bg-gold-primary/10 px-3 py-2.5 text-[10px] uppercase tracking-[0.18em] text-gold-dark transition-colors hover:bg-gold-primary/15 disabled:cursor-not-allowed disabled:opacity-50"
         onClick={() => onUseSelection(selectedItemIds)}
-        disabled={catalogueItems.length > 0 && selectedCount === 0}
+        disabled={allCatalogueItems.length > 0 && selectedCount === 0}
       >
-        {importActionLabel(categoryKey, catalogueItems.length > 0)}
+        {importActionLabel(categoryKey, allCatalogueItems.length > 0)}
       </button>
     </div>
   );

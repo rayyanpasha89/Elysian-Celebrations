@@ -108,7 +108,7 @@ export function TestimonialCarousel() {
         >
           <div>
             <p className="font-accent text-[11px] uppercase tracking-[0.32em] text-gold-primary">
-              Love Stories
+              Chapter 06 · Couple notes
             </p>
             <h2
               className="mt-5 max-w-xl font-display font-bold leading-[0.94] text-ivory"
@@ -116,6 +116,11 @@ export function TestimonialCarousel() {
             >
               Proof that the planning can feel as considered as the wedding itself.
             </h2>
+            <div className="mt-5 flex items-center gap-2">
+              <span className="h-px w-10 bg-gradient-to-r from-transparent to-gold-primary/55" />
+              <span className="inline-block h-1.5 w-1.5 rotate-45 bg-gold-primary/60" />
+              <span className="h-px w-10 bg-gradient-to-l from-transparent to-gold-primary/55" />
+            </div>
             <p className="mt-5 max-w-xl font-heading text-lg font-light leading-relaxed text-ivory/72">
               Couples come to us for clarity, taste, and calm execution. These stories reflect the
               real outcome: less noise, stronger direction, and a weekend that feels intentional in

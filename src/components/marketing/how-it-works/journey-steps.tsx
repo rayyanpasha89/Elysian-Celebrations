@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { motion } from "framer-motion";
 import {
+  ArrowUpRight,
   MapPin,
   PartyPopper,
   Sparkles,
@@ -87,7 +89,7 @@ export function JourneySteps() {
           className="mb-14 text-center md:mb-20"
         >
           <p className="font-accent text-[11px] uppercase tracking-[0.3em] text-gold-primary mb-4">
-            How it works
+            Chapter 02 · How it works
           </p>
           <h2
             id="how-it-works-heading"
@@ -99,8 +101,12 @@ export function JourneySteps() {
             Each act reduces noise, strengthens taste, and keeps the wedding readable from the
             first brief through the final dance.
           </p>
-          {/* Gold divider */}
-          <div className="mx-auto mt-8 h-[1px] w-16 bg-gradient-to-r from-transparent via-gold-primary/40 to-transparent" />
+          {/* Gold divider with ornament */}
+          <div className="mx-auto mt-8 flex max-w-[180px] items-center gap-2">
+            <span className="h-px flex-1 bg-gradient-to-r from-transparent to-gold-primary/40" />
+            <span className="inline-block h-1.5 w-1.5 rotate-45 bg-gold-primary/55" />
+            <span className="h-px flex-1 bg-gradient-to-l from-transparent to-gold-primary/40" />
+          </div>
         </motion.div>
 
         {/* Central vertical thread */}
@@ -134,6 +140,13 @@ export function JourneySteps() {
                   <span className="font-display text-5xl font-bold text-gold-primary/[0.08] leading-none select-none">
                     {String(index + 1).padStart(2, "0")}
                   </span>
+                  <p
+                    className={`font-accent text-[10px] uppercase tracking-[0.28em] text-gold-dark ${
+                      isRight ? "md:self-end" : ""
+                    }`}
+                  >
+                    Act {String(index + 1).padStart(2, "0")}
+                  </p>
                   <h3 className="font-display text-[length:var(--text-h2)] text-charcoal -mt-2">
                     {step.title}
                   </h3>
@@ -166,6 +179,26 @@ export function JourneySteps() {
             );
           })}
         </motion.ol>
+
+        <div className="mt-20 flex flex-col items-center gap-6 text-center md:mt-28">
+          <div className="flex items-center gap-2">
+            <span className="h-px w-10 bg-gradient-to-r from-transparent to-gold-primary/50" />
+            <span className="inline-block h-1.5 w-1.5 rotate-45 bg-gold-primary/55" />
+            <span className="h-px w-10 bg-gradient-to-l from-transparent to-gold-primary/50" />
+          </div>
+          <p className="max-w-xl font-heading text-base leading-relaxed text-slate">
+            Once these five acts hold together, the planning surface itself starts
+            doing the heavy lifting — vendors, budget, and the weekend programme
+            move as one.
+          </p>
+          <Link
+            href="/contact"
+            className="font-accent inline-flex items-center gap-2 border border-gold-primary px-6 py-3 text-[11px] uppercase tracking-[0.22em] text-gold-primary transition-colors hover:bg-gold-primary hover:text-midnight"
+          >
+            Begin Act One
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
       </div>
     </section>
   );

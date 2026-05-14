@@ -58,9 +58,13 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
 - Rebuilt the manager bookings page into a booking command center with status metrics, tabbed inquiry/confirmed/completed/cancelled queues, a sticky operations brief, payment due totals, event/logistics/menu context, vendor scope/catalogue rows, and safe manager status actions.
 - Rebuilt client and vendor messages around real booking threads. `/api/messages` now returns every relevant booking conversation, including empty inquiry threads, status labels, service scope, wedding day/event/date/venue context, notes, and correct unread direction; both inboxes show side context panels and suggested first-message prompts.
 - Added persistent per-user message thread read state through `message_thread_reads`, so client/vendor inbox unread pills now survive refreshes and fresh vendor inquiries can be marked read before the first reply exists.
+- Added a manager Message Command surface at `/manager/messages`, with all booking conversations, unread/status metrics, client-vendor thread inspection, booking context rail, and manager-safe read tracking.
+- Made message unread state fully per-user for the active inbox surfaces, so manager/admin oversight no longer mutates a global read flag that could affect client or vendor unread state.
 - Reworked event-planning saves for menus, menu items, and tasks so the API updates/inserts/removes nested rows instead of deleting and recreating every row on each save. Existing row IDs are preserved by explicit ID when available, with stable key/order matching for the current client payload.
 - Polished the client Event Editor into a guided step flow with horizontal section pills, previous/next controls, richer vendor/service empty states, and category-aware grouped catalogue previews that show real offering rows before importing them into an event plan.
+- Reduced Event Editor DOM work by rendering only the active guided section, added show-all catalogue rows for deep vendor offerings, and upgraded the client payload to send existing menu/item/task IDs explicitly.
 - Upgraded the marketing homepage flow with a cinematic assurance strip, sharper atmosphere-gallery layering, hover depth, and refined gold divider treatment below the hero.
+- Refined the marketing JourneySteps section with chapter-style editorial labeling, an ornamented gold divider, ghost step numbers, a central planning thread, and richer icon cards.
 
 ## Verified Recently
 
@@ -71,6 +75,8 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
 - `npm run db:query` for newly added Supabase tables and columns
 - Local dev server started at `http://localhost:3000`
 - Basic HTTP smoke check passed for `/`
+- Browser smoke check passed for `/` after the marketing updates, with no fresh console errors.
+- Browser auth-gate smoke check passed for `/manager/messages`, redirecting signed-out users to Clerk login with no fresh console errors.
 - `/client/budget` correctly redirects unauthenticated users to Clerk login
 
 ## Current Rebuild Order
@@ -88,7 +94,6 @@ Items 1, 2, and 3 are implemented in the follow-up slice and should be rechecked
 
 - Vercel auto-deploy is assumed from the connected GitHub project, but local CLI verification is blocked by missing Vercel credentials.
 - The current event-linked budget model supports one event per budget line item.
-- Event planning menu/task saves now preserve rows, but the client payload should still be upgraded to send menu/item/task IDs explicitly for perfect matching after complex reorders.
 - Vendor service catalogue rows do not yet support drag ordering or image/reference attachments.
 - Manager booking notes and payment amounts can be viewed, but inline manager editing is still intentionally limited to status actions.
 - Messages are real booking threads with persisted unread state, but visible read receipts and per-message attachments are still future work.

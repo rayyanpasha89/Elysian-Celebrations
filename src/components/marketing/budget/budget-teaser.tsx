@@ -67,7 +67,7 @@ export function BudgetTeaser() {
             animate={isInView ? "visible" : "hidden"}
           >
             <p className="mb-4 font-accent text-[11px] uppercase tracking-[0.3em] text-gold-primary">
-              Investment Planning
+              Chapter 05 · Investment planning
             </p>
             <h2
               className="mb-6 font-display font-bold leading-[0.96] text-charcoal"
@@ -77,7 +77,11 @@ export function BudgetTeaser() {
               <br />
               <span className="text-gold-primary">before the details scatter.</span>
             </h2>
-            <div className="mb-6 h-[1px] w-12 bg-gradient-to-r from-gold-primary/40 to-transparent" />
+            <div className="mb-6 flex items-center gap-2">
+              <span className="h-px w-10 bg-gradient-to-r from-transparent to-gold-primary/45" />
+              <span className="inline-block h-1.5 w-1.5 rotate-45 bg-gold-primary/55" />
+              <span className="h-px w-10 bg-gradient-to-l from-transparent to-gold-primary/45" />
+            </div>
             <p className="mb-8 max-w-xl font-heading text-lg font-light leading-relaxed text-slate">
               This is the planning surface where the celebration becomes legible:
               target allocations, real quotes, and visible spend move together so

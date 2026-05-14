@@ -81,7 +81,7 @@ export function VendorMarquee() {
         >
           <div>
             <p className="mb-4 font-accent text-[11px] uppercase tracking-[0.3em] text-gold-primary">
-              The network
+              Chapter 04 · The network
             </p>
             <h2
               className="max-w-3xl font-display font-bold leading-[0.96] text-charcoal"
@@ -89,6 +89,11 @@ export function VendorMarquee() {
             >
               The vendor roster should feel curated, not crowded.
             </h2>
+            <div className="mt-5 flex items-center gap-2">
+              <span className="h-px w-10 bg-gradient-to-r from-transparent to-gold-primary/45" />
+              <span className="inline-block h-1.5 w-1.5 rotate-45 bg-gold-primary/55" />
+              <span className="h-px w-10 bg-gradient-to-l from-transparent to-gold-primary/45" />
+            </div>
             <p className="mt-5 max-w-xl font-heading text-lg font-light leading-relaxed text-slate">
               We look for teams who can protect atmosphere, timing, and guest
               experience, not just deliver a service line. The point is chemistry
@@ -114,7 +119,7 @@ export function VendorMarquee() {
                 href="/contact"
                 className="inline-flex items-center gap-2 border border-gold-primary/35 px-5 py-3 font-accent text-[11px] uppercase tracking-[0.2em] text-gold-dark transition-all duration-300 hover:bg-gold-primary hover:text-midnight"
               >
-                Start a curated brief
+                Curate vendors for our weekend
                 <ArrowUpRight className="h-3.5 w-3.5" />
               </Link>
             </div>

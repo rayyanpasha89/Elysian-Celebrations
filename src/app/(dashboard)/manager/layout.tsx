@@ -18,6 +18,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: "Inquiries", href: "/manager/inquiries" },
       { label: "Bookings", href: "/manager/bookings" },
+      { label: "Messages", href: "/manager/messages" },
       { label: "Clients", href: "/manager/clients" },
       { label: "Vendors", href: "/manager/vendors" },
     ],

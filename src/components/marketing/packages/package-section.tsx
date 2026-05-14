@@ -81,7 +81,7 @@ type PackageSectionProps = {
 
 export function PackageSection({
   showHeader = true,
-  eyebrow = "Curated Offerings",
+  eyebrow = "Chapter 03 · Curated offerings",
   title = "Packages designed like a collection, not a price list.",
   subtitle =
     "Every tier starts with a clear editorial shape, then expands into the exact mix of design, logistics, and celebration support your weekend needs.",
@@ -114,6 +114,11 @@ export function PackageSection({
             <p className="font-heading mx-auto mt-4 max-w-3xl text-lg font-light leading-relaxed text-slate">
               {subtitle}
             </p>
+            <div className="mx-auto mt-8 flex max-w-[180px] items-center gap-2">
+              <span className="h-px flex-1 bg-gradient-to-r from-transparent to-gold-primary/40" />
+              <span className="inline-block h-1.5 w-1.5 rotate-45 bg-gold-primary/55" />
+              <span className="h-px flex-1 bg-gradient-to-l from-transparent to-gold-primary/40" />
+            </div>
           </motion.div>
         )}
 
@@ -254,7 +259,7 @@ function PackageCard({
               : "border border-charcoal/20 bg-transparent text-charcoal hover:border-charcoal hover:bg-charcoal hover:text-ivory"
           )}
         >
-          Request a tailored brief
+          Shape this tier with us
         </Link>
       </div>
     </motion.div>
