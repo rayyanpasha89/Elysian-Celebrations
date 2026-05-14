@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useClerk } from "@clerk/nextjs";
@@ -49,6 +49,7 @@ const DASHBOARD_ROUTE_TITLES: Record<string, string> = {
   "/manager": "Dashboard",
   "/manager/inquiries": "Inquiries",
   "/manager/bookings": "Bookings",
+  "/manager/messages": "Messages",
   "/manager/clients": "Clients",
   "/manager/vendors": "Vendors",
   "/manager/configurator": "Event Configurator",
@@ -77,6 +78,16 @@ export function resolveDashboardTitle(pathname: string, explicitTitle?: string):
   return DASHBOARD_ROUTE_TITLES[path] ?? explicitTitle ?? fallbackTitleFromPath(pathname);
 }
 
+type NotificationItem = {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  link: string | null;
+  isRead: boolean;
+  time: string;
+};
+
 interface TopbarProps {
   /** Optional override when pathname is not in the route map */
   title?: string;
@@ -94,8 +105,13 @@ export function Topbar({
   const pathname = usePathname();
   const { signOut } = useClerk();
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(true);
+  const [notificationsError, setNotificationsError] = useState<string | null>(null);
 
   const displayTitle = resolveDashboardTitle(pathname ?? "", title);
+  const unreadCount = notifications.filter((item) => !item.isRead).length;
 
   // Derive settings route from the current portal context
   const portalRoot = (pathname ?? "").split("/").filter(Boolean)[0] ?? "client";
@@ -108,6 +124,75 @@ export function Topbar({
     .toUpperCase()
     .slice(0, 2);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadNotifications() {
+      try {
+        setNotificationsLoading(true);
+        setNotificationsError(null);
+        const response = await fetch("/api/notifications");
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Failed to load notifications");
+        }
+        if (!cancelled) {
+          setNotifications((payload.notifications ?? []) as NotificationItem[]);
+        }
+      } catch {
+        if (!cancelled) {
+          setNotifications([]);
+          setNotificationsError("Notifications could not be loaded.");
+        }
+      } finally {
+        if (!cancelled) setNotificationsLoading(false);
+      }
+    }
+
+    void loadNotifications();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function markNotificationRead(id: string) {
+    setNotifications((current) =>
+      current.map((item) => (item.id === id ? { ...item, isRead: true } : item))
+    );
+
+    try {
+      await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+    } catch {
+      setNotifications((current) =>
+        current.map((item) =>
+          item.id === id ? { ...item, isRead: false } : item
+        )
+      );
+    }
+  }
+
+  async function markAllNotificationsRead() {
+    const previous = notifications;
+    setNotifications((current) =>
+      current.map((item) => ({ ...item, isRead: true }))
+    );
+
+    try {
+      await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ all: true }),
+      });
+    } catch {
+      setNotifications(previous);
+    }
+  }
+
   return (
     <header className="sticky top-0 z-30 border-b border-charcoal/8 bg-ivory/95 backdrop-blur-md">
       <div className="flex items-center justify-between px-6 py-4 lg:px-8">
@@ -119,25 +204,116 @@ export function Topbar({
         </div>
 
         <div className="flex items-center gap-4">
-          <button
-            type="button"
-            onClick={() => { /* Notification panel — planned feature */ }}
-            className="relative flex h-9 w-9 items-center justify-center border border-charcoal/10 text-charcoal/60 transition-colors hover:border-gold-primary hover:text-gold-primary"
-            aria-label="Notifications"
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path
-                d="M8 1.5a4.5 4.5 0 00-4.5 4.5v3L2 10.5V12h12v-1.5L12.5 9V6A4.5 4.5 0 008 1.5zM6.5 13a1.5 1.5 0 003 0"
-                stroke="currentColor"
-                strokeWidth="1.2"
-              />
-            </svg>
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setShowNotifications((current) => !current);
+                setShowDropdown(false);
+              }}
+              className="relative flex h-9 w-9 items-center justify-center border border-charcoal/10 text-charcoal/60 transition-colors hover:border-gold-primary hover:text-gold-primary"
+              aria-label="Notifications"
+              aria-expanded={showNotifications}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M8 1.5a4.5 4.5 0 00-4.5 4.5v3L2 10.5V12h12v-1.5L12.5 9V6A4.5 4.5 0 008 1.5zM6.5 13a1.5 1.5 0 003 0"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                />
+              </svg>
+              {unreadCount > 0 ? (
+                <span className="absolute -right-1 -top-1 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-gold-primary px-1 font-accent text-[8px] leading-none text-midnight">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              ) : null}
+            </button>
+
+            <AnimatePresence>
+              {showNotifications ? (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowNotifications(false)}
+                    aria-hidden
+                  />
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute right-0 top-full z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] border border-charcoal/10 bg-ivory shadow-lg"
+                  >
+                    <div className="flex items-center justify-between gap-3 border-b border-charcoal/8 px-4 py-3">
+                      <div>
+                        <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
+                          Notifications
+                        </p>
+                        <p className="mt-1 text-xs text-slate">
+                          {unreadCount > 0
+                            ? `${unreadCount} unread`
+                            : "All caught up"}
+                        </p>
+                      </div>
+                      {unreadCount > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => void markAllNotificationsRead()}
+                          className="font-accent text-[9px] uppercase tracking-[0.16em] text-gold-dark transition-colors hover:text-charcoal"
+                        >
+                          Mark all read
+                        </button>
+                      ) : null}
+                    </div>
+
+                    <div className="max-h-[380px] overflow-y-auto">
+                      {notificationsLoading ? (
+                        <div className="space-y-3 px-4 py-4">
+                          <div className="h-3 w-24 animate-pulse bg-charcoal/10" />
+                          <div className="h-12 animate-pulse bg-charcoal/5" />
+                          <div className="h-12 animate-pulse bg-charcoal/5" />
+                        </div>
+                      ) : notificationsError ? (
+                        <div className="px-4 py-5">
+                          <p className="text-sm text-slate">{notificationsError}</p>
+                        </div>
+                      ) : notifications.length > 0 ? (
+                        <ul className="list-none divide-y divide-charcoal/8 pl-0">
+                          {notifications.map((notification) => (
+                            <li key={notification.id}>
+                              <NotificationRow
+                                notification={notification}
+                                onRead={() => void markNotificationRead(notification.id)}
+                                onClose={() => setShowNotifications(false)}
+                              />
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="px-4 py-6">
+                          <p className="font-heading text-sm text-charcoal">
+                            No notifications yet
+                          </p>
+                          <p className="mt-1 text-xs leading-relaxed text-slate">
+                            Booking updates, reminders, and system notes will appear
+                            here when they are ready.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                </>
+              ) : null}
+            </AnimatePresence>
+          </div>
 
           <div className="relative">
             <button
               type="button"
-              onClick={() => setShowDropdown(!showDropdown)}
+              onClick={() => {
+                setShowDropdown(!showDropdown);
+                setShowNotifications(false);
+              }}
               className="flex items-center gap-3 transition-opacity hover:opacity-80"
             >
               <div className="flex h-9 w-9 items-center justify-center bg-midnight font-accent text-[11px] tracking-wider text-ivory">
@@ -187,6 +363,65 @@ export function Topbar({
         </div>
       </div>
     </header>
+  );
+}
+
+function NotificationRow({
+  notification,
+  onRead,
+  onClose,
+}: {
+  notification: NotificationItem;
+  onRead: () => void;
+  onClose: () => void;
+}) {
+  const content = (
+    <>
+      <span
+        className={cn(
+          "mt-1 h-2 w-2 shrink-0 rounded-full",
+          notification.isRead ? "bg-charcoal/15" : "bg-gold-primary"
+        )}
+      />
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="font-heading text-sm text-charcoal">
+            {notification.title}
+          </span>
+          <span className="font-accent text-[8px] uppercase tracking-[0.14em] text-slate">
+            {notification.time}
+          </span>
+        </span>
+        <span className="mt-1 block text-xs leading-relaxed text-slate">
+          {notification.message}
+        </span>
+      </span>
+    </>
+  );
+
+  if (notification.link) {
+    return (
+      <Link
+        href={notification.link}
+        onClick={() => {
+          onRead();
+          onClose();
+        }}
+        className="flex gap-3 px-4 py-3 text-left transition-colors hover:bg-cream/70"
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onRead}
+      className="flex w-full gap-3 px-4 py-3 text-left transition-colors hover:bg-cream/70"
+    >
+      {content}
+    </button>
   );
 }
 
