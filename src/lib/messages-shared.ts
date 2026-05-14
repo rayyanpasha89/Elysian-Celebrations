@@ -32,6 +32,8 @@ export type Conversation = {
   counterpartyRole: "vendor" | "client";
   hasMessages: boolean;
   unread: boolean;
+  unreadCount: number;
+  lastReadAt: string | null;
   booking: BookingContext;
   messages: MessageEntry[];
 };

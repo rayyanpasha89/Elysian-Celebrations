@@ -33,6 +33,7 @@ model User {
   accounts      Account[]
   sessions      Session[]
   sentMessages  Message[]      @relation("SentMessages")
+  threadReads   MessageThreadRead[]
   notifications Notification[]
 
   @@map("users")
@@ -468,6 +469,7 @@ model Booking {
   vendorService VendorService? @relation(fields: [vendorServiceId], references: [id])
   weddingEvent  WeddingEvent?  @relation(fields: [weddingEventId], references: [id])
   messages      Message[]
+  threadReads   MessageThreadRead[]
 
   @@map("bookings")
 }
@@ -529,6 +531,21 @@ model Message {
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   @@map("messages")
+}
+
+model MessageThreadRead {
+  id        String   @id @default(cuid())
+  bookingId String
+  userId    String
+  readAt    DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingId, userId])
+  @@map("message_thread_reads")
 }
 
 // ─── Notifications ────────────────────────────────────────────

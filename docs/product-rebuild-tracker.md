@@ -23,12 +23,14 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
   - `20260512000100_deepen_event_planning.sql`
   - `20260512000200_link_budget_items_to_events.sql`
   - `20260514000100_deepen_vendor_offerings.sql`
+  - `20260514000200_add_message_thread_reads.sql`
 - Remote table/column checks passed for:
   - `wedding_event_menus`
   - `wedding_event_menu_items`
   - `wedding_event_logistics`
   - `wedding_event_tasks`
   - `budget_items.wedding_event_id`
+  - `message_thread_reads`
 
 ## Shipped Recently
 
@@ -55,6 +57,7 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
 - Rebuilt the client budget page with a category/event view toggle, event-level planned/quoted/paid/due/variance cards, inline event reassignment, paid toggles, and unassigned-item surfacing.
 - Rebuilt the manager bookings page into a booking command center with status metrics, tabbed inquiry/confirmed/completed/cancelled queues, a sticky operations brief, payment due totals, event/logistics/menu context, vendor scope/catalogue rows, and safe manager status actions.
 - Rebuilt client and vendor messages around real booking threads. `/api/messages` now returns every relevant booking conversation, including empty inquiry threads, status labels, service scope, wedding day/event/date/venue context, notes, and correct unread direction; both inboxes show side context panels and suggested first-message prompts.
+- Added persistent per-user message thread read state through `message_thread_reads`, so client/vendor inbox unread pills now survive refreshes and fresh vendor inquiries can be marked read before the first reply exists.
 
 ## Verified Recently
 
@@ -85,4 +88,5 @@ Items 1, 2, and 3 are implemented in the follow-up slice and should be rechecked
 - Event planning menu/task saves still replace nested rows instead of preserving row IDs.
 - Vendor service catalogue rows do not yet support drag ordering or image/reference attachments.
 - Manager booking notes and payment amounts can be viewed, but inline manager editing is still intentionally limited to status actions.
-- Messages are real booking threads, but read receipts and per-message attachments are still future work.
+- Messages are real booking threads with persisted unread state, but visible read receipts and per-message attachments are still future work.
+- Message unread state is persisted per thread, but live delivery still needs Supabase Realtime or a polling layer.

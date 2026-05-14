@@ -352,6 +352,16 @@ create table messages (
   created_at timestamptz not null default now()
 );
 
+create table message_thread_reads (
+  id uuid primary key default gen_random_uuid(),
+  booking_id uuid not null references bookings(id) on delete cascade,
+  user_id text not null references users(id) on delete cascade,
+  read_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (booking_id, user_id)
+);
+
 -- ─── Notifications ───────────────────────────────────────────
 
 create table notifications (
@@ -485,6 +495,8 @@ create index idx_vendor_profile_views_vendor on vendor_profile_views(vendor_prof
 create index idx_vendor_profile_views_created_at on vendor_profile_views(created_at desc);
 create index idx_guests_list on guests(guest_list_id);
 create index idx_messages_booking on messages(booking_id);
+create index idx_message_thread_reads_user on message_thread_reads(user_id);
+create index idx_message_thread_reads_booking on message_thread_reads(booking_id);
 create index idx_notifications_user on notifications(user_id);
 create index idx_mood_board_items_board on mood_board_items(mood_board_id);
 create index idx_blog_posts_slug on blog_posts(slug);
@@ -507,6 +519,7 @@ create trigger tr_destinations_updated before update on destinations for each ro
 create trigger tr_weddings_updated before update on weddings for each row execute function update_updated_at();
 create trigger tr_budgets_updated before update on budgets for each row execute function update_updated_at();
 create trigger tr_bookings_updated before update on bookings for each row execute function update_updated_at();
+create trigger tr_message_thread_reads_updated before update on message_thread_reads for each row execute function update_updated_at();
 create trigger tr_guest_lists_updated before update on guest_lists for each row execute function update_updated_at();
 create trigger tr_mood_boards_updated before update on mood_boards for each row execute function update_updated_at();
 create trigger tr_blog_posts_updated before update on blog_posts for each row execute function update_updated_at();

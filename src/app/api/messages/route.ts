@@ -58,6 +58,7 @@ type BookingRow = {
   id: string;
   status: string | null;
   event_date: string | null;
+  created_at: string;
   notes: string | null;
   client: SingleOrArray<{ user_id: string | null; partner_name: string | null }>;
   vendor: SingleOrArray<{
@@ -90,7 +91,13 @@ type MessageRow = {
   booking_id: string;
   sender_id: string;
   content: string;
+  is_read: boolean;
   created_at: string;
+};
+
+type ThreadReadRow = {
+  booking_id: string;
+  read_at: string;
 };
 
 type ConversationMessage = {
@@ -128,12 +135,14 @@ type Conversation = {
   counterpartyRole: "vendor" | "client";
   hasMessages: boolean;
   unread: boolean;
+  unreadCount: number;
+  lastReadAt: string | null;
   booking: BookingContext;
   messages: { id: string; from: "vendor" | "client"; text: string; time: string }[];
 };
 
 const BOOKING_SELECT =
-  "id, status, event_date, notes, client:client_profiles(user_id, partner_name), vendor:vendor_profiles(user_id, business_name, slug), service:vendor_services(id, name, service_scope), wedding_event:wedding_events(id, name, event_type, date, start_time, venue, wedding_day:wedding_days(id, name, date))";
+  "id, status, event_date, created_at, notes, client:client_profiles(user_id, partner_name), vendor:vendor_profiles(user_id, business_name, slug), service:vendor_services(id, name, service_scope), wedding_event:wedding_events(id, name, event_type, date, start_time, venue, wedding_day:wedding_days(id, name, date))";
 
 function deriveBookingContext(booking: BookingRow): BookingContext {
   const service = pickOne(booking.service);
@@ -172,7 +181,8 @@ function buildConversation(
   booking: BookingRow,
   counterpartyRole: "vendor" | "client",
   myUserId: string,
-  messages: MessageRow[]
+  messages: MessageRow[],
+  threadReadAt: string | null
 ): Conversation {
   const vendor = pickOne(booking.vendor);
   const client = pickOne(booking.client);
@@ -202,8 +212,19 @@ function buildConversation(
     context.weddingEvent?.name ||
     "Inquiry waiting on a first message";
 
-  const selfRole = counterpartyRole === "vendor" ? "client" : "vendor";
-  const unread = last ? last.from !== selfRole : context.status === "INQUIRY";
+  const readBoundary = threadReadAt ? new Date(threadReadAt).getTime() : 0;
+  const unreadMessages = messages.filter((message) => {
+    if (message.sender_id === myUserId) return false;
+    if (message.is_read) return false;
+    return new Date(message.created_at).getTime() > readBoundary;
+  });
+  const inquiryCreatedAt = new Date(booking.created_at).getTime();
+  const freshInquiryUnread =
+    messages.length === 0 &&
+    context.status === "INQUIRY" &&
+    counterpartyRole === "client" &&
+    inquiryCreatedAt > readBoundary;
+  const unreadCount = unreadMessages.length + (freshInquiryUnread ? 1 : 0);
 
   return {
     id: booking.id,
@@ -215,7 +236,9 @@ function buildConversation(
     counterpartyName,
     counterpartyRole,
     hasMessages: projected.length > 0,
-    unread,
+    unread: unreadCount > 0,
+    unreadCount,
+    lastReadAt: threadReadAt,
     booking: context,
     messages: projected.map((m) => ({
       id: m.id,
@@ -224,6 +247,34 @@ function buildConversation(
       time: m.time,
     })),
   };
+}
+
+function mapThreadReads(reads: ThreadReadRow[] | null) {
+  const byBooking = new Map<string, string>();
+  for (const read of reads ?? []) {
+    byBooking.set(read.booking_id, read.read_at);
+  }
+  return byBooking;
+}
+
+async function loadThreadReads(
+  supabase: ReturnType<typeof createAdminSupabaseClient>,
+  userId: string,
+  bookingIds: string[]
+) {
+  if (bookingIds.length === 0) return new Map<string, string>();
+  const { data, error } = await supabase
+    .from("message_thread_reads")
+    .select("booking_id, read_at")
+    .eq("user_id", userId)
+    .in("booking_id", bookingIds);
+
+  if (error) {
+    console.error("message_thread_reads:", error);
+    throw new Error("Failed to load read state");
+  }
+
+  return mapThreadReads((data ?? []) as ThreadReadRow[]);
 }
 
 function sortConversations(list: Conversation[]) {
@@ -276,10 +327,15 @@ export async function GET() {
       const bookingRows = (bookings ?? []) as BookingRow[];
       const bookingIds = bookingRows.map((b) => b.id);
       const messagesByBooking = new Map<string, MessageRow[]>();
+      const threadReadsByBooking = await loadThreadReads(
+        supabase,
+        session.userId,
+        bookingIds
+      );
       if (bookingIds.length > 0) {
         const { data: msgs, error: mErr } = await supabase
           .from("messages")
-          .select("id, booking_id, sender_id, content, created_at")
+          .select("id, booking_id, sender_id, content, is_read, created_at")
           .in("booking_id", bookingIds)
           .order("created_at", { ascending: true });
         if (mErr) {
@@ -299,7 +355,8 @@ export async function GET() {
             booking,
             "vendor",
             session.userId,
-            messagesByBooking.get(booking.id) ?? []
+            messagesByBooking.get(booking.id) ?? [],
+            threadReadsByBooking.get(booking.id) ?? null
           )
         )
       );
@@ -334,10 +391,15 @@ export async function GET() {
       const bookingRows = (bookings ?? []) as BookingRow[];
       const bookingIds = bookingRows.map((b) => b.id);
       const messagesByBooking = new Map<string, MessageRow[]>();
+      const threadReadsByBooking = await loadThreadReads(
+        supabase,
+        session.userId,
+        bookingIds
+      );
       if (bookingIds.length > 0) {
         const { data: msgs, error: mErr } = await supabase
           .from("messages")
-          .select("id, booking_id, sender_id, content, created_at")
+          .select("id, booking_id, sender_id, content, is_read, created_at")
           .in("booking_id", bookingIds)
           .order("created_at", { ascending: true });
         if (mErr) {
@@ -357,7 +419,8 @@ export async function GET() {
             booking,
             "client",
             session.userId,
-            messagesByBooking.get(booking.id) ?? []
+            messagesByBooking.get(booking.id) ?? [],
+            threadReadsByBooking.get(booking.id) ?? null
           )
         )
       );
@@ -368,6 +431,94 @@ export async function GET() {
     return apiSuccess({ conversations: [] });
   } catch (e) {
     console.error("GET /api/messages", e);
+    return apiError("Internal server error", 500);
+  }
+}
+
+export async function PATCH(request: Request) {
+  const session = await getAuthSession();
+  if (session instanceof NextResponse) return session;
+  const roleCheck = requireRole(session, "client", "vendor");
+  if (roleCheck) return roleCheck;
+
+  try {
+    const body = (await request.json()) as {
+      bookingId?: unknown;
+    };
+    const bookingId =
+      typeof body.bookingId === "string" ? body.bookingId.trim() : "";
+
+    if (!bookingId) {
+      return apiError("Booking ID is required");
+    }
+
+    const supabase = createAdminSupabaseClient();
+    const { data: booking, error: bookingErr } = await supabase
+      .from("bookings")
+      .select("id, client:client_profiles(user_id), vendor:vendor_profiles(user_id)")
+      .eq("id", bookingId)
+      .maybeSingle();
+
+    if (bookingErr) {
+      console.error("bookings:", bookingErr);
+      return apiError("Failed to load booking", 500);
+    }
+    if (!booking) {
+      return apiError("Booking not found", 404);
+    }
+
+    const clientRelation = Array.isArray(booking.client)
+      ? booking.client[0]
+      : booking.client;
+    const vendorRelation = Array.isArray(booking.vendor)
+      ? booking.vendor[0]
+      : booking.vendor;
+
+    const canRead =
+      clientRelation?.user_id === session.userId ||
+      vendorRelation?.user_id === session.userId;
+
+    if (!canRead) {
+      return apiError("Forbidden", 403);
+    }
+
+    const readAt = new Date().toISOString();
+    const { data: threadRead, error: readErr } = await supabase
+      .from("message_thread_reads")
+      .upsert(
+        {
+          booking_id: bookingId,
+          user_id: session.userId,
+          read_at: readAt,
+        },
+        { onConflict: "booking_id,user_id" }
+      )
+      .select("read_at")
+      .single();
+
+    if (readErr) {
+      console.error("message_thread_reads upsert:", readErr);
+      return apiError("Failed to mark thread read", 500);
+    }
+
+    const { error: messageErr } = await supabase
+      .from("messages")
+      .update({ is_read: true })
+      .eq("booking_id", bookingId)
+      .neq("sender_id", session.userId)
+      .eq("is_read", false);
+
+    if (messageErr) {
+      console.error("messages mark read:", messageErr);
+      return apiError("Failed to mark messages read", 500);
+    }
+
+    return apiSuccess({
+      bookingId,
+      readAt: threadRead?.read_at ?? readAt,
+    });
+  } catch (e) {
+    console.error("PATCH /api/messages", e);
     return apiError("Internal server error", 500);
   }
 }

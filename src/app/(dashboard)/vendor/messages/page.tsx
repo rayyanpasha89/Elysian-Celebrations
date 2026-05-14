@@ -69,11 +69,61 @@ export default function VendorMessagesPage() {
     () => conversations.find((c) => c.id === active) ?? null,
     [conversations, active]
   );
+  const currentId = current?.id ?? null;
+  const currentUnread = Boolean(current?.unread);
 
   useEffect(() => {
     if (!messagesScrollRef.current) return;
     messagesScrollRef.current.scrollTop = messagesScrollRef.current.scrollHeight;
   }, [current?.id, current?.messages.length]);
+
+  useEffect(() => {
+    if (!currentId || !currentUnread) return;
+    const optimisticReadAt = new Date().toISOString();
+    setConversations((list) =>
+      list.map((conversation) =>
+        conversation.id === currentId
+          ? {
+              ...conversation,
+              unread: false,
+              unreadCount: 0,
+              lastReadAt: optimisticReadAt,
+            }
+          : conversation
+      )
+    );
+
+    void fetch("/api/messages", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookingId: currentId }),
+    })
+      .then(async (res) => {
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "Read update failed");
+        if (!json.readAt) return;
+        setConversations((list) =>
+          list.map((conversation) =>
+            conversation.id === currentId
+              ? { ...conversation, lastReadAt: json.readAt }
+              : conversation
+          )
+        );
+      })
+      .catch(() => {
+        setConversations((list) =>
+          list.map((conversation) =>
+            conversation.id === currentId
+              ? {
+                  ...conversation,
+                  unread: true,
+                  unreadCount: Math.max(1, conversation.unreadCount),
+                }
+              : conversation
+          )
+        );
+      });
+  }, [currentId, currentUnread]);
 
   const sendMessage = async () => {
     if (!current) return;
@@ -107,6 +157,8 @@ export default function VendorMessagesPage() {
                 createdAt: new Date().toISOString(),
                 hasMessages: true,
                 unread: false,
+                unreadCount: 0,
+                lastReadAt: new Date().toISOString(),
                 messages: [
                   ...conversation.messages,
                   {
@@ -297,6 +349,11 @@ function ConversationList({
                     <p className="font-display text-sm text-charcoal">
                       {conversation.counterpartyName}
                     </p>
+                    {conversation.unread ? (
+                      <span className="font-accent rounded-full bg-gold-primary px-2 py-0.5 text-[8px] uppercase tracking-[0.14em] text-midnight">
+                        Unread
+                      </span>
+                    ) : null}
                     <span
                       className={cn(
                         statusBadgeBase,
