@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { BudgetCanvas } from "@/components/dashboard/budget/budget-canvas";
+import {
+  BudgetByEventView,
+  type BudgetEventBucket,
+} from "@/components/dashboard/budget/budget-by-event-view";
 import { BudgetItemPalette } from "@/components/dashboard/budget/budget-item-palette";
 import { BudgetSummary } from "@/components/dashboard/budget/budget-summary";
 import { useBudgetHydrated } from "@/hooks/use-budget-hydrated";
@@ -11,6 +15,7 @@ import { cn, formatCurrency } from "@/lib/utils";
 import { useBudgetStore, type BudgetCategory } from "@/stores/budget-store";
 
 type MobileTab = "palette" | "canvas" | "summary";
+type PlannerView = "category" | "event";
 
 type BudgetApiPayload = {
   budgetName: string;
@@ -84,6 +89,7 @@ export default function BudgetPage() {
   const reset = useBudgetStore((state) => state.reset);
 
   const [mobileTab, setMobileTab] = useState<MobileTab>("canvas");
+  const [plannerView, setPlannerView] = useState<PlannerView>("category");
   const [isEditingBudget, setIsEditingBudget] = useState(false);
   const [loadingRemote, setLoadingRemote] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -174,7 +180,7 @@ export default function BudgetPage() {
     [categories]
   );
 
-  const eventOptions = useMemo(
+  const eventOptions = useMemo<BudgetEventBucket[]>(
     () =>
       eventPlanSpend?.days.flatMap((day) =>
         (day.events ?? []).map((event) => ({
@@ -188,6 +194,21 @@ export default function BudgetPage() {
         }))
       ) ?? [],
     [eventPlanSpend]
+  );
+
+  const taggedItemCount = useMemo(
+    () =>
+      categories.reduce(
+        (sum, category) =>
+          sum + category.items.filter((item) => item.eventId).length,
+        0
+      ),
+    [categories]
+  );
+  const totalItemCount = useMemo(
+    () =>
+      categories.reduce((sum, category) => sum + category.items.length, 0),
+    [categories]
   );
 
   const saveBudget = async () => {
@@ -332,14 +353,25 @@ export default function BudgetPage() {
 
           <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[460px]">
             <QuickStat
-              label="Categories"
-              value={`${categories.length}`}
-              hint="Target buckets in plan"
-            />
-            <QuickStat
               label="Quoted"
               value={`₹${(totalQuoted / 100000).toFixed(1)}L`}
-              hint="Current committed estimate"
+              hint={`${totalItemCount} ${totalItemCount === 1 ? "line item" : "line items"}`}
+            />
+            <QuickStat
+              label="Tagged to events"
+              value={`${taggedItemCount}/${totalItemCount}`}
+              hint={
+                totalItemCount === 0
+                  ? "Add line items to start tagging"
+                  : taggedItemCount === totalItemCount
+                    ? "Every line is in an event"
+                    : "Switch to By event to tag the rest"
+              }
+              tone={
+                totalItemCount > 0 && taggedItemCount < totalItemCount
+                  ? "warning"
+                  : "healthy"
+              }
             />
             <QuickStat
               label="Status"
@@ -350,56 +382,88 @@ export default function BudgetPage() {
           </div>
         </div>
 
-        <div className="mt-6 flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
-          <button
-            type="button"
-            onClick={() => {
-              rebalanceAllocations();
-              toast.success("Category targets rebalanced");
-            }}
-            className="font-accent inline-flex items-center justify-center border border-charcoal/15 px-4 py-2.5 text-[10px] uppercase tracking-[0.2em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark"
-          >
-            Rebalance targets
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (
-                window.confirm(
-                  "Reset the budget planner back to the default structure?"
-                )
-              ) {
-                reset();
-                toast.success("Budget plan reset locally");
-              }
-            }}
-            className="font-accent inline-flex items-center justify-center border border-charcoal/15 px-4 py-2.5 text-[10px] uppercase tracking-[0.2em] text-charcoal transition-colors hover:border-error hover:text-error"
-          >
-            Reset planner
-          </button>
+        <div className="mt-6 flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                rebalanceAllocations();
+                toast.success("Category targets rebalanced");
+              }}
+              className="font-accent inline-flex items-center justify-center border border-charcoal/15 px-4 py-2.5 text-[10px] uppercase tracking-[0.2em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark"
+            >
+              Rebalance targets
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (
+                  window.confirm(
+                    "Reset the budget planner back to the default structure?"
+                  )
+                ) {
+                  reset();
+                  toast.success("Budget plan reset locally");
+                }
+              }}
+              className="font-accent inline-flex items-center justify-center border border-charcoal/15 px-4 py-2.5 text-[10px] uppercase tracking-[0.2em] text-slate/80 transition-colors hover:border-error hover:text-error"
+            >
+              Reset planner
+            </button>
+          </div>
           <button
             type="button"
             onClick={() => void saveBudget()}
             disabled={saving || !isDirty}
             className={cn(
-              "font-accent inline-flex items-center justify-center border px-5 py-2.5 text-[10px] uppercase tracking-[0.2em] transition-all duration-500",
+              "font-accent inline-flex items-center justify-center border px-6 py-3 text-[11px] uppercase tracking-[0.22em] transition-all duration-500",
               saving || !isDirty
                 ? "border-charcoal/10 text-slate"
-                : "border-gold-primary text-gold-primary hover:bg-gold-primary hover:text-midnight"
+                : "border-gold-primary bg-gold-primary text-midnight shadow-[0_14px_36px_rgba(201,169,110,0.18)] hover:bg-gold-dark hover:border-gold-dark"
             )}
           >
-            {saving ? "Saving..." : isDirty ? "Save draft" : "Saved"}
+            {saving ? "Saving..." : isDirty ? "Save changes" : "All saved"}
           </button>
         </div>
       </div>
 
-      {eventPlanSpend ? (
+      {eventPlanSpend && eventPlanSpend.eventCount > 0 ? (
         <EventPlanSpendCallout
           summary={eventPlanSpend}
           budgetCap={totalBudget}
           categories={categories}
         />
       ) : null}
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="inline-flex items-center gap-1 border border-charcoal/8 bg-ivory p-1">
+          {(
+            [
+              { key: "category", label: "By category" },
+              { key: "event", label: "By event" },
+            ] as const
+          ).map((view) => (
+            <button
+              key={view.key}
+              type="button"
+              onClick={() => setPlannerView(view.key)}
+              className={cn(
+                "font-accent inline-flex items-center justify-center px-4 py-2 text-[10px] uppercase tracking-[0.18em] transition-colors",
+                plannerView === view.key
+                  ? "bg-charcoal text-ivory"
+                  : "text-slate hover:text-charcoal"
+              )}
+            >
+              {view.label}
+            </button>
+          ))}
+        </div>
+        <p className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
+          {plannerView === "event"
+            ? "Items grouped by celebration day"
+            : "Items grouped by spend category"}
+        </p>
+      </div>
 
       <div className="flex gap-1 border border-charcoal/8 p-1 lg:hidden">
         {(
@@ -424,12 +488,28 @@ export default function BudgetPage() {
         ))}
       </div>
 
-      <div className="hidden lg:grid lg:grid-cols-[320px_minmax(0,1fr)_340px] lg:gap-6">
-        <div className="border border-charcoal/8 bg-ivory p-4">
-          <BudgetItemPalette />
-        </div>
+      <div
+        className={cn(
+          "hidden lg:grid lg:gap-6",
+          plannerView === "category"
+            ? "lg:grid-cols-[320px_minmax(0,1fr)_340px]"
+            : "lg:grid-cols-[minmax(0,1fr)_340px]"
+        )}
+      >
+        {plannerView === "category" ? (
+          <div className="border border-charcoal/8 bg-ivory p-4">
+            <BudgetItemPalette />
+          </div>
+        ) : null}
         <div>
-          <BudgetCanvas eventOptions={eventOptions} />
+          {plannerView === "category" ? (
+            <BudgetCanvas eventOptions={eventOptions} />
+          ) : (
+            <BudgetByEventView
+              events={eventOptions}
+              weddingName={eventPlanSpend?.weddingName ?? null}
+            />
+          )}
         </div>
         <div className="border border-charcoal/8 bg-ivory p-4">
           <BudgetSummary />
@@ -438,12 +518,26 @@ export default function BudgetPage() {
 
       <div className="space-y-4 lg:hidden">
         {mobileTab === "palette" ? (
-          <div className="border border-charcoal/8 bg-ivory p-4">
-            <BudgetItemPalette />
-          </div>
+          plannerView === "category" ? (
+            <div className="border border-charcoal/8 bg-ivory p-4">
+              <BudgetItemPalette />
+            </div>
+          ) : (
+            <div className="border border-dashed border-charcoal/15 bg-ivory p-4 text-sm text-slate">
+              Switch to <span className="text-charcoal">By category</span> view to
+              drag new line items in from the palette.
+            </div>
+          )
         ) : null}
         {mobileTab === "canvas" ? (
-          <BudgetCanvas eventOptions={eventOptions} />
+          plannerView === "category" ? (
+            <BudgetCanvas eventOptions={eventOptions} />
+          ) : (
+            <BudgetByEventView
+              events={eventOptions}
+              weddingName={eventPlanSpend?.weddingName ?? null}
+            />
+          )
         ) : null}
         {mobileTab === "summary" ? (
           <div className="border border-charcoal/8 bg-ivory p-4">

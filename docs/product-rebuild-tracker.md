@@ -52,6 +52,7 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
 - Refined the client vendor profile preview at `/client/vendors` to title the catalogue section by category ("Menu and counters", "Setups and areas", "Coverage and deliverables", "Sets and tech", "Looks and coverage") and group itemized offerings by type rather than mixing menus, setups, and deliverables into one stream.
 - Added `src/lib/vendor-offering.ts` to centralize array normalization, item-type whitelisting, and per-category copy (catalogue labels, scope prompt, example chips, item type options) shared by both the vendor editor and the client preview.
 - Connected vendor offerings back into the Event Editor. Clients can select catalogue rows from a chosen vendor service, add catering rows directly into the event menu, and append decor/photography/entertainment scope into the relevant event notes with a follow-up confirmation task.
+- Rebuilt the client budget page with a category/event view toggle, event-level planned/quoted/paid/due/variance cards, inline event reassignment, paid toggles, and unassigned-item surfacing.
 
 ## Verified Recently
 
