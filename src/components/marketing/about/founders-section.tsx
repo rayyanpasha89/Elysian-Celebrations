@@ -1,10 +1,14 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Sparkles, MapPin, UsersRound } from "lucide-react";
 import { fadeLeft, fadeRight, staggerContainer, staggerItem } from "@/animations/variants";
 import { useInViewAnimation } from "@/hooks/use-in-view-animation";
 import { AnimatedCounter } from "@/components/shared/animated-counter";
+import {
+  OrnamentRule,
+  SectionEyebrow,
+} from "@/components/marketing/shared/marketing-primitives";
 
 const stats = [
   { label: "Couples", value: 150, suffix: "+" },
@@ -40,6 +44,7 @@ const detailImageTwo =
 
 export function FoundersSection() {
   const { ref, isInView } = useInViewAnimation({ threshold: 0.15 });
+  const prefersReducedMotion = useReducedMotion();
 
   return (
     <section
@@ -62,8 +67,8 @@ export function FoundersSection() {
             animate={isInView ? "visible" : "hidden"}
             className="relative"
           >
-            <div className="relative grid gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-              <div className="relative overflow-hidden border border-charcoal/8 bg-midnight shadow-[0_28px_90px_rgba(26,26,46,0.12)]">
+              <div className="relative grid gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+              <div className="relative aspect-[4/5] min-h-[30rem] overflow-hidden border border-charcoal/8 bg-midnight shadow-[0_28px_90px_rgba(26,26,46,0.12)]">
                 <div
                   className="absolute inset-0 bg-cover bg-center"
                   style={{
@@ -87,13 +92,13 @@ export function FoundersSection() {
 
               <div className="grid gap-4">
                 <div
-                  className="min-h-[220px] overflow-hidden border border-charcoal/8 bg-cover bg-center shadow-[0_20px_60px_rgba(26,26,46,0.08)]"
+                  className="aspect-[4/3] min-h-[220px] overflow-hidden border border-charcoal/8 bg-cover bg-center shadow-[0_20px_60px_rgba(26,26,46,0.08)]"
                   style={{
                     backgroundImage: `linear-gradient(180deg, rgba(17,24,39,0.06), rgba(17,24,39,0.22)), url(${detailImageOne})`,
                   }}
                 />
                 <div
-                  className="min-h-[180px] overflow-hidden border border-charcoal/8 bg-cover bg-center shadow-[0_20px_60px_rgba(26,26,46,0.08)]"
+                  className="aspect-[4/3] min-h-[180px] overflow-hidden border border-charcoal/8 bg-cover bg-center shadow-[0_20px_60px_rgba(26,26,46,0.08)]"
                   style={{
                     backgroundImage: `linear-gradient(180deg, rgba(17,24,39,0.04), rgba(17,24,39,0.22)), url(${detailImageTwo})`,
                   }}
@@ -120,16 +125,14 @@ export function FoundersSection() {
             initial="hidden"
             animate={isInView ? "visible" : "hidden"}
           >
-            <p className="font-accent mb-4 text-[11px] uppercase tracking-[0.3em] text-gold-primary">
-              About the studio
-            </p>
+            <SectionEyebrow label="About the studio" className="mb-4" />
             <h2
               className="font-display mb-6 font-bold leading-[0.96] text-charcoal"
               style={{ fontSize: "var(--text-h1)" }}
             >
               Meet the people behind the planning.
             </h2>
-            <div className="mb-6 h-[1px] w-14 bg-gradient-to-r from-gold-primary/55 to-transparent" />
+            <OrnamentRule align="start" className="mb-6" />
 
             <div className="space-y-4 font-heading text-base font-light leading-relaxed text-slate">
               <p className="first-letter:float-left first-letter:mr-2 first-letter:mt-1 first-letter:font-display first-letter:text-4xl first-letter:font-bold first-letter:text-gold-primary">
@@ -188,9 +191,19 @@ export function FoundersSection() {
                 <motion.svg
                   viewBox="0 0 200 50"
                   className="mt-4 h-12 w-auto text-gold-primary"
-                  initial={{ pathLength: 0, opacity: 0 }}
-                  animate={isInView ? { pathLength: 1, opacity: 1 } : {}}
-                  transition={{ duration: 2, delay: 0.3, ease: "easeInOut" }}
+                  initial={prefersReducedMotion ? false : { pathLength: 0, opacity: 0 }}
+                  animate={
+                    prefersReducedMotion
+                      ? { opacity: 1 }
+                      : isInView
+                        ? { pathLength: 1, opacity: 1 }
+                        : {}
+                  }
+                  transition={
+                    prefersReducedMotion
+                      ? { duration: 0 }
+                      : { duration: 2, delay: 0.3, ease: "easeInOut" }
+                  }
                 >
                   <motion.path
                     d="M10 35 C 30 10, 50 10, 60 25 S 80 45, 90 30 S 110 10, 130 25 S 150 45, 170 20 L 190 25"
@@ -198,9 +211,19 @@ export function FoundersSection() {
                     stroke="currentColor"
                     strokeWidth="1.5"
                     strokeLinecap="round"
-                    initial={{ pathLength: 0 }}
-                    animate={isInView ? { pathLength: 1 } : { pathLength: 0 }}
-                    transition={{ duration: 2, delay: 0.6, ease: "easeInOut" }}
+                    initial={prefersReducedMotion ? false : { pathLength: 0 }}
+                    animate={
+                      prefersReducedMotion
+                        ? { pathLength: 1 }
+                        : isInView
+                          ? { pathLength: 1 }
+                          : { pathLength: 0 }
+                    }
+                    transition={
+                      prefersReducedMotion
+                        ? { duration: 0 }
+                        : { duration: 2, delay: 0.6, ease: "easeInOut" }
+                    }
                   />
                 </motion.svg>
               </div>

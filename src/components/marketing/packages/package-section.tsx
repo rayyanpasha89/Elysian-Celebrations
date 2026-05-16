@@ -135,6 +135,8 @@ function PackageCard({
   pkg: (typeof packages)[0];
   isInView: boolean;
 }) {
+  const headingId = `pkg-${pkg.name}`;
+
   return (
     <motion.div
       variants={staggerItem}
@@ -145,92 +147,103 @@ function PackageCard({
           : "border border-charcoal/5 bg-cream/80 shadow-[0_18px_60px_rgba(26,26,46,0.06)] hover:-translate-y-1 hover:shadow-[0_30px_80px_rgba(26,26,46,0.1)]"
       )}
     >
-      <div className="relative">
-        <div
-          className="min-h-[200px] bg-cover bg-center"
-          style={{
-            backgroundImage: `linear-gradient(180deg, rgba(17,24,39,0.12), rgba(17,24,39,0.72)), url(${pkg.image})`,
-          }}
-        >
-          <div className="flex h-full min-h-[200px] flex-col justify-between p-5 text-ivory">
-            <div className="flex items-start justify-between gap-4">
-              {pkg.featured ? (
-                <span className="border border-gold-primary/55 bg-gold-primary/20 px-3 py-1.5 font-accent text-[10px] uppercase tracking-[0.22em] text-gold-light backdrop-blur-md">
-                  Recommended
-                </span>
-              ) : (
-                <span />
-              )}
-              <div className="text-right">
-                <p className="font-accent text-[9px] uppercase tracking-[0.18em] text-gold-light/85">
-                  Starting from
+      <article aria-labelledby={headingId}>
+        <div className="relative">
+          <div
+            className="min-h-[200px] bg-cover bg-center"
+            style={{
+              backgroundImage: `linear-gradient(180deg, rgba(17,24,39,0.12), rgba(17,24,39,0.72)), url(${pkg.image})`,
+            }}
+          >
+            <div className="flex h-full min-h-[200px] flex-col justify-between p-5 text-ivory">
+              <div className="flex items-start justify-between gap-4">
+                {pkg.featured ? (
+                  <span className="border border-gold-primary/55 bg-gold-primary/20 px-3 py-1.5 font-accent text-[10px] uppercase tracking-[0.22em] text-gold-light backdrop-blur-md">
+                    Recommended
+                  </span>
+                ) : (
+                  <span />
+                )}
+                <div className="text-right">
+                  <p className="font-accent text-[9px] uppercase tracking-[0.18em] text-gold-light/85">
+                    Starting from
+                  </p>
+                  <p className="mt-1 font-display text-xl text-ivory">
+                    <AnimatedCounter
+                      target={pkg.startingPrice}
+                      prefix="₹"
+                      formatter={(v) => `${(v / 100000).toFixed(0)}L`}
+                    />
+                  </p>
+                </div>
+              </div>
+
+              <div className="max-w-[20rem]">
+                <p className="font-accent text-[10px] uppercase tracking-[0.24em] text-gold-light/80">
+                  Tier {pkg.tier}
                 </p>
-                <p className="mt-1 font-display text-xl text-ivory">
-                  <AnimatedCounter
-                    target={pkg.startingPrice}
-                    prefix="₹"
-                    formatter={(v) => `${(v / 100000).toFixed(0)}L`}
-                  />
+                <h3
+                  id={headingId}
+                  className="mt-2 font-display text-3xl leading-none text-ivory"
+                >
+                  {pkg.name}
+                </h3>
+                <p className="mt-2 font-accent text-[10px] uppercase tracking-[0.2em] text-gold-light/85">
+                  {pkg.tagline}
+                </p>
+                <p className="mt-3 text-sm leading-relaxed text-ivory/78">
+                  {pkg.mood}
                 </p>
               </div>
             </div>
-
-            <div className="max-w-[20rem]">
-              <p className="font-accent text-[10px] uppercase tracking-[0.24em] text-gold-light/80">
-                Tier {pkg.tier}
-              </p>
-              <h3 className="mt-2 font-display text-3xl leading-none text-ivory">
-                {pkg.name}
-              </h3>
-              <p className="mt-2 font-accent text-[10px] uppercase tracking-[0.2em] text-gold-light/85">
-                {pkg.tagline}
-              </p>
-              <p className="mt-3 text-sm leading-relaxed text-ivory/78">
-                {pkg.mood}
-              </p>
-            </div>
           </div>
         </div>
-      </div>
 
-      <div className="space-y-7 p-6 md:p-7">
-        <div className="flex items-center justify-between gap-4 border-b border-charcoal/8 pb-4">
-          <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
-            Curated for
-          </p>
-          <p className="max-w-[13rem] text-right text-sm leading-relaxed text-charcoal/78">
-            {pkg.mood}
-          </p>
+        <div className="space-y-7 p-6 md:p-7">
+          <div className="flex items-center justify-between gap-4 border-b border-charcoal/8 pb-4">
+            <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
+              Curated for
+            </p>
+            <p className="max-w-[13rem] text-right text-sm leading-relaxed text-charcoal/78">
+              {pkg.mood}
+            </p>
+          </div>
+
+          <ul className="grid gap-3">
+            {pkg.inclusions.map((item, i) => (
+              <motion.li
+                key={item}
+                initial={{ opacity: 0, x: -10 }}
+                animate={isInView ? { opacity: 1, x: 0 } : {}}
+                transition={{ delay: 0.5 + i * 0.08, duration: 0.4 }}
+                className="flex items-start gap-2.5 text-sm leading-relaxed text-slate"
+              >
+                <span
+                  aria-hidden
+                  aria-label="Inclusion"
+                  className="mt-0.5 flex-shrink-0 text-gold-primary"
+                >
+                  <Check size={16} />
+                </span>
+                {item}
+              </motion.li>
+            ))}
+          </ul>
+
+          <Link
+            href={`/contact?tier=${pkg.name.toLowerCase()}`}
+            className={cn(
+              "inline-flex w-full items-center justify-center gap-2 py-3.5 text-center font-accent text-[11px] uppercase tracking-[0.2em] transition-all duration-500",
+              pkg.featured
+                ? "border border-gold-primary bg-transparent text-gold-primary hover:bg-gold-primary hover:text-midnight"
+                : "border border-charcoal/20 bg-transparent text-charcoal hover:border-charcoal hover:bg-charcoal hover:text-ivory"
+            )}
+          >
+            Shape this tier with us
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </Link>
         </div>
-
-        <ul className="grid gap-3">
-          {pkg.inclusions.map((item, i) => (
-            <motion.li
-              key={item}
-              initial={{ opacity: 0, x: -10 }}
-              animate={isInView ? { opacity: 1, x: 0 } : {}}
-              transition={{ delay: 0.5 + i * 0.08, duration: 0.4 }}
-              className="flex items-start gap-2.5 text-sm leading-relaxed text-slate"
-            >
-              <Check size={16} className="mt-0.5 flex-shrink-0 text-gold-primary" />
-              {item}
-            </motion.li>
-          ))}
-        </ul>
-
-        <Link
-          href={`/contact?tier=${pkg.name.toLowerCase()}`}
-          className={cn(
-            "inline-flex w-full items-center justify-center gap-2 py-3.5 text-center font-accent text-[11px] uppercase tracking-[0.2em] transition-all duration-500",
-            pkg.featured
-              ? "border border-gold-primary bg-transparent text-gold-primary hover:bg-gold-primary hover:text-midnight"
-              : "border border-charcoal/20 bg-transparent text-charcoal hover:border-charcoal hover:bg-charcoal hover:text-ivory"
-          )}
-        >
-          Shape this tier with us
-          <ArrowUpRight className="h-3.5 w-3.5" />
-        </Link>
-      </div>
+      </article>
     </motion.div>
   );
 }
