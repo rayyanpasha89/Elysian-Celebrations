@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowUpRight, Check } from "lucide-react";
 import { fadeUp, staggerContainer, staggerItem } from "@/animations/variants";
@@ -136,6 +137,30 @@ function PackageCard({
   isInView: boolean;
 }) {
   const headingId = `pkg-${pkg.name}`;
+  const [isExpanded, setIsExpanded] = useState(false);
+  const visibleMobileInclusions = isExpanded
+    ? pkg.inclusions
+    : pkg.inclusions.slice(0, 4);
+  const hiddenInclusionCount = Math.max(pkg.inclusions.length - 4, 0);
+
+  const renderInclusion = (item: string, i: number) => (
+    <motion.li
+      key={item}
+      initial={{ opacity: 0, x: -10 }}
+      animate={isInView ? { opacity: 1, x: 0 } : {}}
+      transition={{ delay: 0.5 + i * 0.08, duration: 0.4 }}
+      className="flex items-start gap-2.5 text-sm leading-relaxed text-slate"
+    >
+      <span
+        aria-hidden
+        aria-label="Inclusion"
+        className="mt-0.5 flex-shrink-0 text-gold-primary"
+      >
+        <Check size={16} />
+      </span>
+      {item}
+    </motion.li>
+  );
 
   return (
     <motion.div
@@ -209,25 +234,23 @@ function PackageCard({
             </p>
           </div>
 
-          <ul className="grid gap-3">
-            {pkg.inclusions.map((item, i) => (
-              <motion.li
-                key={item}
-                initial={{ opacity: 0, x: -10 }}
-                animate={isInView ? { opacity: 1, x: 0 } : {}}
-                transition={{ delay: 0.5 + i * 0.08, duration: 0.4 }}
-                className="flex items-start gap-2.5 text-sm leading-relaxed text-slate"
-              >
-                <span
-                  aria-hidden
-                  aria-label="Inclusion"
-                  className="mt-0.5 flex-shrink-0 text-gold-primary"
-                >
-                  <Check size={16} />
-                </span>
-                {item}
-              </motion.li>
-            ))}
+          <ul className="grid gap-3 md:hidden">
+            {visibleMobileInclusions.map(renderInclusion)}
+          </ul>
+          {hiddenInclusionCount > 0 ? (
+            <button
+              type="button"
+              aria-expanded={isExpanded}
+              onClick={() => setIsExpanded((current) => !current)}
+              className="font-accent text-[10px] uppercase tracking-[0.2em] text-gold-primary transition-colors duration-300 hover:text-gold-dark md:hidden"
+            >
+              {isExpanded
+                ? "Show fewer inclusions"
+                : `+ ${hiddenInclusionCount} more inclusions`}
+            </button>
+          ) : null}
+          <ul className="hidden gap-3 md:grid">
+            {pkg.inclusions.map(renderInclusion)}
           </ul>
 
           <Link
