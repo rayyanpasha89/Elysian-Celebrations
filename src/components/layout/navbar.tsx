@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { MagneticButton } from "@/components/shared/magnetic-button";
 import { NavSignIn } from "@/components/layout/nav-sign-in";
@@ -19,13 +19,36 @@ const navLinks = [
 
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isMobileCondensed, setIsMobileCondensed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 24);
-    handleScroll();
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
+    let frame = 0;
+
+    const updateScrollState = () => {
+      const scrolled = window.scrollY > 24;
+      const isMobile = window.innerWidth < 768;
+      setIsScrolled(scrolled);
+      setIsMobileCondensed(isMobile && scrolled);
+    };
+
+    const requestUpdate = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        updateScrollState();
+      });
+    };
+
+    updateScrollState();
+    window.addEventListener("scroll", requestUpdate, { passive: true });
+    window.addEventListener("resize", requestUpdate);
+    return () => {
+      window.removeEventListener("scroll", requestUpdate);
+      window.removeEventListener("resize", requestUpdate);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
   }, []);
 
   return (
@@ -36,10 +59,18 @@ export function Navbar() {
         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.45 }}
         className="fixed inset-x-0 top-0 z-[10020]"
       >
-        <div className="mx-auto max-w-[1500px] px-[var(--section-padding-x)] pt-5">
+        <div
+          className={cn(
+            "mx-auto max-w-[1500px] px-[var(--section-padding-x)] md:pt-5",
+            prefersReducedMotion ? "" : "transition-all duration-300",
+            isMobileCondensed ? "pt-2" : "pt-5"
+          )}
+        >
           <nav
             className={cn(
-              "relative flex items-center justify-between overflow-hidden border px-4 py-3 transition-all duration-500 md:px-6",
+              "relative flex items-center justify-between overflow-hidden border px-4 py-3 md:h-auto md:px-6 md:py-3",
+              prefersReducedMotion ? "transition-none" : "transition-all duration-500",
+              isMobileCondensed && "h-14 px-3 py-1 md:h-auto md:px-6 md:py-3",
               isScrolled
                 ? "border-charcoal/6 bg-ivory/88 shadow-[0_22px_80px_rgba(17,24,39,0.12)] backdrop-blur-2xl"
                 : "border-white/12 bg-white/[0.04] shadow-[0_22px_90px_rgba(0,0,0,0.18)] backdrop-blur-2xl"
@@ -63,7 +94,9 @@ export function Navbar() {
               <div className="flex items-center gap-3">
                 <div
                   className={cn(
-                    "h-10 w-10 border transition-colors duration-500",
+                    "border md:h-10 md:w-10",
+                    prefersReducedMotion ? "transition-none" : "transition-all duration-500",
+                    isMobileCondensed ? "h-8 w-8" : "h-10 w-10",
                     isScrolled
                       ? "border-gold-primary/30 bg-gold-primary/10 shadow-[0_10px_30px_rgba(201,169,110,0.12)]"
                       : "border-white/12 bg-white/[0.06] shadow-[0_10px_30px_rgba(0,0,0,0.12)]"
@@ -76,7 +109,9 @@ export function Navbar() {
                 <div>
                   <span
                     className={cn(
-                      "block font-display text-[1.45rem] font-bold tracking-[0.02em] transition-colors duration-500 md:text-[1.55rem]",
+                      "block font-display font-bold tracking-[0.02em] md:text-[1.55rem]",
+                      prefersReducedMotion ? "transition-none" : "transition-all duration-500",
+                      isMobileCondensed ? "text-[1.18rem]" : "text-[1.45rem]",
                       isScrolled ? "text-charcoal" : "text-ivory"
                     )}
                   >
@@ -84,7 +119,11 @@ export function Navbar() {
                   </span>
                   <span
                     className={cn(
-                      "block font-accent text-[10px] uppercase tracking-[0.34em] transition-colors duration-500",
+                      "block font-accent uppercase md:text-[10px] md:tracking-[0.34em]",
+                      prefersReducedMotion ? "transition-none" : "transition-all duration-500",
+                      isMobileCondensed
+                        ? "text-[8px] tracking-[0.24em]"
+                        : "text-[10px] tracking-[0.34em]",
                       isScrolled ? "text-gold-dark" : "text-gold-light"
                     )}
                   >
@@ -155,7 +194,8 @@ export function Navbar() {
             <button
               onClick={() => setIsMobileOpen((open) => !open)}
               className={cn(
-                "relative z-10 p-2 transition-colors lg:hidden",
+                "relative z-10 transition-colors lg:hidden",
+                isMobileCondensed ? "p-1.5" : "p-2",
                 isScrolled || isMobileOpen ? "text-charcoal" : "text-ivory"
               )}
               aria-label="Toggle menu"
