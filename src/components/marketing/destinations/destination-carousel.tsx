@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { DestinationCard } from "./destination-card";
 import { fadeUp } from "@/animations/variants";
 import { useInViewAnimation } from "@/hooks/use-in-view-animation";
+import { SectionHeader } from "@/components/marketing/shared/marketing-primitives";
 
 const destinations = [
   {
@@ -89,9 +90,41 @@ const destinations = [
 
 export function DestinationCarousel() {
   const trackRef = useRef<HTMLDivElement>(null);
+  const cardRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const [activeIndex, setActiveIndex] = useState(0);
   const { ref: titleRef, isInView } = useInViewAnimation({ threshold: 0.3 });
   const destinationCount = destinations.length;
   const venueCount = destinations.reduce((sum, destination) => sum + destination.venueCount, 0);
+
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const strongestEntry = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+
+        if (!strongestEntry) return;
+
+        const nextIndex = Number(
+          (strongestEntry.target as HTMLElement).dataset.destinationIndex ?? 0
+        );
+        setActiveIndex(nextIndex);
+      },
+      {
+        root: track,
+        threshold: [0.45, 0.6, 0.75],
+      }
+    );
+
+    cardRefs.current.forEach((card) => {
+      if (card) observer.observe(card);
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   const scrollTrack = (direction: "left" | "right") => {
     if (!trackRef.current) return;
@@ -99,6 +132,14 @@ export function DestinationCarousel() {
     trackRef.current.scrollBy({
       left: direction === "right" ? scrollAmount : -scrollAmount,
       behavior: "smooth",
+    });
+  };
+
+  const scrollToDestination = (index: number) => {
+    cardRefs.current[index]?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
     });
   };
 
@@ -115,29 +156,27 @@ export function DestinationCarousel() {
           variants={fadeUp}
           initial="hidden"
           animate={isInView ? "visible" : "hidden"}
-          className="grid gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(260px,0.85fr)] lg:items-end"
+          className="space-y-8"
         >
-          <div className="max-w-4xl">
-            <p className="mb-4 inline-flex items-center gap-2 font-accent text-[10px] uppercase tracking-[0.34em] text-gold-light/80">
-              <Sparkles className="h-3.5 w-3.5" />
-              Destinations
-            </p>
-            <h2
-              className="font-display font-bold leading-[0.96] text-ivory"
-              style={{ fontSize: "clamp(2.6rem, 5vw, 5.4rem)" }}
-            >
-              Seven places,
-              <br />
-              <span className="text-gold-primary">seven different atmospheres</span>
-            </h2>
-            <p className="mt-5 max-w-2xl text-lg font-light leading-relaxed text-ivory/68">
-              Each destination is chosen for visual weight, guest comfort, vendor depth,
-              and the kind of narrative it creates when the celebration needs to feel
-              expensive, considered, and deeply personal.
-            </p>
-          </div>
+          <SectionHeader
+            chapter="02"
+            eyebrow="Destinations"
+            title={
+              <>
+                Seven places,
+                <br />
+                <span className="text-gold-primary">
+                  seven different atmospheres
+                </span>
+              </>
+            }
+            intro="Each destination is chosen for visual weight, guest comfort, vendor depth, and the kind of narrative it creates when the celebration needs to feel expensive, considered, and deeply personal."
+            align="center"
+            tone="light"
+            className="max-w-4xl"
+          />
 
-          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+          <div className="grid gap-3 sm:grid-cols-3">
             <StatCard
               label="Curated destinations"
               value={destinationCount}
@@ -174,11 +213,33 @@ export function DestinationCarousel() {
         style={{ WebkitOverflowScrolling: "touch" }}
       >
         {destinations.map((dest, i) => (
-          <div key={dest.name} className="snap-start">
+          <div
+            key={dest.name}
+            ref={(node) => {
+              cardRefs.current[i] = node;
+            }}
+            data-destination-index={i}
+            className="snap-center md:snap-start"
+          >
             <DestinationCard index={i} {...dest} />
           </div>
         ))}
         <div className="w-4 flex-shrink-0" aria-hidden />
+      </div>
+
+      <div className="relative z-10 -mt-12 flex justify-center gap-2 px-[var(--section-padding-x)] pb-12 md:hidden">
+        {destinations.map((destination, i) => (
+          <button
+            key={destination.slug}
+            type="button"
+            aria-label={`Show ${destination.name}`}
+            aria-current={activeIndex === i ? "true" : undefined}
+            onClick={() => scrollToDestination(i)}
+            className={`h-1.5 rounded-full transition-all duration-300 ${
+              activeIndex === i ? "w-7 bg-gold-primary" : "w-1.5 bg-ivory/28"
+            }`}
+          />
+        ))}
       </div>
     </section>
   );
