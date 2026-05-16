@@ -11,6 +11,12 @@ import {
   Wallet,
 } from "lucide-react";
 
+import {
+  OrnamentRule,
+  SectionEyebrow,
+  SectionHeader,
+} from "@/components/marketing/shared/marketing-primitives";
+
 const steps = [
   {
     title: "Frame the atmosphere",
@@ -66,7 +72,6 @@ export function JourneySteps() {
     <section
       id="how-it-works"
       className="relative bg-ivory px-[var(--section-padding-x)] py-[var(--section-padding-y)] text-charcoal overflow-hidden"
-      aria-labelledby="how-it-works-heading"
     >
       {/* Subtle dot pattern background */}
       <div className="absolute inset-0 dot-pattern opacity-40 pointer-events-none" />
@@ -88,104 +93,88 @@ export function JourneySteps() {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="mb-14 text-center md:mb-20"
         >
-          <p className="font-accent text-[11px] uppercase tracking-[0.3em] text-gold-primary mb-4">
-            Chapter 02 · How it works
-          </p>
-          <h2
-            id="how-it-works-heading"
-            className="font-display text-[length:var(--text-h1)] leading-tight text-charcoal"
-          >
-            The planning unfolds in five deliberate acts.
-          </h2>
-          <p className="font-sans mx-auto mt-4 max-w-2xl text-[length:var(--text-body)] text-slate">
-            Each act reduces noise, strengthens taste, and keeps the wedding readable from the
-            first brief through the final dance.
-          </p>
-          {/* Gold divider with ornament */}
-          <div className="mx-auto mt-8 flex max-w-[180px] items-center gap-2">
-            <span className="h-px flex-1 bg-gradient-to-r from-transparent to-gold-primary/40" />
-            <span className="inline-block h-1.5 w-1.5 rotate-45 bg-gold-primary/55" />
-            <span className="h-px flex-1 bg-gradient-to-l from-transparent to-gold-primary/40" />
-          </div>
+          <SectionHeader
+            chapter="03"
+            eyebrow="How it works"
+            title="The planning unfolds in five deliberate acts."
+            intro="Each act reduces noise, strengthens taste, and keeps the wedding readable from the first brief through the final dance."
+            align="center"
+          />
         </motion.div>
 
-        {/* Central vertical thread */}
-        <div className="hidden md:block absolute left-1/2 top-[280px] bottom-[120px] w-[1px] -translate-x-1/2 bg-gradient-to-b from-transparent via-gold-primary/15 to-transparent z-0" />
+        <div className="relative">
+          {/* Central vertical thread */}
+          <div className="absolute inset-y-12 left-1/2 z-0 hidden w-px -translate-x-1/2 bg-gradient-to-b from-transparent via-gold-primary/15 to-transparent md:block" />
 
-        <motion.ol
-          className="relative list-none pl-0 flex flex-col gap-12 md:gap-20"
-          variants={container}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.15 }}
-        >
-          {steps.map((step, index) => {
-            const Icon = step.icon;
-            const isRight = index % 2 === 1;
+          <motion.ol
+            className="relative z-10 list-none pl-0 flex flex-col gap-12 md:gap-20"
+            variants={container}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.15 }}
+          >
+            {steps.map((step, index) => {
+              const Icon = step.icon;
+              const isRight = index % 2 === 1;
 
-            return (
-              <motion.li
-                key={step.title}
-                variants={itemVariants}
-                className={`flex flex-col gap-6 md:flex-row md:items-center md:gap-16 ${
-                  isRight ? "md:flex-row-reverse" : ""
-                }`}
-              >
-                <div
-                  className={`flex flex-1 flex-col gap-3 ${
-                    isRight ? "md:text-right" : "md:text-left"
+              return (
+                <motion.li
+                  key={step.title}
+                  variants={itemVariants}
+                  className={`flex flex-col-reverse gap-3 md:items-center md:gap-6 ${
+                    isRight ? "md:flex-row-reverse" : "md:flex-row"
                   }`}
                 >
-                  {/* Large ghost step number */}
-                  <span className="font-display text-5xl font-bold text-gold-primary/[0.08] leading-none select-none">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                  <p
-                    className={`font-accent text-[10px] uppercase tracking-[0.28em] text-gold-dark ${
-                      isRight ? "md:self-end" : ""
+                  <div
+                    className={`flex flex-1 flex-col gap-3 ${
+                      isRight ? "md:text-right" : "md:text-left"
                     }`}
                   >
-                    Act {String(index + 1).padStart(2, "0")}
-                  </p>
-                  <h3 className="font-display text-[length:var(--text-h2)] text-charcoal -mt-2">
-                    {step.title}
-                  </h3>
-                  <p className="font-sans text-[length:var(--text-body)] leading-relaxed text-slate">
-                    {step.body}
-                  </p>
-                </div>
-
-                <div
-                  className={`flex shrink-0 justify-center md:w-[280px] ${
-                    isRight ? "md:justify-start" : "md:justify-end"
-                  }`}
-                >
-                  <div className="group relative flex h-28 w-28 items-center justify-center border border-gold-primary/20 bg-cream/60 transition-all duration-500 hover:border-gold-primary/40 hover:bg-cream">
-                    {/* Inner glow */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-gold-light/20 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
-                    {/* Corner accents */}
-                    <div className="absolute top-0 left-0 h-3 w-[1px] bg-gold-primary/30" />
-                    <div className="absolute top-0 left-0 h-[1px] w-3 bg-gold-primary/30" />
-                    <div className="absolute bottom-0 right-0 h-3 w-[1px] bg-gold-primary/30" />
-                    <div className="absolute bottom-0 right-0 h-[1px] w-3 bg-gold-primary/30" />
-                    <Icon
-                      className="relative h-10 w-10 text-gold-dark transition-colors duration-300 group-hover:text-gold-primary"
-                      strokeWidth={1.25}
-                      aria-hidden
+                    {/* Large ghost step number */}
+                    <span className="font-display text-5xl font-bold text-gold-primary/[0.08] leading-none select-none">
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+                    <SectionEyebrow
+                      size="sm"
+                      label={`Act ${String(index + 1).padStart(2, "0")}`}
+                      className={isRight ? "md:self-end" : undefined}
                     />
+                    <h3 className="font-display text-[length:var(--text-h2)] text-charcoal -mt-2">
+                      {step.title}
+                    </h3>
+                    <p className="font-sans text-[length:var(--text-body)] leading-relaxed text-slate">
+                      {step.body}
+                    </p>
                   </div>
-                </div>
-              </motion.li>
-            );
-          })}
-        </motion.ol>
+
+                  <div
+                    className={`flex shrink-0 justify-center md:w-[280px] ${
+                      isRight ? "md:justify-start" : "md:justify-end"
+                    }`}
+                  >
+                    <div className="group relative flex h-16 w-16 items-center justify-center border border-gold-primary/20 bg-cream/60 transition-all duration-500 hover:border-gold-primary/40 hover:bg-cream md:h-28 md:w-28">
+                      {/* Inner glow */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-gold-light/20 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+                      {/* Corner accents */}
+                      <div className="absolute top-0 left-0 h-3 w-[1px] bg-gold-primary/30" />
+                      <div className="absolute top-0 left-0 h-[1px] w-3 bg-gold-primary/30" />
+                      <div className="absolute bottom-0 right-0 h-3 w-[1px] bg-gold-primary/30" />
+                      <div className="absolute bottom-0 right-0 h-[1px] w-3 bg-gold-primary/30" />
+                      <Icon
+                        className="relative h-6 w-6 text-gold-dark transition-colors duration-300 group-hover:text-gold-primary md:h-10 md:w-10"
+                        strokeWidth={1.25}
+                        aria-hidden
+                      />
+                    </div>
+                  </div>
+                </motion.li>
+              );
+            })}
+          </motion.ol>
+        </div>
 
         <div className="mt-20 flex flex-col items-center gap-6 text-center md:mt-28">
-          <div className="flex items-center gap-2">
-            <span className="h-px w-10 bg-gradient-to-r from-transparent to-gold-primary/50" />
-            <span className="inline-block h-1.5 w-1.5 rotate-45 bg-gold-primary/55" />
-            <span className="h-px w-10 bg-gradient-to-l from-transparent to-gold-primary/50" />
-          </div>
+          <OrnamentRule align="center" width={96} />
           <p className="max-w-xl font-heading text-base leading-relaxed text-slate">
             Once these five acts hold together, the planning surface itself starts
             doing the heavy lifting — vendors, budget, and the weekend programme
@@ -195,7 +184,7 @@ export function JourneySteps() {
             href="/contact"
             className="font-accent inline-flex items-center gap-2 border border-gold-primary px-6 py-3 text-[11px] uppercase tracking-[0.22em] text-gold-primary transition-colors hover:bg-gold-primary hover:text-midnight"
           >
-            Begin Act One
+            Begin the planning
             <ArrowUpRight className="h-3.5 w-3.5" />
           </Link>
         </div>
