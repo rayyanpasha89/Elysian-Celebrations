@@ -137,7 +137,7 @@ function AtmosphereGallery() {
   ];
 
   return (
-    <section className="relative overflow-hidden bg-ivory px-[var(--section-padding-x)] py-[calc(var(--section-padding-y)*0.95)]">
+    <section className="relative overflow-hidden bg-ivory px-[var(--section-padding-x)] py-12 md:py-[calc(var(--section-padding-y)*0.95)]">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(201,169,110,0.08),transparent_24%),radial-gradient(circle_at_82%_26%,rgba(123,167,201,0.07),transparent_26%)]" />
       <div className="relative z-10 mx-auto max-w-7xl">
         <div className="mb-10 grid gap-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-end">
@@ -162,6 +162,8 @@ function AtmosphereGallery() {
               key={moment.title}
               className={cn(
                 "group",
+                index === 0 && "hidden sm:block",
+                index === 1 && "hidden lg:block",
                 index === 2 && "sm:col-span-2 lg:col-span-1"
               )}
             >
