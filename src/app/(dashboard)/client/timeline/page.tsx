@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer, staggerItem } from "@/animations/variants";
-import { ListEmptyState } from "@/components/dashboard/list-empty-state";
 import { dashBtn, dashCard, dashLabel } from "@/lib/dashboard-styles";
 import { cn } from "@/lib/utils";
 
@@ -230,7 +230,25 @@ export default function ClientTimelinePage() {
 
       {tasks.length === 0 ? (
         <div className="mt-12">
-          <ListEmptyState hint="Add tasks to plan your wedding timeline." />
+          <div className="border border-dashed border-gold-primary/30 bg-gold-primary/8 p-5">
+            <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-gold-dark">
+              What to do next
+            </p>
+            <h3 className="mt-2 font-display text-xl text-charcoal">
+              Add a wedding day and event first.
+            </h3>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-charcoal">
+              Your timeline becomes useful once it has real event anchors. Build
+              Day 1, add the first ceremony or dinner, then tasks can attach to
+              the actual flow.
+            </p>
+            <Link
+              href="/client/wedding"
+              className="mt-4 inline-flex font-accent text-[10px] uppercase tracking-[0.18em] text-gold-primary hover:text-gold-dark"
+            >
+              Add wedding day →
+            </Link>
+          </div>
         </div>
       ) : (
         <motion.div variants={fadeUp} className="relative mt-14">

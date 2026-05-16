@@ -266,13 +266,19 @@ export default function ClientDashboard() {
             </div>
 
             {tasks.length === 0 ? (
-              <div className="border border-dashed border-charcoal/12 bg-cream/30 px-5 py-8 text-center">
-                <p className="font-heading text-sm text-slate">No tasks yet.</p>
+              <div className="border border-dashed border-gold-primary/30 bg-gold-primary/8 px-5 py-6">
+                <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-gold-dark">
+                  What to do next
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-charcoal">
+                  Add your first wedding day and event, then this timeline starts
+                  showing the tasks that actually move the weekend forward.
+                </p>
                 <Link
-                  href="/client/timeline"
-                  className="mt-3 inline-block font-accent text-[10px] uppercase tracking-[0.18em] text-gold-primary"
+                  href="/client/wedding"
+                  className="mt-4 inline-flex font-accent text-[10px] uppercase tracking-[0.18em] text-gold-primary hover:text-gold-dark"
                 >
-                  Add your first task
+                  Start the wedding plan →
                 </Link>
               </div>
             ) : (

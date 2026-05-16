@@ -281,7 +281,30 @@ export default function ClientGuestsPage() {
       </motion.div>
 
       {filtered.length === 0 ? (
-        <ListEmptyState hint="Add guests to your list or complete onboarding to create a guest list." />
+        counts.total === 0 ? (
+          <div className="mt-6 border border-dashed border-gold-primary/30 bg-gold-primary/8 p-5">
+            <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-gold-dark">
+              What to do next
+            </p>
+            <h3 className="mt-2 font-display text-xl text-charcoal">
+              Add your first 10 guests.
+            </h3>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-charcoal">
+              Start with the people who shape the weekend: immediate family,
+              closest friends, and anyone whose travel or meal preference affects
+              the plan early.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowForm(true)}
+              className="mt-4 inline-flex font-accent text-[10px] uppercase tracking-[0.18em] text-gold-primary hover:text-gold-dark"
+            >
+              Add first guest →
+            </button>
+          </div>
+        ) : (
+          <ListEmptyState hint="No guests match this RSVP filter yet." />
+        )
       ) : (
         <motion.div variants={fadeUp} className="scrollbar-elysian mt-6 overflow-x-auto">
           <table className="w-full min-w-[640px] border-collapse text-left">
