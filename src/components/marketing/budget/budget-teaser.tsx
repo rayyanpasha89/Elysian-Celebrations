@@ -224,7 +224,7 @@ export function BudgetTeaser() {
               </div>
 
               <MagneticButton href="/client/budget" className="w-full justify-center gap-2 text-xs">
-                Build your full budget
+                Open the budget canvas
                 <ArrowRight size={14} />
               </MagneticButton>
             </div>

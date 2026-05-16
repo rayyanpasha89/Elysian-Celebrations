@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Check } from "lucide-react";
+import { ArrowUpRight, Check } from "lucide-react";
 import { fadeUp, staggerContainer, staggerItem } from "@/animations/variants";
 import { useInViewAnimation } from "@/hooks/use-in-view-animation";
 import { AnimatedCounter } from "@/components/shared/animated-counter";
+import { SectionHeader } from "@/components/marketing/shared/marketing-primitives";
 import { cn } from "@/lib/utils";
 
 const packages = [
@@ -81,7 +81,7 @@ type PackageSectionProps = {
 
 export function PackageSection({
   showHeader = true,
-  eyebrow = "Chapter 03 · Curated offerings",
+  eyebrow = "Curated offerings",
   title = "Packages designed like a collection, not a price list.",
   subtitle =
     "Every tier starts with a clear editorial shape, then expands into the exact mix of design, logistics, and celebration support your weekend needs.",
@@ -100,25 +100,15 @@ export function PackageSection({
             variants={fadeUp}
             initial="hidden"
             animate={isInView ? "visible" : "hidden"}
-            className="relative mb-16 text-center"
+            className="relative mb-16"
           >
-            <p className="font-accent mb-4 text-xs uppercase tracking-[0.3em] text-gold-primary">
-              {eyebrow}
-            </p>
-            <h2
-              className="mx-auto max-w-4xl font-display font-bold text-charcoal"
-              style={{ fontSize: "var(--text-display)" }}
-            >
-              {title}
-            </h2>
-            <p className="font-heading mx-auto mt-4 max-w-3xl text-lg font-light leading-relaxed text-slate">
-              {subtitle}
-            </p>
-            <div className="mx-auto mt-8 flex max-w-[180px] items-center gap-2">
-              <span className="h-px flex-1 bg-gradient-to-r from-transparent to-gold-primary/40" />
-              <span className="inline-block h-1.5 w-1.5 rotate-45 bg-gold-primary/55" />
-              <span className="h-px flex-1 bg-gradient-to-l from-transparent to-gold-primary/40" />
-            </div>
+            <SectionHeader
+              chapter="04"
+              eyebrow={eyebrow}
+              title={title}
+              intro={subtitle}
+              align="center"
+            />
           </motion.div>
         )}
 
@@ -145,36 +135,14 @@ function PackageCard({
   pkg: (typeof packages)[0];
   isInView: boolean;
 }) {
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const [isHovered, setIsHovered] = useState(false);
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 2;
-    const y = ((e.clientY - rect.top) / rect.height - 0.5) * 2;
-    setMousePos({ x, y });
-  };
-
   return (
     <motion.div
       variants={staggerItem}
-      onMouseMove={handleMouseMove}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => {
-        setIsHovered(false);
-        setMousePos({ x: 0, y: 0 });
-      }}
-      style={{
-        transform: isHovered
-          ? `perspective(1000px) rotateX(${-mousePos.y * 5}deg) rotateY(${mousePos.x * 5}deg)`
-          : "perspective(1000px) rotateX(0deg) rotateY(0deg)",
-        transition: "transform 0.2s ease-out",
-      }}
       className={cn(
-        "relative overflow-hidden p-0 transition-shadow duration-300",
+        "group relative overflow-hidden p-0 transition-all duration-500",
         pkg.featured
-          ? "bg-ivory shadow-[0_36px_100px_rgba(26,26,46,0.14)] ring-1 ring-gold-primary/30 md:-mt-4 md:mb-4"
-          : "border border-charcoal/5 bg-cream/80 shadow-[0_18px_60px_rgba(26,26,46,0.06)] hover:shadow-[0_28px_80px_rgba(26,26,46,0.09)]"
+          ? "bg-ivory shadow-[0_36px_100px_rgba(26,26,46,0.14)] ring-1 ring-gold-primary/30 hover:shadow-[0_44px_120px_rgba(26,26,46,0.18)] md:-mt-4 md:mb-4"
+          : "border border-charcoal/5 bg-cream/80 shadow-[0_18px_60px_rgba(26,26,46,0.06)] hover:-translate-y-1 hover:shadow-[0_30px_80px_rgba(26,26,46,0.1)]"
       )}
     >
       <div className="relative">
@@ -186,21 +154,18 @@ function PackageCard({
         >
           <div className="flex h-full min-h-[200px] flex-col justify-between p-5 text-ivory">
             <div className="flex items-start justify-between gap-4">
-              <div className="border border-white/12 bg-midnight/35 px-3 py-2 backdrop-blur-md">
-                <p className="font-accent text-[9px] uppercase tracking-[0.22em] text-gold-light">
-                  Tier {pkg.tier}
-                </p>
-                {pkg.featured && (
-                  <p className="mt-1 font-accent text-[9px] uppercase tracking-[0.18em] text-ivory/75">
-                    Recommended
-                  </p>
-                )}
-              </div>
-              <div className="max-w-[8rem] border border-white/12 bg-midnight/35 px-3 py-2 text-right backdrop-blur-md">
-                <p className="font-accent text-[9px] uppercase tracking-[0.18em] text-gold-light">
+              {pkg.featured ? (
+                <span className="border border-gold-primary/55 bg-gold-primary/20 px-3 py-1.5 font-accent text-[10px] uppercase tracking-[0.22em] text-gold-light backdrop-blur-md">
+                  Recommended
+                </span>
+              ) : (
+                <span />
+              )}
+              <div className="text-right">
+                <p className="font-accent text-[9px] uppercase tracking-[0.18em] text-gold-light/85">
                   Starting from
                 </p>
-                <p className="mt-1 font-display text-xl">
+                <p className="mt-1 font-display text-xl text-ivory">
                   <AnimatedCounter
                     target={pkg.startingPrice}
                     prefix="₹"
@@ -210,14 +175,17 @@ function PackageCard({
               </div>
             </div>
 
-            <div className="max-w-[18rem]">
-              <h3 className="font-display text-3xl leading-none text-ivory">
+            <div className="max-w-[20rem]">
+              <p className="font-accent text-[10px] uppercase tracking-[0.24em] text-gold-light/80">
+                Tier {pkg.tier}
+              </p>
+              <h3 className="mt-2 font-display text-3xl leading-none text-ivory">
                 {pkg.name}
               </h3>
               <p className="mt-2 font-accent text-[10px] uppercase tracking-[0.2em] text-gold-light/85">
                 {pkg.tagline}
               </p>
-              <p className="mt-3 text-sm leading-relaxed text-ivory/76">
+              <p className="mt-3 text-sm leading-relaxed text-ivory/78">
                 {pkg.mood}
               </p>
             </div>
@@ -253,13 +221,14 @@ function PackageCard({
         <Link
           href={`/contact?tier=${pkg.name.toLowerCase()}`}
           className={cn(
-            "block w-full py-3.5 text-center font-accent text-[11px] uppercase tracking-[0.2em] transition-all duration-500",
+            "inline-flex w-full items-center justify-center gap-2 py-3.5 text-center font-accent text-[11px] uppercase tracking-[0.2em] transition-all duration-500",
             pkg.featured
               ? "border border-gold-primary bg-transparent text-gold-primary hover:bg-gold-primary hover:text-midnight"
               : "border border-charcoal/20 bg-transparent text-charcoal hover:border-charcoal hover:bg-charcoal hover:text-ivory"
           )}
         >
           Shape this tier with us
+          <ArrowUpRight className="h-3.5 w-3.5" />
         </Link>
       </div>
     </motion.div>

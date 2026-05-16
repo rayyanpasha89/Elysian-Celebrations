@@ -78,8 +78,8 @@ export default function HomePage() {
 
               <div className="mt-8 grid gap-4">
                 {[
-                  "A first response built around destination fit and scale",
-                  "Early budget direction before the scope loses shape",
+                  "A first response shaped around destination fit",
+                  "Budget direction before the scope can drift",
                   "Vendor curation that already reflects your taste",
                 ].map((point) => (
                   <div

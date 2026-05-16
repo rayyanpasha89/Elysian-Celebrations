@@ -79,13 +79,13 @@ export function HeroSection() {
             className="mt-10 flex flex-col gap-5 sm:flex-row sm:flex-wrap sm:items-center"
           >
             <MagneticButton href="#destinations" className="px-10 py-4 text-sm">
-              Explore Destinations
+              Map our destinations
             </MagneticButton>
             <a
               href="#how-it-works"
               className="group inline-flex items-center gap-3 font-accent text-[11px] uppercase tracking-[0.24em] text-ivory/68 transition-colors hover:text-gold-primary"
             >
-              See the planning flow
+              Walk the five acts
               <span className="h-px w-10 bg-current transition-all duration-500 group-hover:w-16" />
             </a>
           </motion.div>
