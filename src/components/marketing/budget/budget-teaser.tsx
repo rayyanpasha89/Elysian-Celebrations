@@ -7,6 +7,7 @@ import { fadeLeft, fadeRight } from "@/animations/variants";
 import { useInViewAnimation } from "@/hooks/use-in-view-animation";
 import { AnimatedCounter } from "@/components/shared/animated-counter";
 import { MagneticButton } from "@/components/shared/magnetic-button";
+import { SectionHeader } from "@/components/marketing/shared/marketing-primitives";
 import { formatCurrency } from "@/lib/utils";
 
 const budgetBreakdown = [
@@ -66,27 +67,21 @@ export function BudgetTeaser() {
             initial="hidden"
             animate={isInView ? "visible" : "hidden"}
           >
-            <p className="mb-4 font-accent text-[11px] uppercase tracking-[0.3em] text-gold-primary">
-              Chapter 05 · Investment planning
-            </p>
-            <h2
-              className="mb-6 font-display font-bold leading-[0.96] text-charcoal"
-              style={{ fontSize: "var(--text-h1)" }}
-            >
-              Shape the budget
-              <br />
-              <span className="text-gold-primary">before the details scatter.</span>
-            </h2>
-            <div className="mb-6 flex items-center gap-2">
-              <span className="h-px w-10 bg-gradient-to-r from-transparent to-gold-primary/45" />
-              <span className="inline-block h-1.5 w-1.5 rotate-45 bg-gold-primary/55" />
-              <span className="h-px w-10 bg-gradient-to-l from-transparent to-gold-primary/45" />
-            </div>
-            <p className="mb-8 max-w-xl font-heading text-lg font-light leading-relaxed text-slate">
-              This is the planning surface where the celebration becomes legible:
-              target allocations, real quotes, and visible spend move together so
-              the experience stays intentional instead of improvised.
-            </p>
+            <SectionHeader
+              chapter="06"
+              eyebrow="Investment planning"
+              title={
+                <>
+                  Shape the budget
+                  <br />
+                  <span className="text-gold-primary">before the details scatter.</span>
+                </>
+              }
+              intro="This is the planning surface where the celebration becomes legible: target allocations, real quotes, and visible spend move together so the experience stays intentional instead of improvised."
+              align="start"
+              titleMaxWidth="max-w-xl"
+              className="mb-8"
+            />
 
             <div className="grid gap-4 sm:grid-cols-3">
               {budgetNotes.map(({ icon: Icon, title, body }) => (
@@ -150,6 +145,7 @@ export function BudgetTeaser() {
             variants={fadeRight}
             initial="hidden"
             animate={isInView ? "visible" : "hidden"}
+            className="grid gap-5"
           >
             <div className="overflow-hidden border border-gold-primary/15 bg-cream shadow-[0_28px_100px_rgba(26,26,46,0.12)]">
               <div
@@ -168,97 +164,69 @@ export function BudgetTeaser() {
                 </div>
                 <div className="absolute bottom-5 left-5 right-5 grid gap-3 sm:grid-cols-3">
                   {[
-                    `${guestCount} guests`,
-                    formatCurrency(estimatedTotal),
-                    "Quote-aware planning",
+                    { label: "Guest frame", value: `${guestCount} guests` },
+                    { label: "Current estimate", value: formatCurrency(estimatedTotal) },
+                    { label: "Forecast", value: formatCurrency(estimatedTotal) },
                   ].map((item) => (
                     <div
-                      key={item}
+                      key={item.label}
                       className="border border-white/12 bg-midnight/45 px-3 py-2 text-center text-ivory backdrop-blur-md"
                     >
                       <p className="font-accent text-[9px] uppercase tracking-[0.18em] text-gold-light/85">
-                        {item === `${guestCount} guests` ? "Guest frame" : item === formatCurrency(estimatedTotal) ? "Current estimate" : "Workflow"}
+                        {item.label}
                       </p>
-                      <p className="mt-1 text-sm text-ivory/82">{item}</p>
+                      <p className="mt-1 text-sm text-ivory/82">{item.value}</p>
                     </div>
                   ))}
                 </div>
               </div>
+            </div>
 
-              <div className="p-7 md:p-8">
-                <div className="mb-6 flex items-center justify-between gap-4">
-                  <div>
-                    <span className="font-accent text-[10px] uppercase tracking-[0.3em] text-gold-primary/55">
-                      Interactive preview
-                    </span>
-                    <h3 className="mt-1 font-display text-2xl font-semibold text-charcoal">
-                      Quick estimate
-                    </h3>
-                  </div>
-                  <span className="border border-gold-primary/15 bg-gold-primary/8 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-gold-dark">
-                    Live
+            <div className="border border-gold-primary/15 bg-cream p-7 shadow-[0_28px_100px_rgba(26,26,46,0.1)] md:p-8">
+              <div className="mb-8">
+                <div className="mb-3 flex items-center justify-between">
+                  <label className="font-accent text-xs uppercase tracking-[0.15em] text-slate">
+                    Guest count
+                  </label>
+                  <span className="font-display text-2xl font-bold text-charcoal">
+                    {guestCount}
                   </span>
                 </div>
-
-                <div className="mb-8">
-                  <div className="mb-3 flex items-center justify-between">
-                    <label className="font-accent text-xs uppercase tracking-[0.15em] text-slate">
-                      Guest count
-                    </label>
-                    <span className="font-display text-2xl font-bold text-charcoal">
-                      {guestCount}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min={50}
-                    max={500}
-                    step={10}
-                    value={guestCount}
-                    onChange={(e) => setGuestCount(Number(e.target.value))}
-                    className="h-[2px] w-full appearance-none bg-gold-light/30 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:bg-gold-primary [&::-webkit-slider-thumb]:shadow-[var(--shadow-gold)]"
-                  />
-                  <div className="mt-1 flex justify-between text-[10px] font-accent text-slate/50">
-                    <span>50</span>
-                    <span>500</span>
-                  </div>
+                <input
+                  type="range"
+                  min={50}
+                  max={500}
+                  step={10}
+                  value={guestCount}
+                  onChange={(e) => setGuestCount(Number(e.target.value))}
+                  className="h-[2px] w-full appearance-none bg-gold-light/30 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:bg-gold-primary [&::-webkit-slider-thumb]:shadow-[var(--shadow-gold)]"
+                />
+                <div className="mt-1 flex justify-between text-[10px] font-accent text-slate/50">
+                  <span>50</span>
+                  <span>500</span>
                 </div>
+              </div>
 
-                <div className="mb-6 border border-gold-primary/12 bg-ivory p-6 text-center shadow-[0_18px_50px_rgba(26,26,46,0.05)]">
-                  <p className="mb-2 font-accent text-xs uppercase tracking-[0.2em] text-slate">
-                    Estimated starting from
-                  </p>
-                  <div className="font-display text-4xl font-bold text-charcoal">
+              <div className="mb-6 border border-gold-primary/12 bg-ivory p-6 text-center shadow-[0_18px_50px_rgba(26,26,46,0.05)]">
+                <p className="mb-2 font-accent text-xs uppercase tracking-[0.2em] text-slate">
+                  Estimated starting from
+                </p>
+                <div className="font-display text-4xl font-bold text-charcoal">
                   <AnimatedCounter
                     target={estimatedTotal}
                     duration={0.8}
                     formatter={(val) => formatCurrency(val)}
                   />
                 </div>
-                  <p className="mt-2 text-xs text-slate/60">
-                    A directional estimate based on the current guest frame.
-                  </p>
-                </div>
-
-                <div className="mb-6 grid gap-3 sm:grid-cols-3">
-                  {budgetNotes.map(({ icon: Icon, title }) => (
-                    <div
-                      key={title}
-                      className="flex items-center gap-3 border border-charcoal/8 bg-white/72 p-3"
-                    >
-                      <div className="flex h-10 w-10 items-center justify-center border border-gold-primary/18 bg-gold-primary/10 text-gold-dark">
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <p className="text-sm leading-snug text-charcoal">{title}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <MagneticButton href="/client/budget" className="w-full justify-center gap-2 text-xs">
-                  Build your full budget
-                  <ArrowRight size={14} />
-                </MagneticButton>
+                <p className="mt-2 text-xs text-slate/60">
+                  A directional estimate based on the current guest frame.
+                </p>
               </div>
+
+              <MagneticButton href="/client/budget" className="w-full justify-center gap-2 text-xs">
+                Build your full budget
+                <ArrowRight size={14} />
+              </MagneticButton>
             </div>
           </motion.div>
         </div>

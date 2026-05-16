@@ -1,26 +1,29 @@
 "use client";
 
 import { useRef, type ReactNode } from "react";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import { CalendarDays, Layers3, WalletCards } from "lucide-react";
+// `WalletCards` is used by SignalCard below. Hero no longer renders the
+// secondary `FeaturePlane`, keeping the right-rail to 3 visual planes.
 import { MagneticButton } from "@/components/shared/magnetic-button";
 import { MARKETING_IMAGES } from "@/lib/marketing-images";
 import { cn } from "@/lib/utils";
 
 export function HeroSection() {
   const sectionRef = useRef<HTMLDivElement>(null);
+  const prefersReducedMotion = useReducedMotion();
   const { scrollYProgress } = useScroll({
     target: sectionRef,
     offset: ["start start", "end start"],
   });
 
-  const backgroundY = useTransform(scrollYProgress, [0, 1], ["0%", "24%"]);
+  const backgroundY = useTransform(scrollYProgress, [0, 1], ["0%", "16%"]);
   const contentOpacity = useTransform(scrollYProgress, [0, 0.45], [1, 0.2]);
-  const contentY = useTransform(scrollYProgress, [0, 0.45], [0, -48]);
-  const stageY = useTransform(scrollYProgress, [0, 1], [0, 80]);
-  const stageRotateX = useTransform(scrollYProgress, [0, 1], [18, 8]);
-  const stageRotateY = useTransform(scrollYProgress, [0, 1], [-18, -8]);
-  const haloScale = useTransform(scrollYProgress, [0, 1], [1, 1.25]);
+  const contentY = useTransform(scrollYProgress, [0, 0.45], [0, -32]);
+  const stageY = useTransform(scrollYProgress, [0, 1], [0, 48]);
+  const stageRotateX = useTransform(scrollYProgress, [0, 1], [11, 5]);
+  const stageRotateY = useTransform(scrollYProgress, [0, 1], [-11, -5]);
+  const haloScale = useTransform(scrollYProgress, [0, 1], [1, 1.18]);
 
   return (
     <section
@@ -44,9 +47,13 @@ export function HeroSection() {
       <div className="relative z-10 mx-auto grid min-h-screen max-w-[1500px] gap-14 px-[var(--section-padding-x)] py-[calc(var(--section-padding-y)*1.15)] lg:grid-cols-[minmax(0,1fr)_minmax(420px,640px)] lg:items-center">
         <motion.div style={{ opacity: contentOpacity, y: contentY }} className="max-w-3xl">
           <motion.p
-            initial={{ opacity: 0, y: 18 }}
+            initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            transition={
+              prefersReducedMotion
+                ? { duration: 0 }
+                : { duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }
+            }
             className="font-accent text-xs uppercase tracking-[0.42em] text-gold-light"
           >
             Destination Weddings, Reframed
@@ -87,7 +94,7 @@ export function HeroSection() {
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 2.2, ease: [0.16, 1, 0.3, 1] }}
-            className="mt-12 grid gap-4 sm:grid-cols-3"
+            className="mt-12 grid items-stretch gap-4 sm:grid-cols-3"
           >
             <SignalCard
               icon={Layers3}
@@ -142,8 +149,8 @@ export function HeroSection() {
               <motion.div
                 animate={{ y: [0, -10, 0], rotateZ: [-1.4, 1, -1.4] }}
                 transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute left-[2%] top-[24%] w-[40%]"
-                style={{ transform: "translateZ(120px)" }}
+                className="absolute left-[2%] top-[22%] w-[40%] motion-reduce:animate-none"
+                style={{ transform: "translateZ(80px)" }}
               >
                 <PhotoPlane
                   eyebrow="Lakefront setting"
@@ -155,8 +162,8 @@ export function HeroSection() {
               <motion.div
                 animate={{ y: [0, 12, 0], rotateZ: [1.5, -1, 1.5] }}
                 transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 0.4 }}
-                className="absolute right-[0%] top-[10%] w-[34%]"
-                style={{ transform: "translateZ(190px)" }}
+                className="absolute right-[0%] top-[8%] w-[34%] motion-reduce:animate-none"
+                style={{ transform: "translateZ(120px)" }}
               >
                 <PhotoPlane
                   eyebrow="Portrait rhythm"
@@ -166,25 +173,10 @@ export function HeroSection() {
               </motion.div>
 
               <motion.div
-                animate={{ y: [0, 10, 0], rotateZ: [-1, 1.2, -1] }}
-                transition={{ duration: 7.5, repeat: Infinity, ease: "easeInOut", delay: 0.9 }}
-                className="absolute bottom-[14%] left-[9%] w-[31%]"
-                style={{ transform: "translateZ(210px)" }}
-              >
-                <FeaturePlane
-                  eyebrow="Budget architecture"
-                  title="Keep the spend readable"
-                  copy="Targets, quotes, and paid amounts stay visible while the design evolves."
-                  accent="from-gold-primary/55 via-gold-light/15 to-transparent"
-                  icon={WalletCards}
-                />
-              </motion.div>
-
-              <motion.div
                 animate={{ y: [0, -14, 0], rotateZ: [-1.4, 1.2, -1.4] }}
                 transition={{ duration: 9, repeat: Infinity, ease: "easeInOut", delay: 0.8 }}
-                className="absolute bottom-[5%] left-[24%] w-[58%]"
-                style={{ transform: "translateZ(240px)" }}
+                className="absolute bottom-[6%] left-[22%] w-[60%] motion-reduce:animate-none"
+                style={{ transform: "translateZ(160px)" }}
               >
                 <MainStageCard />
               </motion.div>
@@ -192,12 +184,12 @@ export function HeroSection() {
               <motion.div
                 animate={{ rotate: 360 }}
                 transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
-                className="absolute left-1/2 top-1/2 h-[84%] w-[84%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/8"
+                className="absolute left-1/2 top-1/2 h-[84%] w-[84%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/8 motion-reduce:animate-none"
               />
               <motion.div
                 animate={{ rotate: -360 }}
                 transition={{ duration: 24, repeat: Infinity, ease: "linear" }}
-                className="absolute left-1/2 top-1/2 h-[62%] w-[62%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-gold-primary/18"
+                className="absolute left-1/2 top-1/2 h-[62%] w-[62%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-gold-primary/18 motion-reduce:animate-none"
               />
             </motion.div>
           </div>
@@ -222,12 +214,12 @@ export function HeroSection() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 2.8, duration: 1 }}
-        className="absolute bottom-10 left-1/2 z-20 -translate-x-1/2"
+        className="absolute bottom-10 left-1/2 z-20 hidden -translate-x-1/2 lg:block"
       >
         <motion.div
           animate={{ y: [0, 8, 0] }}
           transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-          className="flex flex-col items-center gap-3"
+          className="flex flex-col items-center gap-3 motion-reduce:animate-none"
         >
           <span className="font-accent text-[10px] uppercase tracking-[0.3em] text-ivory/34">
             Scroll
@@ -274,24 +266,20 @@ function AnimatedLine({
         <span
           key={`${text}-${wordIndex}`}
           className="inline-flex overflow-hidden"
-          style={{ perspective: "1000px" }}
         >
-          {word.split("").map((char, charIndex) => (
-            <motion.span
-              key={`${word}-${charIndex}`}
-              initial={{ rotateX: 90, opacity: 0, y: "42%" }}
-              animate={{ rotateX: 0, opacity: 1, y: "0%" }}
-              transition={{
-                duration: 0.6,
-                delay: delay + (wordIndex * word.length + charIndex) * 0.04,
-                ease: [0.16, 1, 0.3, 1],
-              }}
-              className="inline-block"
-              style={{ transformOrigin: "bottom center" }}
-            >
-              {char}
-            </motion.span>
-          ))}
+          <motion.span
+            initial={{ opacity: 0, y: "32%" }}
+            animate={{ opacity: 1, y: "0%" }}
+            transition={{
+              duration: 0.55,
+              delay: delay + wordIndex * 0.07,
+              ease: [0.16, 1, 0.3, 1],
+            }}
+            className="inline-block"
+            style={{ transformOrigin: "bottom center" }}
+          >
+            {word}
+          </motion.span>
           <span className="inline-block w-[0.28em]" />
         </span>
       ))}
@@ -309,7 +297,7 @@ function SignalCard({
   value: string;
 }) {
   return (
-    <div className="border border-white/10 bg-white/[0.04] p-4 backdrop-blur-xl">
+    <div className="min-h-[88px] border border-white/10 bg-white/[0.04] p-4 backdrop-blur-xl">
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center border border-gold-primary/20 bg-gold-primary/10 text-gold-light">
           <Icon className="h-4 w-4" />
@@ -339,7 +327,7 @@ function FloatingTag({
       animate={{ y: [0, -8, 0] }}
       transition={{ duration: 6, delay, repeat: Infinity, ease: "easeInOut" }}
       className={cn(
-        "absolute z-20 border border-white/10 bg-white/[0.05] px-4 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-ivory/70 backdrop-blur-xl",
+        "absolute z-20 border border-white/10 bg-white/[0.05] px-4 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-ivory/70 backdrop-blur-xl motion-reduce:animate-none",
         className
       )}
       style={{ transform: "translateZ(320px)" }}
@@ -375,36 +363,6 @@ function PhotoPlane({
           {title}
         </h3>
       </div>
-    </div>
-  );
-}
-
-function FeaturePlane({
-  eyebrow,
-  title,
-  copy,
-  accent,
-  icon: Icon,
-}: {
-  eyebrow: string;
-  title: string;
-  copy: string;
-  accent: string;
-  icon: typeof Layers3;
-}) {
-  return (
-    <div className="relative overflow-hidden border border-white/10 bg-[rgba(250,247,242,0.92)] p-5 text-charcoal shadow-[0_30px_90px_rgba(0,0,0,0.22)]">
-      <div className={cn("absolute inset-x-0 top-0 h-1 bg-gradient-to-r", accent)} />
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center border border-charcoal/8 bg-charcoal/5 text-charcoal">
-          <Icon className="h-4 w-4" />
-        </div>
-        <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
-          {eyebrow}
-        </p>
-      </div>
-      <h3 className="mt-4 font-display text-xl leading-tight">{title}</h3>
-      <p className="mt-3 text-sm leading-relaxed text-slate">{copy}</p>
     </div>
   );
 }
