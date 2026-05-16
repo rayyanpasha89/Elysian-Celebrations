@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, Quote, Sparkles, Star } from "lucide-react";
+import { ChevronLeft, ChevronRight, Quote, Sparkles } from "lucide-react";
 import { fadeUp } from "@/animations/variants";
 import { useInViewAnimation } from "@/hooks/use-in-view-animation";
+import { usePrefersReducedMotion } from "@/hooks/use-media-query";
+import { SectionHeader } from "@/components/marketing/shared/marketing-primitives";
 import { cn } from "@/lib/utils";
 
 const testimonials = [
@@ -68,15 +70,19 @@ const trustSignals = [
 
 export function TestimonialCarousel() {
   const [current, setCurrent] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
   const { ref, isInView } = useInViewAnimation({ threshold: 0.2 });
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
+    if (prefersReducedMotion || isPaused) return;
+
     const timer = setInterval(() => {
       setCurrent((prev) => (prev + 1) % testimonials.length);
     }, 6500);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [isPaused, prefersReducedMotion]);
 
   const currentTestimonial = testimonials[current];
   const prev = () => setCurrent((c) => (c - 1 + testimonials.length) % testimonials.length);
@@ -107,25 +113,15 @@ export function TestimonialCarousel() {
           className="flex flex-col justify-between border border-white/10 bg-white/[0.04] p-6 shadow-[0_28px_100px_rgba(0,0,0,0.24)] backdrop-blur-2xl md:p-8"
         >
           <div>
-            <p className="font-accent text-[11px] uppercase tracking-[0.32em] text-gold-primary">
-              Chapter 06 · Couple notes
-            </p>
-            <h2
-              className="mt-5 max-w-xl font-display font-bold leading-[0.94] text-ivory"
-              style={{ fontSize: "var(--text-h1)" }}
-            >
-              Proof that the planning can feel as considered as the wedding itself.
-            </h2>
-            <div className="mt-5 flex items-center gap-2">
-              <span className="h-px w-10 bg-gradient-to-r from-transparent to-gold-primary/55" />
-              <span className="inline-block h-1.5 w-1.5 rotate-45 bg-gold-primary/60" />
-              <span className="h-px w-10 bg-gradient-to-l from-transparent to-gold-primary/55" />
-            </div>
-            <p className="mt-5 max-w-xl font-heading text-lg font-light leading-relaxed text-ivory/72">
-              Couples come to us for clarity, taste, and calm execution. These stories reflect the
-              real outcome: less noise, stronger direction, and a weekend that feels intentional in
-              every frame.
-            </p>
+            <SectionHeader
+              chapter="07"
+              eyebrow="Couple notes"
+              title="Proof that the planning can feel as considered as the wedding itself."
+              intro="Couples come to us for clarity, taste, and calm execution. These stories reflect the real outcome: less noise, stronger direction, and a weekend that feels intentional in every frame."
+              align="start"
+              tone="light"
+              titleMaxWidth="max-w-xl"
+            />
 
             <div className="mt-8 grid gap-3">
               {trustSignals.map((signal) => (
@@ -155,6 +151,10 @@ export function TestimonialCarousel() {
             initial="hidden"
             animate={isInView ? "visible" : "hidden"}
             className="relative overflow-hidden border border-white/10 bg-white/[0.03] shadow-[0_35px_120px_rgba(0,0,0,0.28)]"
+            onMouseEnter={() => setIsPaused(true)}
+            onMouseLeave={() => setIsPaused(false)}
+            onFocus={() => setIsPaused(true)}
+            onBlur={() => setIsPaused(false)}
           >
             <div className="absolute inset-0">
               <motion.div
@@ -165,9 +165,10 @@ export function TestimonialCarousel() {
                 transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
                 className="absolute inset-0 bg-cover bg-center"
                 style={{
-                  backgroundImage: `linear-gradient(180deg, rgba(16,16,27,0.16), rgba(16,16,27,0.84)), url(${currentTestimonial.image})`,
+                  backgroundImage: `url(${currentTestimonial.image})`,
                 }}
               />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(16,16,27,0.32),rgba(16,16,27,0.32))] md:bg-[linear-gradient(180deg,rgba(16,16,27,0.16),rgba(16,16,27,0.84))]" />
             </div>
 
             <div className="relative grid min-h-[38rem] gap-6 p-6 md:p-8 lg:grid-cols-[minmax(0,1.12fr)_minmax(280px,0.88fr)]">
@@ -192,7 +193,7 @@ export function TestimonialCarousel() {
                     className="max-w-3xl"
                   >
                     <div className="mb-8 h-px w-16 bg-gradient-to-r from-gold-primary/60 to-transparent" />
-                    <blockquote className="font-heading text-2xl font-light leading-[1.8] text-ivory/86 md:text-[1.6rem]">
+                    <blockquote className="font-heading text-2xl font-light leading-[1.8] text-ivory md:text-[1.6rem] md:text-ivory/86">
                       {currentTestimonial.quote}
                     </blockquote>
                   </motion.div>
@@ -205,10 +206,10 @@ export function TestimonialCarousel() {
                 </div>
               </div>
 
-              <div className="flex h-full flex-col justify-between border border-white/10 bg-midnight/45 p-4 backdrop-blur-md md:p-5">
+              <div className="flex h-full min-h-[14rem] flex-col justify-between border border-white/10 bg-midnight/45 p-4 backdrop-blur-md md:p-5">
                 <div className="relative overflow-hidden border border-white/10 bg-black/20">
                   <div
-                    className="min-h-[17rem] bg-cover bg-center"
+                    className="min-h-[14rem] bg-cover bg-center md:min-h-[17rem]"
                     style={{
                       backgroundImage: `linear-gradient(180deg, rgba(16,16,27,0.08), rgba(16,16,27,0.68)), url(${currentTestimonial.image})`,
                     }}
@@ -220,30 +221,6 @@ export function TestimonialCarousel() {
                     </p>
                     <p className="mt-1 text-sm leading-relaxed text-ivory/84">
                       {currentTestimonial.highlight}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid gap-3">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <MiniTrustCard
-                      eyebrow="Trust signal"
-                      title="Budget and direction aligned"
-                      body="The planning surface stayed readable even as the event grew more layered."
-                    />
-                    <MiniTrustCard
-                      eyebrow="Delivery"
-                      title="Calm on the day"
-                      body="The weekend moved in sequence instead of reacting to every small change."
-                    />
-                  </div>
-                  <div className="border border-white/10 bg-white/[0.04] px-4 py-4">
-                    <p className="font-accent text-[9px] uppercase tracking-[0.22em] text-gold-light">
-                      What the couple noticed
-                    </p>
-                    <p className="mt-2 text-sm leading-relaxed text-ivory/72">
-                      Less back-and-forth, more confidence, and a final result that looked as good as
-                      it felt to plan.
                     </p>
                   </div>
                 </div>
@@ -276,11 +253,6 @@ export function TestimonialCarousel() {
               >
                 <ChevronLeft size={16} />
               </button>
-
-              <div className="flex items-center gap-2 border border-white/10 bg-white/[0.03] px-4 py-2 text-[10px] uppercase tracking-[0.22em] text-ivory/54">
-                <Star className="h-3.5 w-3.5 text-gold-primary" />
-                Auto-advancing story reel
-              </div>
 
               <button
                 type="button"
@@ -316,26 +288,6 @@ function StatPill({ label, value }: { label: string; value: string }) {
         {label}
       </p>
       <p className="mt-1 text-sm leading-relaxed text-ivory/82">{value}</p>
-    </div>
-  );
-}
-
-function MiniTrustCard({
-  eyebrow,
-  title,
-  body,
-}: {
-  eyebrow: string;
-  title: string;
-  body: string;
-}) {
-  return (
-    <div className="border border-white/10 bg-white/[0.035] p-4">
-      <p className="font-accent text-[9px] uppercase tracking-[0.2em] text-gold-light">
-        {eyebrow}
-      </p>
-      <p className="mt-2 font-display text-lg text-ivory">{title}</p>
-      <p className="mt-2 text-sm leading-relaxed text-ivory/68">{body}</p>
     </div>
   );
 }
