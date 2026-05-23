@@ -24,6 +24,8 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
   - `20260512000200_link_budget_items_to_events.sql`
   - `20260514000100_deepen_vendor_offerings.sql`
   - `20260514000200_add_message_thread_reads.sql`
+  - `20260601000100_add_vendor_service_item_media.sql`
+  - `20260601000200_enable_message_realtime.sql`
 - Remote table/column checks passed for:
   - `wedding_event_menus`
   - `wedding_event_menu_items`
@@ -31,10 +33,17 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
   - `wedding_event_tasks`
   - `budget_items.wedding_event_id`
   - `message_thread_reads`
+  - `vendor_service_items.image_urls`
+  - `vendor_service_items.reference_url`
+  - `messages` in `supabase_realtime`
 
 ## Shipped Recently
 
-- Added vendor catalogue media: new `vendor_service_items.image_urls text[]` and `reference_url text` columns (migration `20260601000100_add_vendor_service_item_media.sql`), with the vendor offering normalizer enforcing http/https-only URLs, a six-image cap, and per-URL length caps. Vendor editor exposes a paste-URL + remove media flow per row, and both the client vendor preview and the Event Editor's `ServiceOfferingPreview` render thumbnails + optional moodboard link. Fallback is graceful — rows without images render exactly as before. No Supabase Storage upload helper added in this slice; URLs can be pasted from any public CDN/Storage public bucket.
+- Added vendor catalogue media: new `vendor_service_items.image_urls text[]` and `reference_url text` columns (migration `20260601000100_add_vendor_service_item_media.sql`), with the vendor offering normalizer enforcing http/https-only URLs, a six-image cap, and per-URL length caps. Vendor editor now supports both Supabase Storage uploads and pasted public URLs per catalogue row, plus remove controls. Client vendor previews and the Event Editor's `ServiceOfferingPreview` render thumbnails + optional moodboard links with graceful text-only fallback.
+- Enabled Supabase Realtime for `messages` (migration `20260601000200_enable_message_realtime.sql`). Client, vendor, and manager inboxes subscribe per booking thread and refresh through `/api/messages`, so live updates preserve server-side role projection and privacy checks.
+- Added real vendor profile-view tracking through the existing `vendor_profile_views` table. Vendor detail API records non-owner profile views, `/api/dashboard/vendor` and `/api/vendor/analytics` surface monthly view counts, and analytics no longer hard-code profile views to `0`.
+- Closed dashboard dead-route gaps with real pages for `/vendor/portfolio`, `/vendor/reviews`, `/vendor/inquiries`, `/vendor/calendar`, and `/manager/weddings`.
+- Replaced blog seed placeholder bodies with real editorial copy for the seeded blog posts.
 - Fixed Vercel build failure caused by Clerk hooks rendering during prerender.
 - Added a remote-first Supabase workflow so migrations and ad-hoc SQL can run from repo scripts.
 - Added cloud testing bootstrap docs and seed workflow for realistic Clerk plus Supabase test data.
@@ -76,11 +85,14 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
 - `npm run build`
 - `npm run db:migrations`
 - `npm run db:query` for newly added Supabase tables and columns
+- `npm run db:push` for pending media + realtime migrations
+- Remote SQL checks for media columns and `messages` realtime publication membership
 - Local dev server started at `http://localhost:3000`
 - Basic HTTP smoke check passed for `/`
 - Browser smoke check passed for `/` after the marketing updates, with no fresh console errors.
 - Browser auth-gate smoke check passed for `/manager/messages`, redirecting signed-out users to Clerk login with no fresh console errors.
 - `/client/budget` correctly redirects unauthenticated users to Clerk login
+- Browser auth-gate smoke checks passed for `/vendor/portfolio`, `/vendor/reviews`, `/vendor/inquiries`, `/vendor/calendar`, and `/manager/weddings`, all redirecting signed-out users to Clerk login with no fresh console errors.
 
 ## Current Rebuild Order
 
@@ -97,7 +109,6 @@ Items 1, 2, and 3 are implemented in the follow-up slice and should be rechecked
 
 - Vercel auto-deploy is assumed from the connected GitHub project, but local CLI verification is blocked by missing Vercel credentials.
 - The current event-linked budget model supports one event per budget line item.
-- Vendor service catalogue rows do not yet support drag ordering or image/reference attachments.
+- Vendor service catalogue rows support image/reference attachments, but true drag ordering is still deferred.
 - Manager booking notes and payment amounts can be viewed, but inline manager editing is still intentionally limited to status actions.
-- Messages are real booking threads with persisted unread state, but visible read receipts and per-message attachments are still future work.
-- Message unread state is persisted per thread, but live delivery still needs Supabase Realtime or a polling layer.
+- Messages are real booking threads with persisted unread state and realtime refresh, but visible read receipts and per-message attachments are still future work.

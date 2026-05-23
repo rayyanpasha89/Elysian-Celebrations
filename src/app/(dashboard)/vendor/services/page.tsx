@@ -1,6 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type DragEvent,
+  type FormEvent,
+} from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer, staggerItem } from "@/animations/variants";
@@ -15,6 +24,8 @@ type ServiceItem = {
   name: string;
   description: string;
   dietaryTags: string[];
+  imageUrls: string[];
+  referenceUrl: string;
   sortOrder: number;
 };
 
@@ -113,6 +124,8 @@ function buildPayload(draft: DraftState, defaultItemType: string) {
         name: item.name.trim(),
         description: item.description.trim(),
         dietaryTags: item.dietaryTags,
+        imageUrls: item.imageUrls,
+        referenceUrl: item.referenceUrl.trim(),
         sortOrder: item.sortOrder ?? index,
       })),
   };
@@ -137,6 +150,8 @@ function mapApiService(raw: ApiService): Service {
       name: item.name,
       description: item.description ?? "",
       dietaryTags: item.dietary_tags ?? [],
+      imageUrls: item.image_urls ?? [],
+      referenceUrl: item.reference_url ?? "",
       sortOrder: item.sort_order ?? 0,
     })),
     active: raw.is_active ?? true,
@@ -149,6 +164,8 @@ type ApiServiceItem = {
   name: string;
   description: string | null;
   dietary_tags: string[] | null;
+  image_urls: string[] | null;
+  reference_url: string | null;
   sort_order: number | null;
 };
 
@@ -452,6 +469,28 @@ export default function VendorServicesPage() {
                             ))}
                           </div>
                         ) : null}
+                        {item.imageUrls.length > 0 ? (
+                          <div className="mt-3 flex flex-wrap gap-1.5">
+                            {item.imageUrls.slice(0, 4).map((url, i) => (
+                              <div
+                                key={`${url}-${i}`}
+                                className="h-12 w-12 overflow-hidden border border-charcoal/10 bg-cream/40"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={url}
+                                  alt=""
+                                  className="h-full w-full object-cover"
+                                />
+                              </div>
+                            ))}
+                            {item.imageUrls.length > 4 ? (
+                              <div className="flex h-12 w-12 items-center justify-center border border-charcoal/10 bg-cream/40 text-[10px] text-charcoal/60">
+                                +{item.imageUrls.length - 4}
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </li>
                     ))}
                   </ul>
@@ -468,6 +507,7 @@ export default function VendorServicesPage() {
                     draft={editDraft}
                     onChange={setEditDraft}
                     copy={copy}
+                    serviceId={s.id}
                   />
                   <div className="flex flex-wrap gap-3">
                     <button type="submit" className={dashBtn} disabled={savingEdit}>
@@ -516,10 +556,16 @@ function ServiceEditor({
   draft,
   onChange,
   copy,
+  serviceId,
 }: {
   draft: DraftState;
   onChange: (next: DraftState) => void;
   copy: ReturnType<typeof categoryCopy>;
+  /**
+   * Required for media uploads. New services (no id yet) get the URL-paste
+   * fallback only; ItemMediaEditor shows a hint to save first.
+   */
+  serviceId?: string | null;
 }) {
   const updateField = <K extends keyof DraftState>(field: K, value: DraftState[K]) =>
     onChange({ ...draft, [field]: value });
@@ -534,6 +580,8 @@ function ServiceEditor({
           name: "",
           description: "",
           dietaryTags: [],
+          imageUrls: [],
+          referenceUrl: "",
           sortOrder: draft.items.length,
         },
       ],
@@ -572,6 +620,8 @@ function ServiceEditor({
       name: source.name ? `${source.name} (copy)` : "",
       description: source.description,
       dietaryTags: [...source.dietaryTags],
+      imageUrls: [...source.imageUrls],
+      referenceUrl: source.referenceUrl,
       sortOrder: index + 1,
     };
     const next = [
@@ -825,11 +875,257 @@ function ServiceEditor({
                     }
                   />
                 ) : null}
+                <ItemMediaEditor
+                  imageUrls={item.imageUrls}
+                  referenceUrl={item.referenceUrl}
+                  onChange={(patch) => updateItem(index, patch)}
+                  serviceId={serviceId ?? null}
+                />
               </li>
             ))}
           </ul>
         )}
       </div>
+    </div>
+  );
+}
+
+function ItemMediaEditor({
+  imageUrls,
+  referenceUrl,
+  onChange,
+  serviceId,
+}: {
+  imageUrls: string[];
+  referenceUrl: string;
+  onChange: (patch: Partial<ServiceItem>) => void;
+  /** Service must be saved before uploads are allowed. */
+  serviceId: string | null;
+}) {
+  const [draftUrl, setDraftUrl] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const MAX_IMAGES = 6;
+  const remaining = MAX_IMAGES - imageUrls.length;
+  const canUpload = Boolean(serviceId) && remaining > 0 && !uploading;
+
+  const pushUrl = (url: string) => {
+    if (imageUrls.includes(url) || imageUrls.length >= MAX_IMAGES) return;
+    onChange({ imageUrls: [...imageUrls, url] });
+  };
+
+  const tryAdd = () => {
+    const trimmed = draftUrl.trim();
+    if (!trimmed) return;
+    try {
+      const parsed = new URL(trimmed);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return;
+    } catch {
+      return;
+    }
+    if (imageUrls.includes(trimmed)) {
+      setDraftUrl("");
+      return;
+    }
+    if (imageUrls.length >= MAX_IMAGES) return;
+    onChange({ imageUrls: [...imageUrls, trimmed] });
+    setDraftUrl("");
+  };
+
+  const removeAt = (target: number) => {
+    onChange({
+      imageUrls: imageUrls.filter((_, i) => i !== target),
+    });
+  };
+
+  const uploadFiles = useCallback(
+    async (files: File[]) => {
+      if (!serviceId) {
+        toast.error("Save the service first, then upload images");
+        return;
+      }
+      const allowed = files
+        .filter((file) =>
+          ["image/jpeg", "image/png", "image/webp"].includes(file.type)
+        )
+        .slice(0, remaining);
+
+      if (files.length > 0 && allowed.length === 0) {
+        toast.error("Only JPEG, PNG, or WebP images are accepted");
+        return;
+      }
+
+      setUploading(true);
+      try {
+        for (const file of allowed) {
+          const form = new FormData();
+          form.append("file", file);
+          const res = await fetch(
+            `/api/vendor/services/${serviceId}/images`,
+            { method: "POST", body: form }
+          );
+          const json = await res.json();
+          if (!res.ok) {
+            toast.error(json.error ?? "Upload failed");
+            continue;
+          }
+          if (typeof json.url === "string") pushUrl(json.url);
+        }
+      } finally {
+        setUploading(false);
+      }
+    },
+    // pushUrl + imageUrls referenced via the closure; we don't want to thrash
+    // the callback identity on every keystroke. Service id is the meaningful key.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [serviceId, remaining]
+  );
+
+  const onFilesPicked = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    if (files.length > 0) void uploadFiles(files);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const onDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDragging(false);
+    const files = Array.from(event.dataTransfer.files ?? []);
+    if (files.length > 0) void uploadFiles(files);
+  };
+
+  const onDragOver = (event: DragEvent<HTMLDivElement>) => {
+    if (!canUpload) return;
+    event.preventDefault();
+    setIsDragging(true);
+  };
+
+  const onDragLeave = () => setIsDragging(false);
+
+  return (
+    <div className="mt-3 space-y-3 border-t border-charcoal/8 pt-3">
+      <div>
+        <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
+          Reference imagery
+        </p>
+        <p className="mt-1 text-[11px] leading-relaxed text-slate/80">
+          Up to {MAX_IMAGES} images per row. Couples see these as thumbnails on
+          your profile and inside the Event Editor catalogue preview.
+        </p>
+      </div>
+
+      {imageUrls.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {imageUrls.map((url, i) => (
+            <div
+              key={`${url}-${i}`}
+              className="group relative h-14 w-14 overflow-hidden border border-charcoal/10 bg-cream/40"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={url}
+                alt={`Reference ${i + 1}`}
+                className="h-full w-full object-cover"
+              />
+              <button
+                type="button"
+                onClick={() => removeAt(i)}
+                aria-label="Remove image"
+                className="absolute right-0 top-0 flex h-4 w-4 items-center justify-center bg-midnight/70 text-[10px] text-ivory opacity-0 transition-opacity group-hover:opacity-100"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {serviceId ? (
+        <div
+          onDrop={onDrop}
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          className={cn(
+            "border border-dashed px-4 py-5 text-center transition-colors",
+            isDragging
+              ? "border-gold-primary bg-gold-primary/10"
+              : "border-charcoal/15 bg-cream/30"
+          )}
+        >
+          <p className="text-[11px] leading-relaxed text-slate/80">
+            {uploading
+              ? "Uploading…"
+              : isDragging
+                ? "Drop to upload"
+                : "Drop images here, or"}{" "}
+            {!uploading && !isDragging ? (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!canUpload}
+                className="font-accent inline text-[10px] uppercase tracking-[0.18em] text-gold-dark underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                browse files
+              </button>
+            ) : null}
+          </p>
+          <p className="mt-1 text-[10px] text-slate/60">
+            JPEG · PNG · WebP, up to 8 MB each
+          </p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+            className="hidden"
+            onChange={onFilesPicked}
+          />
+        </div>
+      ) : (
+        <p className="border border-dashed border-charcoal/15 bg-cream/25 px-3 py-3 text-[11px] leading-relaxed text-slate/80">
+          Save the service first to enable direct image uploads. You can paste
+          URLs below in the meantime.
+        </p>
+      )}
+
+      <div className="flex gap-2">
+        <input
+          className={cn(inputBase, "py-2")}
+          placeholder={
+            remaining > 0
+              ? "Or paste an image URL (https://…)"
+              : "Image limit reached"
+          }
+          value={draftUrl}
+          onChange={(e) => setDraftUrl(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              tryAdd();
+            }
+          }}
+          disabled={remaining <= 0}
+        />
+        <button
+          type="button"
+          onClick={tryAdd}
+          disabled={remaining <= 0 || !draftUrl.trim()}
+          className="font-accent shrink-0 border border-gold-primary/45 bg-gold-primary/10 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-gold-dark transition-colors hover:bg-gold-primary/15 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Add URL
+        </button>
+      </div>
+      <p className="text-[10px] text-slate/70">
+        {imageUrls.length}/{MAX_IMAGES} images
+      </p>
+
+      <input
+        className={cn(inputBase, "py-2")}
+        placeholder="Optional moodboard or portfolio link (e.g. Pinterest)"
+        value={referenceUrl}
+        onChange={(e) => onChange({ referenceUrl: e.target.value })}
+      />
     </div>
   );
 }

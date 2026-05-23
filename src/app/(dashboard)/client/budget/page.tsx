@@ -349,6 +349,18 @@ export default function BudgetPage() {
               allocations, drag real line items into categories, and compare quotes
               with actual spend before the weekend gets away from you.
             </p>
+            {totalItemCount === 0 ? (
+              <div className="mt-4 border border-dashed border-gold-primary/30 bg-gold-primary/8 px-4 py-3">
+                <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-gold-dark">
+                  What to do next
+                </p>
+                <p className="mt-1 text-sm leading-relaxed text-charcoal">
+                  Drag a line item from the palette into a category to start the
+                  plan — venue, catering, or photography are the quickest places
+                  to anchor early estimates.
+                </p>
+              </div>
+            ) : null}
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[460px]">

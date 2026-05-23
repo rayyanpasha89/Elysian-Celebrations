@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer, staggerItem } from "@/animations/variants";
 import { ListEmptyState } from "@/components/dashboard/list-empty-state";
+import { useMessageRealtime } from "@/hooks/use-message-realtime";
 import { dashCard, dashLabel, statusBadgeBase } from "@/lib/dashboard-styles";
 import {
   clientPlaceholder,
@@ -28,6 +29,28 @@ export default function ClientMessagesPage() {
   const [sending, setSending] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const messagesScrollRef = useRef<HTMLDivElement | null>(null);
+
+  async function refreshConversations() {
+    try {
+      const res = await fetch("/api/messages");
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      const list = (json.conversations ?? []) as Conversation[];
+      setConversations(list);
+      setNeedsOnboarding(Boolean(json.needsOnboarding));
+      setActive((currentActive) => {
+        if (currentActive && list.some((conversation) => conversation.id === currentActive)) {
+          return currentActive;
+        }
+        if (bookingIdParam && list.some((conversation) => conversation.id === bookingIdParam)) {
+          return bookingIdParam;
+        }
+        return list[0]?.id ?? null;
+      });
+    } catch {
+      toast.error("Could not refresh live messages");
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -63,6 +86,12 @@ export default function ClientMessagesPage() {
   useEffect(() => {
     if (bookingIdParam) setActive(bookingIdParam);
   }, [bookingIdParam]);
+
+  useMessageRealtime({
+    conversations,
+    enabled: !loading && conversations.length > 0,
+    onRefresh: refreshConversations,
+  });
 
   const current = useMemo(
     () => conversations.find((c) => c.id === active) ?? null,

@@ -10,8 +10,39 @@ export type VendorServiceItemInput = {
   name: string;
   description: string | null;
   dietaryTags: string[];
+  imageUrls: string[];
+  referenceUrl: string | null;
   sortOrder: number | null;
 };
+
+const MAX_IMAGES_PER_ITEM = 6;
+const URL_MAX_LENGTH = 1024;
+
+function isSafeUrl(raw: string): boolean {
+  if (raw.length > URL_MAX_LENGTH) return false;
+  try {
+    const url = new URL(raw);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+function toUrlArray(raw: unknown, max = MAX_IMAGES_PER_ITEM): string[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== "string") continue;
+    const trimmed = entry.trim();
+    if (!trimmed || !isSafeUrl(trimmed)) continue;
+    if (seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    out.push(trimmed);
+    if (out.length >= max) break;
+  }
+  return out;
+}
 
 const ITEM_TYPE_WHITELIST = new Set([
   "inclusion",
@@ -74,6 +105,11 @@ export function normalizeServiceItems(raw: unknown): VendorServiceItemInput[] {
         ? entry.description.trim().slice(0, 600)
         : null;
     const dietaryTags = toStringArray(entry.dietaryTags, 6, 40);
+    const imageUrls = toUrlArray(entry.imageUrls);
+    const referenceUrlRaw =
+      typeof entry.referenceUrl === "string" ? entry.referenceUrl.trim() : "";
+    const referenceUrl =
+      referenceUrlRaw && isSafeUrl(referenceUrlRaw) ? referenceUrlRaw : null;
     const sortOrderRaw = Number(entry.sortOrder);
     const sortOrder = Number.isFinite(sortOrderRaw)
       ? Math.max(0, Math.min(9999, Math.floor(sortOrderRaw)))
@@ -83,6 +119,8 @@ export function normalizeServiceItems(raw: unknown): VendorServiceItemInput[] {
       name: name.slice(0, 120),
       description,
       dietaryTags,
+      imageUrls,
+      referenceUrl,
       sortOrder,
     });
     if (items.length >= 30) break;

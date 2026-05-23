@@ -36,6 +36,8 @@ type VendorServiceItemApi = {
   name: string;
   description: string | null;
   dietary_tags: string[] | null;
+  image_urls: string[] | null;
+  reference_url: string | null;
   sort_order: number | null;
 };
 
@@ -545,6 +547,18 @@ export default function ClientVendorsPage() {
             a shortlist synced to your account so your planning follows you across
             sessions and devices.
           </p>
+          {savedCount === 0 ? (
+            <div className="mt-4 border border-dashed border-gold-primary/30 bg-gold-primary/8 px-4 py-3">
+              <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-gold-dark">
+                Start your shortlist
+              </p>
+              <p className="mt-1 text-sm leading-relaxed text-charcoal">
+                Open a profile and tap <span className="text-gold-dark">Shortlist</span> to
+                save vendors here. You can compare their catalogues, scope, and
+                imagery before reaching out.
+              </p>
+            </div>
+          ) : null}
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -907,25 +921,64 @@ function VendorDetailPanel({
                 <ul className="mt-3 list-none space-y-2 pl-0">
                   {group.items.slice(0, 6).map((item) => (
                     <li key={item.id} className="border-t border-charcoal/8 pt-2 first:border-t-0 first:pt-0">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="font-heading text-sm text-charcoal">
-                            {item.name}
-                          </p>
-                          <p className="mt-1 font-accent text-[10px] uppercase tracking-[0.14em] text-slate">
-                            {item.serviceName}
-                          </p>
-                        </div>
-                        {item.dietary_tags?.length ? (
-                          <span className="border border-sage/30 px-2 py-1 font-heading text-[11px] text-sage">
-                            {item.dietary_tags.slice(0, 2).join(", ")}
-                          </span>
+                      <div className="flex flex-wrap items-start gap-3">
+                        {item.image_urls && item.image_urls.length > 0 ? (
+                          <div className="h-14 w-14 shrink-0 overflow-hidden border border-charcoal/10 bg-cream/40">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={item.image_urls[0]}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
                         ) : null}
+                        <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-heading text-sm text-charcoal">
+                              {item.name}
+                            </p>
+                            <p className="mt-1 font-accent text-[10px] uppercase tracking-[0.14em] text-slate">
+                              {item.serviceName}
+                            </p>
+                          </div>
+                          {item.dietary_tags?.length ? (
+                            <span className="border border-sage/30 px-2 py-1 font-heading text-[11px] text-sage">
+                              {item.dietary_tags.slice(0, 2).join(", ")}
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
                       {item.description ? (
                         <p className="mt-1 text-xs leading-relaxed text-slate">
                           {item.description}
                         </p>
+                      ) : null}
+                      {item.image_urls && item.image_urls.length > 1 ? (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {item.image_urls.slice(1, 5).map((url, i) => (
+                            <div
+                              key={`${url}-${i}`}
+                              className="h-10 w-10 overflow-hidden border border-charcoal/10 bg-cream/40"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={url}
+                                alt=""
+                                className="h-full w-full object-cover"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                      {item.reference_url ? (
+                        <a
+                          href={item.reference_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-2 inline-flex font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark hover:text-gold-primary"
+                        >
+                          View moodboard →
+                        </a>
                       ) : null}
                     </li>
                   ))}

@@ -12,6 +12,7 @@ import {
 import { fadeUp } from "@/animations/variants";
 import { useInViewAnimation } from "@/hooks/use-in-view-animation";
 import { MARKETING_IMAGES } from "@/lib/marketing-images";
+import { SectionHeader } from "@/components/marketing/shared/marketing-primitives";
 
 const vendorCategories = [
   "Photography",
@@ -80,25 +81,14 @@ export function VendorMarquee() {
           className="grid gap-10 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] lg:items-start"
         >
           <div>
-            <p className="mb-4 font-accent text-[11px] uppercase tracking-[0.3em] text-gold-primary">
-              Chapter 04 · The network
-            </p>
-            <h2
-              className="max-w-3xl font-display font-bold leading-[0.96] text-charcoal"
-              style={{ fontSize: "var(--text-h1)" }}
-            >
-              The vendor roster should feel curated, not crowded.
-            </h2>
-            <div className="mt-5 flex items-center gap-2">
-              <span className="h-px w-10 bg-gradient-to-r from-transparent to-gold-primary/45" />
-              <span className="inline-block h-1.5 w-1.5 rotate-45 bg-gold-primary/55" />
-              <span className="h-px w-10 bg-gradient-to-l from-transparent to-gold-primary/45" />
-            </div>
-            <p className="mt-5 max-w-xl font-heading text-lg font-light leading-relaxed text-slate">
-              We look for teams who can protect atmosphere, timing, and guest
-              experience, not just deliver a service line. The point is chemistry
-              across the whole weekend.
-            </p>
+            <SectionHeader
+              chapter="05"
+              eyebrow="The network"
+              title="The vendor roster should feel curated, not crowded."
+              intro="We look for teams who can protect atmosphere, timing, and guest experience, not just deliver a service line. The point is chemistry across the whole weekend."
+              align="start"
+              titleMaxWidth="max-w-3xl"
+            />
 
             <div className="mt-8 grid gap-3">
               {standards.map((standard) => (
@@ -162,22 +152,9 @@ export function VendorMarquee() {
           </div>
 
           <div className="relative z-10 mb-4 overflow-hidden">
-            <div className="flex animate-[marquee-left_30s_linear_infinite] hover:[animation-play-state:paused]">
+            <div className="flex motion-safe:animate-[marquee-left_45s_linear_infinite] hover:[animation-play-state:paused]">
               {marqueeRow.map((name, i) => (
                 <VendorChip key={`r1-${i}`} name={name} index={i % vendorCategories.length} />
-              ))}
-            </div>
-          </div>
-
-          <div className="relative z-10 overflow-hidden">
-            <div className="flex animate-[marquee-right_35s_linear_infinite] hover:[animation-play-state:paused]">
-              {marqueeRow.map((name, i) => (
-                <VendorChip
-                  key={`r2-${i}`}
-                  name={name}
-                  variant="outlined"
-                  index={i % vendorCategories.length}
-                />
               ))}
             </div>
           </div>
@@ -194,14 +171,6 @@ export function VendorMarquee() {
           }
           100% {
             transform: translateX(-50%);
-          }
-        }
-        @keyframes marquee-right {
-          0% {
-            transform: translateX(-50%);
-          }
-          100% {
-            transform: translateX(0);
           }
         }
       `}</style>

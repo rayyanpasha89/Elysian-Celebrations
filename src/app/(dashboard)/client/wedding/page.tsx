@@ -180,6 +180,8 @@ type VendorPlannerOption = {
       name: string;
       description: string | null;
       dietary_tags: string[] | null;
+      image_urls: string[] | null;
+      reference_url: string | null;
       sort_order: number | null;
     }[] | null;
   }[];
@@ -3131,10 +3133,14 @@ export default function ClientWeddingPage() {
                 </div>
               </div>
             ) : (
-              <div className="mt-4 border border-dashed border-charcoal/15 bg-cream/30 p-5">
-                <p className="font-heading text-sm text-slate">
-                  Select an event to edit its timing, menu, decor, guest count,
-                  spend, and vendor plan.
+              <div className="mt-4 border border-dashed border-gold-primary/30 bg-gold-primary/8 p-5">
+                <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-gold-dark">
+                  What to do next
+                </p>
+                <p className="mt-2 font-heading text-sm text-charcoal">
+                  Pick an event from the day cards above to open the seven-step
+                  editor — start with <span className="text-gold-dark">Basics</span>{" "}
+                  for guest count and venue, then move down to vendors and tasks.
                 </p>
               </div>
             )}
@@ -3298,6 +3304,16 @@ function ServiceOfferingPreview({
                           onChange={() => toggleItem(item.id)}
                           className="mt-1 h-3.5 w-3.5 shrink-0 border border-charcoal/30 accent-gold-primary"
                         />
+                        {item.image_urls && item.image_urls.length > 0 ? (
+                          <span className="h-10 w-10 shrink-0 overflow-hidden border border-charcoal/10 bg-cream/40">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={item.image_urls[0]}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                          </span>
+                        ) : null}
                         <span className="min-w-0 flex-1">
                           <span className="font-heading text-xs text-charcoal">
                             {item.name}

@@ -88,6 +88,8 @@ export async function PATCH(
               name: item.name,
               description: item.description,
               dietary_tags: item.dietaryTags,
+              image_urls: item.imageUrls,
+              reference_url: item.referenceUrl,
               sort_order: item.sortOrder ?? index,
             }))
           );
@@ -100,7 +102,7 @@ export async function PATCH(
     const { data: row, error: fetchError } = await supabase
       .from("vendor_services")
       .select(
-        "*, items:vendor_service_items(id, item_type, name, description, dietary_tags, sort_order)"
+        "*, items:vendor_service_items(id, item_type, name, description, dietary_tags, image_urls, reference_url, sort_order)"
       )
       .eq("id", id)
       .maybeSingle();

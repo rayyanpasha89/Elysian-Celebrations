@@ -48,6 +48,7 @@ export async function GET() {
         quotePipeline: 0,
         completedBookings: 0,
         liveInquiries: 0,
+        profileViews: 0,
         rating: 0,
         reviewCount: 0,
         weeklyInquiryVolume: Array.from({ length: 6 }, (_, index) => ({
@@ -72,6 +73,16 @@ export async function GET() {
       Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0)
     );
     const currentWeekStart = startOfWeek(now);
+    const { count: profileViewsCount, error: viewsError } = await supabase
+      .from("vendor_profile_views")
+      .select("id", { count: "exact", head: true })
+      .eq("vendor_profile_id", vendorProfile.id)
+      .gte("created_at", monthStart.toISOString());
+
+    if (viewsError) {
+      console.error("GET /api/vendor/analytics profile views", viewsError);
+    }
+
     const weeklyInquiryVolume = Array.from({ length: 6 }, (_, index) => {
       const start = new Date(currentWeekStart);
       start.setUTCDate(start.getUTCDate() - (5 - index) * 7);
@@ -132,6 +143,7 @@ export async function GET() {
       quotePipeline,
       completedBookings,
       liveInquiries,
+      profileViews: profileViewsCount ?? 0,
       rating: vendorProfile.rating,
       reviewCount: vendorProfile.review_count,
       weeklyInquiryVolume: weeklyInquiryVolume.map(({ label, count }) => ({

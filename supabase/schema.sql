@@ -100,6 +100,8 @@ create table vendor_service_items (
   name text not null,
   description text,
   dietary_tags text[] not null default '{}',
+  image_urls text[] not null default '{}',
+  reference_url text,
   sort_order integer not null default 0,
   created_at timestamptz not null default now()
 );

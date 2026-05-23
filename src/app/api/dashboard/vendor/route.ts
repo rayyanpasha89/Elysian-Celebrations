@@ -57,6 +57,7 @@ export async function GET() {
       { data: reviews },
       { data: inquiryRows },
       { data: upcoming },
+      { count: profileViewsCount },
     ] = await Promise.all([
       supabase
         .from("bookings")
@@ -101,6 +102,11 @@ export async function GET() {
         .gte("event_date", new Date().toISOString())
         .order("event_date", { ascending: true })
         .limit(5),
+      supabase
+        .from("vendor_profile_views")
+        .select("id", { count: "exact", head: true })
+        .eq("vendor_profile_id", vp.id)
+        .gte("created_at", monthStart.toISOString()),
     ]);
 
     const revenueMonth = (revenueRows ?? []).reduce((sum, row) => {
@@ -162,7 +168,7 @@ export async function GET() {
         confirmedBookings: confirmedBookings ?? 0,
         avgRating: Math.round(avgRating * 10) / 10,
         revenueMonth,
-        profileViews: 0,
+        profileViews: profileViewsCount ?? 0,
       },
       pendingInquiries: inquiryList,
       upcomingEvents,

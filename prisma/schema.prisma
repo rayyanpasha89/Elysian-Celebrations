@@ -35,6 +35,7 @@ model User {
   sentMessages  Message[]      @relation("SentMessages")
   threadReads   MessageThreadRead[]
   notifications Notification[]
+  vendorProfileViews VendorProfileView[]
 
   @@map("users")
 }
@@ -277,6 +278,7 @@ model VendorProfile {
   bookings     Booking[]
   savedBy      SavedVendor[]
   destinations VendorDestination[]
+  profileViews VendorProfileView[]
 
   @@map("vendor_profiles")
 }
@@ -322,6 +324,8 @@ model VendorServiceItem {
   name            String
   description     String?
   dietaryTags     String[] @default([])
+  imageUrls       String[] @default([])
+  referenceUrl    String?
   sortOrder       Int      @default(0)
   createdAt       DateTime @default(now())
 
@@ -496,6 +500,20 @@ model SavedVendor {
 
   @@unique([clientProfileId, vendorProfileId])
   @@map("saved_vendors")
+}
+
+// ─── Vendor Analytics ─────────────────────────────────────────
+
+model VendorProfileView {
+  id              String   @id @default(cuid())
+  vendorProfileId String
+  viewerUserId    String?
+  createdAt       DateTime @default(now())
+
+  vendorProfile VendorProfile @relation(fields: [vendorProfileId], references: [id], onDelete: Cascade)
+  viewer        User?         @relation(fields: [viewerUserId], references: [id], onDelete: SetNull)
+
+  @@map("vendor_profile_views")
 }
 
 // ─── Reviews ──────────────────────────────────────────────────

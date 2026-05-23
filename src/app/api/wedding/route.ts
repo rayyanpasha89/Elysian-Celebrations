@@ -342,7 +342,7 @@ export async function GET() {
           .select(
             `id, wedding_event_id, status, event_date, notes, total_amount, paid_amount,
             vendor:vendor_profiles(id, business_name, slug, category:vendor_categories(name, slug)),
-            service:vendor_services(id, name, description, service_scope, base_price, max_price, unit, event_type_fit, inclusions, deliverables, add_ons, items:vendor_service_items(id, item_type, name, description, dietary_tags, sort_order))`
+            service:vendor_services(id, name, description, service_scope, base_price, max_price, unit, event_type_fit, inclusions, deliverables, add_ons, items:vendor_service_items(id, item_type, name, description, dietary_tags, image_urls, reference_url, sort_order))`
           )
           .in("wedding_event_id", eventIds)
           .order("created_at", { ascending: true }),

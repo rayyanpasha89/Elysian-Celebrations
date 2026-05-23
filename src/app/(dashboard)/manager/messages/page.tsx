@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { fadeUp, staggerContainer, staggerItem } from "@/animations/variants";
 import { ListEmptyState } from "@/components/dashboard/list-empty-state";
+import { useMessageRealtime } from "@/hooks/use-message-realtime";
 import { dashCard, dashLabel, statusBadgeBase } from "@/lib/dashboard-styles";
 import {
   formatBookingDate,
@@ -18,6 +19,24 @@ export default function ManagerMessagesPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [active, setActive] = useState<string | null>(null);
   const messagesScrollRef = useRef<HTMLDivElement | null>(null);
+
+  async function refreshConversations() {
+    try {
+      const res = await fetch("/api/messages");
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Failed to load messages");
+      const list = (json.conversations ?? []) as Conversation[];
+      setConversations(list);
+      setActive((currentActive) => {
+        if (currentActive && list.some((conversation) => conversation.id === currentActive)) {
+          return currentActive;
+        }
+        return list[0]?.id ?? null;
+      });
+    } catch {
+      // Keep the current command-center state; the next realtime event or reload can recover.
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -44,6 +63,12 @@ export default function ManagerMessagesPage() {
       cancelled = true;
     };
   }, []);
+
+  useMessageRealtime({
+    conversations,
+    enabled: !loading && conversations.length > 0,
+    onRefresh: refreshConversations,
+  });
 
   const current = useMemo(
     () => conversations.find((conversation) => conversation.id === active) ?? null,
