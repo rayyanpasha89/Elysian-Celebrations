@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClientWeddingContext, ensureWeddingDays } from "@/lib/wedding-plan.server";
 import {
+  buildDefaultRequirementsForEvent,
+  mealPeriodForTimeBlock,
   normalizeEventRequirementPayload,
   normalizeTimeBlockKey,
 } from "@/lib/event-platform";
@@ -79,11 +81,15 @@ export async function POST(request: NextRequest) {
     if (!targetDayId) {
       return apiError("Add a wedding day before creating events", 409);
     }
+    if (!days.some((day) => day.id === targetDayId)) {
+      return apiError("Celebration day not found", 404);
+    }
 
     const nextSortOrder =
       (existingEvents ?? [])
         .filter((event) => event.wedding_day_id === targetDayId)
         .reduce((max, event) => Math.max(max, event.sort_order), -1) + 1;
+    const timeBlock = normalizeTimeBlockKey(body.timeBlock);
 
     const { data: event, error } = await supabase
       .from("wedding_events")
@@ -92,7 +98,7 @@ export async function POST(request: NextRequest) {
         wedding_day_id: targetDayId,
         name,
         event_type: toOptionalString(body.eventType),
-        time_block: normalizeTimeBlockKey(body.timeBlock),
+        time_block: timeBlock,
         date,
         start_time: toOptionalString(body.startTime),
         end_time: toOptionalString(body.endTime),
@@ -117,6 +123,60 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error("wedding_events insert:", error);
       return apiError("Failed to create event", 500);
+    }
+
+    const { error: menuInsertError } = await supabase
+      .from("wedding_event_menus")
+      .insert({
+        wedding_event_id: event.id,
+        name: `${event.name} Food and beverage plan`,
+        meal_period: mealPeriodForTimeBlock(event.time_block, event.start_time),
+        service_style: event.food_style ?? null,
+        notes:
+          event.menu_notes ??
+          "Use this starter menu to define drinks, pre-meal stations, mains, post-meal stations, live counters, and custom food requirements.",
+        sort_order: 0,
+      });
+
+    if (menuInsertError) {
+      console.error("wedding_event_menus insert:", menuInsertError);
+    }
+
+    const { error: taskInsertError } = await supabase
+      .from("wedding_event_tasks")
+      .insert({
+        wedding_event_id: event.id,
+        title: "Confirm final run of show",
+        owner: "Planner",
+        status: "OPEN",
+        sort_order: 0,
+      });
+
+    if (taskInsertError) {
+      console.error("wedding_event_tasks insert:", taskInsertError);
+    }
+
+    const requirementRows = buildDefaultRequirementsForEvent({
+      eventName: event.name,
+      timeBlock: event.time_block,
+      startTime: event.start_time,
+    }).map((requirement) => ({
+      wedding_event_id: event.id,
+      category: requirement.category,
+      title: requirement.title,
+      status: requirement.status,
+      priority: requirement.priority,
+      payload: requirement.payload,
+      notes: requirement.notes,
+      sort_order: requirement.sortOrder,
+    }));
+
+    const { error: requirementsInsertError } = await supabase
+      .from("wedding_event_requirements")
+      .insert(requirementRows);
+
+    if (requirementsInsertError) {
+      console.error("wedding_event_requirements insert:", requirementsInsertError);
     }
 
     return apiSuccess({ event }, 201);

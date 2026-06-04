@@ -16,6 +16,13 @@ import {
 const hasClerkKeys =
   process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
   !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.includes("REPLACE_ME");
+const protectedPrefixes = ["/client", "/vendor", "/admin", "/manager"];
+
+function isProtectedPath(pathname: string) {
+  return protectedPrefixes.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+}
 
 async function clerkHandler(req: NextRequest, event: NextFetchEvent) {
   const { clerkMiddleware, createRouteMatcher } = await import(
@@ -62,9 +69,7 @@ function testAuthHandler(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
   const isAuthRoute =
     pathname.startsWith("/login") || pathname.startsWith("/register");
-  const isProtectedRoute = ["/client", "/vendor", "/admin", "/manager"].some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
-  );
+  const isProtectedRoute = isProtectedPath(pathname);
 
   let response: NextResponse;
 
@@ -106,6 +111,17 @@ export default async function proxy(
   if (hasClerkKeys) {
     return clerkHandler(req, event);
   }
+
+  if (process.env.NODE_ENV === "production") {
+    const pathname = req.nextUrl.pathname;
+    if (pathname.startsWith("/api/") || isProtectedPath(pathname)) {
+      return NextResponse.json(
+        { error: "Authentication is not configured" },
+        { status: 503 }
+      );
+    }
+  }
+
   return NextResponse.next();
 }
 

@@ -504,7 +504,7 @@ function requirementPayloadForCategory({
 
   if (category === "entertainment") {
     return {
-      enabled: timeBlock === "evening",
+      enabled: timeBlock === "evening" || Boolean(startTime && startTime >= "17:00"),
       performanceType: "",
       sets: [],
       technicalNeeds: [],

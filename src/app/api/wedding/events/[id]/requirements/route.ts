@@ -105,7 +105,11 @@ function normalizePriority(value: unknown) {
 function normalizeRequirements(value: unknown) {
   if (!Array.isArray(value)) return [];
 
-  return value.slice(0, 60).map((entry: RequirementDraft, index) => {
+  return value.slice(0, 60).map((rawEntry: unknown, index) => {
+    const entry =
+      rawEntry && typeof rawEntry === "object"
+        ? (rawEntry as RequirementDraft)
+        : {};
     const category = normalizeCategory(entry.category);
     return {
       id: toOptionalId(entry.id),
@@ -215,7 +219,7 @@ async function resolveVendorLink(
 ) {
   if (vendorServiceId) {
     const { data: service, error } = await supabase
-      .from("vendor_services")
+    .from("vendor_services")
       .select("id, vendor_profile_id")
       .eq("id", vendorServiceId)
       .maybeSingle();
@@ -227,6 +231,16 @@ async function resolveVendorLink(
 
     if (!service?.id) {
       return { error: apiError("Vendor service not found", 404) };
+    }
+
+    if (
+      vendorProfileId &&
+      service.vendor_profile_id &&
+      vendorProfileId !== service.vendor_profile_id
+    ) {
+      return {
+        error: apiError("Vendor service does not belong to selected vendor", 400),
+      };
     }
 
     return {

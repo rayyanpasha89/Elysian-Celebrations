@@ -20,6 +20,7 @@ import {
 import { categoryCopy } from "@/lib/vendor-offering";
 import {
   EVENT_FINALIZATION_CHECKLIST,
+  EVENT_PLATFORM_TYPES,
   EVENT_REQUIREMENT_CATEGORIES,
   EVENT_REQUIREMENT_PRIORITY_OPTIONS,
   EVENT_REQUIREMENT_STATUS_OPTIONS,
@@ -272,6 +273,16 @@ type EventRequirementDraft = {
   notes: string;
 };
 
+type EventCreationDraft = {
+  name: string;
+  eventType: string;
+  timeBlock: EventTimeBlockKey;
+  date: string;
+  startTime: string;
+  endTime: string;
+  venue: string;
+};
+
 type EventDetailDraft = {
   weddingDayId: string;
   name: string;
@@ -353,6 +364,19 @@ const EDITOR_SECTIONS: {
   },
 ];
 
+const BLOCK_PURPOSE_OPTIONS: string[] = Array.from(
+  new Set([
+    ...EVENT_TYPE_OPTIONS,
+    ...EVENT_PLATFORM_TYPES.map((eventType) => eventType.label),
+  ])
+);
+
+function blockPurposeOptionsWithCurrent(value: string) {
+  return value && !BLOCK_PURPOSE_OPTIONS.includes(value)
+    ? [value, ...BLOCK_PURPOSE_OPTIONS]
+    : BLOCK_PURPOSE_OPTIONS;
+}
+
 function draftId(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -428,6 +452,41 @@ function defaultRequirementDrafts() {
   return EVENT_REQUIREMENT_CATEGORIES.map((category) =>
     createRequirementDraft(category.key)
   );
+}
+
+function nextAvailableTimeBlockForDay(day: WeddingDay): EventTimeBlockKey {
+  const usedBlocks = new Set(
+    day.events
+      .map((event) => event.time_block)
+      .filter((timeBlock): timeBlock is EventTimeBlockKey => Boolean(timeBlock))
+  );
+
+  return (
+    EVENT_TIME_BLOCKS.find((block) => !usedBlocks.has(block.key))?.key ??
+    "evening"
+  );
+}
+
+function timeBlockDefaults(timeBlock: EventTimeBlockKey) {
+  return (
+    EVENT_TIME_BLOCKS.find((block) => block.key === timeBlock) ??
+    EVENT_TIME_BLOCKS.at(-1)!
+  );
+}
+
+function createEventDraftForDay(day?: WeddingDay): EventCreationDraft {
+  const timeBlock = day ? nextAvailableTimeBlockForDay(day) : "evening";
+  const defaults = timeBlockDefaults(timeBlock);
+
+  return {
+    name: "",
+    eventType: "Custom",
+    timeBlock,
+    date: day?.date ? day.date.slice(0, 10) : "",
+    startTime: defaults.defaultStartTime,
+    endTime: defaults.defaultEndTime,
+    venue: "",
+  };
 }
 
 function emptyVendorSelections(): Record<
@@ -782,13 +841,9 @@ export default function ClientWeddingPage() {
     notes: "",
   });
   const [eventFormDayId, setEventFormDayId] = useState<string | null>(null);
-  const [eventDraft, setEventDraft] = useState({
-    name: "",
-    eventType: "Custom",
-    date: "",
-    startTime: "",
-    venue: "",
-  });
+  const [eventDraft, setEventDraft] = useState<EventCreationDraft>(
+    createEventDraftForDay
+  );
   const [detailDraft, setDetailDraft] = useState<EventDetailDraft | null>(null);
   const [editorSection, setEditorSection] = useState<EditorSectionKey>("basics");
   const [savingDay, setSavingDay] = useState(false);
@@ -1125,8 +1180,10 @@ export default function ClientWeddingPage() {
           weddingDayId: eventFormDayId,
           name: eventDraft.name,
           eventType: eventDraft.eventType,
+          timeBlock: eventDraft.timeBlock,
           date: eventDraft.date || null,
           startTime: eventDraft.startTime || null,
+          endTime: eventDraft.endTime || null,
           venue: eventDraft.venue || null,
         }),
       });
@@ -1145,13 +1202,7 @@ export default function ClientWeddingPage() {
             null
         );
       }
-      setEventDraft({
-        name: "",
-        eventType: "Custom",
-        date: "",
-        startTime: "",
-        venue: "",
-      });
+      setEventDraft(createEventDraftForDay());
       setEventFormDayId(null);
       toast.success("Event added");
     } catch (error) {
@@ -2127,13 +2178,7 @@ export default function ClientWeddingPage() {
                             setEventFormDayId(
                               current => (current === day.id ? null : day.id)
                             );
-                            setEventDraft({
-                              name: "",
-                              eventType: "Custom",
-                              date: day.date ? day.date.slice(0, 10) : "",
-                              startTime: "",
-                              venue: "",
-                            });
+                            setEventDraft(createEventDraftForDay(day));
                           }}
                         >
                           Add event
@@ -2178,9 +2223,29 @@ export default function ClientWeddingPage() {
                             }
                             className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
                           >
-                            {EVENT_TYPE_OPTIONS.map((option) => (
+                            {blockPurposeOptionsWithCurrent(eventDraft.eventType).map((option) => (
                               <option key={option} value={option}>
                                 {option}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            value={eventDraft.timeBlock}
+                            onChange={(event) => {
+                              const timeBlock = event.target.value as EventTimeBlockKey;
+                              const defaults = timeBlockDefaults(timeBlock);
+                              setEventDraft((current) => ({
+                                ...current,
+                                timeBlock,
+                                startTime: defaults.defaultStartTime,
+                                endTime: defaults.defaultEndTime,
+                              }));
+                            }}
+                            className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                          >
+                            {EVENT_TIME_BLOCKS.map((option) => (
+                              <option key={option.key} value={option.key}>
+                                {option.label}
                               </option>
                             ))}
                           </select>
@@ -2202,6 +2267,17 @@ export default function ClientWeddingPage() {
                               setEventDraft((current) => ({
                                 ...current,
                                 startTime: event.target.value,
+                              }))
+                            }
+                            className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                          />
+                          <input
+                            type="time"
+                            value={eventDraft.endTime}
+                            onChange={(event) =>
+                              setEventDraft((current) => ({
+                                ...current,
+                                endTime: event.target.value,
                               }))
                             }
                             className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
@@ -2445,7 +2521,7 @@ export default function ClientWeddingPage() {
                       }
                       className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
                     >
-                      {EVENT_TYPE_OPTIONS.map((option) => (
+                      {blockPurposeOptionsWithCurrent(detailDraft.eventType).map((option) => (
                         <option key={option} value={option}>
                           {option}
                         </option>
