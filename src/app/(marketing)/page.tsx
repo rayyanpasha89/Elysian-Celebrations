@@ -8,14 +8,24 @@ import { TestimonialCarousel } from "@/components/marketing/testimonials/testimo
 import { FoundersSection } from "@/components/marketing/about/founders-section";
 import { PlanningManifesto } from "@/components/marketing/home/planning-manifesto";
 import { ContactForm } from "@/components/marketing/contact/contact-form";
+import { redirect } from "next/navigation";
 import {
   SectionEyebrow,
   SectionHeader,
 } from "@/components/marketing/shared/marketing-primitives";
+import { getOptionalAuthSession } from "@/lib/api-utils";
+import { portalPathForRole } from "@/lib/role-utils";
 import { cn } from "@/lib/utils";
 import { MARKETING_IMAGES } from "@/lib/marketing-images";
 
-export default function HomePage() {
+export default async function HomePage() {
+  // Signed-in users should land in their portal, not the marketing hero.
+  // Anonymous visitors fall through to the landing page below.
+  const session = await getOptionalAuthSession();
+  if (session) {
+    redirect(portalPathForRole(session.role));
+  }
+
   return (
     <>
       <HeroSection />

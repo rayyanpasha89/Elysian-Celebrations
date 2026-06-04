@@ -38,9 +38,9 @@ import {
 } from "@/lib/event-platform";
 import { cn } from "@/lib/utils";
 
-type Step = 0 | 1 | 2 | 3;
+type Step = 0 | 1 | 2 | 3 | 4;
 
-const STEP_LABELS = ["Name", "Type", "Days", "Time blocks"] as const;
+const STEP_LABELS = ["Name", "Type", "Days", "Dates", "Time blocks"] as const;
 
 type LocalDay = {
   name: string;
@@ -160,9 +160,11 @@ export default function ClientOnboardingPage() {
   // Step 2
   const [eventType, setEventType] = useState<EventPlatformType>("wedding");
   const [customEventType, setCustomEventType] = useState("");
-  // Step 3
+  // Step 3 — scale
   const [dayCount, setDayCount] = useState(3);
   const [eventDate, setEventDate] = useState("");
+  const [guestCount, setGuestCount] = useState(120);
+  const [budgetTotal, setBudgetTotal] = useState(800000);
   // Step 4
   const eventTypeLabel = useMemo(() => {
     const match = EVENT_PLATFORM_TYPES.find((t) => t.value === eventType);
@@ -206,15 +208,20 @@ export default function ClientOnboardingPage() {
       return true;
     }
     if (step === 2) return dayCount >= 1 && dayCount <= 14 && Boolean(eventDate);
+    if (step === 3) return days.length > 0 && days.every((day) => Boolean(day.date));
     return true;
   };
 
   const next = () => {
     if (!canAdvance()) {
-      toast.error("Please complete this step before continuing.");
+      if (step === 3) {
+        toast.error("Pick a date for every day before continuing.");
+      } else {
+        toast.error("Please complete this step before continuing.");
+      }
       return;
     }
-    setStep((s) => (s < 3 ? ((s + 1) as Step) : s));
+    setStep((s) => (s < 4 ? ((s + 1) as Step) : s));
   };
 
   const back = () => setStep((s) => (s > 0 ? ((s - 1) as Step) : s));
@@ -222,7 +229,8 @@ export default function ClientOnboardingPage() {
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (saving) return;
-    if (step < 3) {
+    // Submitting before the final step only advances — never creates the event.
+    if (step < 4) {
       next();
       return;
     }
@@ -249,11 +257,10 @@ export default function ClientOnboardingPage() {
           coupleName: profileName.trim(),
           weddingDate: eventDate || null,
           dayCount,
-          // Defaults so the existing API contract stays satisfied. The
-          // backend ignores anything else for now; once Codex's API slice
-          // lands, `definitionPayload` will be persisted in full.
-          guestCount: 100,
-          budgetTotal: 500000,
+          // Real values captured in the scale step so the budget planner and
+          // catering sizing start from the user's own numbers, not defaults.
+          guestCount,
+          budgetTotal,
           eventType,
           customEventType:
             eventType === CUSTOM_EVENT_TYPE_VALUE ? customEventType.trim() : null,
@@ -304,7 +311,21 @@ export default function ClientOnboardingPage() {
         </div>
       </motion.header>
 
-      <form onSubmit={onSubmit} className="mt-10 space-y-8">
+      <form
+        onSubmit={onSubmit}
+        onKeyDown={(e) => {
+          // Prevent Enter inside any field from advancing or creating early —
+          // only explicit Continue / Create clicks move the flow.
+          if (
+            e.key === "Enter" &&
+            (e.target as HTMLElement).tagName !== "TEXTAREA" &&
+            step < 4
+          ) {
+            e.preventDefault();
+          }
+        }}
+        className="mt-10 space-y-8"
+      >
         <motion.div variants={fadeUp} className={cn(dashCard, "space-y-6")}>
           {step === 0 ? (
             <NameStep value={profileName} onChange={setProfileName} />
@@ -326,36 +347,55 @@ export default function ClientOnboardingPage() {
             <DaysStep
               dayCount={dayCount}
               eventDate={eventDate}
+              guestCount={guestCount}
+              budgetTotal={budgetTotal}
               onDayCountChange={(value) => setDayCount(normalizeDayCount(value))}
               onEventDateChange={setEventDate}
+              onGuestCountChange={setGuestCount}
+              onBudgetTotalChange={setBudgetTotal}
               eventTypeLabel={eventTypeLabel}
             />
           ) : null}
 
           {step === 3 ? (
-            <BlocksStep
+            <DatesStep
               days={days}
               onDayPatch={(index, patch) => {
                 setDays((current) =>
                   current.map((day, i) => (i === index ? { ...day, ...patch } : day))
                 );
               }}
-              onBlockPatch={(dayIndex, blockKey, patch) => {
-                setDays((current) =>
-                  current.map((day, i) =>
-                    i === dayIndex
-                      ? {
-                          ...day,
-                          blocks: {
-                            ...day.blocks,
-                            [blockKey]: { ...day.blocks[blockKey], ...patch },
-                          },
-                        }
-                      : day
-                  )
-                );
-              }}
             />
+          ) : null}
+
+          {step === 4 ? (
+            <>
+              <ReviewSummary
+                eventName={profileName}
+                eventTypeLabel={eventTypeLabel}
+                days={days}
+                guestCount={guestCount}
+                budgetTotal={budgetTotal}
+              />
+              <BlocksStep
+                days={days}
+                onBlockPatch={(dayIndex, blockKey, patch) => {
+                  setDays((current) =>
+                    current.map((day, i) =>
+                      i === dayIndex
+                        ? {
+                            ...day,
+                            blocks: {
+                              ...day.blocks,
+                              [blockKey]: { ...day.blocks[blockKey], ...patch },
+                            },
+                          }
+                        : day
+                    )
+                  );
+                }}
+              />
+            </>
           ) : null}
         </motion.div>
 
@@ -371,7 +411,7 @@ export default function ClientOnboardingPage() {
           >
             ← Back
           </button>
-          {step < 3 ? (
+          {step < 4 ? (
             <button type="button" onClick={next} className={dashBtn}>
               Continue →
             </button>
@@ -471,16 +511,25 @@ function TypeStep({
 function DaysStep({
   dayCount,
   eventDate,
+  guestCount,
+  budgetTotal,
   eventTypeLabel,
   onDayCountChange,
   onEventDateChange,
+  onGuestCountChange,
+  onBudgetTotalChange,
 }: {
   dayCount: number;
   eventDate: string;
+  guestCount: number;
+  budgetTotal: number;
   eventTypeLabel: string;
   onDayCountChange: (v: number) => void;
   onEventDateChange: (v: string) => void;
+  onGuestCountChange: (v: number) => void;
+  onBudgetTotalChange: (v: number) => void;
 }) {
+  const budgetInLakh = (budgetTotal / 100000).toFixed(1);
   return (
     <div className="space-y-5">
       <div>
@@ -537,17 +586,193 @@ function DaysStep({
           day&apos;s date and morning / afternoon / evening blocks before anything is created.
         </p>
       </div>
+
+      <div className="grid gap-4 border-t border-charcoal/8 pt-5 sm:grid-cols-2">
+        <div>
+          <label htmlFor="guestCount" className={dashLabel}>
+            Estimated guests
+          </label>
+          <input
+            id="guestCount"
+            type="number"
+            min={1}
+            max={100000}
+            value={guestCount}
+            onChange={(e) =>
+              onGuestCountChange(Math.max(1, Number(e.target.value) || 1))
+            }
+            className="mt-3 w-full border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm outline-none focus:border-gold-primary"
+          />
+          <p className="mt-2 text-xs text-slate">
+            A rough number is fine — it sizes catering, seating, and hotel
+            blocks. You can refine it per day later.
+          </p>
+        </div>
+        <div>
+          <label htmlFor="budgetTotal" className={dashLabel}>
+            Working budget (₹)
+          </label>
+          <input
+            id="budgetTotal"
+            type="number"
+            min={0}
+            step={50000}
+            value={budgetTotal}
+            onChange={(e) =>
+              onBudgetTotalChange(Math.max(0, Number(e.target.value) || 0))
+            }
+            className="mt-3 w-full border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm outline-none focus:border-gold-primary"
+          />
+          <p className="mt-2 text-xs text-slate">
+            Sets the cap in your budget planner — about{" "}
+            <span className="text-charcoal">₹{budgetInLakh}L</span>. Adjust it
+            any time from the Budget page.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function formatDayDateLabel(value: string | null): string {
+  if (!value) return "Date not set";
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return "Date not set";
+  return new Date(Date.UTC(year, month - 1, day, 12)).toLocaleDateString("en-IN", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+// Step 4 (Dates) — one date per day. Pre-filled from the main date in Step 3,
+// the user fine-tunes each. Dedicated step so it can't be missed.
+function DatesStep({
+  days,
+  onDayPatch,
+}: {
+  days: LocalDay[];
+  onDayPatch: (index: number, patch: Partial<LocalDay>) => void;
+}) {
+  return (
+    <div className="space-y-5">
+      <div>
+        <p className={dashLabel}>Set each day&apos;s date</p>
+        <p className="mt-2 text-xs leading-relaxed text-slate">
+          We pre-filled dates counting back from your main date. Adjust any of
+          them — give each day its own date and a name you recognise.
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        {days.map((day, dayIndex) => (
+          <div
+            key={dayIndex}
+            className="grid gap-3 border border-charcoal/10 bg-cream/30 p-4 sm:grid-cols-[minmax(0,1fr)_14rem]"
+          >
+            <div className="min-w-0">
+              <label htmlFor={`event-date-day-name-${dayIndex}`} className={dashLabel}>
+                Day {dayIndex + 1} name
+              </label>
+              <input
+                id={`event-date-day-name-${dayIndex}`}
+                value={day.name}
+                onChange={(e) => onDayPatch(dayIndex, { name: e.target.value })}
+                className="mt-2 w-full border-0 border-b border-charcoal/15 bg-transparent py-2 font-display text-lg text-charcoal outline-none focus:border-gold-primary"
+                placeholder={`Day ${dayIndex + 1}`}
+              />
+            </div>
+            <div>
+              <label htmlFor={`event-date-day-${dayIndex}`} className={dashLabel}>
+                Date
+              </label>
+              <input
+                id={`event-date-day-${dayIndex}`}
+                type="date"
+                value={day.date ?? ""}
+                onChange={(e) =>
+                  onDayPatch(dayIndex, { date: e.target.value || null })
+                }
+                className="mt-2 w-full border border-charcoal/12 bg-ivory px-3 py-2 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Compact "what you're about to create" recap shown on the final step.
+function ReviewSummary({
+  eventName,
+  eventTypeLabel,
+  days,
+  guestCount,
+  budgetTotal,
+}: {
+  eventName: string;
+  eventTypeLabel: string;
+  days: LocalDay[];
+  guestCount: number;
+  budgetTotal: number;
+}) {
+  const enabledBlocks = days.reduce(
+    (sum, day) => sum + Object.values(day.blocks).filter((b) => b.enabled).length,
+    0
+  );
+  const dated = days.filter((d) => d.date).map((d) => d.date as string).sort();
+  const range =
+    dated.length > 0
+      ? dated.length === 1
+        ? formatDayDateLabel(dated[0])
+        : `${formatDayDateLabel(dated[0])} → ${formatDayDateLabel(dated[dated.length - 1])}`
+      : "Dates pending";
+
+  const items: Array<{ label: string; value: string }> = [
+    { label: "Event", value: eventName.trim() || "Untitled event" },
+    { label: "Type", value: eventTypeLabel },
+    { label: "Days", value: `${days.length}` },
+    { label: "Time blocks", value: `${enabledBlocks}` },
+    { label: "Guests", value: guestCount.toLocaleString("en-IN") },
+    { label: "Budget", value: `₹${(budgetTotal / 100000).toFixed(1)}L` },
+  ];
+
+  return (
+    <div className="border border-gold-primary/30 bg-gold-primary/5 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className={cn(dashLabel, "text-gold-dark")}>About to create</p>
+        <span className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
+          {range}
+        </span>
+      </div>
+      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+        {items.map((item) => (
+          <div key={item.label}>
+            <dt className="font-accent text-[9px] uppercase tracking-[0.18em] text-slate">
+              {item.label}
+            </dt>
+            <dd className="mt-1 truncate font-heading text-sm text-charcoal">
+              {item.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-3 text-[11px] leading-relaxed text-slate">
+        Nothing is saved until you press{" "}
+        <span className="text-charcoal">Create event &amp; open planner</span>.
+        Toggle and rename the blocks below first.
+      </p>
     </div>
   );
 }
 
 function BlocksStep({
   days,
-  onDayPatch,
   onBlockPatch,
 }: {
   days: LocalDay[];
-  onDayPatch: (index: number, patch: Partial<LocalDay>) => void;
   onBlockPatch: (
     dayIndex: number,
     blockKey: EventTimeBlockKey,
@@ -557,10 +782,10 @@ function BlocksStep({
   return (
     <div className="space-y-5">
       <div>
-        <p className={dashLabel}>Shape each day</p>
+        <p className={dashLabel}>Choose time blocks for each day</p>
         <p className="mt-2 text-xs leading-relaxed text-slate">
-          Morning, afternoon, and evening are created by default. Turn off any
-          block you do not need, then rename the rest — &quot;Morning&quot; can become
+          Morning, afternoon, and evening are on by default. Turn off any block
+          you do not need, then rename the rest — &quot;Morning&quot; can become
           &quot;Haldi brunch&quot;, &quot;Evening&quot; can become &quot;Reception&quot;.
         </p>
       </div>
@@ -568,33 +793,11 @@ function BlocksStep({
       <div className="space-y-4">
         {days.map((day, dayIndex) => (
           <div key={dayIndex} className="border border-charcoal/10 bg-cream/30 p-4">
-            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem]">
-              <div className="min-w-0">
-                <label htmlFor={`event-day-name-${dayIndex}`} className={dashLabel}>
-                  Day {dayIndex + 1} name
-                </label>
-                <input
-                  id={`event-day-name-${dayIndex}`}
-                  value={day.name}
-                  onChange={(e) => onDayPatch(dayIndex, { name: e.target.value })}
-                  className="mt-2 w-full border-0 border-b border-charcoal/15 bg-transparent py-2 font-display text-lg text-charcoal outline-none focus:border-gold-primary"
-                  placeholder={`Day ${dayIndex + 1}`}
-                />
-              </div>
-              <div>
-                <label htmlFor={`event-day-date-${dayIndex}`} className={dashLabel}>
-                  Date
-                </label>
-                <input
-                  id={`event-day-date-${dayIndex}`}
-                  type="date"
-                  value={day.date ?? ""}
-                  onChange={(e) =>
-                    onDayPatch(dayIndex, { date: e.target.value || null })
-                  }
-                  className="mt-2 w-full border border-charcoal/12 bg-ivory px-3 py-2 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                />
-              </div>
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="font-display text-lg text-charcoal">{day.name}</p>
+              <span className="font-accent text-[10px] uppercase tracking-[0.18em] text-gold-dark">
+                {formatDayDateLabel(day.date)}
+              </span>
             </div>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-3">

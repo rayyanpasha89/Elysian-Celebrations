@@ -56,7 +56,7 @@ export function HeroSection() {
             }
             className="font-accent text-xs uppercase tracking-[0.42em] text-gold-light"
           >
-            Destination Weddings, Reframed
+            Event Design, Reframed
           </motion.p>
 
           <HeroHeadline />
@@ -67,9 +67,10 @@ export function HeroSection() {
             transition={{ duration: 0.8, delay: 1.6, ease: [0.16, 1, 0.3, 1] }}
             className="mt-8 max-w-2xl font-heading text-lg leading-relaxed text-ivory/72 md:text-[1.35rem]"
           >
-            Build a destination wedding that feels cinematic before guests even
-            arrive. We connect atmosphere, budget, vendors, and the weekend flow
-            so the celebration reads like one beautifully resolved world.
+            Weddings, launches, galas, retreats — design any event that feels
+            cinematic before a single guest arrives. Elysian connects
+            atmosphere, budget, vendors, and the run-of-show into one
+            beautifully resolved world.
           </motion.p>
 
           <motion.div
@@ -109,7 +110,7 @@ export function HeroSection() {
             <SignalCard
               icon={CalendarDays}
               label="Event flow"
-              value="Weekend mapped with intention"
+              value="Every day mapped with intention"
             />
           </motion.div>
         </motion.div>
@@ -143,7 +144,7 @@ export function HeroSection() {
                 Budget runway
               </FloatingTag>
               <FloatingTag className="left-[12%] bottom-[10%]" delay={2.1}>
-                Weekend flow
+                Run-of-show
               </FloatingTag>
 
               <motion.div
@@ -233,16 +234,19 @@ export function HeroSection() {
 
 function HeroHeadline() {
   const line1 = "Design the";
-  const line2 = "Wedding in Three Dimensions";
+  const line2 = "Event in Three Dimensions";
 
   return (
     <h1
       className="mt-6 font-display font-bold leading-[0.95] text-ivory"
       style={{ fontSize: "var(--text-hero)" }}
+      aria-label={`${line1} ${line2}`}
     >
-      <AnimatedLine text={line1} delay={0.45} />
-      <br />
-      <AnimatedLine text={line2} delay={0.8} className="text-gold-primary" />
+      <span aria-hidden="true">
+        <AnimatedLine text={line1} delay={0.45} />
+        <br />
+        <AnimatedLine text={line2} delay={0.8} className="text-gold-primary" />
+      </span>
     </h1>
   );
 }
@@ -406,7 +410,7 @@ function MainStageCard() {
             Event architecture
           </p>
           <p className="mt-2 text-sm leading-relaxed text-charcoal">
-            Build the weekend programme as a designed sequence, not a scattered set
+            Build the event programme as a designed sequence, not a scattered set
             of notes.
           </p>
         </div>
@@ -417,7 +421,7 @@ function MainStageCard() {
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
             <MiniStageMetric label="Creative fit" value="Aligned" />
             <MiniStageMetric label="Budget readiness" value="Visible" />
-            <MiniStageMetric label="Weekend coverage" value="Mapped" />
+            <MiniStageMetric label="Event coverage" value="Mapped" />
           </div>
         </div>
       </div>
