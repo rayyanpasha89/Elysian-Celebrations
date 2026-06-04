@@ -265,7 +265,7 @@ export async function GET() {
       needsProfile: false,
       subtitle: wedding
         ? `${dest?.name ?? "Your destination"} wedding — ${daysUntil(weddingDate)} days to go.`
-        : "Set up your wedding to unlock planning tools.",
+        : "Set up your event plan to unlock planning tools.",
     });
   } catch (e) {
     console.error("dashboard client", e);

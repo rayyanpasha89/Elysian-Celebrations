@@ -16,7 +16,7 @@ const DASHBOARD_ROUTE_TITLES: Record<string, string> = {
   "/client/mood-board": "Mood Board",
   "/client/messages": "Messages",
   "/client/settings": "Settings",
-  "/client/wedding": "My Wedding",
+  "/client/wedding": "Event Plan",
   "/client/timeline": "Timeline",
   "/client/bookings": "Bookings",
 

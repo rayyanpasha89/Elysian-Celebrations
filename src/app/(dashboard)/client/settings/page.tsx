@@ -133,14 +133,14 @@ export default function ClientSettingsPage() {
       </motion.section>
 
       <motion.section variants={fadeUp} className={dashCard}>
-        <h3 className="font-display text-lg text-charcoal">Wedding details</h3>
+        <h3 className="font-display text-lg text-charcoal">Event details</h3>
         <p className="font-heading mt-2 text-sm text-slate">
-          Updates your client profile and, when a wedding exists, the wedding record (date and destination).
+          Updates your client profile and, when an event plan exists, the event record (date and destination).
         </p>
         {!hasWedding && (
           <p className="font-heading mt-3 text-sm text-charcoal/80">
-            You don&apos;t have a wedding record yet—destination and shared wedding date will apply after onboarding
-            or when a wedding is created. Partner name and guest count still save here.
+            You don&apos;t have an event plan yet—destination and shared event date will apply after onboarding
+            or when an event plan is created. Name and guest count still save here.
           </p>
         )}
         <form
@@ -158,15 +158,15 @@ export default function ClientSettingsPage() {
               });
               const data = await res.json();
               if (!res.ok) throw new Error(data.error ?? "Save failed");
-              toast.success("Wedding details saved");
+              toast.success("Event details saved");
             } catch (e) {
               toast.error(e instanceof Error ? e.message : "Could not save");
             }
           })}
           className="mt-6 space-y-8"
         >
-          <FloatingField id="partner" label="Partner / couple name" {...wedding.register("partnerName")} />
-          <FloatingField id="wed-date" label="Wedding date" type="date" {...wedding.register("date")} />
+          <FloatingField id="partner" label="Event / host name" {...wedding.register("partnerName")} />
+          <FloatingField id="wed-date" label="Event date" type="date" {...wedding.register("date")} />
           <FloatingField id="wed-guests" label="Guest count" type="number" min={0} {...wedding.register("guestCount")} />
           <div>
             <label htmlFor="wed-dest" className={cn(dashLabel, "block")}>
@@ -186,7 +186,7 @@ export default function ClientSettingsPage() {
               ))}
             </select>
             {!hasWedding && (
-              <p className="font-heading mt-2 text-xs text-slate">Available after a wedding record exists.</p>
+              <p className="font-heading mt-2 text-xs text-slate">Available after an event plan exists.</p>
             )}
           </div>
           <button type="submit" className={dashBtn} disabled={wedding.formState.isSubmitting}>

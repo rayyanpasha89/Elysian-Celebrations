@@ -29,7 +29,7 @@ type ClientDashboardPayload = {
 };
 
 const quickActions = [
-  { label: "Wedding plan", href: "/client/wedding" },
+  { label: "Event plan", href: "/client/wedding" },
   { label: "Vendors", href: "/client/vendors" },
   { label: "Guests", href: "/client/guests" },
   { label: "Timeline", href: "/client/timeline" },
@@ -153,7 +153,7 @@ export default function ClientDashboard() {
             )}
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate">
               This is your command center—jump into the budget planner, day-by-day
-              wedding plan, vendors, and guest flow from one place. Shortcuts below
+              event plan, vendors, and guest flow from one place. Shortcuts below
               mirror how the budget screen keeps tools one click away.
             </p>
           </div>
@@ -183,7 +183,7 @@ export default function ClientDashboard() {
                   Countdown
                 </p>
                 <p className="mt-2 font-display text-xl text-charcoal">
-                  Set your date in onboarding or the wedding plan.
+                  Set your date in onboarding or the event plan.
                 </p>
               </div>
             )}
@@ -198,7 +198,7 @@ export default function ClientDashboard() {
             Open budget planner
           </Link>
           <Link href="/client/wedding" className={actionLinkClass}>
-            Edit wedding plan
+            Edit event plan
           </Link>
         </div>
 
@@ -271,14 +271,14 @@ export default function ClientDashboard() {
                   What to do next
                 </p>
                 <p className="mt-2 text-sm leading-relaxed text-charcoal">
-                  Add your first wedding day and event, then this timeline starts
+                  Add your first event day and time block, then this timeline starts
                   showing the tasks that actually move the weekend forward.
                 </p>
                 <Link
                   href="/client/wedding"
                   className="mt-4 inline-flex font-accent text-[10px] uppercase tracking-[0.18em] text-gold-primary hover:text-gold-dark"
                 >
-                  Start the wedding plan →
+                  Start the event plan →
                 </Link>
               </div>
             ) : (
@@ -325,7 +325,7 @@ export default function ClientDashboard() {
             <div className="border border-charcoal/8 bg-ivory p-6">
               <div className="mb-5 flex items-start justify-between gap-4">
                 <div>
-                  <p className={sectionEyebrowClass}>Wedding operating plan</p>
+                  <p className={sectionEyebrowClass}>Event operating plan</p>
                   <h2 className="mt-2 font-display text-xl text-charcoal">
                     Overview
                   </h2>
@@ -339,14 +339,14 @@ export default function ClientDashboard() {
               </div>
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
                 {[
-                  { label: "Wedding name", value: wedding.name },
+                  { label: "Event name", value: wedding.name },
                   {
                     label: "Destination",
                     value: wedding.destinationName ?? "TBD",
                   },
                   { label: "Status", value: wedding.status },
                   {
-                    label: "Wedding date",
+                    label: "Event date",
                     value:
                       weddingDate?.toLocaleDateString("en-IN", {
                         day: "numeric",

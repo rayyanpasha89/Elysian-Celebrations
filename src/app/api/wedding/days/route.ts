@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as Record<string, unknown>;
     const { supabase, wedding } = await getClientWeddingContext(session.userId);
     if (!wedding) {
-      return apiError("Wedding not found", 404);
+      return apiError("Event plan not found", 404);
     }
 
     const { data: existingEvents, error: eventsError } = await supabase
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
 
     if (eventsError) {
       console.error("wedding_events load:", eventsError);
-      return apiError("Failed to load wedding plan", 500);
+      return apiError("Failed to load event plan", 500);
     }
 
     const existingDays = await ensureWeddingDays(

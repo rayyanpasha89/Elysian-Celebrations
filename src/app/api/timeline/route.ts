@@ -31,7 +31,7 @@ async function getClientWedding(
     .maybeSingle();
   if (wErr) {
     console.error("weddings:", wErr);
-    throw new Error("Failed to load wedding");
+    throw new Error("Failed to load event plan");
   }
 
   return wedding;
@@ -143,7 +143,7 @@ export async function GET() {
         is_completed: task.status === "DONE",
         sort_order: task.sort_order ?? 0,
         source: "event" as const,
-        event_name: event?.name ?? "Wedding event",
+        event_name: event?.name ?? "Event block",
         event_day_name: event?.dayName ?? null,
         owner: task.owner,
       };
@@ -181,7 +181,7 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminSupabaseClient();
     const wedding = await getClientWedding(supabase, session.userId);
     if (!wedding) {
-      return apiError("Create your wedding first", 409);
+      return apiError("Create your event plan first", 409);
     }
 
     const body = await request.json();

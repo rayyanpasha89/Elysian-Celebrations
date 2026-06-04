@@ -154,7 +154,7 @@ export async function PATCH(request: NextRequest) {
         body.destinationId !== undefined
       ) {
         return apiError(
-          "Complete onboarding first to save wedding details.",
+          "Complete onboarding first to save event details.",
           400
         );
       }

@@ -168,7 +168,7 @@ function mapRequirementRow(row: RequirementRow) {
 async function requireClientEvent(eventId: string, userId: string) {
   const { supabase, wedding } = await getClientWeddingContext(userId);
   if (!wedding) {
-    return { error: apiError("Wedding not found", 404), supabase, event: null };
+    return { error: apiError("Event plan not found", 404), supabase, event: null };
   }
 
   const { data: event, error } = await supabase

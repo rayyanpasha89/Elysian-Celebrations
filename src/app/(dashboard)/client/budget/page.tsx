@@ -262,10 +262,10 @@ export default function BudgetPage() {
           Budget setup
         </p>
         <h1 className="mt-2 font-display text-3xl text-charcoal">
-          Start with your wedding setup
+          Start with your event setup
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate">
-          Your budget plan connects to your client profile and wedding details, so
+          Your budget plan connects to your client profile and event details, so
           complete onboarding first and this planner will be ready with a default
           structure the moment you come back.
         </p>
@@ -303,7 +303,7 @@ export default function BudgetPage() {
                   onChange={(event) => {
                     const nextValue = event.target.value;
                     setBudgetTitleDraft(nextValue);
-                    setBudgetName(nextValue.trim() || "Wedding Investment Plan");
+                    setBudgetName(nextValue.trim() || "Event Investment Plan");
                   }}
                   className="mt-2 w-full border-b border-charcoal/12 bg-transparent py-2 font-display text-2xl text-charcoal outline-none transition-colors focus:border-gold-primary"
                 />
@@ -599,7 +599,7 @@ function EventPlanSpendCallout({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-2xl">
           <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-slate">
-            Wedding operating plan
+            Event operating plan
           </p>
           <h2 className="mt-2 font-display text-2xl text-charcoal">
             {summary.weddingName}
@@ -645,7 +645,7 @@ function EventPlanSpendCallout({
             href="/client/wedding"
             className="font-accent inline-flex items-center justify-center border border-charcoal/15 px-5 py-2.5 text-[10px] uppercase tracking-[0.2em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark"
           >
-            Edit wedding plan
+            Edit event plan
           </Link>
         </div>
       </div>
@@ -701,7 +701,7 @@ function EventPlanSpendCallout({
           </ul>
         ) : (
           <p className="mt-4 text-sm leading-relaxed text-slate">
-            No per-event estimates yet. Open your wedding plan and set estimated
+            No per-event estimates yet. Open your event plan and set estimated
             spend on each function to roll it up here.
           </p>
         )}

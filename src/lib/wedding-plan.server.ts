@@ -149,7 +149,7 @@ export async function ensureWeddingDays(
     .order("sort_order", { ascending: true });
 
   if (createdDaysError || !createdDays) {
-    throw createdDaysError ?? new Error("Failed to create wedding days");
+    throw createdDaysError ?? new Error("Failed to create event days");
   }
 
   const dayIdByKey = new Map<string, string>();

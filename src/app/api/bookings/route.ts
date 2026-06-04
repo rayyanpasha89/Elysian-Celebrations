@@ -238,7 +238,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (weddingEventId && typeof weddingEventId !== "string") {
-      return apiError("Wedding event ID is invalid", 400);
+      return apiError("Event block ID is invalid", 400);
     }
 
     const { data: clientProfile, error: cpErr } = await supabase
@@ -304,7 +304,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (!wedding) {
-        return apiError("Wedding not found", 404);
+        return apiError("Event plan not found", 404);
       }
 
       const { data: linkedEvent, error: linkedEventError } = await supabase
@@ -315,7 +315,7 @@ export async function POST(request: NextRequest) {
         .maybeSingle();
 
       if (linkedEventError) {
-        console.error("Wedding event lookup error:", linkedEventError);
+        console.error("Event block lookup error:", linkedEventError);
         return apiError("Failed to validate booking event", 500);
       }
 

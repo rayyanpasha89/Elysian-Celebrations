@@ -175,7 +175,7 @@ export function BudgetCanvas({
             Planning Canvas
           </p>
           <h3 className="mt-2 font-display text-xl text-charcoal">
-            Build the budget like a real wedding plan
+            Build the budget like a real event plan
           </h3>
           <p className="mt-2 text-sm leading-relaxed text-slate">
             Each category tracks target allocation, live quotes, actuals, and paid
@@ -546,7 +546,7 @@ function SortableBudgetItem({
               />
               <div className="md:col-span-3">
                 <label className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
-                  Wedding event
+                  Event block
                 </label>
                 <select
                   value={item.eventId ?? ""}

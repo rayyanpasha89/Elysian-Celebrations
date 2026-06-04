@@ -102,7 +102,7 @@ export function firstMessageSuggestionsForClient(
     tips.push(`Share that the venue is ${event.venue} and ask about logistics.`);
   }
   if (tips.length === 0) {
-    tips.push("Share your wedding date and what you're hoping for.");
+    tips.push("Share your event date and what you're hoping for.");
     tips.push("Ask which packages match your guest count and style.");
   }
   return tips.slice(0, 3);
@@ -127,7 +127,7 @@ export function firstMessageSuggestionsForVendor(
   }
   if (tips.length === 0) {
     tips.push("Introduce yourself and share what a typical engagement looks like.");
-    tips.push("Ask for the wedding date, guest count, and venue.");
+    tips.push("Ask for the event date, guest count, and venue.");
   }
   return tips.slice(0, 3);
 }

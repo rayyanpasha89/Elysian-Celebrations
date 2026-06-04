@@ -25,7 +25,7 @@ export async function PATCH(
     const body = (await request.json()) as Record<string, unknown>;
     const { supabase, wedding } = await getClientWeddingContext(session.userId);
     if (!wedding) {
-      return apiError("Wedding not found", 404);
+      return apiError("Event plan not found", 404);
     }
 
     const { data: currentDay, error: currentDayError } = await supabase
@@ -93,7 +93,7 @@ export async function DELETE(
     const { id } = await params;
     const { supabase, wedding } = await getClientWeddingContext(session.userId);
     if (!wedding) {
-      return apiError("Wedding not found", 404);
+      return apiError("Event plan not found", 404);
     }
 
     const { data: targetDay, error: targetDayError } = await supabase

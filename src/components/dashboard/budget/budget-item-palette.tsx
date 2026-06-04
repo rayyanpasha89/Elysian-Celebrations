@@ -60,7 +60,7 @@ export function BudgetItemPalette() {
         </h3>
         <p className="mt-2 text-sm leading-relaxed text-slate">
           Click to add instantly, or drag an item onto a category to shape your
-          plan around the wedding you actually want.
+          plan around the event you actually want.
         </p>
       </div>
 

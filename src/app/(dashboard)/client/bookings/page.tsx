@@ -257,7 +257,7 @@ export default function ClientBookingsPage() {
                     </p>
                     <p>
                       <span className={dashLabel}>Day </span>
-                      {booking.event_context?.day?.name ?? "Wedding plan"}
+                      {booking.event_context?.day?.name ?? "Event plan"}
                     </p>
                     <p>
                       <span className={dashLabel}>Date </span>
@@ -309,7 +309,7 @@ export default function ClientBookingsPage() {
                   </p>
                   {selectedBooking.event_context ? (
                     <p className="mt-3 font-accent text-[10px] uppercase tracking-[0.18em] text-gold-light">
-                      {selectedBooking.event_context.day?.name ?? "Wedding plan"} ·{" "}
+                      {selectedBooking.event_context.day?.name ?? "Event plan"} ·{" "}
                       {selectedBooking.event_context.name}
                     </p>
                   ) : null}

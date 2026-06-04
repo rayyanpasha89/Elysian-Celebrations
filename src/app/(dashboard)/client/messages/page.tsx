@@ -239,12 +239,12 @@ export default function ClientMessagesPage() {
           variants={fadeUp}
           className="mt-12 border border-charcoal/8 bg-cream/30 p-8"
         >
-          <p className={dashLabel}>Set up your wedding first</p>
+          <p className={dashLabel}>Set up your event first</p>
           <h3 className="font-display mt-2 text-2xl text-charcoal">
             Complete onboarding to start conversations
           </h3>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate">
-            Messages are tied to bookings on your wedding. Finish onboarding so
+            Messages are tied to bookings on your event plan. Finish onboarding so
             vendors can be linked to the right event and day.
           </p>
           <Link
@@ -308,7 +308,7 @@ export default function ClientMessagesPage() {
         </h2>
         <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate">
           Every thread is tied to a real booking. Switch between conversations to
-          see the service, the wedding event, the day, and the venue without
+          see the service, the event block, the day, and the venue without
           leaving the inbox.
         </p>
       </motion.div>
@@ -615,12 +615,12 @@ function ContextPanel({
       <ContextRow label="Service" value={booking.service?.name ?? null} />
       <ContextRow label="Service scope" value={booking.service?.scope ?? null} />
       <ContextRow
-        label="Wedding event"
+        label="Event block"
         value={booking.weddingEvent?.name ?? null}
         secondary={booking.weddingEvent?.eventType ?? null}
       />
       <ContextRow
-        label="Wedding day"
+        label="Event day"
         value={booking.weddingDay?.name ?? null}
         secondary={formatBookingDate(booking.weddingDay?.date ?? null)}
       />

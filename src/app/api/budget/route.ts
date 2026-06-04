@@ -247,7 +247,7 @@ async function getOrCreateBudget(profileId: string) {
     .from("budgets")
     .insert({
       client_profile_id: profileId,
-      name: "Wedding Investment Plan",
+      name: "Event Investment Plan",
       total_budget: 2500000,
     })
     .select("id, name, total_budget")
@@ -403,7 +403,7 @@ export async function PUT(request: NextRequest) {
     const budgetName =
       typeof body.budgetName === "string" && body.budgetName.trim()
         ? body.budgetName.trim()
-        : "Wedding Investment Plan";
+        : "Event Investment Plan";
     const totalBudget =
       typeof body.totalBudget === "number" && Number.isFinite(body.totalBudget)
         ? Math.max(0, Math.floor(body.totalBudget))

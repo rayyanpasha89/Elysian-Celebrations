@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -822,6 +824,7 @@ function importTargetSection(categoryKey: PlannerVendorCategoryKey): EditorSecti
 }
 
 export default function ClientWeddingPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<WeddingPayload | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -849,6 +852,7 @@ export default function ClientWeddingPage() {
   const [savingDay, setSavingDay] = useState(false);
   const [savingEvent, setSavingEvent] = useState(false);
   const [savingDetail, setSavingDetail] = useState(false);
+  const [deletingPlan, setDeletingPlan] = useState(false);
   const [draggedEventId, setDraggedEventId] = useState<string | null>(null);
   const [vendorOptionsLoading, setVendorOptionsLoading] = useState(false);
   const [vendorOptions, setVendorOptions] = useState<
@@ -864,7 +868,7 @@ export default function ClientWeddingPage() {
     const response = await fetch("/api/wedding");
     const json = await response.json();
     if (!response.ok) {
-      throw new Error(json.error ?? "Failed to load wedding plan");
+      throw new Error(json.error ?? "Failed to load event plan");
     }
     return json as WeddingPayload;
   }, []);
@@ -890,7 +894,7 @@ export default function ClientWeddingPage() {
           toast.error(
             error instanceof Error
               ? error.message
-              : "Could not load wedding details"
+              : "Could not load event details"
           );
         }
       } finally {
@@ -1406,6 +1410,44 @@ export default function ClientWeddingPage() {
     }
   };
 
+  const deleteEventPlan = async () => {
+    if (!wedding) return;
+
+    const typed = window.prompt(
+      `Type DELETE to permanently remove "${wedding.name}" and its days, events, menus, logistics, tasks, and draft vendor inquiries. Confirmed booking history will be preserved but unlinked.`
+    );
+
+    if (typed !== "DELETE") {
+      toast.info("Event plan delete cancelled");
+      return;
+    }
+
+    setDeletingPlan(true);
+
+    try {
+      const response = await fetch("/api/wedding", {
+        method: "DELETE",
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        throw new Error(json.error ?? "Failed to delete event plan");
+      }
+
+      setData({ wedding: null, days: [] });
+      setSelectedEventId(null);
+      setDetailDraft(null);
+      setLayer("definition");
+      toast.success("Event plan deleted. Start a fresh structure when you're ready.");
+      router.push("/client/onboarding");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete event plan"
+      );
+    } finally {
+      setDeletingPlan(false);
+    }
+  };
+
   const nudgeEvent = async (eventId: string, direction: -1 | 1) => {
     const day = findEventDay(days, eventId);
     if (!day) return;
@@ -1848,16 +1890,24 @@ export default function ClientWeddingPage() {
         className="text-[15px] md:text-base [&_.text-sm]:text-[15px] [&_.text-xs]:text-sm [&_input]:text-base [&_select]:text-base [&_textarea]:text-base"
       >
         <motion.header variants={fadeUp} className="border-b border-charcoal/8 pb-8">
-          <p className={dashLabel}>Wedding</p>
+          <p className={dashLabel}>Event plan</p>
           <h2 className="font-display mt-2 text-3xl font-semibold text-charcoal md:text-4xl">
-            No wedding yet
+            No event plan yet
           </h2>
           <p className="font-heading mt-2 text-sm text-slate">
             Complete onboarding to shape your celebration, day by day.
           </p>
         </motion.header>
         <div className="mt-12">
-          <ListEmptyState hint="Go to onboarding from the dashboard to create your wedding." />
+          <ListEmptyState
+            title="Create your first event structure"
+            hint="Start with event type, number of days, and morning / afternoon / evening blocks."
+          />
+          <div className="mt-6 flex justify-center">
+            <Link href="/client/onboarding" className={dashBtn}>
+              Create event plan
+            </Link>
+          </div>
         </div>
       </motion.div>
     );
@@ -1871,7 +1921,7 @@ export default function ClientWeddingPage() {
       className="text-[15px] md:text-base [&_.text-sm]:text-[15px] [&_.text-xs]:text-sm [&_input]:text-base [&_select]:text-base [&_textarea]:text-base"
     >
       <motion.header variants={fadeUp} className="border-b border-charcoal/8 pb-8">
-        <p className={dashLabel}>Wedding operating plan</p>
+        <p className={dashLabel}>Event operating plan</p>
         <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h2 className="font-display text-3xl font-semibold text-charcoal md:text-4xl">
@@ -1882,15 +1932,25 @@ export default function ClientWeddingPage() {
               timing, guest flow, menu logic, decor brief, and vendor picks.
             </p>
           </div>
-          <div className="font-heading text-sm text-slate">
-            {wedding.date
-              ? new Date(wedding.date).toLocaleDateString("en-IN", {
-                  weekday: "long",
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })
-              : "Date TBD"}
+          <div className="flex flex-col gap-3 lg:items-end">
+            <div className="font-heading text-sm text-slate">
+              {wedding.date
+                ? new Date(wedding.date).toLocaleDateString("en-IN", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })
+                : "Date TBD"}
+            </div>
+            <button
+              type="button"
+              className="border border-rose/35 px-4 py-2.5 font-accent text-[10px] uppercase tracking-[0.18em] text-rose transition-colors hover:bg-rose hover:text-ivory disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={deletingPlan}
+              onClick={() => void deleteEventPlan()}
+            >
+              {deletingPlan ? "Deleting..." : "Delete event plan"}
+            </button>
           </div>
         </div>
       </motion.header>

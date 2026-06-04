@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
 
     const { supabase, wedding } = await getClientWeddingContext(session.userId);
     if (!wedding) {
-      return apiError("Wedding not found", 404);
+      return apiError("Event plan not found", 404);
     }
 
     const { data: existingEvents, error: existingEventsError } = await supabase
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
 
     const targetDayId = weddingDayId ?? days[0]?.id ?? null;
     if (!targetDayId) {
-      return apiError("Add a wedding day before creating events", 409);
+      return apiError("Add an event day before creating events", 409);
     }
     if (!days.some((day) => day.id === targetDayId)) {
       return apiError("Celebration day not found", 404);

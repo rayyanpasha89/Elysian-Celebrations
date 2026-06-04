@@ -300,7 +300,7 @@ export async function GET() {
 
     if (weddingError) {
       console.error("weddings:", weddingError);
-      return apiError("Failed to load wedding", 500);
+      return apiError("Failed to load event plan", 500);
     }
 
     if (!wedding) {
@@ -317,7 +317,7 @@ export async function GET() {
 
     if (eventsError) {
       console.error("wedding_events:", eventsError);
-      return apiError("Failed to load wedding events", 500);
+      return apiError("Failed to load event blocks", 500);
     }
 
     const days = await ensureWeddingDays(
@@ -340,7 +340,7 @@ export async function GET() {
 
     if (refreshedEventsError) {
       console.error("wedding_events reload:", refreshedEventsError);
-      return apiError("Failed to load wedding plan", 500);
+      return apiError("Failed to load event plan", 500);
     }
 
     const eventIds = (events ?? []).map((event) => event.id);
@@ -575,6 +575,118 @@ export async function GET() {
   }
 }
 
+export async function DELETE() {
+  const session = await getAuthSession();
+  if (session instanceof NextResponse) return session;
+  const roleCheck = requireRole(session, "client");
+  if (roleCheck) return roleCheck;
+
+  try {
+    const supabase = createAdminSupabaseClient();
+
+    const { data: profile, error: profileError } = await supabase
+      .from("client_profiles")
+      .select("id")
+      .eq("user_id", session.userId)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error("client_profiles:", profileError);
+      return apiError("Failed to load profile", 500);
+    }
+
+    if (!profile?.id) {
+      return apiError("Event plan not found", 404);
+    }
+
+    const { data: wedding, error: weddingError } = await supabase
+      .from("weddings")
+      .select("id, name")
+      .eq("client_profile_id", profile.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (weddingError) {
+      console.error("weddings:", weddingError);
+      return apiError("Failed to load event plan", 500);
+    }
+
+    if (!wedding) {
+      return apiError("Event plan not found", 404);
+    }
+
+    const { data: events, error: eventsError } = await supabase
+      .from("wedding_events")
+      .select("id")
+      .eq("wedding_id", wedding.id);
+
+    if (eventsError) {
+      console.error("wedding_events:", eventsError);
+      return apiError("Failed to load event plan dependencies", 500);
+    }
+
+    const eventIds = (events ?? [])
+      .map((event) => event.id)
+      .filter((id): id is string => typeof id === "string" && id.length > 0);
+
+    if (eventIds.length > 0) {
+      const { error: draftBookingsError } = await supabase
+        .from("bookings")
+        .delete()
+        .in("wedding_event_id", eventIds)
+        .in("status", ["INQUIRY", "QUOTE_SENT"]);
+
+      if (draftBookingsError) {
+        console.error("bookings draft delete:", draftBookingsError);
+        return apiError("Failed to remove draft vendor inquiries", 500);
+      }
+
+      const { error: bookingUnlinkError } = await supabase
+        .from("bookings")
+        .update({ wedding_event_id: null })
+        .in("wedding_event_id", eventIds);
+
+      if (bookingUnlinkError) {
+        console.error("bookings unlink:", bookingUnlinkError);
+        return apiError("Failed to unlink confirmed bookings", 500);
+      }
+
+      const { error: budgetUnlinkError } = await supabase
+        .from("budget_items")
+        .update({ wedding_event_id: null })
+        .in("wedding_event_id", eventIds);
+
+      if (budgetUnlinkError) {
+        console.error("budget_items unlink:", budgetUnlinkError);
+        return apiError("Failed to unlink budget items", 500);
+      }
+    }
+
+    const { error: deleteError } = await supabase
+      .from("weddings")
+      .delete()
+      .eq("id", wedding.id)
+      .eq("client_profile_id", profile.id);
+
+    if (deleteError) {
+      console.error("weddings delete:", deleteError);
+      return apiError("Failed to delete event plan", 500);
+    }
+
+    return apiSuccess({
+      ok: true,
+      deletedPlan: {
+        id: wedding.id,
+        name: wedding.name,
+      },
+    });
+  } catch (error) {
+    console.error("DELETE /api/wedding", error);
+    return apiError("Internal server error", 500);
+  }
+}
+
 export async function POST(request: NextRequest) {
   const session = await getAuthSession();
   if (session instanceof NextResponse) return session;
@@ -599,7 +711,7 @@ export async function POST(request: NextRequest) {
         ? coupleName.trim()
         : typeof partnerName === "string" && partnerName.trim()
           ? partnerName.trim()
-          : "Our Wedding";
+          : "Untitled Event";
 
     const dateIso =
       typeof weddingDate === "string" && weddingDate
@@ -725,7 +837,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (existingWedding) {
-      return apiError("Wedding already exists", 409);
+      return apiError("Event plan already exists", 409);
     }
 
     const { data: wedding, error: weddingError } = await supabase
@@ -746,7 +858,7 @@ export async function POST(request: NextRequest) {
 
     if (weddingError || !wedding) {
       console.error("weddings insert:", weddingError);
-      return apiError("Failed to create wedding", 500);
+      return apiError("Failed to create event plan", 500);
     }
 
     const celebrationPlan = useLayeredDefinition
@@ -895,10 +1007,7 @@ export async function POST(request: NextRequest) {
 
     const { error: budgetError } = await supabase.from("budgets").insert({
       client_profile_id: profileId,
-      name:
-        eventDefinition.eventType === "wedding"
-          ? "My Wedding Budget"
-          : "My Event Budget",
+      name: "Event Investment Plan",
       total_budget: budget,
     });
 

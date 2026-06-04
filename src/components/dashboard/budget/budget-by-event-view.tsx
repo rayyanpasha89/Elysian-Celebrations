@@ -127,7 +127,7 @@ export function BudgetByEventView({
           No events to roll up yet
         </h3>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate">
-          Open the wedding planner to add days and events. Once they exist, every
+          Open the event planner to add days and events. Once they exist, every
           budget line you tag to an event will land here with its planned versus
           quoted total.
         </p>

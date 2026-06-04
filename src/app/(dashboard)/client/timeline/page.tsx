@@ -235,7 +235,7 @@ export default function ClientTimelinePage() {
               What to do next
             </p>
             <h3 className="mt-2 font-display text-xl text-charcoal">
-              Add a wedding day and event first.
+              Add an event day and time block first.
             </h3>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-charcoal">
               Your timeline becomes useful once it has real event anchors. Build
@@ -246,7 +246,7 @@ export default function ClientTimelinePage() {
               href="/client/wedding"
               className="mt-4 inline-flex font-accent text-[10px] uppercase tracking-[0.18em] text-gold-primary hover:text-gold-dark"
             >
-              Add wedding day →
+              Add event day →
             </Link>
           </div>
         </div>

@@ -11,7 +11,7 @@ const navGroups: NavGroup[] = [
     title: "Overview",
     items: [
       { label: "Dashboard", href: "/client" },
-      { label: "My Wedding", href: "/client/wedding" },
+      { label: "Event Plan", href: "/client/wedding" },
     ],
   },
   {

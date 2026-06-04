@@ -488,7 +488,7 @@ async function syncEventTasks(
 async function requireOwnedEvent(userId: string, eventId: string) {
   const { supabase, wedding } = await getClientWeddingContext(userId);
   if (!wedding) {
-    return { error: apiError("Wedding not found", 404) };
+    return { error: apiError("Event plan not found", 404) };
   }
 
   const { data: event, error } = await supabase
