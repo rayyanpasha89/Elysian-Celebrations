@@ -140,6 +140,27 @@ export const EVENT_REQUIREMENT_CATEGORIES = [
 export type EventRequirementCategoryKey =
   (typeof EVENT_REQUIREMENT_CATEGORIES)[number]["key"];
 
+export const EVENT_REQUIREMENT_STATUS_OPTIONS = [
+  "DRAFT",
+  "NEEDS_VENDOR",
+  "QUOTE_NEEDED",
+  "CONFIRMED",
+  "DONE",
+] as const;
+
+export const EVENT_REQUIREMENT_PRIORITY_OPTIONS = [
+  "LOW",
+  "NORMAL",
+  "HIGH",
+  "CRITICAL",
+] as const;
+
+export type EventRequirementStatus =
+  (typeof EVENT_REQUIREMENT_STATUS_OPTIONS)[number];
+
+export type EventRequirementPriority =
+  (typeof EVENT_REQUIREMENT_PRIORITY_OPTIONS)[number];
+
 export const EVENT_FINALIZATION_CHECKLIST = [
   {
     key: "definition",
@@ -229,6 +250,16 @@ export type EventDefinitionPlanDay = {
     notes: string | null;
     sortOrder: number;
   }[];
+};
+
+export type EventRequirementSeed = {
+  category: EventRequirementCategoryKey;
+  title: string;
+  status: EventRequirementStatus;
+  priority: EventRequirementPriority;
+  payload: Record<string, SafeJson>;
+  notes: string | null;
+  sortOrder: number;
 };
 
 type BuildEventDefinitionPayloadInput = {
@@ -389,12 +420,179 @@ function buildDefaultBlockTitle(
   return `${blockLabel} ${dayName}`;
 }
 
+function defaultRequirementCategoriesForBlock(
+  block: EventDefinitionTimeBlock
+): EventRequirementCategoryKey[] {
+  if (block.requirementCategories.length > 0) {
+    return block.requirementCategories;
+  }
+
+  return [
+    "food",
+    "decor",
+    "photo-video",
+    "entertainment",
+    "hospitality",
+    "logistics",
+  ];
+}
+
+export function mealPeriodForTimeBlock(
+  timeBlock: EventTimeBlockKey | null | undefined,
+  startTime: string | null | undefined
+) {
+  if (timeBlock === "morning") return "Breakfast";
+  if (timeBlock === "afternoon") return "Lunch";
+  if (timeBlock === "evening") return "Dinner";
+  if (!startTime) return "Meal";
+  if (startTime < "12:00") return "Breakfast";
+  if (startTime < "17:00") return "Lunch";
+  return "Dinner";
+}
+
+function requirementPayloadForCategory({
+  category,
+  eventName,
+  timeBlock,
+  startTime,
+}: {
+  category: EventRequirementCategoryKey;
+  eventName: string;
+  timeBlock: EventTimeBlockKey | null;
+  startTime: string | null;
+}): Record<string, SafeJson> {
+  const mealPeriod = mealPeriodForTimeBlock(timeBlock, startTime);
+
+  if (category === "food") {
+    return {
+      enabled: true,
+      mealPeriod,
+      dietaryMode: "mixed",
+      vegRequired: true,
+      nonVegRequired: true,
+      drinks: [],
+      preMealStations: [],
+      mainCourse: [],
+      postMealStations: [],
+      liveStations: [],
+      customStations: [],
+      vendorNotes: "",
+    };
+  }
+
+  if (category === "decor") {
+    return {
+      enabled: true,
+      mood: "",
+      areas: [],
+      floral: "",
+      lighting: "",
+      installations: [],
+      referenceNotes: "",
+    };
+  }
+
+  if (category === "photo-video") {
+    return {
+      enabled: true,
+      coverageStyle: "",
+      moments: [eventName],
+      deliverables: [],
+      teamNotes: "",
+    };
+  }
+
+  if (category === "entertainment") {
+    return {
+      enabled: timeBlock === "evening",
+      performanceType: "",
+      sets: [],
+      technicalNeeds: [],
+      runOfShowNotes: "",
+    };
+  }
+
+  if (category === "hospitality") {
+    return {
+      enabled: true,
+      roomBlocks: [],
+      hotelBookingNotes: "",
+      welcomeAmenities: [],
+      guestSupport: [],
+    };
+  }
+
+  if (category === "logistics") {
+    return {
+      enabled: true,
+      transport: "",
+      loadIn: "",
+      familyCall: "",
+      weatherPlan: "",
+      securityNotes: "",
+    };
+  }
+
+  return {
+    enabled: true,
+    notes: "",
+  };
+}
+
+export function buildDefaultRequirementsForEvent({
+  eventName,
+  timeBlock,
+  startTime,
+  categories,
+}: {
+  eventName: string;
+  timeBlock: EventTimeBlockKey | null;
+  startTime: string | null;
+  categories?: EventRequirementCategoryKey[];
+}): EventRequirementSeed[] {
+  const block: EventDefinitionTimeBlock = {
+    slot: timeBlock ?? "evening",
+    label:
+      EVENT_TIME_BLOCKS.find((entry) => entry.key === timeBlock)?.label ??
+      "Event",
+    enabled: true,
+    title: eventName,
+    eventType: eventName,
+    startTime,
+    endTime: null,
+    requirementCategories: categories ?? [],
+    notes: null,
+  };
+
+  return defaultRequirementCategoriesForBlock(block).map((category, index) => {
+    const categoryCopy =
+      EVENT_REQUIREMENT_CATEGORIES.find((entry) => entry.key === category) ??
+      EVENT_REQUIREMENT_CATEGORIES.at(-1)!;
+
+    return {
+      category,
+      title: categoryCopy.label,
+      status: "DRAFT",
+      priority: category === "food" || category === "logistics" ? "HIGH" : "NORMAL",
+      payload: requirementPayloadForCategory({
+        category,
+        eventName,
+        timeBlock,
+        startTime,
+      }),
+      notes: categoryCopy.description,
+      sortOrder: index,
+    };
+  });
+}
+
 function normalizeDefinitionTimeBlock(
   rawBlock: unknown,
   slot: (typeof EVENT_TIME_BLOCKS)[number],
   dayName: string,
   eventTypeLabel: string
 ): EventDefinitionTimeBlock {
+  const hasExplicitBlock = Boolean(rawBlock && typeof rawBlock === "object");
   const block =
     rawBlock && typeof rawBlock === "object"
       ? (rawBlock as Record<string, unknown>)
@@ -407,7 +605,9 @@ function normalizeDefinitionTimeBlock(
   const enabled =
     typeof block.enabled === "boolean"
       ? block.enabled
-      : Boolean(toOptionalString(block.title ?? block.name ?? block.label, 120));
+      : hasExplicitBlock
+        ? Boolean(toOptionalString(block.title ?? block.name ?? block.label, 120))
+        : true;
 
   return {
     slot: slot.key,

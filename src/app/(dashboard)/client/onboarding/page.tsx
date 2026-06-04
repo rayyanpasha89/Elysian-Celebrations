@@ -72,7 +72,7 @@ function createEmptyDay(
     blocks: EVENT_TIME_BLOCKS.reduce(
       (acc, block) => {
         acc[block.key] = {
-          enabled: block.key === "evening", // evening on by default — most events have one
+          enabled: true,
           title:
             eventTypeLabel.toLowerCase() === "wedding"
               ? `${block.label} function`
@@ -523,9 +523,9 @@ function BlocksStep({
       <div>
         <p className={dashLabel}>Shape each day</p>
         <p className="mt-2 text-xs leading-relaxed text-slate">
-          Toggle which time blocks happen on each day. Rename them — &quot;Morning&quot;
-          can become &quot;Haldi brunch&quot;, &quot;Evening&quot; can become &quot;Reception&quot;. You can
-          come back and refine in the planner.
+          Morning, afternoon, and evening are created by default. Turn off any
+          block you do not need, then rename the rest — &quot;Morning&quot; can become
+          &quot;Haldi brunch&quot;, &quot;Evening&quot; can become &quot;Reception&quot;.
         </p>
       </div>
 

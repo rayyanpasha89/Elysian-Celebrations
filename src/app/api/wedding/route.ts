@@ -4,10 +4,12 @@ import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { ensureWeddingDays } from "@/lib/wedding-plan.server";
 import { buildDefaultCelebrationPlan } from "@/lib/wedding-plan";
 import {
+  buildDefaultRequirementsForEvent,
   buildCelebrationPlanFromEventDefinition,
   buildEventDefinitionPayload,
   extractEventDefinitionDays,
   hasExplicitEventDefinition,
+  mealPeriodForTimeBlock,
   normalizeDayCount as normalizeEventDayCount,
 } from "@/lib/event-platform";
 import {
@@ -813,24 +815,26 @@ export async function POST(request: NextRequest) {
       const { data: createdEvents, error: eventsInsertError } = await supabase
         .from("wedding_events")
         .insert(eventsToInsert)
-        .select("id, name, event_type, time_block, start_time, food_style, menu_notes, sort_order");
+        .select("id, name, event_type, time_block, start_time, end_time, food_style, menu_notes, sort_order");
 
       if (eventsInsertError) {
         console.error("wedding_events insert:", eventsInsertError);
       } else if (createdEvents && createdEvents.length > 0) {
         const menuRows = createdEvents
-          .filter((event) => event.food_style)
+          .filter((event) => useLayeredDefinition || event.food_style)
           .map((event) => ({
             wedding_event_id: event.id,
-            name: `${event.name} Menu`,
-            meal_period:
-              event.start_time && event.start_time < "12:00"
-                ? "Breakfast"
-                : event.start_time && event.start_time < "17:00"
-                  ? "Lunch"
-                  : "Dinner",
-            service_style: event.food_style,
-            notes: event.menu_notes,
+            name: useLayeredDefinition
+              ? `${event.name} Food and beverage plan`
+              : `${event.name} Menu`,
+            meal_period: mealPeriodForTimeBlock(
+              event.time_block,
+              event.start_time
+            ),
+            service_style: event.food_style ?? null,
+            notes:
+              event.menu_notes ??
+              "Use this starter menu to define drinks, pre-meal stations, mains, post-meal stations, live counters, and custom food requirements.",
             sort_order: 0,
           }));
 
@@ -856,6 +860,35 @@ export async function POST(request: NextRequest) {
           );
         if (taskInsertError) {
           console.error("wedding_event_tasks insert:", taskInsertError);
+        }
+
+        const requirementRows = createdEvents.flatMap((event) =>
+          buildDefaultRequirementsForEvent({
+            eventName: event.name,
+            timeBlock: event.time_block,
+            startTime: event.start_time,
+          }).map((requirement) => ({
+            wedding_event_id: event.id,
+            category: requirement.category,
+            title: requirement.title,
+            status: requirement.status,
+            priority: requirement.priority,
+            payload: requirement.payload,
+            notes: requirement.notes,
+            sort_order: requirement.sortOrder,
+          }))
+        );
+
+        if (requirementRows.length > 0) {
+          const { error: requirementsInsertError } = await supabase
+            .from("wedding_event_requirements")
+            .insert(requirementRows);
+          if (requirementsInsertError) {
+            console.error(
+              "wedding_event_requirements insert:",
+              requirementsInsertError
+            );
+          }
         }
       }
     }

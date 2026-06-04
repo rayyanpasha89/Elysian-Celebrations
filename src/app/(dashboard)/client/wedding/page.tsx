@@ -20,7 +20,11 @@ import {
 import { categoryCopy } from "@/lib/vendor-offering";
 import {
   EVENT_FINALIZATION_CHECKLIST,
+  EVENT_REQUIREMENT_CATEGORIES,
+  EVENT_REQUIREMENT_PRIORITY_OPTIONS,
+  EVENT_REQUIREMENT_STATUS_OPTIONS,
   EVENT_TIME_BLOCKS,
+  type EventRequirementCategoryKey,
   type EventTimeBlockKey,
 } from "@/lib/event-platform";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -112,6 +116,19 @@ type EventTask = {
   sortOrder: number;
 };
 
+type EventRequirement = {
+  id: string;
+  category: EventRequirementCategoryKey;
+  title: string;
+  status: string;
+  priority: string;
+  vendorProfileId: string | null;
+  vendorServiceId: string | null;
+  payload: Record<string, unknown>;
+  notes: string | null;
+  sortOrder: number;
+};
+
 type WeddingEvent = {
   id: string;
   wedding_day_id: string | null;
@@ -136,6 +153,7 @@ type WeddingEvent = {
   menus: EventMenu[];
   logistics: EventLogistics | null;
   tasks: EventTask[];
+  requirements: EventRequirement[];
   vendorSelections: EventVendorSelection[];
 };
 
@@ -241,6 +259,19 @@ type EventTaskDraft = {
   dueDate: string;
 };
 
+type EventRequirementDraft = {
+  clientId: string;
+  id: string | null;
+  category: EventRequirementCategoryKey;
+  title: string;
+  status: string;
+  priority: string;
+  vendorProfileId: string | null;
+  vendorServiceId: string | null;
+  payload: Record<string, unknown>;
+  notes: string;
+};
+
 type EventDetailDraft = {
   weddingDayId: string;
   name: string;
@@ -261,11 +292,13 @@ type EventDetailDraft = {
   menus: MenuDraft[];
   logistics: LogisticsDraft;
   tasks: EventTaskDraft[];
+  requirements: EventRequirementDraft[];
   vendorSelections: Record<PlannerVendorCategoryKey, VendorDraftSelection | null>;
 };
 
 type EditorSectionKey =
   | "basics"
+  | "requirements"
   | "food"
   | "design"
   | "vendors"
@@ -282,6 +315,11 @@ const EDITOR_SECTIONS: {
     key: "basics",
     label: "Basics",
     helper: "Name, day, time, venue, guests, and budget.",
+  },
+  {
+    key: "requirements",
+    label: "Needs",
+    helper: "Food, decor, photo/video, entertainment, hotels, logistics, and custom asks.",
   },
   {
     key: "food",
@@ -363,6 +401,33 @@ function createTaskDraft(): EventTaskDraft {
     status: "OPEN",
     dueDate: "",
   };
+}
+
+function createRequirementDraft(
+  category: EventRequirementCategoryKey
+): EventRequirementDraft {
+  const copy =
+    EVENT_REQUIREMENT_CATEGORIES.find((entry) => entry.key === category) ??
+    EVENT_REQUIREMENT_CATEGORIES.at(-1)!;
+
+  return {
+    clientId: draftId("event_requirement"),
+    id: null,
+    category,
+    title: copy.label,
+    status: "DRAFT",
+    priority: category === "food" || category === "logistics" ? "HIGH" : "NORMAL",
+    vendorProfileId: null,
+    vendorServiceId: null,
+    payload: { enabled: true },
+    notes: copy.description,
+  };
+}
+
+function defaultRequirementDrafts() {
+  return EVENT_REQUIREMENT_CATEGORIES.map((category) =>
+    createRequirementDraft(category.key)
+  );
 }
 
 function emptyVendorSelections(): Record<
@@ -464,6 +529,24 @@ function buildDetailDraft(event: WeddingEvent): EventDetailDraft {
               owner: "Planner",
             },
           ],
+    requirements:
+      (event.requirements ?? []).length > 0
+        ? (event.requirements ?? [])
+            .slice()
+            .sort((left, right) => left.sortOrder - right.sortOrder)
+            .map((requirement) => ({
+              clientId: requirement.id,
+              id: requirement.id,
+              category: requirement.category,
+              title: requirement.title,
+              status: requirement.status,
+              priority: requirement.priority,
+              vendorProfileId: requirement.vendorProfileId,
+              vendorServiceId: requirement.vendorServiceId,
+              payload: requirement.payload ?? {},
+              notes: requirement.notes ?? "",
+            }))
+        : defaultRequirementDrafts(),
     vendorSelections,
   };
 }
@@ -497,6 +580,24 @@ function planningPayloadFromDraft(draft: EventDetailDraft) {
         owner: task.owner || null,
         status: task.status,
         dueDate: task.dueDate || null,
+      })),
+  };
+}
+
+function requirementsPayloadFromDraft(draft: EventDetailDraft) {
+  return {
+    requirements: draft.requirements
+      .filter((requirement) => requirement.title.trim())
+      .map((requirement) => ({
+        ...(requirement.id ? { id: requirement.id } : {}),
+        category: requirement.category,
+        title: requirement.title,
+        status: requirement.status,
+        priority: requirement.priority,
+        vendorProfileId: requirement.vendorProfileId,
+        vendorServiceId: requirement.vendorServiceId,
+        payload: requirement.payload,
+        notes: requirement.notes || null,
       })),
   };
 }
@@ -1179,6 +1280,21 @@ export default function ClientWeddingPage() {
         throw new Error(planningJson.error ?? "Failed to save event planning");
       }
 
+      const requirementsResponse = await fetch(
+        `/api/wedding/events/${selectedEvent.id}/requirements`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requirementsPayloadFromDraft(detailDraft)),
+        }
+      );
+      const requirementsJson = await requirementsResponse.json();
+      if (!requirementsResponse.ok) {
+        throw new Error(
+          requirementsJson.error ?? "Failed to save event requirements"
+        );
+      }
+
       await syncVendorSelections(selectedEvent, detailDraft);
       await refreshWedding();
       toast.success("Event plan saved");
@@ -1574,6 +1690,58 @@ export default function ClientWeddingPage() {
               current.tasks.length > 1
                 ? current.tasks.filter((task) => task.clientId !== taskClientId)
                 : current.tasks,
+          }
+        : current
+    );
+  };
+
+  const updateRequirement = (
+    requirementClientId: string,
+    updates: Partial<Omit<EventRequirementDraft, "clientId">>
+  ) => {
+    setDetailDraft((current) =>
+      current
+        ? {
+            ...current,
+            requirements: current.requirements.map((requirement) =>
+              requirement.clientId === requirementClientId
+                ? { ...requirement, ...updates }
+                : requirement
+            ),
+          }
+        : current
+    );
+  };
+
+  const addRequirement = () => {
+    setDetailDraft((current) =>
+      current
+        ? {
+            ...current,
+            requirements: [
+              ...current.requirements,
+              {
+                ...createRequirementDraft("custom"),
+                title: "Custom requirement",
+                notes: "",
+              },
+            ],
+          }
+        : current
+    );
+  };
+
+  const removeRequirement = (requirementClientId: string) => {
+    setDetailDraft((current) =>
+      current
+        ? {
+            ...current,
+            requirements:
+              current.requirements.length > 1
+                ? current.requirements.filter(
+                    (requirement) => requirement.clientId !== requirementClientId
+                  )
+                : current.requirements,
           }
         : current
     );
@@ -2395,6 +2563,139 @@ export default function ClientWeddingPage() {
                   </Field>
                 </div>
 
+                ) : null}
+
+                {editorSection === "requirements" ? (
+                <div className="space-y-4 border-t border-charcoal/8 pt-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className={dashLabel}>Block requirements</p>
+                      <p className="mt-1 text-sm text-slate">
+                        Decide what this time block actually needs before picking vendors.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.16em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark"
+                      onClick={addRequirement}
+                    >
+                      Add custom need
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {detailDraft.requirements.map((requirement) => {
+                      const category = requirementCategoryCopy(requirement.category);
+                      return (
+                        <div
+                          key={requirement.clientId}
+                          className="border border-charcoal/10 bg-cream/25 p-4"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <p className="font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark">
+                                {category.label}
+                              </p>
+                              <p className="mt-1 text-xs leading-relaxed text-slate">
+                                {category.description}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate transition-colors hover:text-rose"
+                              onClick={() => removeRequirement(requirement.clientId)}
+                            >
+                              Remove
+                            </button>
+                          </div>
+
+                          <div className="mt-4 grid gap-3 md:grid-cols-2">
+                            <Field label="Need title">
+                              <input
+                                type="text"
+                                value={requirement.title}
+                                onChange={(event) =>
+                                  updateRequirement(requirement.clientId, {
+                                    title: event.target.value,
+                                  })
+                                }
+                                className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                              />
+                            </Field>
+                            <Field label="Category">
+                              <select
+                                value={requirement.category}
+                                onChange={(event) =>
+                                  updateRequirement(requirement.clientId, {
+                                    category: event.target.value as EventRequirementCategoryKey,
+                                  })
+                                }
+                                className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                              >
+                                {EVENT_REQUIREMENT_CATEGORIES.map((option) => (
+                                  <option key={option.key} value={option.key}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </Field>
+                            <Field label="Status">
+                              <select
+                                value={requirement.status}
+                                onChange={(event) =>
+                                  updateRequirement(requirement.clientId, {
+                                    status: event.target.value,
+                                  })
+                                }
+                                className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                              >
+                                {EVENT_REQUIREMENT_STATUS_OPTIONS.map((option) => (
+                                  <option key={option} value={option}>
+                                    {option.replaceAll("_", " ")}
+                                  </option>
+                                ))}
+                              </select>
+                            </Field>
+                            <Field label="Priority">
+                              <select
+                                value={requirement.priority}
+                                onChange={(event) =>
+                                  updateRequirement(requirement.clientId, {
+                                    priority: event.target.value,
+                                  })
+                                }
+                                className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                              >
+                                {EVENT_REQUIREMENT_PRIORITY_OPTIONS.map((option) => (
+                                  <option key={option} value={option}>
+                                    {option}
+                                  </option>
+                                ))}
+                              </select>
+                            </Field>
+                          </div>
+
+                          <Field label="Structured starting points" className="mt-4">
+                            <RequirementPayloadPreview payload={requirement.payload} />
+                          </Field>
+
+                          <Field label="Requirement notes" className="mt-4">
+                            <textarea
+                              value={requirement.notes}
+                              onChange={(event) =>
+                                updateRequirement(requirement.clientId, {
+                                  notes: event.target.value,
+                                })
+                              }
+                              className="min-h-[86px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                              placeholder="Specific choices, constraints, questions for vendors, references..."
+                            />
+                          </Field>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
                 ) : null}
 
                 {editorSection === "food" ? (
@@ -3484,6 +3785,64 @@ function serviceItemTypeLabel(value: string) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function requirementCategoryCopy(categoryKey: EventRequirementCategoryKey) {
+  return (
+    EVENT_REQUIREMENT_CATEGORIES.find((category) => category.key === categoryKey) ??
+    EVENT_REQUIREMENT_CATEGORIES.at(-1)!
+  );
+}
+
+function payloadValueToLabel(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.length > 0 ? value.join(", ") : "To be decided";
+  }
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "string" && value.trim()) return value;
+  if (typeof value === "number") return String(value);
+  return "To be decided";
+}
+
+function payloadKeyToLabel(key: string) {
+  return key
+    .replace(/([A-Z])/g, " $1")
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function RequirementPayloadPreview({
+  payload,
+}: {
+  payload: Record<string, unknown>;
+}) {
+  const entries = Object.entries(payload)
+    .filter(([key]) => key !== "enabled")
+    .slice(0, 8);
+
+  if (entries.length === 0) {
+    return (
+      <p className="border border-dashed border-charcoal/15 bg-ivory/50 px-3 py-2 text-xs leading-relaxed text-slate">
+        No structured fields yet. Use notes for now, and this requirement can
+        still be matched to vendors and quotes.
+      </p>
+    );
+  }
+
+  return (
+    <div className="grid gap-2 md:grid-cols-2">
+      {entries.map(([key, value]) => (
+        <div key={key} className="border border-charcoal/8 bg-ivory/60 p-3">
+          <p className="font-accent text-[9px] uppercase tracking-[0.16em] text-slate">
+            {payloadKeyToLabel(key)}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-charcoal">
+            {payloadValueToLabel(value)}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const TIME_BLOCK_LABEL_BY_KEY = new Map<EventTimeBlockKey, string>(
   EVENT_TIME_BLOCKS.map((block) => [block.key, block.label])
 );
@@ -3613,18 +3972,40 @@ function computeFinalizationChecks(
 ): CheckResult[] {
   const allEvents = days.flatMap((day) => day.events);
   const totalEvents = allEvents.length;
-  const missingVendors = allEvents.filter(
-    (event) => event.vendorSelections.length === 0
-  ).length;
-  const flaggedForFood = allEvents.filter(
-    (event) =>
-      Boolean(event.food_style) ||
-      Boolean(event.menu_notes) ||
-      (event.food_preferences ?? []).length > 0
+  const allRequirements = allEvents.flatMap(
+    (event) => event.requirements ?? []
   );
-  const missingMenus = flaggedForFood.filter((event) => event.menus.length === 0)
-    .length;
-  const missingLogistics = allEvents.filter((event) => !event.logistics).length;
+  const eventsMissingRequirements = allEvents.filter(
+    (event) => (event.requirements ?? []).length === 0
+  ).length;
+  const unresolvedRequirements = allRequirements.filter(
+    (requirement) =>
+      requirement.status !== "CONFIRMED" && requirement.status !== "DONE"
+  ).length;
+  const hospitalityRequirements = allRequirements.filter(
+    (requirement) => requirement.category === "hospitality"
+  );
+  const draftHospitalityRequirements = hospitalityRequirements.filter(
+    (requirement) => requirement.status === "DRAFT"
+  ).length;
+  const missingVendors = allEvents.filter(
+    (event) =>
+      event.vendorSelections.length === 0 &&
+      !(event.requirements ?? []).some(
+        (requirement) =>
+          Boolean(requirement.vendorProfileId) ||
+          Boolean(requirement.vendorServiceId)
+      )
+  ).length;
+  const missingFoodMenus = allEvents.filter((event) => {
+    const needsFood = (event.requirements ?? []).some(
+      (requirement) => requirement.category === "food"
+    );
+    return needsFood && event.menus.length === 0;
+  }).length;
+  const missingLogistics = allEvents.filter(
+    (event) => !hasLogisticsDetails(event.logistics)
+  ).length;
   const missingBudget = allEvents.filter(
     (event) => !event.estimated_budget || event.estimated_budget <= 0
   ).length;
@@ -3671,13 +4052,22 @@ function computeFinalizationChecks(
             detail: "No blocks to fill requirements against.",
           };
         }
-        if (missingMenus > 0 || flaggedForFood.length < totalEvents / 2) {
+        if (eventsMissingRequirements > 0) {
+          return {
+            key: entry.key,
+            label: entry.label,
+            description: entry.description,
+            status: "missing",
+            detail: `${eventsMissingRequirements} block(s) still need requirement cards.`,
+          };
+        }
+        if (unresolvedRequirements > 0 || missingFoodMenus > 0) {
           return {
             key: entry.key,
             label: entry.label,
             description: entry.description,
             status: "partial",
-            detail: `${missingMenus} food block(s) still need menu drafts.`,
+            detail: `${unresolvedRequirements} need(s) unresolved · ${missingFoodMenus} food plan(s) missing.`,
           };
         }
         return {
@@ -3685,7 +4075,7 @@ function computeFinalizationChecks(
           label: entry.label,
           description: entry.description,
           status: "ok",
-          detail: "Food and design notes are captured across the plan.",
+          detail: `${allRequirements.length} requirement card(s) confirmed or done.`,
         };
       case "vendors":
         return {
@@ -3693,7 +4083,7 @@ function computeFinalizationChecks(
           label: entry.label,
           description: entry.description,
           status: missingVendors === 0 && totalEvents > 0 ? "ok" : "partial",
-          detail: `${missingVendors} of ${totalEvents} block(s) still need vendor picks.`,
+          detail: `${missingVendors} of ${totalEvents} block(s) still need a vendor or service link.`,
         };
       case "budget":
         return {
@@ -3708,8 +4098,13 @@ function computeFinalizationChecks(
           key: entry.key,
           label: entry.label,
           description: entry.description,
-          status: missingGuestCount === 0 && totalEvents > 0 ? "ok" : "partial",
-          detail: `${missingGuestCount} block(s) missing a guest count.`,
+          status:
+            missingGuestCount === 0 &&
+            draftHospitalityRequirements === 0 &&
+            totalEvents > 0
+              ? "ok"
+              : "partial",
+          detail: `${missingGuestCount} guest count gap(s) · ${draftHospitalityRequirements} hospitality draft(s).`,
         };
       case "run-of-show":
         return {
@@ -3738,6 +4133,20 @@ function computeFinalizationChecks(
       }
     }
   });
+}
+
+function hasLogisticsDetails(logistics: EventLogistics | null) {
+  if (!logistics) return false;
+
+  return [
+    logistics.guestArrivalTime,
+    logistics.vendorLoadInTime,
+    logistics.familyCallTime,
+    logistics.transportNotes,
+    logistics.roomingNotes,
+    logistics.weatherPlan,
+    logistics.ceremonyNotes,
+  ].some((value) => Boolean(value?.trim()));
 }
 
 function FinalizationLayer({
