@@ -267,6 +267,22 @@ create table wedding_event_tasks (
   created_at timestamptz not null default now()
 );
 
+create table wedding_event_requirements (
+  id uuid primary key default gen_random_uuid(),
+  wedding_event_id uuid not null references wedding_events(id) on delete cascade,
+  category text not null,
+  title text not null default 'Requirement',
+  status text not null default 'DRAFT',
+  priority text not null default 'NORMAL',
+  vendor_profile_id uuid references vendor_profiles(id) on delete set null,
+  vendor_service_id uuid references vendor_services(id) on delete set null,
+  payload jsonb not null default '{}'::jsonb,
+  notes text,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 -- ─── Budgets ─────────────────────────────────────────────────
 
 create table budgets (
@@ -500,6 +516,9 @@ create index idx_wedding_events_time_block on wedding_events(time_block);
 create index idx_wedding_event_menus_event on wedding_event_menus(wedding_event_id, sort_order);
 create index idx_wedding_event_menu_items_menu on wedding_event_menu_items(menu_id, sort_order);
 create index idx_wedding_event_tasks_event on wedding_event_tasks(wedding_event_id, sort_order);
+create index idx_wedding_event_requirements_event on wedding_event_requirements(wedding_event_id, sort_order);
+create index idx_wedding_event_requirements_category on wedding_event_requirements(category);
+create index idx_wedding_event_requirements_vendor on wedding_event_requirements(vendor_profile_id);
 create index idx_budget_items_wedding_event on budget_items(wedding_event_id);
 create index idx_vendor_profile_views_vendor on vendor_profile_views(vendor_profile_id);
 create index idx_vendor_profile_views_created_at on vendor_profile_views(created_at desc);
@@ -529,6 +548,7 @@ create trigger tr_destinations_updated before update on destinations for each ro
 create trigger tr_weddings_updated before update on weddings for each row execute function update_updated_at();
 create trigger tr_budgets_updated before update on budgets for each row execute function update_updated_at();
 create trigger tr_bookings_updated before update on bookings for each row execute function update_updated_at();
+create trigger tr_wedding_event_requirements_updated before update on wedding_event_requirements for each row execute function update_updated_at();
 create trigger tr_message_thread_reads_updated before update on message_thread_reads for each row execute function update_updated_at();
 create trigger tr_guest_lists_updated before update on guest_lists for each row execute function update_updated_at();
 create trigger tr_mood_boards_updated before update on mood_boards for each row execute function update_updated_at();

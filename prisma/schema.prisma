@@ -185,6 +185,7 @@ model WeddingEvent {
   menus       WeddingEventMenu[]
   logistics   WeddingEventLogistics?
   tasks       WeddingEventTask[]
+  requirements WeddingEventRequirement[]
 
   @@map("wedding_events")
 }
@@ -254,6 +255,28 @@ model WeddingEventTask {
   @@map("wedding_event_tasks")
 }
 
+model WeddingEventRequirement {
+  id              String   @id @default(cuid())
+  weddingEventId  String
+  category        String
+  title           String   @default("Requirement")
+  status          String   @default("DRAFT")
+  priority        String   @default("NORMAL")
+  vendorProfileId String?
+  vendorServiceId String?
+  payload         Json     @default("{}")
+  notes           String?
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  weddingEvent  WeddingEvent   @relation(fields: [weddingEventId], references: [id], onDelete: Cascade)
+  vendorProfile VendorProfile? @relation(fields: [vendorProfileId], references: [id], onDelete: SetNull)
+  vendorService VendorService? @relation(fields: [vendorServiceId], references: [id], onDelete: SetNull)
+
+  @@map("wedding_event_requirements")
+}
+
 // ─── Vendors ──────────────────────────────────────────────────
 
 model VendorProfile {
@@ -285,6 +308,7 @@ model VendorProfile {
   savedBy      SavedVendor[]
   destinations VendorDestination[]
   profileViews VendorProfileView[]
+  eventRequirements WeddingEventRequirement[]
 
   @@map("vendor_profiles")
 }
@@ -319,6 +343,7 @@ model VendorService {
   vendorProfile VendorProfile @relation(fields: [vendorProfileId], references: [id], onDelete: Cascade)
   bookings      Booking[]
   items         VendorServiceItem[]
+  eventRequirements WeddingEventRequirement[]
 
   @@map("vendor_services")
 }

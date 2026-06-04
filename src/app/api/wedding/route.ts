@@ -82,6 +82,20 @@ type EventTaskRow = {
   sort_order: number;
 };
 
+type EventRequirementRow = {
+  id: string;
+  wedding_event_id: string;
+  category: string;
+  title: string;
+  status: string;
+  priority: string;
+  vendor_profile_id: string | null;
+  vendor_service_id: string | null;
+  payload: Record<string, unknown> | null;
+  notes: string | null;
+  sort_order: number;
+};
+
 type EventBookingRow = {
   id: string;
   wedding_event_id: string | null;
@@ -333,6 +347,7 @@ export async function GET() {
     let menuItemsByMenu = new Map<string, EventMenuItemRow[]>();
     let logisticsByEvent = new Map<string, EventLogisticsRow>();
     let tasksByEvent = new Map<string, EventTaskRow[]>();
+    let requirementsByEvent = new Map<string, EventRequirementRow[]>();
 
     if (eventIds.length > 0) {
       const [
@@ -340,6 +355,7 @@ export async function GET() {
         { data: eventMenus, error: menusError },
         { data: eventLogistics, error: logisticsError },
         { data: eventTasks, error: tasksError },
+        { data: eventRequirements, error: requirementsError },
       ] = await Promise.all([
         supabase
           .from("bookings")
@@ -366,6 +382,13 @@ export async function GET() {
           .select("id, wedding_event_id, title, owner, status, due_date, sort_order")
           .in("wedding_event_id", eventIds)
           .order("sort_order", { ascending: true }),
+        supabase
+          .from("wedding_event_requirements")
+          .select(
+            "id, wedding_event_id, category, title, status, priority, vendor_profile_id, vendor_service_id, payload, notes, sort_order"
+          )
+          .in("wedding_event_id", eventIds)
+          .order("sort_order", { ascending: true }),
       ]);
 
       if (bookingsError) {
@@ -384,6 +407,10 @@ export async function GET() {
         console.error("wedding_event_tasks:", tasksError);
         return apiError("Failed to load event tasks", 500);
       }
+      if (requirementsError) {
+        console.error("wedding_event_requirements:", requirementsError);
+        return apiError("Failed to load event requirements", 500);
+      }
 
       bookingsByEvent = mapEventBookings(
         normalizeEventBookingRows((eventBookings ?? []) as RawEventBookingRow[])
@@ -396,6 +423,9 @@ export async function GET() {
         ])
       );
       tasksByEvent = groupByEvent((eventTasks ?? []) as EventTaskRow[]);
+      requirementsByEvent = groupByEvent(
+        (eventRequirements ?? []) as EventRequirementRow[]
+      );
 
       const menuIds = ((eventMenus ?? []) as EventMenuRow[]).map((menu) => menu.id);
       if (menuIds.length > 0) {
@@ -477,6 +507,20 @@ export async function GET() {
                 status: task.status,
                 dueDate: task.due_date,
                 sortOrder: task.sort_order,
+              })),
+            requirements: (requirementsByEvent.get(event.id) ?? [])
+              .sort((left, right) => left.sort_order - right.sort_order)
+              .map((requirement) => ({
+                id: requirement.id,
+                category: requirement.category,
+                title: requirement.title,
+                status: requirement.status,
+                priority: requirement.priority,
+                vendorProfileId: requirement.vendor_profile_id,
+                vendorServiceId: requirement.vendor_service_id,
+                payload: requirement.payload ?? {},
+                notes: requirement.notes,
+                sortOrder: requirement.sort_order,
               })),
             vendorSelections: (
               bookingsByEvent.get(event.id) ?? []
