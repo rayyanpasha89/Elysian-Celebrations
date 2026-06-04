@@ -18,6 +18,11 @@ import {
   type PlannerVendorCategoryKey,
 } from "@/lib/wedding-plan";
 import { categoryCopy } from "@/lib/vendor-offering";
+import {
+  EVENT_FINALIZATION_CHECKLIST,
+  EVENT_TIME_BLOCKS,
+  type EventTimeBlockKey,
+} from "@/lib/event-platform";
 import { cn, formatCurrency } from "@/lib/utils";
 
 type Destination = {
@@ -112,6 +117,7 @@ type WeddingEvent = {
   wedding_day_id: string | null;
   name: string;
   event_type: string | null;
+  time_block: EventTimeBlockKey | null;
   date: string | null;
   start_time: string | null;
   end_time: string | null;
@@ -125,6 +131,7 @@ type WeddingEvent = {
   decor_notes: string | null;
   attire_notes: string | null;
   notes: string | null;
+  requirement_payload?: Record<string, unknown> | null;
   sort_order: number;
   menus: EventMenu[];
   logistics: EventLogistics | null;
@@ -658,6 +665,13 @@ export default function ClientWeddingPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<WeddingPayload | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  // Layer tab — Definition (what we're planning), Requirements (the existing
+  // 7-step per-block editor, default), Finalization (gap checklist before
+  // launch). Requirements is the primary work surface; the other two are
+  // light read-mostly views over the same underlying day/event state.
+  const [layer, setLayer] = useState<"definition" | "requirements" | "finalization">(
+    "requirements"
+  );
   const [showDayForm, setShowDayForm] = useState(false);
   const [dayDraft, setDayDraft] = useState({ name: "", date: "", notes: "" });
   const [editingDayId, setEditingDayId] = useState<string | null>(null);
@@ -1654,6 +1668,67 @@ export default function ClientWeddingPage() {
         </div>
       </motion.div>
 
+      <motion.div
+        variants={fadeUp}
+        className="mt-10 border-b border-charcoal/10"
+      >
+        <div className="flex flex-wrap items-end justify-between gap-3 pb-3">
+          <div>
+            <p className={dashLabel}>Layered planner</p>
+            <p className="mt-1 text-xs leading-relaxed text-slate">
+              {layer === "definition"
+                ? "Step 1 · Confirm the shape — name, days, time blocks."
+                : layer === "requirements"
+                  ? "Step 2 · Fill in what each block needs — food, decor, vendors."
+                  : "Step 3 · Close the gaps before go-live."}
+            </p>
+          </div>
+          <div className="inline-flex border border-charcoal/12 bg-cream/30 p-1">
+            {(
+              [
+                { key: "definition", label: "1 · Definition" },
+                { key: "requirements", label: "2 · Requirements" },
+                { key: "finalization", label: "3 · Finalization" },
+              ] as const
+            ).map((tab) => {
+              const active = layer === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setLayer(tab.key)}
+                  className={cn(
+                    "font-accent inline-flex items-center justify-center px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition-colors",
+                    active
+                      ? "bg-charcoal text-ivory"
+                      : "text-slate hover:text-charcoal"
+                  )}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </motion.div>
+
+      {layer === "definition" ? (
+        <DefinitionLayer
+          weddingName={wedding.name}
+          days={days}
+          totalEvents={totalEvents}
+        />
+      ) : null}
+
+      {layer === "finalization" ? (
+        <FinalizationLayer
+          days={days}
+          weddingDate={wedding.date}
+          onJumpToRequirements={() => setLayer("requirements")}
+        />
+      ) : null}
+
+      {layer === "requirements" ? (
       <div className="mt-10 grid gap-8 xl:grid-cols-[minmax(0,1fr)_420px]">
         <div>
           <motion.div
@@ -3159,6 +3234,7 @@ export default function ClientWeddingPage() {
           </div>
         </motion.aside>
       </div>
+      ) : null}
     </motion.div>
   );
 }
@@ -3406,6 +3482,336 @@ function serviceItemTypeLabel(value: string) {
   return value
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+const TIME_BLOCK_LABEL_BY_KEY = new Map<EventTimeBlockKey, string>(
+  EVENT_TIME_BLOCKS.map((block) => [block.key, block.label])
+);
+
+function classifyEventBlock(event: WeddingEvent): EventTimeBlockKey | null {
+  if (event.time_block) return event.time_block;
+
+  const tag = (event.event_type ?? "").toLowerCase();
+  for (const block of EVENT_TIME_BLOCKS) {
+    if (tag === block.key || tag.includes(block.label.toLowerCase())) {
+      return block.key;
+    }
+  }
+
+  const start = event.start_time;
+  if (!start || start.length < 4) return null;
+  const hour = Number(start.slice(0, 2));
+  if (!Number.isFinite(hour)) return null;
+  if (hour < 12) return "morning";
+  if (hour < 17) return "afternoon";
+  return "evening";
+}
+
+function DefinitionLayer({
+  weddingName,
+  days,
+  totalEvents,
+}: {
+  weddingName: string;
+  days: WeddingDay[];
+  totalEvents: number;
+}) {
+  return (
+    <motion.section variants={fadeUp} className="mt-8 space-y-5">
+      <div className={cn(dashCard, "border-dashed border-gold-primary/35 bg-gold-primary/5")}>
+        <p className={cn(dashLabel, "text-gold-dark")}>What&apos;s defined so far</p>
+        <h3 className="mt-2 font-display text-2xl text-charcoal">
+          {weddingName || "Your event"}
+        </h3>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate">
+          You have {days.length} {days.length === 1 ? "day" : "days"} and{" "}
+          {totalEvents} time {totalEvents === 1 ? "block" : "blocks"} drafted.
+          Refine each block under{" "}
+          <span className="text-gold-dark">Requirements</span>.
+        </p>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {days.length === 0 ? (
+          <div className={cn(dashCard, "border-dashed border-charcoal/15")}>
+            <p className={dashLabel}>No days yet</p>
+            <p className="mt-2 text-sm text-slate">
+              Switch to Requirements and use the Add day control to seed one.
+            </p>
+          </div>
+        ) : null}
+
+        {days.map((day) => (
+          <article key={day.id} className={dashCard}>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className={dashLabel}>Day {day.sort_order + 1}</p>
+                <p className="mt-1 font-display text-lg text-charcoal">{day.name}</p>
+                <p className="mt-1 text-xs text-slate">{formatDayDate(day.date)}</p>
+              </div>
+              <span className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
+                {day.events.length} {day.events.length === 1 ? "block" : "blocks"}
+              </span>
+            </div>
+
+            <ul className="mt-4 list-none space-y-2 pl-0">
+              {EVENT_TIME_BLOCKS.map((block) => {
+                const events = day.events.filter(
+                  (event) => classifyEventBlock(event) === block.key
+                );
+                const label = TIME_BLOCK_LABEL_BY_KEY.get(block.key) ?? block.label;
+
+                if (events.length === 0) {
+                  return (
+                    <li
+                      key={block.key}
+                      className="border border-dashed border-charcoal/12 bg-cream/30 px-3 py-2"
+                    >
+                      <p className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate/70">
+                        {label} · skipped
+                      </p>
+                    </li>
+                  );
+                }
+
+                return events.map((event) => (
+                  <li
+                    key={event.id}
+                    className="border border-charcoal/8 bg-cream/40 px-3 py-2"
+                  >
+                    <p className="font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark">
+                      {label}
+                    </p>
+                    <p className="mt-1 font-heading text-sm text-charcoal">
+                      {event.name}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-slate">
+                      {formatEventWindow(event)}
+                    </p>
+                  </li>
+                ));
+              })}
+            </ul>
+          </article>
+        ))}
+      </div>
+    </motion.section>
+  );
+}
+
+type CheckResult = {
+  key: string;
+  label: string;
+  description: string;
+  status: "ok" | "missing" | "partial";
+  detail: string;
+};
+
+function computeFinalizationChecks(
+  days: WeddingDay[],
+  weddingDate: string | null
+): CheckResult[] {
+  const allEvents = days.flatMap((day) => day.events);
+  const totalEvents = allEvents.length;
+  const missingVendors = allEvents.filter(
+    (event) => event.vendorSelections.length === 0
+  ).length;
+  const flaggedForFood = allEvents.filter(
+    (event) =>
+      Boolean(event.food_style) ||
+      Boolean(event.menu_notes) ||
+      (event.food_preferences ?? []).length > 0
+  );
+  const missingMenus = flaggedForFood.filter((event) => event.menus.length === 0)
+    .length;
+  const missingLogistics = allEvents.filter((event) => !event.logistics).length;
+  const missingBudget = allEvents.filter(
+    (event) => !event.estimated_budget || event.estimated_budget <= 0
+  ).length;
+  const missingGuestCount = allEvents.filter(
+    (event) => !event.guest_count || event.guest_count <= 0
+  ).length;
+  const missingTasks = allEvents.filter((event) => event.tasks.length === 0).length;
+
+  return EVENT_FINALIZATION_CHECKLIST.map((entry): CheckResult => {
+    switch (entry.key) {
+      case "definition":
+        if (!weddingDate) {
+          return {
+            key: entry.key,
+            label: entry.label,
+            description: entry.description,
+            status: "missing",
+            detail: "No primary date is set yet.",
+          };
+        }
+        if (totalEvents === 0) {
+          return {
+            key: entry.key,
+            label: entry.label,
+            description: entry.description,
+            status: "missing",
+            detail: "No time blocks have been added yet.",
+          };
+        }
+        return {
+          key: entry.key,
+          label: entry.label,
+          description: entry.description,
+          status: "ok",
+          detail: `${days.length} day(s) · ${totalEvents} block(s) confirmed.`,
+        };
+      case "requirements":
+        if (totalEvents === 0) {
+          return {
+            key: entry.key,
+            label: entry.label,
+            description: entry.description,
+            status: "missing",
+            detail: "No blocks to fill requirements against.",
+          };
+        }
+        if (missingMenus > 0 || flaggedForFood.length < totalEvents / 2) {
+          return {
+            key: entry.key,
+            label: entry.label,
+            description: entry.description,
+            status: "partial",
+            detail: `${missingMenus} food block(s) still need menu drafts.`,
+          };
+        }
+        return {
+          key: entry.key,
+          label: entry.label,
+          description: entry.description,
+          status: "ok",
+          detail: "Food and design notes are captured across the plan.",
+        };
+      case "vendors":
+        return {
+          key: entry.key,
+          label: entry.label,
+          description: entry.description,
+          status: missingVendors === 0 && totalEvents > 0 ? "ok" : "partial",
+          detail: `${missingVendors} of ${totalEvents} block(s) still need vendor picks.`,
+        };
+      case "budget":
+        return {
+          key: entry.key,
+          label: entry.label,
+          description: entry.description,
+          status: missingBudget === 0 && totalEvents > 0 ? "ok" : "partial",
+          detail: `${missingBudget} block(s) without an estimated spend.`,
+        };
+      case "guests-hotels":
+        return {
+          key: entry.key,
+          label: entry.label,
+          description: entry.description,
+          status: missingGuestCount === 0 && totalEvents > 0 ? "ok" : "partial",
+          detail: `${missingGuestCount} block(s) missing a guest count.`,
+        };
+      case "run-of-show":
+        return {
+          key: entry.key,
+          label: entry.label,
+          description: entry.description,
+          status:
+            missingTasks === 0 && missingLogistics === 0 && totalEvents > 0
+              ? "ok"
+              : "partial",
+          detail: `${missingTasks} block(s) without tasks · ${missingLogistics} without logistics.`,
+        };
+      default: {
+        const fallback = entry as unknown as {
+          key: string;
+          label: string;
+          description: string;
+        };
+        return {
+          key: fallback.key,
+          label: fallback.label,
+          description: fallback.description,
+          status: "ok",
+          detail: "",
+        };
+      }
+    }
+  });
+}
+
+function FinalizationLayer({
+  days,
+  weddingDate,
+  onJumpToRequirements,
+}: {
+  days: WeddingDay[];
+  weddingDate: string | null;
+  onJumpToRequirements: () => void;
+}) {
+  const checks = useMemo(
+    () => computeFinalizationChecks(days, weddingDate),
+    [days, weddingDate]
+  );
+  const okCount = checks.filter((check) => check.status === "ok").length;
+  const readyPercent = Math.round((okCount / checks.length) * 100);
+
+  return (
+    <motion.section variants={fadeUp} className="mt-8 space-y-5">
+      <div className={cn(dashCard, "border-gold-primary/25 bg-gold-primary/5")}>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className={dashLabel}>Layer 3 · Finalization</p>
+            <h3 className="mt-2 font-display text-2xl text-charcoal">
+              Finish the gaps before execution.
+            </h3>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate">
+              This is the readiness pass for vendors, menus, budgets, guests,
+              hotels, logistics, and the final run of show.
+            </p>
+          </div>
+          <div className="border border-charcoal/10 bg-ivory/70 px-4 py-3 text-right">
+            <p className="font-display text-3xl text-charcoal">{readyPercent}%</p>
+            <p className={dashLabel}>Ready</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          className={cn(dashBtn, "mt-5")}
+          onClick={onJumpToRequirements}
+        >
+          Fill requirements
+        </button>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {checks.map((check) => (
+          <article
+            key={check.key}
+            className={cn(
+              dashCard,
+              check.status === "ok"
+                ? "border-sage/25 bg-sage/5"
+                : check.status === "missing"
+                  ? "border-rose/25 bg-rose/5"
+                  : "border-gold-primary/25 bg-gold-primary/5"
+            )}
+          >
+            <p className={dashLabel}>{check.status}</p>
+            <h4 className="mt-2 font-display text-lg text-charcoal">
+              {check.label}
+            </h4>
+            <p className="mt-2 text-xs leading-relaxed text-slate">
+              {check.description}
+            </p>
+            <p className="mt-4 border-t border-charcoal/10 pt-3 text-xs text-charcoal">
+              {check.detail}
+            </p>
+          </article>
+        ))}
+      </div>
+    </motion.section>
+  );
 }
 
 function Field({

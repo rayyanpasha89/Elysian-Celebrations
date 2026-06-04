@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { SignInButton, useUser } from "@clerk/nextjs";
+import { TEST_AUTH_QUERY_PARAM } from "@/lib/test-auth";
 import { cn } from "@/lib/utils";
 
 const clerkConfigured =
@@ -33,6 +34,22 @@ function portalLabel(role: unknown): string {
 }
 
 export function NavSignIn({ className, onNavigate }: NavSignInProps) {
+  const testAuthEnabled =
+    process.env.NODE_ENV !== "production" &&
+    process.env.NEXT_PUBLIC_ELYSIAN_TEST_AUTH_BYPASS === "1";
+
+  if (testAuthEnabled) {
+    return (
+      <Link
+        href={`/client?${TEST_AUTH_QUERY_PARAM}=client`}
+        className={className}
+        onClick={() => onNavigate?.()}
+      >
+        Testing Dashboard
+      </Link>
+    );
+  }
+
   if (!clerkConfigured) {
     return (
       <Link href="/login" className={className} onClick={() => onNavigate?.()}>

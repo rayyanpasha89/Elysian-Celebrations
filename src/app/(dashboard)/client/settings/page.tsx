@@ -7,6 +7,7 @@ import { UserProfile, useUser } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer } from "@/animations/variants";
 import { FloatingField } from "@/components/auth/floating-field";
+import { TestAuthAccountNotice } from "@/components/testing/test-auth-account-notice";
 import { dashBtn, dashCard, dashLabel } from "@/lib/dashboard-styles";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +21,9 @@ type WeddingForm = {
 
 export default function ClientSettingsPage() {
   const { user, isLoaded: clerkLoaded } = useUser();
+  const testAuthEnabled =
+    process.env.NODE_ENV !== "production" &&
+    process.env.NEXT_PUBLIC_ELYSIAN_TEST_AUTH_BYPASS === "1";
   const [loading, setLoading] = useState(true);
   const [hasWedding, setHasWedding] = useState(false);
 
@@ -76,7 +80,7 @@ export default function ClientSettingsPage() {
 
   const email = user?.primaryEmailAddress?.emailAddress ?? "";
 
-  if (!clerkLoaded || loading) {
+  if ((!testAuthEnabled && !clerkLoaded) || loading) {
     return (
       <div className="space-y-6 animate-pulse">
         <div className="h-10 w-48 bg-charcoal/10" />
@@ -198,14 +202,18 @@ export default function ClientSettingsPage() {
           immediately to your sign-in.
         </p>
         <div className="mt-6 overflow-hidden border border-charcoal/10">
-          <UserProfile
-            appearance={{
-              elements: {
-                rootBox: "w-full",
-                card: "shadow-none border-0",
-              },
-            }}
-          />
+          {testAuthEnabled ? (
+            <TestAuthAccountNotice />
+          ) : (
+            <UserProfile
+              appearance={{
+                elements: {
+                  rootBox: "w-full",
+                  card: "shadow-none border-0",
+                },
+              }}
+            />
+          )}
         </div>
       </motion.section>
     </motion.div>

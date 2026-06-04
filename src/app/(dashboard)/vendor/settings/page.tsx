@@ -7,6 +7,7 @@ import { UserProfile, useUser } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer } from "@/animations/variants";
 import { FloatingField } from "@/components/auth/floating-field";
+import { TestAuthAccountNotice } from "@/components/testing/test-auth-account-notice";
 import { dashBtn, dashCard, dashLabel } from "@/lib/dashboard-styles";
 
 type BusinessForm = {
@@ -19,6 +20,9 @@ type BusinessForm = {
 
 export default function VendorSettingsPage() {
   const { user, isLoaded: clerkLoaded } = useUser();
+  const testAuthEnabled =
+    process.env.NODE_ENV !== "production" &&
+    process.env.NEXT_PUBLIC_ELYSIAN_TEST_AUTH_BYPASS === "1";
   const [loading, setLoading] = useState(true);
   const [hasVendorProfile, setHasVendorProfile] = useState(true);
 
@@ -64,7 +68,7 @@ export default function VendorSettingsPage() {
 
   const email = user?.primaryEmailAddress?.emailAddress ?? "";
 
-  if (!clerkLoaded || loading) {
+  if ((!testAuthEnabled && !clerkLoaded) || loading) {
     return (
       <div className="space-y-6 animate-pulse">
         <div className="h-10 w-48 bg-charcoal/10" />
@@ -166,14 +170,18 @@ export default function VendorSettingsPage() {
           Password and email are managed by Clerk. Use the profile panel below.
         </p>
         <div className="mt-6 overflow-hidden border border-charcoal/10">
-          <UserProfile
-            appearance={{
-              elements: {
-                rootBox: "w-full",
-                card: "shadow-none border-0",
-              },
-            }}
-          />
+          {testAuthEnabled ? (
+            <TestAuthAccountNotice />
+          ) : (
+            <UserProfile
+              appearance={{
+                elements: {
+                  rootBox: "w-full",
+                  card: "shadow-none border-0",
+                },
+              }}
+            />
+          )}
         </div>
       </motion.section>
     </motion.div>

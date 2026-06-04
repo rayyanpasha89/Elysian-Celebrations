@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClientWeddingContext } from "@/lib/wedding-plan.server";
 import {
+  normalizeEventRequirementPayload,
+  normalizeTimeBlockKey,
+} from "@/lib/event-platform";
+import {
   apiError,
   apiSuccess,
   getAuthSession,
@@ -84,6 +88,9 @@ export async function PATCH(
       updates.wedding_day_id = nextWeddingDayId;
     }
     if (body.eventType !== undefined) updates.event_type = toOptionalString(body.eventType);
+    if (body.timeBlock !== undefined) {
+      updates.time_block = normalizeTimeBlockKey(body.timeBlock);
+    }
     if (body.date !== undefined) {
       updates.date =
         typeof body.date === "string" && body.date
@@ -108,6 +115,11 @@ export async function PATCH(
       updates.attire_notes = toOptionalString(body.attireNotes);
     }
     if (body.notes !== undefined) updates.notes = toOptionalString(body.notes);
+    if (body.requirementPayload !== undefined) {
+      updates.requirement_payload = normalizeEventRequirementPayload(
+        body.requirementPayload
+      );
+    }
     if (body.sortOrder !== undefined && typeof body.sortOrder === "number") {
       updates.sort_order = Math.max(0, Math.round(body.sortOrder));
     }
@@ -117,7 +129,7 @@ export async function PATCH(
       .update(updates)
       .eq("id", id)
       .select(
-        "id, wedding_day_id, name, event_type, date, start_time, end_time, venue, guest_count, estimated_budget, food_style, food_preferences, menu_notes, decor_style, decor_notes, attire_notes, notes, sort_order"
+        "id, wedding_day_id, name, event_type, time_block, date, start_time, end_time, venue, guest_count, estimated_budget, food_style, food_preferences, menu_notes, decor_style, decor_notes, attire_notes, notes, requirement_payload, sort_order"
       )
       .single();
 

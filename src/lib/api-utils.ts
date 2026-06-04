@@ -1,13 +1,21 @@
 import { NextResponse } from "next/server";
 import { auth, clerkClient } from "@clerk/nextjs/server";
+import { cookies } from "next/headers";
 import type { UserRole } from "@/lib/auth-types";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { normalizeRole, roleFromSessionClaims } from "@/lib/role-utils";
+import {
+  isTestAuthEnabled,
+  TEST_AUTH_COOKIE,
+  testAuthRoleFromValue,
+} from "@/lib/test-auth";
 
 export type AuthSession = {
   userId: string;
   role: UserRole;
 };
+
+const testUserCache: Partial<Record<UserRole, string>> = {};
 
 async function resolveRole(
   userId: string,
@@ -33,6 +41,11 @@ async function resolveRole(
 }
 
 export async function getOptionalAuthSession(): Promise<AuthSession | null> {
+  const testSession = await getTestAuthSession();
+  if (testSession) {
+    return testSession;
+  }
+
   const { userId, sessionClaims } = await auth();
   if (!userId) {
     return null;
@@ -45,6 +58,51 @@ export async function getOptionalAuthSession(): Promise<AuthSession | null> {
       sessionClaims as Record<string, unknown> | undefined
     ),
   };
+}
+
+async function getTestAuthSession(): Promise<AuthSession | null> {
+  if (!isTestAuthEnabled()) return null;
+
+  const cookieStore = await cookies();
+  const role = testAuthRoleFromValue(cookieStore.get(TEST_AUTH_COOKIE)?.value);
+  const userId = await resolveTestAuthUserId(role);
+
+  return {
+    userId,
+    role,
+  };
+}
+
+async function resolveTestAuthUserId(role: UserRole): Promise<string> {
+  const envKey = `ELYSIAN_TEST_AUTH_${role.toUpperCase()}_USER_ID`;
+  const configuredId = process.env[envKey]?.trim();
+  if (configuredId) return configuredId;
+
+  if (testUserCache[role]) return testUserCache[role];
+
+  try {
+    const supabase = createAdminSupabaseClient();
+    const rolesToTry = role === "manager" ? ["MANAGER", "ADMIN"] : [role.toUpperCase()];
+
+    for (const dbRole of rolesToTry) {
+      const { data } = await supabase
+        .from("users")
+        .select("id")
+        .eq("role", dbRole)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (data?.id && typeof data.id === "string") {
+        testUserCache[role] = data.id;
+        return data.id;
+      }
+    }
+  } catch {
+    // Keep the bypass usable even before fixture data is bootstrapped.
+  }
+
+  return `test-${role}`;
 }
 
 /**

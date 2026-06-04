@@ -3,6 +3,8 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "sonner";
 import { fontVariables } from "@/lib/fonts";
 import { ScrollProgress } from "@/components/shared/scroll-progress";
+import { TestAuthSwitcher } from "@/components/testing/test-auth-switcher";
+import { isTestAuthEnabled } from "@/lib/test-auth";
 import "./globals.css";
 
 const siteTitle = "Elysian Celebrations — Luxury Destination Weddings";
@@ -46,11 +48,13 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const testAuthEnabled = isTestAuthEnabled();
   const content = (
     <html lang="en" className={`${fontVariables} h-full antialiased`}>
       <body className="min-h-full flex flex-col font-sans">
         <ScrollProgress />
         {children}
+        {testAuthEnabled ? <TestAuthSwitcher /> : null}
         <Toaster position="bottom-right" richColors toastOptions={{ className: "font-sans" }} />
       </body>
     </html>

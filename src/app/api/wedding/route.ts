@@ -4,6 +4,13 @@ import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { ensureWeddingDays } from "@/lib/wedding-plan.server";
 import { buildDefaultCelebrationPlan } from "@/lib/wedding-plan";
 import {
+  buildCelebrationPlanFromEventDefinition,
+  buildEventDefinitionPayload,
+  extractEventDefinitionDays,
+  hasExplicitEventDefinition,
+  normalizeDayCount as normalizeEventDayCount,
+} from "@/lib/event-platform";
+import {
   getAuthSession,
   requireRole,
   apiError,
@@ -15,6 +22,7 @@ type WeddingEventRow = {
   wedding_day_id: string | null;
   name: string;
   event_type: string | null;
+  time_block: string | null;
   date: string | null;
   start_time: string | null;
   end_time: string | null;
@@ -28,6 +36,7 @@ type WeddingEventRow = {
   decor_notes: string | null;
   attire_notes: string | null;
   notes: string | null;
+  requirement_payload: Record<string, unknown> | null;
   sort_order: number;
 };
 
@@ -200,11 +209,6 @@ function normalizeEventBookingRows(rows: RawEventBookingRow[]) {
   });
 }
 
-function normalizeDayCount(value: unknown) {
-  if (typeof value !== "number" || !Number.isFinite(value)) return 3;
-  return Math.min(7, Math.max(1, Math.round(value)));
-}
-
 function mapEventBookings(rows: EventBookingRow[]) {
   const bookingsByEvent = new Map<string, EventBookingRow[]>();
 
@@ -269,7 +273,7 @@ export async function GET() {
     const { data: wedding, error: weddingError } = await supabase
       .from("weddings")
       .select(
-        `id, name, date, status,
+        `id, name, date, status, event_type, custom_event_type, event_platform_version, definition_payload,
         destination:destinations(id, name, slug, country, tagline, hero_image),
         package_tier:package_tiers(name, slug)`
       )
@@ -290,7 +294,7 @@ export async function GET() {
     const { data: initialEvents, error: eventsError } = await supabase
       .from("wedding_events")
       .select(
-        "id, wedding_day_id, name, event_type, date, start_time, end_time, venue, guest_count, estimated_budget, food_style, food_preferences, menu_notes, decor_style, decor_notes, attire_notes, notes, sort_order"
+        "id, wedding_day_id, name, event_type, time_block, date, start_time, end_time, venue, guest_count, estimated_budget, food_style, food_preferences, menu_notes, decor_style, decor_notes, attire_notes, notes, requirement_payload, sort_order"
       )
       .eq("wedding_id", wedding.id)
       .order("sort_order", { ascending: true });
@@ -313,7 +317,7 @@ export async function GET() {
     const { data: events, error: refreshedEventsError } = await supabase
       .from("wedding_events")
       .select(
-        "id, wedding_day_id, name, event_type, date, start_time, end_time, venue, guest_count, estimated_budget, food_style, food_preferences, menu_notes, decor_style, decor_notes, attire_notes, notes, sort_order"
+        "id, wedding_day_id, name, event_type, time_block, date, start_time, end_time, venue, guest_count, estimated_budget, food_style, food_preferences, menu_notes, decor_style, decor_notes, attire_notes, notes, requirement_payload, sort_order"
       )
       .eq("wedding_id", wedding.id)
       .order("sort_order", { ascending: true });
@@ -571,7 +575,26 @@ export async function POST(request: NextRequest) {
         ? Math.floor(budgetTotal)
         : 500000;
 
-    const totalDays = normalizeDayCount(dayCount);
+    const totalDays = normalizeEventDayCount(dayCount);
+    const eventDefinitionInput =
+      body && typeof body === "object"
+        ? ((body.eventDefinition ?? body.definitionPayload) as unknown)
+        : null;
+    const eventDefinitionObject =
+      eventDefinitionInput && typeof eventDefinitionInput === "object"
+        ? (eventDefinitionInput as Record<string, unknown>)
+        : {};
+    const eventDefinition = buildEventDefinitionPayload({
+      eventName: name,
+      eventType: body.eventType ?? eventDefinitionObject.eventType,
+      customEventType: body.customEventType ?? eventDefinitionObject.customEventType,
+      eventDate: dateIso,
+      dayCount: totalDays,
+      days: extractEventDefinitionDays(body as Record<string, unknown>),
+    });
+    const useLayeredDefinition = hasExplicitEventDefinition(
+      body as Record<string, unknown>
+    );
 
     try {
       const clerk = await clerkClient();
@@ -665,6 +688,10 @@ export async function POST(request: NextRequest) {
         client_profile_id: profileId,
         name,
         date: dateIso,
+        event_type: eventDefinition.eventType,
+        custom_event_type: eventDefinition.customEventType,
+        event_platform_version: eventDefinition.version,
+        definition_payload: eventDefinition,
         destination_id: destId,
         status: "PLANNING",
       })
@@ -676,7 +703,27 @@ export async function POST(request: NextRequest) {
       return apiError("Failed to create wedding", 500);
     }
 
-    const celebrationPlan = buildDefaultCelebrationPlan(totalDays, dateIso);
+    const celebrationPlan = useLayeredDefinition
+      ? buildCelebrationPlanFromEventDefinition(eventDefinition).map((day) => ({
+          ...day,
+          events: day.events.map((event) => ({
+            ...event,
+            foodStyle: null,
+            decorStyle: null,
+          })),
+        }))
+      : buildDefaultCelebrationPlan(eventDefinition.dayCount, dateIso).map((day) => ({
+          name: day.name,
+          date: day.date,
+          sortOrder: day.sortOrder,
+          notes: null,
+          events: day.events.map((event) => ({
+            ...event,
+            endTime: null,
+            timeBlock: null,
+            notes: null,
+          })),
+        }));
 
     const { data: createdDays, error: createdDaysError } = await supabase
       .from("wedding_days")
@@ -685,6 +732,7 @@ export async function POST(request: NextRequest) {
           wedding_id: wedding.id,
           name: day.name,
           date: day.date,
+          notes: day.notes,
           sort_order: day.sortOrder,
         }))
       )
@@ -706,10 +754,13 @@ export async function POST(request: NextRequest) {
         wedding_day_id: dayIdBySortOrder.get(day.sortOrder) ?? null,
         name: event.name,
         event_type: event.eventType,
+        time_block: event.timeBlock,
         date: day.date,
         start_time: event.startTime,
+        end_time: event.endTime,
         food_style: event.foodStyle,
         decor_style: event.decorStyle,
+        notes: event.notes,
         sort_order: event.sortOrder,
       }))
     );
@@ -718,7 +769,7 @@ export async function POST(request: NextRequest) {
       const { data: createdEvents, error: eventsInsertError } = await supabase
         .from("wedding_events")
         .insert(eventsToInsert)
-        .select("id, name, event_type, start_time, food_style, menu_notes, sort_order");
+        .select("id, name, event_type, time_block, start_time, food_style, menu_notes, sort_order");
 
       if (eventsInsertError) {
         console.error("wedding_events insert:", eventsInsertError);
@@ -767,7 +818,10 @@ export async function POST(request: NextRequest) {
 
     const { error: budgetError } = await supabase.from("budgets").insert({
       client_profile_id: profileId,
-      name: "My Wedding Budget",
+      name:
+        eventDefinition.eventType === "wedding"
+          ? "My Wedding Budget"
+          : "My Event Budget",
       total_budget: budget,
     });
 

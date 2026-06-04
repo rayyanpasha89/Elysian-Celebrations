@@ -70,3 +70,20 @@ After bootstrapping, these accounts are available:
 - `testing+the-wedding-chapter@elysiancelebrations.app` -> `/vendor`
 
 All seeded accounts use the same password from `ELYSIAN_TEST_USER_PASSWORD`.
+
+## Local auth bypass
+
+For dashboard QA on `localhost`, you can temporarily bypass Clerk email
+verification without removing Clerk from the product:
+
+```bash
+ELYSIAN_TEST_AUTH_BYPASS=1
+NEXT_PUBLIC_ELYSIAN_TEST_AUTH_BYPASS=1
+ELYSIAN_TEST_AUTH_DEFAULT_ROLE=client
+```
+
+When enabled outside production, `/client`, `/vendor`, `/manager`, and `/admin`
+skip Clerk protection and resolve to the first matching Supabase user for that
+role. Use `?testRole=client`, `?testRole=vendor`, `?testRole=manager`, or
+`?testRole=admin` to switch roles. Remove those flags, or set them to `false`,
+to return to the normal Clerk flow.

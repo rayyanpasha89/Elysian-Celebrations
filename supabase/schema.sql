@@ -171,6 +171,10 @@ create table weddings (
   client_profile_id uuid not null references client_profiles(id) on delete cascade,
   name text not null,
   date timestamptz,
+  event_type text not null default 'wedding',
+  custom_event_type text,
+  event_platform_version integer not null default 1,
+  definition_payload jsonb not null default '{}'::jsonb,
   destination_id uuid references destinations(id),
   package_tier_id uuid references package_tiers(id),
   status wedding_status not null default 'PLANNING',
@@ -196,6 +200,7 @@ create table wedding_events (
   wedding_day_id uuid references wedding_days(id) on delete set null,
   name text not null,
   event_type text,
+  time_block text,
   date timestamptz,
   start_time text,
   end_time text,
@@ -209,6 +214,7 @@ create table wedding_events (
   decor_notes text,
   attire_notes text,
   notes text,
+  requirement_payload jsonb not null default '{}'::jsonb,
   sort_order integer not null default 0,
   created_at timestamptz not null default now()
 );
@@ -487,8 +493,10 @@ create index idx_bookings_vendor on bookings(vendor_profile_id);
 create index idx_bookings_status on bookings(status);
 create index idx_saved_vendors_client on saved_vendors(client_profile_id);
 create index idx_saved_vendors_vendor on saved_vendors(vendor_profile_id);
+create index idx_weddings_event_type on weddings(event_type);
 create index idx_wedding_days_wedding on wedding_days(wedding_id);
 create index idx_wedding_events_day on wedding_events(wedding_day_id);
+create index idx_wedding_events_time_block on wedding_events(time_block);
 create index idx_wedding_event_menus_event on wedding_event_menus(wedding_event_id, sort_order);
 create index idx_wedding_event_menu_items_menu on wedding_event_menu_items(menu_id, sort_order);
 create index idx_wedding_event_tasks_event on wedding_event_tasks(wedding_event_id, sort_order);

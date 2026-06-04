@@ -1,160 +1,262 @@
 "use client";
 
-import { useEffect, useState } from "react";
+/**
+ * Layer 1 — Definition.
+ *
+ * A 4-step guided flow that captures the new event-platform model:
+ *   Step 1 — profile name
+ *   Step 2 — event type (14 presets + Custom)
+ *   Step 3 — number of days
+ *   Step 4 — per-day morning / afternoon / evening time blocks (toggle + rename)
+ *
+ * Submits to the existing /api/wedding POST. The request includes the richer
+ * `definitionPayload` (event type, custom name, full day/block plan); when
+ * Codex's API slice wires this through, the backend persists every field
+ * into the new columns (`event_type`, `custom_event_type`, `definition_payload`,
+ * `wedding_events.time_block`). Until then the API only consumes name + day
+ * count and ignores the rest — the planner editor will still pick the model
+ * up via Layer 2.
+ */
+
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { motion } from "framer-motion";
 import { fadeUp, staggerContainer } from "@/animations/variants";
 import { dashBtn, dashCard, dashLabel } from "@/lib/dashboard-styles";
-import { buildDefaultCelebrationPlan } from "@/lib/wedding-plan";
+import {
+  CUSTOM_EVENT_TYPE_VALUE,
+  EVENT_PLATFORM_TYPES,
+  EVENT_TIME_BLOCKS,
+  buildEventDefinitionPayload,
+  normalizeDayCount,
+  type EventDefinitionDay,
+  type EventDefinitionPayload,
+  type EventDefinitionTimeBlock,
+  type EventPlatformType,
+  type EventTimeBlockKey,
+} from "@/lib/event-platform";
 import { cn } from "@/lib/utils";
 
-const schema = z.object({
-  coupleName: z.string().min(2, "Enter both names"),
-  weddingDate: z.string().min(1, "Pick a date"),
-  dayCount: z.number().min(1).max(7),
-  guestCount: z.number().min(1, "At least 1 guest"),
-  destinationId: z.string().optional(),
-  budgetTotal: z.number().min(50000, "Minimum ₹50,000"),
-});
+type Step = 0 | 1 | 2 | 3;
 
-type FormValues = z.infer<typeof schema>;
+const STEP_LABELS = ["Name", "Type", "Days", "Time blocks"] as const;
 
-const steps = [
-  "Names",
-  "Date",
-  "Celebration",
-  "Guests",
-  "Destination",
-  "Budget",
-] as const;
+type LocalDay = {
+  name: string;
+  date: string | null;
+  sortOrder: number;
+  blocks: Record<
+    EventTimeBlockKey,
+    {
+      enabled: boolean;
+      title: string;
+      startTime: string;
+      endTime: string;
+    }
+  >;
+};
+
+const DEFAULT_BLOCK_KEYS = EVENT_TIME_BLOCKS.map((b) => b.key) as EventTimeBlockKey[];
+
+function createEmptyDay(
+  index: number,
+  count: number,
+  eventTypeLabel: string
+): LocalDay {
+  const dayName = count === 1 ? `${eventTypeLabel} Day` : `Day ${index + 1}`;
+  return {
+    name: dayName,
+    date: null,
+    sortOrder: index,
+    blocks: EVENT_TIME_BLOCKS.reduce(
+      (acc, block) => {
+        acc[block.key] = {
+          enabled: block.key === "evening", // evening on by default — most events have one
+          title:
+            eventTypeLabel.toLowerCase() === "wedding"
+              ? `${block.label} function`
+              : `${block.label} ${dayName}`,
+          startTime: block.defaultStartTime,
+          endTime: block.defaultEndTime,
+        };
+        return acc;
+      },
+      {} as LocalDay["blocks"]
+    ),
+  };
+}
+
+function rebuildDays(
+  current: LocalDay[],
+  targetCount: number,
+  eventTypeLabel: string
+): LocalDay[] {
+  const next: LocalDay[] = [];
+  for (let i = 0; i < targetCount; i++) {
+    const existing = current[i];
+    if (existing) {
+      next.push({ ...existing, sortOrder: i });
+    } else {
+      next.push(createEmptyDay(i, targetCount, eventTypeLabel));
+    }
+  }
+  return next;
+}
+
+function toEventDefinitionDay(day: LocalDay): EventDefinitionDay {
+  return {
+    name: day.name,
+    date: day.date,
+    sortOrder: day.sortOrder,
+    timeBlocks: EVENT_TIME_BLOCKS.map(
+      (block): EventDefinitionTimeBlock => {
+        const local = day.blocks[block.key];
+        return {
+          slot: block.key,
+          label: block.label,
+          enabled: local.enabled,
+          title: local.title,
+          eventType: local.title,
+          startTime: local.startTime || null,
+          endTime: local.endTime || null,
+          requirementCategories: [],
+          notes: null,
+        };
+      }
+    ),
+  };
+}
 
 export default function ClientOnboardingPage() {
   const router = useRouter();
-  const [step, setStep] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [destinations, setDestinations] = useState<
-    { id: string; name: string; country: string }[]
-  >([]);
-  const [destLoading, setDestLoading] = useState(true);
+  const [step, setStep] = useState<Step>(0);
+  const [saving, setSaving] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    trigger,
-    watch,
-    formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      coupleName: "",
-      weddingDate: "",
-      dayCount: 3,
-      guestCount: 120,
-      destinationId: "",
-      budgetTotal: 800000,
-    },
-  });
+  // Step 1
+  const [profileName, setProfileName] = useState("");
+  // Step 2
+  const [eventType, setEventType] = useState<EventPlatformType>("wedding");
+  const [customEventType, setCustomEventType] = useState("");
+  // Step 3
+  const [dayCount, setDayCount] = useState(3);
+  const [eventDate, setEventDate] = useState("");
+  // Step 4
+  const eventTypeLabel = useMemo(() => {
+    const match = EVENT_PLATFORM_TYPES.find((t) => t.value === eventType);
+    if (!match) return "Event";
+    return match.value === CUSTOM_EVENT_TYPE_VALUE && customEventType.trim()
+      ? customEventType.trim()
+      : match.label;
+  }, [eventType, customEventType]);
+  const [days, setDays] = useState<LocalDay[]>(() =>
+    Array.from({ length: 3 }, (_, i) => createEmptyDay(i, 3, "Wedding"))
+  );
 
+  // Re-shape the days array when day count changes, and refresh default copy
+  // when event type shifts.
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/destinations");
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error);
-        const list = (json.destinations ?? []).map(
-          (d: { id: string; name: string; country: string }) => ({
-            id: d.id,
-            name: d.name,
-            country: d.country,
-          })
-        );
-        if (!cancelled) setDestinations(list);
-      } catch {
-        if (!cancelled) setDestinations([]);
-      } finally {
-        if (!cancelled) setDestLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    setDays((current) => rebuildDays(current, normalizeDayCount(dayCount), eventTypeLabel));
+  }, [dayCount, eventTypeLabel]);
 
-  const fieldsForStep = (): (keyof FormValues)[] => {
-    if (step === 0) return ["coupleName"];
-    if (step === 1) return ["weddingDate"];
-    if (step === 2) return ["dayCount"];
-    if (step === 3) return ["guestCount"];
-    if (step === 4) return [];
-    return ["budgetTotal"];
+  const definition = useMemo<EventDefinitionPayload>(
+    () =>
+      buildEventDefinitionPayload({
+        eventName: profileName,
+        eventType,
+        customEventType: eventType === CUSTOM_EVENT_TYPE_VALUE ? customEventType : null,
+        eventDate: eventDate || null,
+        dayCount,
+        days: days.map(toEventDefinitionDay),
+      }),
+    [profileName, eventType, customEventType, eventDate, dayCount, days]
+  );
+
+  const canAdvance = (): boolean => {
+    if (step === 0) return profileName.trim().length >= 2;
+    if (step === 1) {
+      if (eventType === CUSTOM_EVENT_TYPE_VALUE) return customEventType.trim().length >= 2;
+      return true;
+    }
+    if (step === 2) return dayCount >= 1 && dayCount <= 14;
+    return true;
   };
 
-  const next = async () => {
-    const ok = await trigger(fieldsForStep(), { shouldFocus: true });
-    if (!ok) return;
-    setStep((s) => Math.min(s + 1, steps.length - 1));
+  const next = () => {
+    if (!canAdvance()) {
+      toast.error("Please complete this step before continuing.");
+      return;
+    }
+    setStep((s) => (s < 3 ? ((s + 1) as Step) : s));
   };
 
-  const back = () => setStep((s) => Math.max(s - 1, 0));
+  const back = () => setStep((s) => (s > 0 ? ((s - 1) as Step) : s));
 
-  const onSubmit = async (values: FormValues) => {
-    setLoading(true);
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (saving) return;
+
+    const enabledCount = days.reduce(
+      (sum, day) => sum + Object.values(day.blocks).filter((b) => b.enabled).length,
+      0
+    );
+    if (enabledCount === 0) {
+      toast.error("Enable at least one time block before finishing.");
+      return;
+    }
+
+    setSaving(true);
     try {
       const res = await fetch("/api/wedding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          coupleName: values.coupleName,
-          weddingDate: values.weddingDate,
-          dayCount: values.dayCount,
-          guestCount: values.guestCount,
-          destinationId: values.destinationId || undefined,
-          budgetTotal: values.budgetTotal,
+          coupleName: profileName.trim(),
+          weddingDate: eventDate || null,
+          dayCount,
+          // Defaults so the existing API contract stays satisfied. The
+          // backend ignores anything else for now; once Codex's API slice
+          // lands, `definitionPayload` will be persisted in full.
+          guestCount: 100,
+          budgetTotal: 500000,
+          eventType,
+          customEventType:
+            eventType === CUSTOM_EVENT_TYPE_VALUE ? customEventType.trim() : null,
+          definitionPayload: definition,
         }),
       });
       const json = await res.json();
       if (res.status === 409) {
-        // Wedding already exists — just go to dashboard
         router.replace("/client");
         return;
       }
       if (!res.ok) throw new Error(json.error ?? "Could not save");
-      router.replace("/client");
-    } catch (e) {
-      console.error(e);
-      toast.error(e instanceof Error ? e.message : "Could not save. Please try again.");
-      setLoading(false);
+      toast.success("Event created — now define what each block needs.");
+      router.replace("/client/wedding");
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Could not save. Please try again.");
+      setSaving(false);
     }
   };
-
-  const weddingDate = watch("weddingDate");
-  const celebrationPreview = buildDefaultCelebrationPlan(
-    watch("dayCount"),
-    weddingDate || null
-  );
 
   return (
     <motion.div
       variants={staggerContainer}
       initial="hidden"
       animate="visible"
-      className="mx-auto max-w-xl"
+      className="mx-auto max-w-2xl"
     >
       <motion.header variants={fadeUp} className="border-b border-charcoal/8 pb-8">
-        <p className={dashLabel}>Onboarding</p>
+        <p className={dashLabel}>Layer 1 · Definition</p>
         <h1 className="font-display mt-2 text-3xl font-semibold text-charcoal">
-          Plan your celebration
+          Define your event
         </h1>
         <p className="font-heading mt-2 text-sm text-slate">
-          Step {step + 1} of {steps.length} — {steps[step]}
+          Step {step + 1} of {STEP_LABELS.length} — {STEP_LABELS[step]}
         </p>
         <div className="mt-6 flex gap-1">
-          {steps.map((_, i) => (
+          {STEP_LABELS.map((_, i) => (
             <div
               key={i}
               className={cn(
@@ -166,182 +268,362 @@ export default function ClientOnboardingPage() {
         </div>
       </motion.header>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="mt-10 space-y-8">
+      <form onSubmit={onSubmit} className="mt-10 space-y-8">
         <motion.div variants={fadeUp} className={cn(dashCard, "space-y-6")}>
-          {step === 0 && (
-            <div>
-              <label htmlFor="coupleName" className={dashLabel}>
-                Couple / wedding title
-              </label>
-              <input
-                id="coupleName"
-                {...register("coupleName")}
-                className="mt-3 w-full border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm outline-none focus:border-gold-primary"
-                placeholder="Priya & Arjun"
-              />
-              {errors.coupleName && (
-                <p className="mt-2 text-xs text-rose">{errors.coupleName.message}</p>
-              )}
-            </div>
-          )}
+          {step === 0 ? (
+            <NameStep value={profileName} onChange={setProfileName} />
+          ) : null}
 
-          {step === 1 && (
-            <div>
-              <label htmlFor="weddingDate" className={dashLabel}>
-                Wedding date
-              </label>
-              <input
-                id="weddingDate"
-                type="date"
-                {...register("weddingDate")}
-                className="mt-3 w-full border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm outline-none focus:border-gold-primary"
-              />
-              {errors.weddingDate && (
-                <p className="mt-2 text-xs text-rose">{errors.weddingDate.message}</p>
-              )}
-            </div>
-          )}
+          {step === 1 ? (
+            <TypeStep
+              value={eventType}
+              custom={customEventType}
+              onChange={(value) => {
+                setEventType(value);
+                if (value !== CUSTOM_EVENT_TYPE_VALUE) setCustomEventType("");
+              }}
+              onCustomChange={setCustomEventType}
+            />
+          ) : null}
 
-          {step === 2 && (
-            <div className="space-y-5">
-              <div>
-                <label htmlFor="dayCount" className={dashLabel}>
-                  How many celebration days?
-                </label>
-                <input
-                  id="dayCount"
-                  type="number"
-                  min={1}
-                  max={7}
-                  {...register("dayCount", { valueAsNumber: true })}
-                  className="mt-3 w-full border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm outline-none focus:border-gold-primary"
-                />
-                <p className="mt-2 text-xs text-slate">
-                  We will create a day-wise planning board with starter events you can
-                  rename, expand, and customize after setup.
-                </p>
-                {errors.dayCount && (
-                  <p className="mt-2 text-xs text-rose">{errors.dayCount.message}</p>
-                )}
-              </div>
+          {step === 2 ? (
+            <DaysStep
+              dayCount={dayCount}
+              eventDate={eventDate}
+              onDayCountChange={(value) => setDayCount(normalizeDayCount(value))}
+              onEventDateChange={setEventDate}
+              eventTypeLabel={eventTypeLabel}
+            />
+          ) : null}
 
-              <div className="border border-charcoal/10 bg-cream/45 p-4">
-                <p className={dashLabel}>Initial celebration plan</p>
-                <div className="mt-4 space-y-4">
-                  {celebrationPreview.map((day) => (
-                    <div key={`${day.sortOrder}-${day.name}`} className="border border-charcoal/10 bg-ivory/80 p-3">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <p className="font-display text-lg text-charcoal">{day.name}</p>
-                          <p className="font-heading text-xs text-slate">
-                            {day.date
-                              ? new Date(day.date).toLocaleDateString("en-IN", {
-                                  weekday: "short",
-                                  day: "numeric",
-                                  month: "short",
-                                  year: "numeric",
-                                })
-                              : "Date follows your final wedding schedule"}
-                          </p>
-                        </div>
-                        <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-gold-dark">
-                          Day {day.sortOrder + 1}
-                        </p>
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {day.events.map((event) => (
-                          <span
-                            key={`${day.name}-${event.name}`}
-                            className="border border-charcoal/10 px-3 py-2 font-heading text-xs text-charcoal"
-                          >
-                            {event.name}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {step === 3 && (
-            <div>
-              <label htmlFor="guestCount" className={dashLabel}>
-                Estimated guest count
-              </label>
-              <input
-                id="guestCount"
-                type="number"
-                min={1}
-                {...register("guestCount", { valueAsNumber: true })}
-                className="mt-3 w-full border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm outline-none focus:border-gold-primary"
-              />
-              {errors.guestCount && (
-                <p className="mt-2 text-xs text-rose">{errors.guestCount.message}</p>
-              )}
-            </div>
-          )}
-
-          {step === 4 && (
-            <div>
-              <p className={dashLabel}>Destination preference</p>
-              {destLoading ? (
-                <p className="mt-3 text-sm text-slate">Loading destinations…</p>
-              ) : (
-                <select
-                  {...register("destinationId")}
-                  className="mt-3 w-full border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm outline-none focus:border-gold-primary"
-                >
-                  <option value="">Decide later</option>
-                  {destinations.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}, {d.country}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-          )}
-
-          {step === 5 && (
-            <div>
-              <label htmlFor="budgetTotal" className={dashLabel}>
-                Total budget (INR)
-              </label>
-              <input
-                id="budgetTotal"
-                type="number"
-                min={50000}
-                step={10000}
-                {...register("budgetTotal", { valueAsNumber: true })}
-                className="mt-3 w-full border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm outline-none focus:border-gold-primary"
-              />
-              {errors.budgetTotal && (
-                <p className="mt-2 text-xs text-rose">{errors.budgetTotal.message}</p>
-              )}
-            </div>
-          )}
+          {step === 3 ? (
+            <BlocksStep
+              days={days}
+              onDayPatch={(index, patch) => {
+                setDays((current) =>
+                  current.map((day, i) => (i === index ? { ...day, ...patch } : day))
+                );
+              }}
+              onBlockPatch={(dayIndex, blockKey, patch) => {
+                setDays((current) =>
+                  current.map((day, i) =>
+                    i === dayIndex
+                      ? {
+                          ...day,
+                          blocks: {
+                            ...day.blocks,
+                            [blockKey]: { ...day.blocks[blockKey], ...patch },
+                          },
+                        }
+                      : day
+                  )
+                );
+              }}
+            />
+          ) : null}
         </motion.div>
 
-        <motion.div variants={fadeUp} className="flex flex-wrap gap-4">
-          {step > 0 && (
-            <button type="button" onClick={back} className={dashBtn}>
-              Back
-            </button>
-          )}
-          {step < steps.length - 1 && (
+        <motion.div variants={fadeUp} className="flex flex-wrap items-center justify-between gap-4">
+          <button
+            type="button"
+            onClick={back}
+            disabled={step === 0}
+            className={cn(
+              "font-accent inline-flex items-center justify-center border border-charcoal/15 px-4 py-2.5 text-[11px] uppercase tracking-[0.2em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark",
+              step === 0 && "cursor-not-allowed opacity-40"
+            )}
+          >
+            ← Back
+          </button>
+          {step < 3 ? (
             <button type="button" onClick={next} className={dashBtn}>
-              Continue
+              Continue →
             </button>
-          )}
-          {step === steps.length - 1 && (
-            <button type="submit" disabled={loading} className={dashBtn}>
-              {loading ? "Saving…" : "Finish & go to dashboard"}
+          ) : (
+            <button type="submit" disabled={saving} className={dashBtn}>
+              {saving ? "Saving…" : "Create event & open planner"}
             </button>
           )}
         </motion.div>
       </form>
     </motion.div>
+  );
+}
+
+function NameStep({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div>
+      <label htmlFor="profileName" className={dashLabel}>
+        Event or profile name
+      </label>
+      <input
+        id="profileName"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-3 w-full border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm outline-none focus:border-gold-primary"
+        placeholder="Priya & Arjun · Spring Wedding"
+        autoFocus
+      />
+      <p className="mt-3 text-xs leading-relaxed text-slate">
+        This is what guests, vendors, and your team will see at the top of every
+        page. You can rename it later from the planner.
+      </p>
+    </div>
+  );
+}
+
+function TypeStep({
+  value,
+  custom,
+  onChange,
+  onCustomChange,
+}: {
+  value: EventPlatformType;
+  custom: string;
+  onChange: (v: EventPlatformType) => void;
+  onCustomChange: (v: string) => void;
+}) {
+  return (
+    <div>
+      <p className={dashLabel}>What kind of event is this?</p>
+      <p className="mt-2 text-xs leading-relaxed text-slate">
+        Pick the closest match. The shape of your planner adapts — a wedding
+        gets multi-day rituals, a launch gets a press flow, a dinner stays
+        intimate.
+      </p>
+      <div className="mt-5 grid gap-2 sm:grid-cols-2">
+        {EVENT_PLATFORM_TYPES.map((option) => {
+          const active = value === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => onChange(option.value)}
+              className={cn(
+                "border px-4 py-3 text-left transition-colors",
+                active
+                  ? "border-gold-primary bg-gold-primary/10 text-charcoal"
+                  : "border-charcoal/10 bg-ivory/70 text-slate hover:border-gold-primary/45 hover:text-charcoal"
+              )}
+            >
+              <span className="font-display text-sm text-charcoal">{option.label}</span>
+              <span className="mt-1 block text-[11px] leading-relaxed text-slate">
+                {option.description}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {value === CUSTOM_EVENT_TYPE_VALUE ? (
+        <div className="mt-4">
+          <label htmlFor="customType" className={dashLabel}>
+            Name your custom event type
+          </label>
+          <input
+            id="customType"
+            value={custom}
+            onChange={(e) => onCustomChange(e.target.value)}
+            className="mt-3 w-full border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm outline-none focus:border-gold-primary"
+            placeholder="Annual board offsite"
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function DaysStep({
+  dayCount,
+  eventDate,
+  eventTypeLabel,
+  onDayCountChange,
+  onEventDateChange,
+}: {
+  dayCount: number;
+  eventDate: string;
+  eventTypeLabel: string;
+  onDayCountChange: (v: number) => void;
+  onEventDateChange: (v: string) => void;
+}) {
+  return (
+    <div className="space-y-5">
+      <div>
+        <label htmlFor="eventDate" className={dashLabel}>
+          Primary date (optional)
+        </label>
+        <input
+          id="eventDate"
+          type="date"
+          value={eventDate}
+          onChange={(e) => onEventDateChange(e.target.value)}
+          className="mt-3 w-full border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm outline-none focus:border-gold-primary"
+        />
+        <p className="mt-2 text-xs text-slate">
+          For multi-day events, this is the final / main day. We auto-fill the
+          earlier days back from it.
+        </p>
+      </div>
+      <div>
+        <label htmlFor="dayCount" className={dashLabel}>
+          How many days does this {eventTypeLabel.toLowerCase()} run?
+        </label>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {[1, 2, 3, 4, 5, 6, 7].map((n) => {
+            const active = dayCount === n;
+            return (
+              <button
+                key={n}
+                type="button"
+                onClick={() => onDayCountChange(n)}
+                className={cn(
+                  "h-12 w-12 border font-display text-base transition-colors",
+                  active
+                    ? "border-gold-primary bg-gold-primary/10 text-charcoal"
+                    : "border-charcoal/15 bg-ivory/70 text-slate hover:border-gold-primary/45 hover:text-charcoal"
+                )}
+              >
+                {n}
+              </button>
+            );
+          })}
+          <input
+            type="number"
+            min={1}
+            max={14}
+            value={dayCount}
+            onChange={(e) => onDayCountChange(Number(e.target.value) || 1)}
+            className="h-12 w-20 border border-charcoal/15 bg-ivory px-3 text-center font-display text-base outline-none focus:border-gold-primary"
+            aria-label="Custom day count"
+          />
+        </div>
+        <p className="mt-3 text-xs leading-relaxed text-slate">
+          Pick a quick preset or type your own (up to 14). You can add or remove
+          days from the planner later.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function BlocksStep({
+  days,
+  onDayPatch,
+  onBlockPatch,
+}: {
+  days: LocalDay[];
+  onDayPatch: (index: number, patch: Partial<LocalDay>) => void;
+  onBlockPatch: (
+    dayIndex: number,
+    blockKey: EventTimeBlockKey,
+    patch: Partial<LocalDay["blocks"][EventTimeBlockKey]>
+  ) => void;
+}) {
+  return (
+    <div className="space-y-5">
+      <div>
+        <p className={dashLabel}>Shape each day</p>
+        <p className="mt-2 text-xs leading-relaxed text-slate">
+          Toggle which time blocks happen on each day. Rename them — &quot;Morning&quot;
+          can become &quot;Haldi brunch&quot;, &quot;Evening&quot; can become &quot;Reception&quot;. You can
+          come back and refine in the planner.
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        {days.map((day, dayIndex) => (
+          <div key={dayIndex} className="border border-charcoal/10 bg-cream/30 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <label className={dashLabel}>Day {dayIndex + 1} name</label>
+                <input
+                  value={day.name}
+                  onChange={(e) => onDayPatch(dayIndex, { name: e.target.value })}
+                  className="mt-2 w-full border-0 border-b border-charcoal/15 bg-transparent py-2 font-display text-lg text-charcoal outline-none focus:border-gold-primary"
+                  placeholder={`Day ${dayIndex + 1}`}
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              {DEFAULT_BLOCK_KEYS.map((blockKey) => {
+                const preset = EVENT_TIME_BLOCKS.find((b) => b.key === blockKey)!;
+                const block = day.blocks[blockKey];
+                return (
+                  <div
+                    key={blockKey}
+                    className={cn(
+                      "border p-3 transition-colors",
+                      block.enabled
+                        ? "border-gold-primary/45 bg-gold-primary/8"
+                        : "border-charcoal/10 bg-ivory/70"
+                    )}
+                  >
+                    <label className="flex items-center justify-between gap-2">
+                      <span className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
+                        {preset.label}
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={block.enabled}
+                        onChange={(e) =>
+                          onBlockPatch(dayIndex, blockKey, {
+                            enabled: e.target.checked,
+                          })
+                        }
+                        className="h-4 w-4 border border-charcoal/30 accent-gold-primary"
+                      />
+                    </label>
+                    {block.enabled ? (
+                      <>
+                        <input
+                          value={block.title}
+                          onChange={(e) =>
+                            onBlockPatch(dayIndex, blockKey, { title: e.target.value })
+                          }
+                          className="mt-3 w-full border-0 border-b border-charcoal/15 bg-transparent py-1.5 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                          placeholder={preset.label}
+                        />
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
+                          <label className="block">
+                            <span className="block text-slate">Starts</span>
+                            <input
+                              type="time"
+                              value={block.startTime}
+                              onChange={(e) =>
+                                onBlockPatch(dayIndex, blockKey, {
+                                  startTime: e.target.value,
+                                })
+                              }
+                              className="mt-1 w-full border border-charcoal/12 bg-ivory px-2 py-1 outline-none focus:border-gold-primary"
+                            />
+                          </label>
+                          <label className="block">
+                            <span className="block text-slate">Ends</span>
+                            <input
+                              type="time"
+                              value={block.endTime}
+                              onChange={(e) =>
+                                onBlockPatch(dayIndex, blockKey, {
+                                  endTime: e.target.value,
+                                })
+                              }
+                              className="mt-1 w-full border border-charcoal/12 bg-ivory px-2 py-1 outline-none focus:border-gold-primary"
+                            />
+                          </label>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="mt-3 text-[11px] leading-relaxed text-slate/80">
+                        {preset.label} skipped on this day.
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

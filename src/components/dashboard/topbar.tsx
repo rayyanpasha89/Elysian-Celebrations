@@ -104,6 +104,9 @@ export function Topbar({
 }: TopbarProps) {
   const pathname = usePathname();
   const { signOut } = useClerk();
+  const testAuthEnabled =
+    process.env.NODE_ENV !== "production" &&
+    process.env.NEXT_PUBLIC_ELYSIAN_TEST_AUTH_BYPASS === "1";
   const [showDropdown, setShowDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -348,11 +351,15 @@ export function Topbar({
                         type="button"
                         onClick={() => {
                           setShowDropdown(false);
+                          if (testAuthEnabled) {
+                            window.location.href = "/";
+                            return;
+                          }
                           void signOut({ redirectUrl: "/" });
                         }}
                         className="block w-full px-4 py-2 text-left font-accent text-[11px] uppercase tracking-[0.15em] text-red-600/70 transition-colors hover:bg-red-50 hover:text-red-700"
                       >
-                        Sign Out
+                        {testAuthEnabled ? "Exit Test View" : "Sign Out"}
                       </button>
                     </div>
                   </motion.div>

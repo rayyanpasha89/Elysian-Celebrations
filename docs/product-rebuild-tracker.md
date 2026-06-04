@@ -26,6 +26,7 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
   - `20260514000200_add_message_thread_reads.sql`
   - `20260601000100_add_vendor_service_item_media.sql`
   - `20260601000200_enable_message_realtime.sql`
+  - `20260604000100_event_platform_definition_layer.sql`
 - Remote table/column checks passed for:
   - `wedding_event_menus`
   - `wedding_event_menu_items`
@@ -36,9 +37,19 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
   - `vendor_service_items.image_urls`
   - `vendor_service_items.reference_url`
   - `messages` in `supabase_realtime`
+  - `weddings.event_type`
+  - `weddings.custom_event_type`
+  - `weddings.event_platform_version`
+  - `weddings.definition_payload`
+  - `wedding_events.time_block`
+  - `wedding_events.requirement_payload`
 
 ## Shipped Recently
 
+- Added the event-platform definition layer so Elysian can move beyond wedding-only planning. Migration `20260604000100_event_platform_definition_layer.sql` adds `weddings.event_type`, `custom_event_type`, `event_platform_version`, and `definition_payload`, plus `wedding_events.time_block` and `requirement_payload`. The remote Supabase database has the migration applied and column checks passed.
+- Added `src/lib/event-platform.ts` as the shared source of truth for the new flow: 14 top-level event types including custom events, Morning/Afternoon/Evening time blocks, requirement categories for food/decor/photo-video/entertainment/hospitality/logistics/custom needs, a finalization checklist, and safe JSON payload normalization for future custom requirements.
+- Updated `/api/wedding` to accept either the old onboarding payload or a new layered `eventDefinition.days[].timeBlocks[]` payload. Old wedding onboarding still creates the classic starter plan; new event-definition payloads create real day/time-block events with stable event IDs that budgets, bookings, menus, vendors, logistics, and tasks can keep using.
+- Updated `/api/wedding/events` and `/api/wedding/events/[id]` so individual events can store and return `time_block` plus a sanitized `requirement_payload`, giving the frontend a safe backend path for Layer 2 customization without another route rewrite.
 - Added vendor catalogue media: new `vendor_service_items.image_urls text[]` and `reference_url text` columns (migration `20260601000100_add_vendor_service_item_media.sql`), with the vendor offering normalizer enforcing http/https-only URLs, a six-image cap, and per-URL length caps. Vendor editor now supports both Supabase Storage uploads and pasted public URLs per catalogue row, plus remove controls. Client vendor previews and the Event Editor's `ServiceOfferingPreview` render thumbnails + optional moodboard links with graceful text-only fallback.
 - Enabled Supabase Realtime for `messages` (migration `20260601000200_enable_message_realtime.sql`). Client, vendor, and manager inboxes subscribe per booking thread and refresh through `/api/messages`, so live updates preserve server-side role projection and privacy checks.
 - Added real vendor profile-view tracking through the existing `vendor_profile_views` table. Vendor detail API records non-owner profile views, `/api/dashboard/vendor` and `/api/vendor/analytics` surface monthly view counts, and analytics no longer hard-code profile views to `0`.
@@ -86,7 +97,9 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
 - `npm run db:migrations`
 - `npm run db:query` for newly added Supabase tables and columns
 - `npm run db:push` for pending media + realtime migrations
+- `npm run db:push` for `20260604000100_event_platform_definition_layer.sql`
 - Remote SQL checks for media columns and `messages` realtime publication membership
+- Remote SQL checks for event-platform definition columns on `weddings` and `wedding_events`
 - Local dev server started at `http://localhost:3000`
 - Basic HTTP smoke check passed for `/`
 - Browser smoke check passed for `/` after the marketing updates, with no fresh console errors.

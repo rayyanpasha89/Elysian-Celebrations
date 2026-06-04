@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClientWeddingContext, ensureWeddingDays } from "@/lib/wedding-plan.server";
 import {
+  normalizeEventRequirementPayload,
+  normalizeTimeBlockKey,
+} from "@/lib/event-platform";
+import {
   apiError,
   apiSuccess,
   getAuthSession,
@@ -88,6 +92,7 @@ export async function POST(request: NextRequest) {
         wedding_day_id: targetDayId,
         name,
         event_type: toOptionalString(body.eventType),
+        time_block: normalizeTimeBlockKey(body.timeBlock),
         date,
         start_time: toOptionalString(body.startTime),
         end_time: toOptionalString(body.endTime),
@@ -101,10 +106,11 @@ export async function POST(request: NextRequest) {
         decor_notes: toOptionalString(body.decorNotes),
         attire_notes: toOptionalString(body.attireNotes),
         notes: toOptionalString(body.notes),
+        requirement_payload: normalizeEventRequirementPayload(body.requirementPayload),
         sort_order: nextSortOrder,
       })
       .select(
-        "id, wedding_day_id, name, event_type, date, start_time, end_time, venue, guest_count, estimated_budget, food_style, food_preferences, menu_notes, decor_style, decor_notes, attire_notes, notes, sort_order"
+        "id, wedding_day_id, name, event_type, time_block, date, start_time, end_time, venue, guest_count, estimated_budget, food_style, food_preferences, menu_notes, decor_style, decor_notes, attire_notes, notes, requirement_payload, sort_order"
       )
       .single();
 
