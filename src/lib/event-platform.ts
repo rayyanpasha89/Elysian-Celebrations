@@ -210,9 +210,18 @@ export type EventDefinitionTimeBlock = {
   eventType: string;
   startTime: string | null;
   endTime: string | null;
+  /** Expected guests for this specific block. Null = inherit from event scale. */
+  guestCount: number | null;
   requirementCategories: EventRequirementCategoryKey[];
   notes: string | null;
 };
+
+/** Clamp an unknown value into a sane guest-count integer, or null. */
+export function normalizeGuestCount(value: unknown): number | null {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.min(100000, Math.max(1, Math.round(n)));
+}
 
 export type EventDefinitionDay = {
   name: string;
@@ -247,6 +256,7 @@ export type EventDefinitionPlanDay = {
     startTime: string | null;
     endTime: string | null;
     timeBlock: EventTimeBlockKey | null;
+    guestCount: number | null;
     notes: string | null;
     sortOrder: number;
   }[];
@@ -560,6 +570,7 @@ export function buildDefaultRequirementsForEvent({
     eventType: eventName,
     startTime,
     endTime: null,
+    guestCount: null,
     requirementCategories: categories ?? [],
     notes: null,
   };
@@ -617,6 +628,7 @@ function normalizeDefinitionTimeBlock(
     eventType,
     startTime: toOptionalString(block.startTime, 20) ?? slot.defaultStartTime,
     endTime: toOptionalString(block.endTime, 20) ?? slot.defaultEndTime,
+    guestCount: normalizeGuestCount(block.guestCount ?? block.guests),
     requirementCategories: normalizeRequirementCategories(
       block.requirementCategories ?? block.requirements
     ),
@@ -732,6 +744,7 @@ export function buildCelebrationPlanFromEventDefinition(
         startTime: block.startTime,
         endTime: block.endTime,
         timeBlock: block.slot,
+        guestCount: block.guestCount,
         notes: block.notes,
         sortOrder: index,
       })),
