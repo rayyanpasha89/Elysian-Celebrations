@@ -329,11 +329,11 @@ const EDITOR_SECTIONS: {
     label: "Basics",
     helper: "Name, day, time, venue, guests, and budget.",
   },
-  {
-    key: "requirements",
-    label: "Needs",
-    helper: "Food, decor, photo/video, entertainment, hotels, logistics, and custom asks.",
-  },
+  // The standalone "Needs" tab was removed to cut redundancy — food, decor,
+  // vendors, and logistics each have their own dedicated section below, so a
+  // separate generic needs-checklist repeated the same categories. The
+  // underlying requirement drafts are still loaded and saved; they're just no
+  // longer surfaced as a duplicate tab.
   {
     key: "food",
     label: "Food",

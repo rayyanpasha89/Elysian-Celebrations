@@ -335,12 +335,12 @@ export default function ClientOnboardingPage() {
       <form
         onSubmit={onSubmit}
         onKeyDown={(e) => {
-          // Prevent Enter inside any field from advancing or creating early —
-          // only explicit Continue / Create clicks move the flow.
+          // Enter inside any field must never submit/advance — on every step,
+          // including the final one. The event is created ONLY by an explicit
+          // click on "Create event & open planner". Textareas keep newlines.
           if (
             e.key === "Enter" &&
-            (e.target as HTMLElement).tagName !== "TEXTAREA" &&
-            step < 4
+            (e.target as HTMLElement).tagName !== "TEXTAREA"
           ) {
             e.preventDefault();
           }
