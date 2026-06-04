@@ -247,10 +247,18 @@ export default function ClientOnboardingPage() {
 
   const back = () => setStep((s) => (s > 0 ? ((s - 1) as Step) : s));
 
-  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  // Form submission NEVER creates the event. An accidental submit (e.g. Enter
+  // in a field) at most advances a step. Creation happens only through the
+  // explicit Create button's onClick → createEvent(). This makes "auto-create"
+  // structurally impossible.
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (saving) return;
-    // Submitting before the final step only advances — never creates the event.
+    if (step < 4) next();
+  };
+
+  const createEvent = async () => {
+    if (saving) return;
     if (step < 4) {
       next();
       return;
@@ -433,7 +441,12 @@ export default function ClientOnboardingPage() {
               Continue →
             </button>
           ) : (
-            <button type="submit" disabled={saving} className={dashBtn}>
+            <button
+              type="button"
+              onClick={() => void createEvent()}
+              disabled={saving}
+              className={dashBtn}
+            >
               {saving ? "Saving…" : "Create event & open planner"}
             </button>
           )}
