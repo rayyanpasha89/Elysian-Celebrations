@@ -87,6 +87,28 @@ function createEmptyDay(
   };
 }
 
+function dateForDayFromPrimaryDate(
+  primaryDate: string,
+  index: number,
+  count: number
+) {
+  const [year, month, day] = primaryDate.split("-").map(Number);
+  if (!year || !month || !day) return null;
+
+  const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  date.setUTCDate(date.getUTCDate() + index - (count - 1));
+  return date.toISOString().slice(0, 10);
+}
+
+function applyPrimaryDateToDays(days: LocalDay[], primaryDate: string) {
+  if (!primaryDate) return days;
+
+  return days.map((day, index) => ({
+    ...day,
+    date: dateForDayFromPrimaryDate(primaryDate, index, days.length),
+  }));
+}
+
 function rebuildDays(
   current: LocalDay[],
   targetCount: number,
@@ -153,11 +175,16 @@ export default function ClientOnboardingPage() {
     Array.from({ length: 3 }, (_, i) => createEmptyDay(i, 3, "Wedding"))
   );
 
-  // Re-shape the days array when day count changes, and refresh default copy
-  // when event type shifts.
+  // Re-shape the days array when day count changes, refresh default copy when
+  // event type shifts, and derive a visible date for every day from the main date.
   useEffect(() => {
-    setDays((current) => rebuildDays(current, normalizeDayCount(dayCount), eventTypeLabel));
-  }, [dayCount, eventTypeLabel]);
+    setDays((current) =>
+      applyPrimaryDateToDays(
+        rebuildDays(current, normalizeDayCount(dayCount), eventTypeLabel),
+        eventDate
+      )
+    );
+  }, [dayCount, eventTypeLabel, eventDate]);
 
   const definition = useMemo<EventDefinitionPayload>(
     () =>
@@ -178,7 +205,7 @@ export default function ClientOnboardingPage() {
       if (eventType === CUSTOM_EVENT_TYPE_VALUE) return customEventType.trim().length >= 2;
       return true;
     }
-    if (step === 2) return dayCount >= 1 && dayCount <= 14;
+    if (step === 2) return dayCount >= 1 && dayCount <= 14 && Boolean(eventDate);
     return true;
   };
 
@@ -195,11 +222,19 @@ export default function ClientOnboardingPage() {
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (saving) return;
+    if (step < 3) {
+      next();
+      return;
+    }
 
     const enabledCount = days.reduce(
       (sum, day) => sum + Object.values(day.blocks).filter((b) => b.enabled).length,
       0
     );
+    if (days.some((day) => !day.date)) {
+      toast.error("Choose a date for every event day before finishing.");
+      return;
+    }
     if (enabledCount === 0) {
       toast.error("Enable at least one time block before finishing.");
       return;
@@ -227,7 +262,8 @@ export default function ClientOnboardingPage() {
       });
       const json = await res.json();
       if (res.status === 409) {
-        router.replace("/client");
+        toast.error("An event plan already exists. Delete it first to start over.");
+        router.replace("/client/wedding");
         return;
       }
       if (!res.ok) throw new Error(json.error ?? "Could not save");
@@ -449,7 +485,7 @@ function DaysStep({
     <div className="space-y-5">
       <div>
         <label htmlFor="eventDate" className={dashLabel}>
-          Primary date (optional)
+          Main / final date
         </label>
         <input
           id="eventDate"
@@ -459,8 +495,8 @@ function DaysStep({
           className="mt-3 w-full border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm outline-none focus:border-gold-primary"
         />
         <p className="mt-2 text-xs text-slate">
-          For multi-day events, this is the final / main day. We auto-fill the
-          earlier days back from it.
+          For multi-day events, this is the final or main day. The next step
+          assigns dates to every day, and you can still adjust each one.
         </p>
       </div>
       <div>
@@ -497,8 +533,8 @@ function DaysStep({
           />
         </div>
         <p className="mt-3 text-xs leading-relaxed text-slate">
-          Pick a quick preset or type your own (up to 14). You can add or remove
-          days from the planner later.
+          Pick a quick preset or type your own (up to 14). Continue to set each
+          day&apos;s date and morning / afternoon / evening blocks before anything is created.
         </p>
       </div>
     </div>
@@ -532,14 +568,31 @@ function BlocksStep({
       <div className="space-y-4">
         {days.map((day, dayIndex) => (
           <div key={dayIndex} className="border border-charcoal/10 bg-cream/30 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <label className={dashLabel}>Day {dayIndex + 1} name</label>
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem]">
+              <div className="min-w-0">
+                <label htmlFor={`event-day-name-${dayIndex}`} className={dashLabel}>
+                  Day {dayIndex + 1} name
+                </label>
                 <input
+                  id={`event-day-name-${dayIndex}`}
                   value={day.name}
                   onChange={(e) => onDayPatch(dayIndex, { name: e.target.value })}
                   className="mt-2 w-full border-0 border-b border-charcoal/15 bg-transparent py-2 font-display text-lg text-charcoal outline-none focus:border-gold-primary"
                   placeholder={`Day ${dayIndex + 1}`}
+                />
+              </div>
+              <div>
+                <label htmlFor={`event-day-date-${dayIndex}`} className={dashLabel}>
+                  Date
+                </label>
+                <input
+                  id={`event-day-date-${dayIndex}`}
+                  type="date"
+                  value={day.date ?? ""}
+                  onChange={(e) =>
+                    onDayPatch(dayIndex, { date: e.target.value || null })
+                  }
+                  className="mt-2 w-full border border-charcoal/12 bg-ivory px-3 py-2 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
                 />
               </div>
             </div>

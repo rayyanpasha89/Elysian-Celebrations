@@ -1438,7 +1438,8 @@ export default function ClientWeddingPage() {
       setDetailDraft(null);
       setLayer("definition");
       toast.success("Event plan deleted. Start a fresh structure when you're ready.");
-      router.push("/client/onboarding");
+      router.replace("/client/onboarding");
+      router.refresh();
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to delete event plan"

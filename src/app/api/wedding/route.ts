@@ -599,27 +599,28 @@ export async function DELETE() {
       return apiError("Event plan not found", 404);
     }
 
-    const { data: wedding, error: weddingError } = await supabase
+    const { data: weddings, error: weddingError } = await supabase
       .from("weddings")
       .select("id, name")
       .eq("client_profile_id", profile.id)
       .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(50);
 
     if (weddingError) {
       console.error("weddings:", weddingError);
       return apiError("Failed to load event plan", 500);
     }
 
-    if (!wedding) {
+    if (!weddings || weddings.length === 0) {
       return apiError("Event plan not found", 404);
     }
+
+    const weddingIds = weddings.map((wedding) => wedding.id);
 
     const { data: events, error: eventsError } = await supabase
       .from("wedding_events")
       .select("id")
-      .eq("wedding_id", wedding.id);
+      .in("wedding_id", weddingIds);
 
     if (eventsError) {
       console.error("wedding_events:", eventsError);
@@ -666,7 +667,6 @@ export async function DELETE() {
     const { error: deleteError } = await supabase
       .from("weddings")
       .delete()
-      .eq("id", wedding.id)
       .eq("client_profile_id", profile.id);
 
     if (deleteError) {
@@ -676,10 +676,10 @@ export async function DELETE() {
 
     return apiSuccess({
       ok: true,
-      deletedPlan: {
+      deletedPlans: weddings.map((wedding) => ({
         id: wedding.id,
         name: wedding.name,
-      },
+      })),
     });
   } catch (error) {
     console.error("DELETE /api/wedding", error);
@@ -834,6 +834,7 @@ export async function POST(request: NextRequest) {
       .from("weddings")
       .select("id")
       .eq("client_profile_id", profileId)
+      .limit(1)
       .maybeSingle();
 
     if (existingWedding) {
