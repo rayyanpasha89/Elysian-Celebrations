@@ -1123,6 +1123,18 @@ export default function ClientWeddingPage() {
     }
   };
 
+  const openEventFormForDay = (day: WeddingDay | null | undefined) => {
+    if (!day) {
+      setShowDayForm(true);
+      toast.info("Create a day first, then add events inside it.");
+      return;
+    }
+
+    setLayer("requirements");
+    setEventFormDayId(day.id);
+    setEventDraft(createEventDraftForDay(day));
+  };
+
   const moveDay = async (dayId: string, direction: -1 | 1) => {
     const dayIndex = days.findIndex((day) => day.id === dayId);
     const otherDay = days[dayIndex + direction];
@@ -1359,6 +1371,15 @@ export default function ClientWeddingPage() {
   };
 
   const deleteEvent = async (eventId: string) => {
+    const eventToDelete = findEventById(days, eventId);
+    const shouldDelete =
+      !eventToDelete ||
+      window.confirm(
+        `Delete "${eventToDelete.name}"? This removes its menus, requirements, tasks, and draft vendor inquiries.`
+      );
+
+    if (!shouldDelete) return;
+
     setSavingDetail(true);
 
     try {
@@ -1370,8 +1391,11 @@ export default function ClientWeddingPage() {
         throw new Error(json.error ?? "Failed to delete event");
       }
 
-      await refreshWedding();
-      setSelectedEventId(null);
+      const payload = await refreshWedding();
+      const nextEvent =
+        payload.days.flatMap((day) => day.events).find((event) => event.id !== eventId) ??
+        null;
+      setSelectedEventId(nextEvent?.id ?? null);
       toast.success("Event removed");
     } catch (error) {
       toast.error(
@@ -1817,7 +1841,12 @@ export default function ClientWeddingPage() {
 
   if (!wedding) {
     return (
-      <motion.div variants={staggerContainer} initial="hidden" animate="visible">
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+        className="text-[15px] md:text-base [&_.text-sm]:text-[15px] [&_.text-xs]:text-sm [&_input]:text-base [&_select]:text-base [&_textarea]:text-base"
+      >
         <motion.header variants={fadeUp} className="border-b border-charcoal/8 pb-8">
           <p className={dashLabel}>Wedding</p>
           <h2 className="font-display mt-2 text-3xl font-semibold text-charcoal md:text-4xl">
@@ -1835,7 +1864,12 @@ export default function ClientWeddingPage() {
   }
 
   return (
-    <motion.div variants={staggerContainer} initial="hidden" animate="visible">
+    <motion.div
+      variants={staggerContainer}
+      initial="hidden"
+      animate="visible"
+      className="text-[15px] md:text-base [&_.text-sm]:text-[15px] [&_.text-xs]:text-sm [&_input]:text-base [&_select]:text-base [&_textarea]:text-base"
+    >
       <motion.header variants={fadeUp} className="border-b border-charcoal/8 pb-8">
         <p className={dashLabel}>Wedding operating plan</p>
         <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -1960,13 +1994,22 @@ export default function ClientWeddingPage() {
                 Days, events, and flow
               </h3>
             </div>
-            <button
-              type="button"
-              className={dashBtn}
-              onClick={() => setShowDayForm((current) => !current)}
-            >
-              {showDayForm ? "Close day form" : "Add day"}
-            </button>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                className={dashBtn}
+                onClick={() => openEventFormForDay(selectedDay ?? days[0])}
+              >
+                Add event
+              </button>
+              <button
+                type="button"
+                className="border border-charcoal/15 px-4 py-3 font-accent text-[11px] uppercase tracking-[0.2em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark"
+                onClick={() => setShowDayForm((current) => !current)}
+              >
+                {showDayForm ? "Close day form" : "Add day"}
+              </button>
+            </div>
           </motion.div>
 
           {showDayForm ? (
@@ -2173,15 +2216,14 @@ export default function ClientWeddingPage() {
                         </button>
                         <button
                           type="button"
-                          className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal"
-                          onClick={() => {
-                            setEventFormDayId(
-                              current => (current === day.id ? null : day.id)
-                            );
-                            setEventDraft(createEventDraftForDay(day));
-                          }}
+                          className="border border-gold-primary bg-gold-primary/10 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-gold-dark transition-colors hover:bg-gold-primary hover:text-midnight"
+                          onClick={() =>
+                            eventFormDayId === day.id
+                              ? setEventFormDayId(null)
+                              : openEventFormForDay(day)
+                          }
                         >
-                          Add event
+                          {eventFormDayId === day.id ? "Close event form" : "Add event"}
                         </button>
                         <button
                           type="button"
@@ -2200,6 +2242,11 @@ export default function ClientWeddingPage() {
                         className="mt-5 border border-charcoal/10 bg-cream/40 p-4"
                       >
                         <p className={dashLabel}>Add event to {day.name}</p>
+                        <p className="mt-2 text-sm leading-relaxed text-slate">
+                          Create a new morning, afternoon, or evening block. It
+                          will automatically get starter requirements, menu,
+                          logistics, and run-of-show tasks.
+                        </p>
                         <div className="mt-4 grid gap-3 md:grid-cols-2">
                           <input
                             type="text"
@@ -2394,6 +2441,14 @@ export default function ClientWeddingPage() {
                                 >
                                   Down
                                 </button>
+                                <button
+                                  type="button"
+                                  className="border border-rose/35 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-rose transition-colors hover:bg-rose hover:text-ivory"
+                                  onClick={() => void deleteEvent(event.id)}
+                                  disabled={savingDetail}
+                                >
+                                  Delete
+                                </button>
                                 <p className="ml-auto font-heading text-xs text-slate">
                                   {event.vendorSelections.length} vendor picks
                                 </p>
@@ -2422,6 +2477,23 @@ export default function ClientWeddingPage() {
                     Refine the flow for this function from food and decor to
                     vendor selections and spend.
                   </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="border border-gold-primary bg-gold-primary/10 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-gold-dark transition-colors hover:bg-gold-primary hover:text-midnight"
+                      onClick={() => openEventFormForDay(selectedDay ?? days[0])}
+                    >
+                      Create another event
+                    </button>
+                    <button
+                      type="button"
+                      className="border border-rose/35 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-rose transition-colors hover:bg-rose hover:text-ivory"
+                      disabled={savingDetail}
+                      onClick={() => void deleteEvent(selectedEvent.id)}
+                    >
+                      Delete this event
+                    </button>
+                  </div>
                 </div>
 
                 <div className="border border-charcoal/10 bg-cream/30 p-3">
