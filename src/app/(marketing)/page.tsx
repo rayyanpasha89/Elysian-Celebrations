@@ -8,24 +8,18 @@ import { TestimonialCarousel } from "@/components/marketing/testimonials/testimo
 import { FoundersSection } from "@/components/marketing/about/founders-section";
 import { PlanningManifesto } from "@/components/marketing/home/planning-manifesto";
 import { ContactForm } from "@/components/marketing/contact/contact-form";
-import { redirect } from "next/navigation";
 import {
   SectionEyebrow,
   SectionHeader,
 } from "@/components/marketing/shared/marketing-primitives";
-import { getOptionalAuthSession } from "@/lib/api-utils";
-import { portalPathForRole } from "@/lib/role-utils";
 import { cn } from "@/lib/utils";
 import { MARKETING_IMAGES } from "@/lib/marketing-images";
 
-export default async function HomePage() {
-  // Signed-in users should land in their portal, not the marketing hero.
-  // Anonymous visitors fall through to the landing page below.
-  const session = await getOptionalAuthSession();
-  if (session) {
-    redirect(portalPathForRole(session.role));
-  }
-
+// The marketing home stays publicly viewable even when signed in, so the
+// dashboard "Back to Site" link and the logo work. Post-login routing to the
+// correct portal is handled by Clerk's afterSignInUrl + the role-aware proxy
+// redirect — we intentionally do NOT force-redirect signed-in users here.
+export default function HomePage() {
   return (
     <>
       <HeroSection />
