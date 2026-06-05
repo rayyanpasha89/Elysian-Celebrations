@@ -227,6 +227,10 @@ function ReviewsList({
         />
       </div>
 
+      {published.length > 0 ? (
+        <ReviewDistribution published={published} />
+      ) : null}
+
       {reviews.length === 0 ? (
         <div className={cn(dashCard, "border-dashed border-charcoal/15")}>
           <p className={dashLabel}>No reviews yet</p>
@@ -266,6 +270,48 @@ function ReviewsList({
           </ul>
         </section>
       ) : null}
+    </div>
+  );
+}
+
+function ReviewDistribution({ published }: { published: ReviewRow[] }) {
+  const total = published.length;
+  const rows = [5, 4, 3, 2, 1].map((stars) => ({
+    stars,
+    count: published.filter((review) => review.rating === stars).length,
+  }));
+  const max = Math.max(1, ...rows.map((row) => row.count));
+
+  return (
+    <div className={cn(dashCard)}>
+      <div className="flex items-center justify-between gap-3">
+        <p className={dashLabel}>Rating distribution</p>
+        <p className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
+          {total} published
+        </p>
+      </div>
+      <div className="mt-5 space-y-2.5">
+        {rows.map((row) => {
+          const pct = total > 0 ? Math.round((row.count / total) * 100) : 0;
+          return (
+            <div key={row.stars} className="flex items-center gap-3">
+              <span className="w-9 shrink-0 font-accent text-[11px] tracking-[0.1em] text-slate">
+                {row.stars}★
+              </span>
+              <div className="h-2.5 flex-1 overflow-hidden bg-charcoal/8">
+                <div
+                  className="h-full bg-gold-primary/60 transition-all duration-500"
+                  style={{ width: `${(row.count / max) * 100}%` }}
+                />
+              </div>
+              <span className="w-16 shrink-0 text-right font-heading text-xs text-charcoal">
+                {row.count}
+                <span className="text-slate"> · {pct}%</span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
