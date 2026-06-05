@@ -4,8 +4,27 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { fadeUp, staggerContainer, staggerItem } from "@/animations/variants";
 import { StatCard } from "@/components/dashboard/stat-card";
+import { BarChart, DonutChart, type DonutSegment } from "@/components/dashboard/ui-kit";
 import { dashCard, dashLabel } from "@/lib/dashboard-styles";
-import { cn } from "@/lib/utils";
+
+const STATUS_COLORS: Record<string, string> = {
+  CONFIRMED: "#9bae8f",
+  COMPLETED: "#7ba7c9",
+  PENDING: "#c9a96e",
+  QUOTE_PENDING: "#c9a96e",
+  QUOTED: "#c9a96e",
+  IN_PROGRESS: "#c9a96e",
+  CANCELLED: "#c98b8b",
+  DECLINED: "#c98b8b",
+};
+const STATUS_PALETTE = ["#c9a96e", "#9bae8f", "#7ba7c9", "#c98b8b", "#b58fae", "#8a8f98"];
+
+function formatStatusLabel(status: string) {
+  return status
+    .split("_")
+    .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
+    .join(" ");
+}
 
 type WeeklyVolumePoint = {
   label: string;
@@ -100,9 +119,16 @@ export default function VendorAnalyticsPage() {
     }));
   }, [analytics.weeklyInquiryVolume]);
 
-  const chartMax = Math.max(
-    1,
-    ...chartPoints.map((point) => point.count)
+  const statusSegments = useMemo<DonutSegment[]>(
+    () =>
+      Object.entries(analytics.bookingsByStatus)
+        .filter(([, value]) => value > 0)
+        .map(([key, value], index) => ({
+          label: formatStatusLabel(key),
+          value,
+          color: STATUS_COLORS[key] ?? STATUS_PALETTE[index % STATUS_PALETTE.length],
+        })),
+    [analytics.bookingsByStatus]
   );
 
   if (loading) {
@@ -177,27 +203,35 @@ export default function VendorAnalyticsPage() {
         />
       </motion.div>
 
-      <motion.div variants={fadeUp} className={cn(dashCard, "mt-10")}>
-        <h3 className="font-display text-lg text-charcoal">Inquiry volume</h3>
-        <p className="font-heading mt-2 text-sm text-slate">
-          Weekly inquiry and quote-stage activity from real booking data.
-        </p>
-        <div className="mt-8 flex h-48 items-end gap-4 border-b border-charcoal/15 pb-2">
-          {chartPoints.map((point) => (
-            <div key={point.label} className="flex flex-1 flex-col items-center gap-2">
-              <div
-                className="flex w-full items-end justify-center border border-charcoal/10 bg-gold-primary/25 text-[10px] text-charcoal transition-colors hover:bg-gold-primary/40"
-                style={{ height: `${Math.max(10, (point.count / chartMax) * 100)}%` }}
-              >
-                {point.count}
-              </div>
-              <span className="font-accent text-[9px] uppercase tracking-[0.15em] text-slate">
-                {point.label}
-              </span>
+      <div className="mt-10 grid gap-6 lg:grid-cols-2">
+        <motion.div variants={fadeUp} className={dashCard}>
+          <h3 className="font-display text-lg text-charcoal">Inquiry volume</h3>
+          <p className="font-heading mt-2 text-sm text-slate">
+            Weekly inquiry and quote-stage activity from real booking data.
+          </p>
+          <BarChart
+            className="mt-8"
+            data={chartPoints.map((point) => ({ label: point.label, value: point.count }))}
+          />
+        </motion.div>
+
+        <motion.div variants={fadeUp} className={dashCard}>
+          <h3 className="font-display text-lg text-charcoal">Booking status</h3>
+          <p className="font-heading mt-2 text-sm text-slate">
+            How your {analytics.bookingsTotal} booking
+            {analytics.bookingsTotal === 1 ? "" : "s"} break down by stage.
+          </p>
+          {statusSegments.length > 0 ? (
+            <div className="mt-8">
+              <DonutChart segments={statusSegments} centerLabel="Bookings" />
             </div>
-          ))}
-        </div>
-      </motion.div>
+          ) : (
+            <p className="mt-8 text-sm text-slate">
+              No bookings yet — your status mix will appear here.
+            </p>
+          )}
+        </motion.div>
+      </div>
 
       <div className="mt-10 grid gap-6 lg:grid-cols-2">
         <motion.div variants={fadeUp} className={dashCard}>
