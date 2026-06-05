@@ -218,6 +218,30 @@ type VendorPlannerOption = {
 type VendorPlannerService = VendorPlannerOption["services"][number];
 type VendorPlannerServiceItem = NonNullable<VendorPlannerService["items"]>[number];
 
+type VenueOption = {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  address?: string | null;
+  capacity?: number | null;
+  price_range?: string | null;
+  hero_image?: string | null;
+  amenities?: string[] | null;
+  destination?:
+    | {
+        name?: string | null;
+        slug?: string | null;
+        country?: string | null;
+      }
+    | {
+        name?: string | null;
+        slug?: string | null;
+        country?: string | null;
+      }[]
+    | null;
+};
+
 type VendorDraftSelection = {
   vendorProfileId: string;
   vendorSlug: string;
@@ -372,6 +396,105 @@ const BLOCK_PURPOSE_OPTIONS: string[] = Array.from(
     ...EVENT_PLATFORM_TYPES.map((eventType) => eventType.label),
   ])
 );
+
+const MENU_BLUEPRINTS = [
+  {
+    label: "Cocktail flow",
+    foodStyle: "Canapes and cocktails",
+    mealPeriod: "Cocktail",
+    serviceStyle: "Passed canapes, bar, and one live station",
+    notes: "Built for mingling, short speeches, and high-energy guest movement.",
+    preferences: ["Vegetarian", "Non-vegetarian"],
+    items: [
+      ["Welcome drink", "Welcome drink", "Signature mocktail and cocktail"],
+      ["Passed canapes", "Starter", "Vegetarian and non-vegetarian rotation"],
+      ["Live counter", "Live counter", "One hero station with chef interaction"],
+      ["Dessert bites", "Dessert", "Small-format sweets for easy circulation"],
+    ],
+  },
+  {
+    label: "Main meal",
+    foodStyle: "Buffet spread",
+    mealPeriod: "Dinner",
+    serviceStyle: "Buffet with live counters and table beverage service",
+    notes: "A full meal structure with enough variety for mixed guest groups.",
+    preferences: ["Vegetarian", "Non-vegetarian", "Jain"],
+    items: [
+      ["Pre-meal station", "Starter", "Chaat, kebab, or regional welcome station"],
+      ["Main course", "Main", "Indian, global, and regional mains"],
+      ["Beverage station", "Beverage", "Soft drinks, mocktails, and bar handoff"],
+      ["Dessert room", "Dessert", "Indian sweets, plated desserts, and coffee"],
+    ],
+  },
+  {
+    label: "Day brunch",
+    foodStyle: "Brunch service",
+    mealPeriod: "Brunch",
+    serviceStyle: "Relaxed brunch with counters and beverage stations",
+    notes: "Best for recovery mornings, poolside lunches, and farewell hosting.",
+    preferences: ["Vegetarian", "Kids menu", "Regional specialties"],
+    items: [
+      ["Fresh beverage bar", "Welcome drink", "Juices, coffee, tea, and hydration"],
+      ["Breakfast counter", "Live counter", "Eggs, dosa, paratha, or waffle station"],
+      ["Light mains", "Main", "Regional and continental brunch options"],
+      ["Dessert and fruit", "Dessert", "Fruit, pastries, and small sweets"],
+    ],
+  },
+] as const;
+
+const LOGISTICS_BLUEPRINTS = [
+  {
+    label: "Resort flow",
+    updates: {
+      guestArrivalTime: "18:00",
+      vendorLoadInTime: "14:00",
+      familyCallTime: "17:30",
+      transportNotes:
+        "Map buggy / shuttle loop, valet point, driver holding area, and elder access.",
+      roomingNotes:
+        "Confirm getting-ready rooms, family holding rooms, and room-block handoff.",
+      weatherPlan:
+        "Keep indoor backup, tenting trigger, heat/rain plan, and signage swap ready.",
+      ceremonyNotes:
+        "Confirm procession route, cue points, seating hold, and family movement.",
+    },
+  },
+  {
+    label: "High-production",
+    updates: {
+      guestArrivalTime: "17:00",
+      vendorLoadInTime: "12:00",
+      familyCallTime: "16:30",
+      transportNotes:
+        "Separate guest entry, artist entry, production parking, and equipment lift path.",
+      roomingNotes:
+        "Create green rooms, family wait zones, artist holding, and security access.",
+      weatherPlan:
+        "Protect stage, LED, sound, power, and guest seating with a timed contingency.",
+      ceremonyNotes:
+        "Lock show caller, backstage cues, emcee handoff, and technical rehearsal.",
+    },
+  },
+] as const;
+
+const TASK_BLUEPRINTS = [
+  {
+    label: "Vendor handoff",
+    tasks: [
+      ["Confirm vendor scope and catalogue rows", "Planner"],
+      ["Share final guest count and timing with vendors", "Planner"],
+      ["Collect quote, payment schedule, and cancellation terms", "Finance"],
+    ],
+  },
+  {
+    label: "Run of show",
+    tasks: [
+      ["Build minute-by-minute run of show", "Planner"],
+      ["Confirm family call times and holding areas", "Planner"],
+      ["Share final cue sheet with venue and production", "Production"],
+    ],
+  },
+] as const;
 
 function blockPurposeOptionsWithCurrent(value: string) {
   return value && !BLOCK_PURPOSE_OPTIONS.includes(value)
@@ -731,6 +854,50 @@ function formatBookingStatus(status: string) {
   return status.toLowerCase().replaceAll("_", " ");
 }
 
+function relationOne<T>(relation: T | T[] | null | undefined) {
+  if (Array.isArray(relation)) return relation[0] ?? null;
+  return relation ?? null;
+}
+
+function venueDestinationLabel(venue: VenueOption) {
+  const destination = relationOne(venue.destination);
+  return [destination?.name, destination?.country].filter(Boolean).join(", ");
+}
+
+function venueMatchesValue(venue: VenueOption, value: string) {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return false;
+  return (
+    venue.name.trim().toLowerCase() === normalized ||
+    venue.slug.trim().toLowerCase() === normalized
+  );
+}
+
+function servicePriceLabel(service: VendorPlannerService) {
+  const base = service.base_price ?? 0;
+  const max = service.max_price ?? null;
+  if (base <= 0) return "Price on request";
+  if (max && max > base) {
+    return `${formatCurrency(base)} - ${formatCurrency(max)}`;
+  }
+  return `From ${formatCurrency(base)}`;
+}
+
+function orderVendorOptionsByShortlist(
+  options: VendorPlannerOption[],
+  savedSlugs: string[]
+) {
+  const saved = new Set(savedSlugs);
+  return options
+    .slice()
+    .sort((left, right) => {
+      const leftSaved = saved.has(left.slug) ? 0 : 1;
+      const rightSaved = saved.has(right.slug) ? 0 : 1;
+      if (leftSaved !== rightSaved) return leftSaved - rightSaved;
+      return (right.rating ?? 0) - (left.rating ?? 0);
+    });
+}
+
 function uniqueList(values: string[]) {
   const seen = new Set<string>();
   return values
@@ -863,6 +1030,9 @@ export default function ClientWeddingPage() {
     photography: [],
     entertainment: [],
   });
+  const [savedVendorSlugs, setSavedVendorSlugs] = useState<string[]>([]);
+  const [venueOptionsLoading, setVenueOptionsLoading] = useState(false);
+  const [venueOptions, setVenueOptions] = useState<VenueOption[]>([]);
 
   const loadWedding = useCallback(async () => {
     const response = await fetch("/api/wedding");
@@ -1005,6 +1175,71 @@ export default function ClientWeddingPage() {
     };
   }, [wedding]);
 
+  useEffect(() => {
+    if (!wedding) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const response = await fetch("/api/saved-vendors");
+        const json = await response.json();
+        if (!response.ok) {
+          throw new Error(json.error ?? "Failed to load shortlist");
+        }
+        if (!cancelled) {
+          setSavedVendorSlugs((json.savedSlugs ?? []) as string[]);
+        }
+      } catch {
+        if (!cancelled) setSavedVendorSlugs([]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [wedding]);
+
+  useEffect(() => {
+    if (!wedding) return;
+
+    let cancelled = false;
+
+    (async () => {
+      setVenueOptionsLoading(true);
+      try {
+        const params = new URLSearchParams({ limit: "12" });
+        if (wedding.destination?.slug) {
+          params.set("destination", wedding.destination.slug);
+        }
+
+        const response = await fetch(`/api/venues?${params.toString()}`);
+        const json = await response.json();
+        if (!response.ok) {
+          throw new Error(json.error ?? "Failed to load venues");
+        }
+        if (!cancelled) {
+          setVenueOptions((json.venues ?? []) as VenueOption[]);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setVenueOptions([]);
+          toast.error(
+            error instanceof Error ? error.message : "Could not load venues"
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setVenueOptionsLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [wedding]);
+
   const totalEvents = useMemo(
     () => days.reduce((sum, day) => sum + day.events.length, 0),
     [days]
@@ -1069,6 +1304,32 @@ export default function ClientWeddingPage() {
   const activeEditorSection =
     visibleEditorSections.find((section) => section.key === editorSection) ??
     visibleEditorSections[0];
+
+  const resolveFinalizationCheck = useCallback(
+    (checkKey: string) => {
+      if (checkKey === "definition") {
+        setLayer("definition");
+        return;
+      }
+
+      const firstEvent = days.flatMap((day) => day.events)[0] ?? null;
+      if (!selectedEventId && firstEvent) {
+        setSelectedEventId(firstEvent.id);
+      }
+
+      const sectionByCheck: Record<string, EditorSectionKey> = {
+        requirements: "food",
+        vendors: "vendors",
+        budget: "basics",
+        "guests-hotels": "logistics",
+        "run-of-show": "tasks",
+      };
+
+      setLayer("requirements");
+      setEditorSection(sectionByCheck[checkKey] ?? "basics");
+    },
+    [days, selectedEventId]
+  );
 
   // Keep the active section within the set the selected event actually exposes,
   // so a hidden need-section can never become a dead/blank tab.
@@ -1603,6 +1864,50 @@ export default function ClientWeddingPage() {
     );
   };
 
+  const applyMenuBlueprint = (blueprint: (typeof MENU_BLUEPRINTS)[number]) => {
+    setDetailDraft((current) => {
+      if (!current) return current;
+
+      const blueprintMenu: MenuDraft = {
+        clientId: draftId("menu"),
+        id: null,
+        name: blueprint.label,
+        mealPeriod: blueprint.mealPeriod,
+        serviceStyle: blueprint.serviceStyle,
+        notes: blueprint.notes,
+        items: blueprint.items.map(([name, course, notes]) => ({
+          clientId: draftId("menu_item"),
+          id: null,
+          name,
+          course,
+          dietaryTags: [],
+          notes,
+        })),
+      };
+      const hasPlannedMenu = current.menus.some(
+        (menu) =>
+          menu.name.trim() ||
+          menu.notes.trim() ||
+          menu.items.some((item) => item.name.trim())
+      );
+
+      return {
+        ...current,
+        foodStyle: blueprint.foodStyle,
+        foodPreferences: uniqueList([
+          ...current.foodPreferences,
+          ...blueprint.preferences,
+        ]),
+        menuNotes: appendPlanningBlock(current.menuNotes, blueprint.label, [
+          blueprint.notes,
+          blueprint.serviceStyle,
+        ]),
+        menus: hasPlannedMenu ? [...current.menus, blueprintMenu] : [blueprintMenu],
+      };
+    });
+    toast.success(`${blueprint.label} starter added`);
+  };
+
   const applyVendorServiceToPlan = ({
     categoryKey,
     vendor,
@@ -1684,6 +1989,110 @@ export default function ClientWeddingPage() {
       categoryKey === "catering"
         ? "Vendor catalogue added to the food plan"
         : "Vendor offering added to the event plan"
+    );
+  };
+
+  const applyLogisticsBlueprint = (
+    blueprint: (typeof LOGISTICS_BLUEPRINTS)[number]
+  ) => {
+    setDetailDraft((current) => {
+      if (!current) return current;
+      const updates = blueprint.updates;
+      return {
+        ...current,
+        logistics: {
+          guestArrivalTime:
+            current.logistics.guestArrivalTime || updates.guestArrivalTime,
+          vendorLoadInTime:
+            current.logistics.vendorLoadInTime || updates.vendorLoadInTime,
+          familyCallTime:
+            current.logistics.familyCallTime || updates.familyCallTime,
+          transportNotes: appendPlanningBlock(
+            current.logistics.transportNotes,
+            blueprint.label,
+            [updates.transportNotes]
+          ),
+          roomingNotes: appendPlanningBlock(
+            current.logistics.roomingNotes,
+            blueprint.label,
+            [updates.roomingNotes]
+          ),
+          weatherPlan: appendPlanningBlock(current.logistics.weatherPlan, blueprint.label, [
+            updates.weatherPlan,
+          ]),
+          ceremonyNotes: appendPlanningBlock(
+            current.logistics.ceremonyNotes,
+            blueprint.label,
+            [updates.ceremonyNotes]
+          ),
+        },
+      };
+    });
+    toast.success(`${blueprint.label} logistics added`);
+  };
+
+  const applyTaskBlueprint = (blueprint: (typeof TASK_BLUEPRINTS)[number]) => {
+    setDetailDraft((current) => {
+      if (!current) return current;
+      const existing = new Set(current.tasks.map((task) => task.title));
+      const nextTasks = blueprint.tasks
+        .filter(([title]) => !existing.has(title))
+        .map(([title, owner]) => ({
+          ...createTaskDraft(),
+          title,
+          owner,
+        }));
+
+      return {
+        ...current,
+        tasks: [...current.tasks, ...nextTasks],
+      };
+    });
+    toast.success(`${blueprint.label} tasks added`);
+  };
+
+  const selectPlannerVendor = (
+    categoryKey: PlannerVendorCategoryKey,
+    vendor: VendorPlannerOption | null
+  ) => {
+    setDetailDraft((current) =>
+      current
+        ? {
+            ...current,
+            vendorSelections: {
+              ...current.vendorSelections,
+              [categoryKey]: vendor
+                ? {
+                    vendorProfileId: vendor.id,
+                    vendorSlug: vendor.slug,
+                    vendorServiceId: "",
+                  }
+                : null,
+            },
+          }
+        : current
+    );
+  };
+
+  const selectPlannerService = (
+    categoryKey: PlannerVendorCategoryKey,
+    vendorServiceId: string
+  ) => {
+    setDetailDraft((current) =>
+      current
+        ? {
+            ...current,
+            vendorSelections: {
+              ...current.vendorSelections,
+              [categoryKey]: current.vendorSelections[categoryKey]
+                ? {
+                    ...current.vendorSelections[categoryKey]!,
+                    vendorServiceId,
+                  }
+                : null,
+            },
+          }
+        : current
     );
   };
 
@@ -2076,12 +2485,19 @@ export default function ClientWeddingPage() {
         <FinalizationLayer
           days={days}
           weddingDate={wedding.date}
-          onJumpToRequirements={() => setLayer("requirements")}
+          onResolveCheck={resolveFinalizationCheck}
         />
       ) : null}
 
       {layer === "requirements" ? (
-      <div className="mt-10 grid gap-8 xl:grid-cols-[minmax(0,1fr)_420px]">
+      <>
+      <LayerTwoGuidance
+        selectedEvent={selectedEvent}
+        selectedDay={selectedDay}
+        venueOptionsCount={venueOptions.length}
+        savedVendorCount={savedVendorSlugs.length}
+      />
+      <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_420px]">
         <div>
           <motion.div
             variants={fadeUp}
@@ -2428,18 +2844,21 @@ export default function ClientWeddingPage() {
                             }
                             className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
                           />
-                          <input
-                            type="text"
-                            value={eventDraft.venue}
-                            onChange={(event) =>
-                              setEventDraft((current) => ({
-                                ...current,
-                                venue: event.target.value,
-                              }))
-                            }
-                            placeholder="Venue or area"
-                            className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary md:col-span-2"
-                          />
+                          <div className="md:col-span-2">
+                            <p className={dashLabel}>Venue or area</p>
+                            <VenuePicker
+                              venues={venueOptions}
+                              loading={venueOptionsLoading}
+                              value={eventDraft.venue}
+                              compact
+                              onChange={(venue) =>
+                                setEventDraft((current) => ({
+                                  ...current,
+                                  venue,
+                                }))
+                              }
+                            />
+                          </div>
                         </div>
                         <div className="mt-4 flex flex-wrap gap-3">
                           <button type="submit" className={dashBtn} disabled={savingEvent}>
@@ -2761,17 +3180,15 @@ export default function ClientWeddingPage() {
                     />
                   </Field>
                   <Field label="Venue" className="md:col-span-2">
-                    <input
-                      type="text"
+                    <VenuePicker
+                      venues={venueOptions}
+                      loading={venueOptionsLoading}
                       value={detailDraft.venue}
-                      onChange={(event) =>
+                      onChange={(venue) =>
                         setDetailDraft((current) =>
-                          current
-                            ? { ...current, venue: event.target.value }
-                            : current
+                          current ? { ...current, venue } : current
                         )
                       }
-                      className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
                     />
                   </Field>
                   <Field label="Guest count">
@@ -2947,14 +3364,39 @@ export default function ClientWeddingPage() {
 
                 {editorSection === "food" ? (
                 <div className="space-y-4 border-t border-charcoal/8 pt-5">
-                  <div>
-                    <p className={dashLabel}>Food and menu</p>
-                    <p className="mt-1 text-sm text-slate">
-                      Shape how hospitality should feel for this function.
+	                  <div>
+	                    <p className={dashLabel}>Food and menu</p>
+	                    <p className="mt-1 text-sm text-slate">
+	                      Shape how hospitality should feel for this function.
+	                    </p>
+	                  </div>
+
+                  <div className="border border-gold-primary/20 bg-gold-primary/5 p-3">
+                    <p className={dashLabel}>Quick menu starters</p>
+                    <p className="mt-1 text-xs leading-relaxed text-slate">
+                      Add a complete menu skeleton first, then fine-tune instead
+                      of typing every station from zero.
                     </p>
+                    <div className="mt-3 grid gap-2 md:grid-cols-3">
+                      {MENU_BLUEPRINTS.map((blueprint) => (
+                        <button
+                          key={blueprint.label}
+                          type="button"
+                          onClick={() => applyMenuBlueprint(blueprint)}
+                          className="border border-charcoal/10 bg-ivory/75 p-3 text-left transition-colors hover:border-gold-primary/45"
+                        >
+                          <span className="font-heading text-sm text-charcoal">
+                            {blueprint.label}
+                          </span>
+                          <span className="mt-1 block text-[11px] leading-relaxed text-slate">
+                            {blueprint.mealPeriod} · {blueprint.items.length} rows
+                          </span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
-                  <Field label="Service format">
+	                  <Field label="Service format">
                     <select
                       value={detailDraft.foodStyle}
                       onChange={(event) =>
@@ -3299,12 +3741,15 @@ export default function ClientWeddingPage() {
                     ) : null}
                   </div>
 
-                  {PLANNER_VENDOR_CATEGORIES.map((category) => {
-                    const selection = detailDraft.vendorSelections[category.key];
-                    const options = vendorOptions[category.key] ?? [];
-                    const currentBookingSelection =
-                      selectedEvent?.vendorSelections
-                        .filter(
+	                  {PLANNER_VENDOR_CATEGORIES.map((category) => {
+	                    const selection = detailDraft.vendorSelections[category.key];
+	                    const options = orderVendorOptionsByShortlist(
+	                      vendorOptions[category.key] ?? [],
+	                      savedVendorSlugs
+	                    );
+	                    const currentBookingSelection =
+	                      selectedEvent?.vendorSelections
+	                        .filter(
                           (entry) => entry.vendor?.categorySlug === category.slug
                         )
                         .at(-1) ?? null;
@@ -3314,49 +3759,27 @@ export default function ClientWeddingPage() {
                       ) ?? null;
 
                     return (
-                      <div key={category.key} className="border border-charcoal/10 p-4">
-                        <p className="font-display text-lg text-charcoal">
-                          {category.label}
-                        </p>
-                        <p className="mt-1 text-sm text-slate">{category.hint}</p>
+	                      <div key={category.key} className="border border-charcoal/10 p-4">
+	                        <p className="font-display text-lg text-charcoal">
+	                          {category.label}
+	                        </p>
+	                        <p className="mt-1 text-sm text-slate">{category.hint}</p>
 
-                        <div className="mt-3 space-y-3">
-                          <select
-                            value={selection?.vendorProfileId ?? ""}
-                            onChange={(event) =>
-                              setDetailDraft((current) => {
-                                if (!current) return current;
-                                const vendor = options.find(
-                                  (option) => option.id === event.target.value
-                                );
-                                return {
-                                  ...current,
-                                  vendorSelections: {
-                                    ...current.vendorSelections,
-                                    [category.key]: vendor
-                                      ? {
-                                          vendorProfileId: vendor.id,
-                                          vendorSlug: vendor.slug,
-                                          vendorServiceId: "",
-                                        }
-                                      : null,
-                                  },
-                                };
-                              })
-                            }
-                            className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                          >
-                            <option value="">Choose a vendor</option>
-                            {options.map((option) => (
-                              <option key={option.id} value={option.id}>
-                                {option.business_name}
-                              </option>
-                            ))}
-                          </select>
+	                        <div className="mt-3 space-y-3">
+	                          <VendorOptionCards
+	                            categoryLabel={category.label}
+	                            options={options}
+	                            savedSlugs={savedVendorSlugs}
+	                            selectedVendorId={selection?.vendorProfileId ?? ""}
+	                            onSelect={(vendor) =>
+	                              selectPlannerVendor(category.key, vendor)
+	                            }
+	                            onClear={() => selectPlannerVendor(category.key, null)}
+	                          />
 
-                          {selectedVendor ? (
-                            <>
-                              <div className="border border-charcoal/10 bg-cream/35 p-3">
+	                          {selectedVendor ? (
+	                            <>
+	                              <div className="border border-charcoal/10 bg-cream/35 p-3">
                                 <div className="flex flex-wrap items-start justify-between gap-2">
                                   <div className="min-w-0">
                                     <p className="font-heading text-sm text-charcoal">
@@ -3380,46 +3803,20 @@ export default function ClientWeddingPage() {
                                   <p className="mt-2 text-xs text-slate">
                                     Current booking status:{" "}
                                     {formatBookingStatus(currentBookingSelection.status)}
-                                  </p>
-                                ) : null}
-                              </div>
+	                                  </p>
+	                                ) : null}
+	                              </div>
 
-                              <select
-                                value={selection?.vendorServiceId ?? ""}
-                                onChange={(event) =>
-                                  setDetailDraft((current) =>
-                                    current
-                                      ? {
-                                          ...current,
-                                          vendorSelections: {
-                                            ...current.vendorSelections,
-                                            [category.key]:
-                                              current.vendorSelections[category.key]
-                                                ? {
-                                                    ...current.vendorSelections[
-                                                      category.key
-                                                    ]!,
-                                                    vendorServiceId:
-                                                      event.target.value,
-                                                  }
-                                                : null,
-                                          },
-                                        }
-                                      : current
-                                  )
-                                }
-                                className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                              >
-                                <option value="">Choose a service or package</option>
-                                {selectedVendor.services.map((service) => (
-                                  <option key={service.id} value={service.id}>
-                                    {service.name}
-                                  </option>
-                                ))}
-                              </select>
+	                              <ServiceOptionCards
+	                                services={selectedVendor.services}
+	                                selectedServiceId={selection?.vendorServiceId ?? ""}
+	                                onSelect={(serviceId) =>
+	                                  selectPlannerService(category.key, serviceId)
+	                                }
+	                              />
 
-                              {selection?.vendorServiceId ? (
-                                <div className="border border-charcoal/10 p-3">
+	                              {selection?.vendorServiceId ? (
+	                                <div className="border border-charcoal/10 p-3">
                                   {selectedVendor.services
                                     .filter(
                                       (service) =>
@@ -3477,15 +3874,35 @@ export default function ClientWeddingPage() {
 
                 {editorSection === "logistics" ? (
                 <div className="space-y-4 border-t border-charcoal/8 pt-5">
-                  <div>
-                    <p className={dashLabel}>Logistics</p>
-                    <p className="mt-1 text-sm text-slate">
-                      Keep guest movement, vendor access, and family timing tied
-                      to this event.
+	                  <div>
+	                    <p className={dashLabel}>Logistics</p>
+	                    <p className="mt-1 text-sm text-slate">
+	                      Keep guest movement, vendor access, and family timing tied
+	                      to this event.
+	                    </p>
+	                  </div>
+
+                  <div className="border border-gold-primary/20 bg-gold-primary/5 p-3">
+                    <p className={dashLabel}>Logistics presets</p>
+                    <p className="mt-1 text-xs leading-relaxed text-slate">
+                      Start with a working operations pattern, then adjust the
+                      exact venue movement details.
                     </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {LOGISTICS_BLUEPRINTS.map((blueprint) => (
+                        <button
+                          key={blueprint.label}
+                          type="button"
+                          onClick={() => applyLogisticsBlueprint(blueprint)}
+                          className="border border-charcoal/10 bg-ivory/75 px-3 py-2 font-heading text-xs text-charcoal transition-colors hover:border-gold-primary/45"
+                        >
+                          {blueprint.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
-                  <div className="grid gap-3 md:grid-cols-3">
+	                  <div className="grid gap-3 md:grid-cols-3">
                     <Field label="Guest arrival">
                       <input
                         type="time"
@@ -3589,16 +4006,36 @@ export default function ClientWeddingPage() {
                         Track the action items that belong specifically to this function.
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal"
-                      onClick={addTask}
-                    >
-                      Add task
-                    </button>
+	                    <button
+	                      type="button"
+	                      className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal"
+	                      onClick={addTask}
+	                    >
+	                      Add task
+	                    </button>
+	                  </div>
+
+                  <div className="border border-gold-primary/20 bg-gold-primary/5 p-3">
+                    <p className={dashLabel}>Task templates</p>
+                    <p className="mt-1 text-xs leading-relaxed text-slate">
+                      Add the common handoff work in one click, then assign dates
+                      as the event gets closer.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {TASK_BLUEPRINTS.map((blueprint) => (
+                        <button
+                          key={blueprint.label}
+                          type="button"
+                          onClick={() => applyTaskBlueprint(blueprint)}
+                          className="border border-charcoal/10 bg-ivory/75 px-3 py-2 font-heading text-xs text-charcoal transition-colors hover:border-gold-primary/45"
+                        >
+                          {blueprint.label} · {blueprint.tasks.length} tasks
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
-                  <div className="space-y-3">
+	                  <div className="space-y-3">
                     {detailDraft.tasks.map((task) => (
                       <div
                         key={task.clientId}
@@ -3782,8 +4219,383 @@ export default function ClientWeddingPage() {
           </div>
         </motion.aside>
       </div>
+      </>
       ) : null}
     </motion.div>
+  );
+}
+
+function LayerTwoGuidance({
+  selectedEvent,
+  selectedDay,
+  venueOptionsCount,
+  savedVendorCount,
+}: {
+  selectedEvent: WeddingEvent | null;
+  selectedDay: WeddingDay | null;
+  venueOptionsCount: number;
+  savedVendorCount: number;
+}) {
+  const guidance = [
+    {
+      label: "Pick one block",
+      value: selectedEvent
+        ? selectedEvent.name
+        : "Open a morning / afternoon / evening block",
+      detail: selectedDay
+        ? `${selectedDay.name} · ${formatDayDate(selectedDay.date)}`
+        : "The editor works event by event so the screen stays lighter.",
+    },
+    {
+      label: "Anchor the venue",
+      value: `${venueOptionsCount} catalogue option${
+        venueOptionsCount === 1 ? "" : "s"
+      } loaded`,
+      detail:
+        "Choose a venue card first; only use custom text for unpublished spaces.",
+    },
+    {
+      label: "Select vendors",
+      value:
+        savedVendorCount > 0
+          ? `${savedVendorCount} shortlisted vendor${
+              savedVendorCount === 1 ? "" : "s"
+            } prioritized`
+          : "Curated vendors ready",
+      detail:
+        "Vendor and package cards import real catalogue rows into menus, decor, and notes.",
+    },
+  ];
+
+  return (
+    <motion.section
+      variants={fadeUp}
+      className="mt-8 grid gap-3 md:grid-cols-3"
+    >
+      {guidance.map((item, index) => (
+        <article
+          key={item.label}
+          className="border border-gold-primary/20 bg-gold-primary/5 p-4"
+        >
+          <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-gold-dark">
+            {String(index + 1).padStart(2, "0")} · {item.label}
+          </p>
+          <p className="mt-2 font-display text-lg text-charcoal">{item.value}</p>
+          <p className="mt-2 text-xs leading-relaxed text-slate">{item.detail}</p>
+        </article>
+      ))}
+    </motion.section>
+  );
+}
+
+function VenuePicker({
+  venues,
+  loading,
+  value,
+  onChange,
+  compact = false,
+}: {
+  venues: VenueOption[];
+  loading: boolean;
+  value: string;
+  onChange: (value: string) => void;
+  compact?: boolean;
+}) {
+  const selectedVenue = venues.find((venue) => venueMatchesValue(venue, value));
+  const [showCustom, setShowCustom] = useState(false);
+  const visibleVenues = compact ? venues.slice(0, 4) : venues.slice(0, 6);
+  const customValueActive = Boolean(value && !selectedVenue);
+  const customOpen = showCustom || customValueActive;
+
+  return (
+    <div className="space-y-3">
+      {loading ? (
+        <div className="border border-charcoal/10 bg-cream/30 p-4 text-sm text-slate">
+          Loading venue catalogue...
+        </div>
+      ) : null}
+
+      {!loading && visibleVenues.length === 0 ? (
+        <div className="border border-dashed border-charcoal/15 bg-cream/30 p-4">
+          <p className={dashLabel}>No venue catalogue yet</p>
+          <p className="mt-2 text-xs leading-relaxed text-slate">
+            Add a custom venue or area for now. Once venues are seeded for this
+            destination, they will appear here as cards.
+          </p>
+        </div>
+      ) : null}
+
+      {visibleVenues.length > 0 ? (
+        <div className={cn("grid gap-3", compact ? "md:grid-cols-2" : "lg:grid-cols-2")}>
+          {visibleVenues.map((venue) => {
+            const active = venueMatchesValue(venue, value);
+            const destinationLabel = venueDestinationLabel(venue);
+            return (
+              <button
+                key={venue.id}
+                type="button"
+                onClick={() => {
+                  onChange(venue.name);
+                  setShowCustom(false);
+                }}
+                className={cn(
+                  "group overflow-hidden border bg-ivory text-left transition-all hover:-translate-y-0.5 hover:border-gold-primary/45 hover:shadow-[0_18px_40px_rgba(26,26,46,0.08)]",
+                  active
+                    ? "border-gold-primary shadow-[0_18px_40px_rgba(201,169,110,0.14)]"
+                    : "border-charcoal/10"
+                )}
+              >
+                {venue.hero_image ? (
+                  <span className="block aspect-[5/2] overflow-hidden bg-cream">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={venue.hero_image}
+                      alt=""
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                  </span>
+                ) : null}
+                <span className="block p-3">
+                  <span className="font-heading text-sm text-charcoal">
+                    {venue.name}
+                  </span>
+                  <span className="mt-1 block text-[11px] leading-relaxed text-slate">
+                    {destinationLabel || venue.address || "Destination venue"}
+                  </span>
+                  <span className="mt-2 flex flex-wrap gap-1.5">
+                    {venue.capacity ? (
+                      <span className="border border-charcoal/10 px-2 py-1 font-heading text-[10px] text-slate">
+                        Up to {venue.capacity}
+                      </span>
+                    ) : null}
+                    {venue.price_range ? (
+                      <span className="border border-gold-primary/25 bg-gold-primary/8 px-2 py-1 font-heading text-[10px] text-gold-dark">
+                        {venue.price_range}
+                      </span>
+                    ) : null}
+                  </span>
+                  {venue.amenities?.length ? (
+                    <span className="mt-2 block text-[11px] leading-relaxed text-slate">
+                      {venue.amenities.slice(0, 3).join(" · ")}
+                    </span>
+                  ) : null}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            if (customValueActive) {
+              onChange("");
+              setShowCustom(false);
+              return;
+            }
+            setShowCustom((current) => !current);
+          }}
+          className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.16em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark"
+        >
+          {customValueActive
+            ? "Clear custom venue"
+            : customOpen
+              ? "Hide custom venue"
+              : "Use custom area"}
+        </button>
+        {value ? (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate transition-colors hover:text-rose"
+          >
+            Clear venue
+          </button>
+        ) : null}
+      </div>
+
+      {customOpen ? (
+        <input
+          type="text"
+          value={selectedVenue ? "" : value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder="Custom venue, lawn, ballroom, beach, terrace..."
+          className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+        />
+      ) : selectedVenue ? (
+        <p className="border border-gold-primary/20 bg-gold-primary/8 px-3 py-2 text-xs leading-relaxed text-gold-dark">
+          Selected from venue catalogue: {selectedVenue.name}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function VendorOptionCards({
+  categoryLabel,
+  options,
+  savedSlugs,
+  selectedVendorId,
+  onSelect,
+  onClear,
+}: {
+  categoryLabel: string;
+  options: VendorPlannerOption[];
+  savedSlugs: string[];
+  selectedVendorId: string;
+  onSelect: (vendor: VendorPlannerOption) => void;
+  onClear: () => void;
+}) {
+  const savedSet = new Set(savedSlugs);
+
+  if (options.length === 0) {
+    return (
+      <div className="border border-dashed border-charcoal/15 bg-cream/25 p-4">
+        <p className={dashLabel}>No {categoryLabel.toLowerCase()} options yet</p>
+        <p className="mt-2 text-xs leading-relaxed text-slate">
+          Open the vendor marketplace to shortlist candidates. They will appear
+          here as selectable cards for this event.
+        </p>
+        <Link
+          href="/client/vendors"
+          className="font-accent mt-3 inline-flex border border-gold-primary/45 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-gold-dark"
+        >
+          Open vendor marketplace
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 md:grid-cols-2">
+        {options.map((option) => {
+          const active = selectedVendorId === option.id;
+          const saved = savedSet.has(option.slug);
+          const firstService = option.services[0];
+          return (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => onSelect(option)}
+              className={cn(
+                "border bg-ivory p-3 text-left transition-all hover:-translate-y-0.5 hover:border-gold-primary/45 hover:shadow-[0_18px_40px_rgba(26,26,46,0.08)]",
+                active
+                  ? "border-gold-primary bg-gold-primary/8 shadow-[0_18px_40px_rgba(201,169,110,0.14)]"
+                  : "border-charcoal/10"
+              )}
+            >
+              <span className="flex items-start justify-between gap-3">
+                <span>
+                  <span className="font-heading text-sm text-charcoal">
+                    {option.business_name}
+                  </span>
+                  <span className="mt-1 block text-[11px] text-slate">
+                    {option.city ?? "Destination ready"}
+                    {option.rating ? ` · ${option.rating.toFixed(1)} rating` : ""}
+                  </span>
+                </span>
+                {saved ? (
+                  <span className="border border-gold-primary/40 bg-gold-primary/10 px-2 py-1 font-accent text-[9px] uppercase tracking-[0.14em] text-gold-dark">
+                    Shortlisted
+                  </span>
+                ) : null}
+              </span>
+              <span className="mt-3 block text-[11px] leading-relaxed text-slate">
+                {option.short_bio ?? "Curated partner with event-ready services."}
+              </span>
+              <span className="mt-3 flex flex-wrap gap-1.5">
+                <span className="border border-charcoal/10 px-2 py-1 font-heading text-[10px] text-slate">
+                  {option.services.length} package
+                  {option.services.length === 1 ? "" : "s"}
+                </span>
+                {firstService ? (
+                  <span className="border border-gold-primary/25 bg-gold-primary/8 px-2 py-1 font-heading text-[10px] text-gold-dark">
+                    {servicePriceLabel(firstService)}
+                  </span>
+                ) : null}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {selectedVendorId ? (
+        <button
+          type="button"
+          onClick={onClear}
+          className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate transition-colors hover:text-rose"
+        >
+          Clear {categoryLabel.toLowerCase()} selection
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function ServiceOptionCards({
+  services,
+  selectedServiceId,
+  onSelect,
+}: {
+  services: VendorPlannerService[];
+  selectedServiceId: string;
+  onSelect: (serviceId: string) => void;
+}) {
+  if (services.length === 0) {
+    return (
+      <div className="border border-dashed border-charcoal/15 bg-cream/25 p-3">
+        <p className={dashLabel}>No packages published</p>
+        <p className="mt-2 text-xs leading-relaxed text-slate">
+          This vendor can still be selected, but they need to publish package
+          scope before catalogue rows can be imported.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <p className={dashLabel}>Choose service or package</p>
+      <div className="mt-2 grid gap-2 md:grid-cols-2">
+        {services.map((service) => {
+          const active = selectedServiceId === service.id;
+          return (
+            <button
+              key={service.id}
+              type="button"
+              onClick={() => onSelect(service.id)}
+              className={cn(
+                "border bg-cream/25 p-3 text-left transition-colors hover:border-gold-primary/45",
+                active
+                  ? "border-gold-primary bg-gold-primary/8"
+                  : "border-charcoal/10"
+              )}
+            >
+              <span className="font-heading text-sm text-charcoal">
+                {service.name}
+              </span>
+              <span className="mt-1 block font-accent text-[10px] uppercase tracking-[0.14em] text-gold-dark">
+                {servicePriceLabel(service)}
+                {service.unit ? ` · ${service.unit}` : ""}
+              </span>
+              <span className="mt-2 block text-[11px] leading-relaxed text-slate">
+                {service.service_scope ??
+                  service.description ??
+                  "Scope will be confirmed with the vendor."}
+              </span>
+              <span className="mt-2 block text-[10px] text-slate/80">
+                {(service.items ?? []).length} catalogue row
+                {(service.items ?? []).length === 1 ? "" : "s"} ·{" "}
+                {(service.inclusions ?? []).length} inclusion
+                {(service.inclusions ?? []).length === 1 ? "" : "s"}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -4399,11 +5211,11 @@ function hasLogisticsDetails(logistics: EventLogistics | null) {
 function FinalizationLayer({
   days,
   weddingDate,
-  onJumpToRequirements,
+  onResolveCheck,
 }: {
   days: WeddingDay[];
   weddingDate: string | null;
-  onJumpToRequirements: () => void;
+  onResolveCheck: (checkKey: string) => void;
 }) {
   const checks = useMemo(
     () => computeFinalizationChecks(days, weddingDate),
@@ -4434,9 +5246,9 @@ function FinalizationLayer({
         <button
           type="button"
           className={cn(dashBtn, "mt-5")}
-          onClick={onJumpToRequirements}
+          onClick={() => onResolveCheck("requirements")}
         >
-          Fill requirements
+          Open next gap
         </button>
       </div>
 
@@ -4463,11 +5275,38 @@ function FinalizationLayer({
             <p className="mt-4 border-t border-charcoal/10 pt-3 text-xs text-charcoal">
               {check.detail}
             </p>
+            <button
+              type="button"
+              onClick={() => onResolveCheck(check.key)}
+              className="font-accent mt-4 inline-flex border border-charcoal/15 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark"
+            >
+              {finalizationActionLabel(check)}
+            </button>
           </article>
         ))}
       </div>
     </motion.section>
   );
+}
+
+function finalizationActionLabel(check: CheckResult) {
+  if (check.status === "ok") return "Review";
+  switch (check.key) {
+    case "definition":
+      return "Review structure";
+    case "requirements":
+      return "Fill requirements";
+    case "vendors":
+      return "Pick vendors";
+    case "budget":
+      return "Set estimates";
+    case "guests-hotels":
+      return "Plan hospitality";
+    case "run-of-show":
+      return "Open tasks";
+    default:
+      return "Resolve";
+  }
 }
 
 function Field({

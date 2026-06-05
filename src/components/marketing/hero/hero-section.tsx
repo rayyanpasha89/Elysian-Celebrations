@@ -2,9 +2,15 @@
 
 import { useRef, type ReactNode } from "react";
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
-import { CalendarDays, Layers3, WalletCards } from "lucide-react";
-// `WalletCards` is used by SignalCard below. Hero no longer renders the
-// secondary `FeaturePlane`, keeping the right-rail to 3 visual planes.
+import {
+  CalendarDays,
+  CheckCircle2,
+  MapPin,
+  Sparkles,
+  Users2,
+  WalletCards,
+} from "lucide-react";
+import { SectionEyebrow } from "@/components/marketing/shared/marketing-primitives";
 import { MagneticButton } from "@/components/shared/magnetic-button";
 import { MARKETING_IMAGES } from "@/lib/marketing-images";
 import { cn } from "@/lib/utils";
@@ -24,19 +30,20 @@ export function HeroSection() {
   const stageRotateX = useTransform(scrollYProgress, [0, 1], [11, 5]);
   const stageRotateY = useTransform(scrollYProgress, [0, 1], [-11, -5]);
   const haloScale = useTransform(scrollYProgress, [0, 1], [1, 1.18]);
+  const shouldAnimate = !prefersReducedMotion;
 
   return (
     <section
       ref={sectionRef}
-      className="relative min-h-screen overflow-hidden bg-midnight text-ivory"
+      className="relative min-h-[100svh] overflow-hidden bg-midnight text-ivory"
     >
       <motion.div
-        style={{ y: backgroundY }}
+        style={shouldAnimate ? { y: backgroundY } : undefined}
         className="absolute inset-0 z-0"
       >
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(232,213,176,0.18),transparent_35%),radial-gradient(circle_at_75%_20%,rgba(123,167,201,0.18),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(212,160,160,0.12),transparent_32%),linear-gradient(135deg,#10101b_0%,#161829_40%,#10131e_100%)]" />
         <motion.div
-          style={{ scale: haloScale }}
+          style={shouldAnimate ? { scale: haloScale } : undefined}
           className="absolute right-[12%] top-[18%] h-[32rem] w-[32rem] rounded-full bg-[radial-gradient(circle,rgba(201,169,110,0.18),rgba(201,169,110,0.02)_60%,transparent_75%)] blur-3xl"
         />
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:120px_120px] opacity-[0.12]" />
@@ -44,28 +51,39 @@ export function HeroSection() {
         <div className="absolute inset-0 noise-dark" />
       </motion.div>
 
-      <div className="relative z-10 mx-auto grid min-h-screen max-w-[1500px] gap-14 px-[var(--section-padding-x)] py-[calc(var(--section-padding-y)*1.15)] lg:grid-cols-[minmax(0,1fr)_minmax(420px,640px)] lg:items-center">
-        <motion.div style={{ opacity: contentOpacity, y: contentY }} className="max-w-3xl">
-          <motion.p
-            initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }}
+      <div className="relative z-10 mx-auto grid min-h-[100svh] max-w-[1500px] gap-12 px-[var(--section-padding-x)] pb-16 pt-28 md:pb-20 lg:grid-cols-[minmax(0,1fr)_minmax(360px,520px)] lg:items-center lg:gap-12 lg:py-[calc(var(--section-padding-y)*1.05)]">
+        <motion.div
+          style={shouldAnimate ? { opacity: contentOpacity, y: contentY } : undefined}
+          className="max-w-3xl"
+        >
+          <motion.div
+            initial={shouldAnimate ? { opacity: 0, y: 18 } : false}
             animate={{ opacity: 1, y: 0 }}
             transition={
-              prefersReducedMotion
-                ? { duration: 0 }
-                : { duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }
+              shouldAnimate
+                ? { duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }
+                : { duration: 0 }
             }
-            className="font-accent text-xs uppercase tracking-[0.42em] text-gold-light"
+            className="contents"
           >
-            Event Design, Reframed
-          </motion.p>
+            <SectionEyebrow
+              label="Event Design, Reframed"
+              tone="light"
+              size="lg"
+            />
+          </motion.div>
 
-          <HeroHeadline />
+          <HeroHeadline shouldAnimate={shouldAnimate} />
 
           <motion.p
-            initial={{ opacity: 0, y: 18 }}
+            initial={shouldAnimate ? { opacity: 0, y: 18 } : false}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 1.6, ease: [0.16, 1, 0.3, 1] }}
-            className="mt-8 max-w-2xl font-heading text-lg leading-relaxed text-ivory/72 md:text-[1.35rem]"
+            transition={
+              shouldAnimate
+                ? { duration: 0.8, delay: 1.25, ease: [0.16, 1, 0.3, 1] }
+                : { duration: 0 }
+            }
+            className="mt-6 max-w-2xl font-heading text-lg leading-relaxed text-ivory/72 md:text-[1.28rem]"
           >
             Weddings, launches, galas, retreats — design any event that feels
             cinematic before a single guest arrives. Elysian connects
@@ -74,10 +92,41 @@ export function HeroSection() {
           </motion.p>
 
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={shouldAnimate ? { opacity: 0, y: 18 } : false}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 2, ease: [0.16, 1, 0.3, 1] }}
-            className="mt-10 flex flex-col gap-5 sm:flex-row sm:flex-wrap sm:items-center"
+            transition={
+              shouldAnimate
+                ? { duration: 0.8, delay: 1.45, ease: [0.16, 1, 0.3, 1] }
+                : { duration: 0 }
+            }
+            className="mt-7 grid max-w-2xl grid-cols-3 gap-3"
+          >
+            <LayerProofCard
+              index="01"
+              title="Define"
+              copy="Event type, days, dates, and time blocks."
+            />
+            <LayerProofCard
+              index="02"
+              title="Compose"
+              copy="Food, venue, decor, vendors, guests, and tasks."
+            />
+            <LayerProofCard
+              index="03"
+              title="Finalize"
+              copy="Readiness checks before the event goes live."
+            />
+          </motion.div>
+
+          <motion.div
+            initial={shouldAnimate ? { opacity: 0, y: 20 } : false}
+            animate={{ opacity: 1, y: 0 }}
+            transition={
+              shouldAnimate
+                ? { duration: 0.8, delay: 1.7, ease: [0.16, 1, 0.3, 1] }
+                : { duration: 0 }
+            }
+            className="mt-8 flex flex-col gap-5 sm:flex-row sm:flex-wrap sm:items-center"
           >
             <MagneticButton href="#destinations" className="px-10 py-4 text-sm">
               Map our destinations
@@ -91,39 +140,21 @@ export function HeroSection() {
             </a>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 2.2, ease: [0.16, 1, 0.3, 1] }}
-            className="mt-12 grid items-stretch gap-4 sm:grid-cols-3"
-          >
-            <SignalCard
-              icon={Layers3}
-              label="Creative direction"
-              value="One spatial planning view"
-            />
-            <SignalCard
-              icon={WalletCards}
-              label="Budget control"
-              value="Targets, quotes, actuals"
-            />
-            <SignalCard
-              icon={CalendarDays}
-              label="Event flow"
-              value="Every day mapped with intention"
-            />
-          </motion.div>
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, y: 40 }}
+          initial={shouldAnimate ? { opacity: 0, y: 40 } : false}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1.1, delay: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          style={{ y: stageY }}
-          className="relative flex items-center justify-center"
+          transition={
+            shouldAnimate
+              ? { duration: 1.1, delay: 0.6, ease: [0.16, 1, 0.3, 1] }
+              : { duration: 0 }
+          }
+          style={shouldAnimate ? { y: stageY } : undefined}
+          className="relative hidden items-center justify-center lg:flex"
         >
-          <div
-            className="relative w-full max-w-[620px]"
+            <div
+            className="relative w-full max-w-[540px]"
             style={{ perspective: "1800px" }}
           >
             <motion.div
@@ -138,17 +169,21 @@ export function HeroSection() {
               <div className="absolute inset-[10%] rounded-[2.2rem] border border-gold-primary/18" />
 
               <FloatingTag className="left-[6%] top-[12%]" delay={1.5}>
-                Vendor chemistry
+                Venue matched
               </FloatingTag>
               <FloatingTag className="right-[4%] top-[18%]" delay={1.8}>
-                Budget runway
+                Vendor packages
               </FloatingTag>
               <FloatingTag className="left-[12%] bottom-[10%]" delay={2.1}>
-                Run-of-show
+                Final checklist
               </FloatingTag>
 
               <motion.div
-                animate={{ y: [0, -10, 0], rotateZ: [-1.4, 1, -1.4] }}
+                animate={
+                  shouldAnimate
+                    ? { y: [0, -10, 0], rotateZ: [-1.4, 1, -1.4] }
+                    : undefined
+                }
                 transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
                 className="absolute left-[2%] top-[22%] w-[40%] motion-reduce:animate-none"
                 style={{ transform: "translateZ(80px)" }}
@@ -161,7 +196,11 @@ export function HeroSection() {
               </motion.div>
 
               <motion.div
-                animate={{ y: [0, 12, 0], rotateZ: [1.5, -1, 1.5] }}
+                animate={
+                  shouldAnimate
+                    ? { y: [0, 12, 0], rotateZ: [1.5, -1, 1.5] }
+                    : undefined
+                }
                 transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 0.4 }}
                 className="absolute right-[0%] top-[8%] w-[34%] motion-reduce:animate-none"
                 style={{ transform: "translateZ(120px)" }}
@@ -174,7 +213,11 @@ export function HeroSection() {
               </motion.div>
 
               <motion.div
-                animate={{ y: [0, -14, 0], rotateZ: [-1.4, 1.2, -1.4] }}
+                animate={
+                  shouldAnimate
+                    ? { y: [0, -14, 0], rotateZ: [-1.4, 1.2, -1.4] }
+                    : undefined
+                }
                 transition={{ duration: 9, repeat: Infinity, ease: "easeInOut", delay: 0.8 }}
                 className="absolute bottom-[6%] left-[22%] w-[60%] motion-reduce:animate-none"
                 style={{ transform: "translateZ(160px)" }}
@@ -183,12 +226,12 @@ export function HeroSection() {
               </motion.div>
 
               <motion.div
-                animate={{ rotate: 360 }}
+                animate={shouldAnimate ? { rotate: 360 } : undefined}
                 transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
                 className="absolute left-1/2 top-1/2 h-[84%] w-[84%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/8 motion-reduce:animate-none"
               />
               <motion.div
-                animate={{ rotate: -360 }}
+                animate={shouldAnimate ? { rotate: -360 } : undefined}
                 transition={{ duration: 24, repeat: Infinity, ease: "linear" }}
                 className="absolute left-1/2 top-1/2 h-[62%] w-[62%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-gold-primary/18 motion-reduce:animate-none"
               />
@@ -212,13 +255,13 @@ export function HeroSection() {
       </motion.div>
 
       <motion.div
-        initial={{ opacity: 0 }}
+        initial={shouldAnimate ? { opacity: 0 } : false}
         animate={{ opacity: 1 }}
-        transition={{ delay: 2.8, duration: 1 }}
+        transition={shouldAnimate ? { delay: 2.8, duration: 1 } : { duration: 0 }}
         className="absolute bottom-10 left-1/2 z-20 hidden -translate-x-1/2 lg:block"
       >
         <motion.div
-          animate={{ y: [0, 8, 0] }}
+          animate={shouldAnimate ? { y: [0, 8, 0] } : undefined}
           transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
           className="flex flex-col items-center gap-3 motion-reduce:animate-none"
         >
@@ -232,20 +275,25 @@ export function HeroSection() {
   );
 }
 
-function HeroHeadline() {
-  const line1 = "Design the";
-  const line2 = "Event in Three Dimensions";
+function HeroHeadline({ shouldAnimate }: { shouldAnimate: boolean }) {
+  const line1 = "Design Events";
+  const line2 = "In Three Dimensions";
 
   return (
     <h1
       className="mt-6 font-display font-bold leading-[0.95] text-ivory"
-      style={{ fontSize: "var(--text-hero)" }}
+      style={{ fontSize: "clamp(3rem, 5.8vw, 5.8rem)" }}
       aria-label={`${line1} ${line2}`}
     >
       <span aria-hidden="true">
-        <AnimatedLine text={line1} delay={0.45} />
+        <AnimatedLine text={line1} delay={0.45} shouldAnimate={shouldAnimate} />
         <br />
-        <AnimatedLine text={line2} delay={0.8} className="text-gold-primary" />
+        <AnimatedLine
+          text={line2}
+          delay={0.8}
+          shouldAnimate={shouldAnimate}
+          className="text-gold-primary"
+        />
       </span>
     </h1>
   );
@@ -254,10 +302,12 @@ function HeroHeadline() {
 function AnimatedLine({
   text,
   delay,
+  shouldAnimate,
   className,
 }: {
   text: string;
   delay: number;
+  shouldAnimate: boolean;
   className?: string;
 }) {
   const words = text.split(" ");
@@ -272,11 +322,11 @@ function AnimatedLine({
           className="inline-flex overflow-hidden"
         >
           <motion.span
-            initial={{ opacity: 0, y: "32%" }}
+            initial={shouldAnimate ? { opacity: 0, y: "32%" } : false}
             animate={{ opacity: 1, y: "0%" }}
             transition={{
-              duration: 0.55,
-              delay: delay + wordIndex * 0.07,
+              duration: shouldAnimate ? 0.55 : 0,
+              delay: shouldAnimate ? delay + wordIndex * 0.07 : 0,
               ease: [0.16, 1, 0.3, 1],
             }}
             className="inline-block"
@@ -291,28 +341,27 @@ function AnimatedLine({
   );
 }
 
-function SignalCard({
-  icon: Icon,
-  label,
-  value,
+function LayerProofCard({
+  index,
+  title,
+  copy,
 }: {
-  icon: typeof Layers3;
-  label: string;
-  value: string;
+  index: string;
+  title: string;
+  copy: string;
 }) {
   return (
-    <div className="min-h-[88px] border border-white/10 bg-white/[0.04] p-4 backdrop-blur-xl">
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center border border-gold-primary/20 bg-gold-primary/10 text-gold-light">
-          <Icon className="h-4 w-4" />
-        </div>
-        <div>
-          <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-ivory/48">
-            {label}
-          </p>
-          <p className="mt-1 text-sm text-ivory/86">{value}</p>
-        </div>
-      </div>
+    <div className="group relative overflow-hidden border border-white/10 bg-white/[0.035] p-3.5 backdrop-blur-xl transition-colors duration-500 hover:border-gold-primary/35">
+      <div className="absolute inset-x-0 top-0 h-px bg-gold-primary/20 transition-colors duration-500 group-hover:bg-gold-primary/55" />
+      <p className="font-accent text-[9px] uppercase tracking-[0.24em] text-gold-light/78">
+        {index}
+      </p>
+      <h3 className="mt-2.5 font-display text-lg leading-none text-ivory sm:text-xl">
+        {title}
+      </h3>
+      <p className="mt-2.5 hidden text-xs leading-relaxed text-ivory/62 sm:block">
+        {copy}
+      </p>
     </div>
   );
 }
@@ -371,9 +420,36 @@ function PhotoPlane({
   );
 }
 
+const MAIN_STAGE_LAYER_ROWS = [
+  {
+    label: "Definition",
+    value: "3 days · 9 blocks",
+    detail: "Name, date, venue, flow",
+    tone: "bg-gold-primary/12 text-gold-dark",
+  },
+  {
+    label: "Requirements",
+    value: "Food · Decor · Photo",
+    detail: "Only chosen needs are shown",
+    tone: "bg-info/10 text-info",
+  },
+  {
+    label: "Finalization",
+    value: "82% ready",
+    detail: "Open gaps become next actions",
+    tone: "bg-success/10 text-success",
+  },
+] as const;
+
+const MAIN_STAGE_VENDOR_PICKS = [
+  "Saffron feast",
+  "House of petals",
+  "The story room",
+] as const;
+
 function MainStageCard() {
   return (
-    <div className="overflow-hidden border border-white/12 bg-[linear-gradient(145deg,rgba(250,247,242,0.94),rgba(245,240,232,0.84))] text-charcoal shadow-[0_35px_120px_rgba(0,0,0,0.3)]">
+    <div className="overflow-hidden border border-white/12 bg-[linear-gradient(145deg,rgba(250,247,242,0.96),rgba(245,240,232,0.9))] text-charcoal shadow-[0_35px_120px_rgba(0,0,0,0.3)]">
       <div className="relative h-28 border-b border-charcoal/8">
         <div
           className="absolute inset-0 bg-cover bg-center"
@@ -383,45 +459,105 @@ function MainStageCard() {
         />
         <div className="absolute left-6 top-4 border border-ivory/14 bg-midnight/42 px-3 py-2 text-ivory backdrop-blur-md">
           <p className="font-accent text-[9px] uppercase tracking-[0.18em] text-gold-light">
-            Tablescape direction
+            Live planner preview
           </p>
-          <p className="mt-1 text-sm text-ivory/84">Design, guests, and spend in one frame</p>
+          <p className="mt-1 text-sm text-ivory/84">
+            Venue, vendors, and run-of-show in one frame
+          </p>
+        </div>
+        <div className="absolute bottom-4 right-5 flex items-center gap-2 border border-ivory/14 bg-ivory/14 px-3 py-2 text-ivory backdrop-blur-md">
+          <CheckCircle2 className="h-3.5 w-3.5 text-gold-light" />
+          <span className="font-accent text-[9px] uppercase tracking-[0.16em]">
+            6 checks
+          </span>
         </div>
       </div>
       <div className="border-b border-charcoal/8 px-6 py-4">
         <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-slate">
-          Elysian planning stack
+          Elysian operating stack
         </p>
-        <h3 className="mt-2 font-display text-2xl">From vision to execution</h3>
+        <h3 className="mt-2 font-display text-2xl">From vision to locked plan</h3>
       </div>
 
-      <div className="grid gap-4 px-6 py-5 md:grid-cols-2">
+      <div className="grid gap-4 px-6 py-5">
+        <div className="grid gap-3">
+          {MAIN_STAGE_LAYER_ROWS.map((row, index) => (
+            <div
+              key={row.label}
+              className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 border border-charcoal/8 bg-white/72 p-3"
+            >
+              <div
+                className={cn(
+                  "flex h-9 w-9 items-center justify-center rounded-full font-accent text-[10px] tracking-[0.14em]",
+                  row.tone
+                )}
+              >
+                {String(index + 1).padStart(2, "0")}
+              </div>
+              <div>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
+                    {row.label}
+                  </p>
+                  <p className="text-xs font-medium text-charcoal">{row.value}</p>
+                </div>
+                <p className="mt-1 text-sm leading-relaxed text-slate">
+                  {row.detail}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-[0.9fr_1.1fr]">
+          <div className="border border-charcoal/8 bg-cream/70 p-4">
+            <div className="flex items-center gap-2 text-gold-dark">
+              <MapPin className="h-4 w-4" />
+              <p className="font-accent text-[10px] uppercase tracking-[0.18em]">
+                Venue anchor
+              </p>
+            </div>
+            <p className="mt-3 font-display text-xl leading-tight">
+              Leela Palace Udaipur
+            </p>
+            <p className="mt-2 text-xs leading-relaxed text-slate">
+              Capacity, destination, amenities, and price cues surface before the
+              user types a thing.
+            </p>
+          </div>
+          <div className="border border-charcoal/8 bg-white/72 p-4">
+            <div className="flex items-center gap-2 text-gold-dark">
+              <Sparkles className="h-4 w-4" />
+              <p className="font-accent text-[10px] uppercase tracking-[0.18em]">
+                Vendor package picks
+              </p>
+            </div>
+            <div className="mt-3 grid gap-2">
+              {MAIN_STAGE_VENDOR_PICKS.map((vendor) => (
+                <div
+                  key={vendor}
+                  className="flex items-center justify-between gap-3 border border-charcoal/6 bg-cream/55 px-3 py-2"
+                >
+                  <span className="text-sm capitalize text-charcoal">
+                    {vendor}
+                  </span>
+                  <span className="font-accent text-[8px] uppercase tracking-[0.16em] text-slate">
+                    Selected
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
         <div className="border border-charcoal/8 bg-white/70 p-4">
           <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
-            Budget canvas
-          </p>
-          <p className="mt-2 text-sm leading-relaxed text-charcoal">
-            Track target allocation, quoted spend, actuals, and paid line items in
-            one drag-and-drop flow.
-          </p>
-        </div>
-        <div className="border border-charcoal/8 bg-white/70 p-4">
-          <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
-            Event architecture
-          </p>
-          <p className="mt-2 text-sm leading-relaxed text-charcoal">
-            Build the event programme as a designed sequence, not a scattered set
-            of notes.
-          </p>
-        </div>
-        <div className="border border-charcoal/8 bg-white/70 p-4 md:col-span-2">
-          <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
-            Vendor intelligence
+            Event intelligence
           </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <MiniStageMetric label="Creative fit" value="Aligned" />
-            <MiniStageMetric label="Budget readiness" value="Visible" />
-            <MiniStageMetric label="Event coverage" value="Mapped" />
+            <MiniStageMetric icon={Users2} label="Guests" value="240" />
+            <MiniStageMetric icon={WalletCards} label="Spend" value="Estimated" />
+            <MiniStageMetric icon={CalendarDays} label="Flow" value="Mapped" />
           </div>
         </div>
       </div>
@@ -430,17 +566,22 @@ function MainStageCard() {
 }
 
 function MiniStageMetric({
+  icon: Icon,
   label,
   value,
 }: {
+  icon: typeof Users2;
   label: string;
   value: string;
 }) {
   return (
     <div className="border border-charcoal/8 bg-cream/60 p-3">
-      <p className="font-accent text-[9px] uppercase tracking-[0.16em] text-slate">
-        {label}
-      </p>
+      <div className="flex items-center gap-2 text-slate">
+        <Icon className="h-3.5 w-3.5" />
+        <p className="font-accent text-[9px] uppercase tracking-[0.16em]">
+          {label}
+        </p>
+      </div>
       <p className="mt-2 text-sm text-charcoal">{value}</p>
     </div>
   );

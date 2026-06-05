@@ -70,10 +70,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const categoryRelation = category?.trim()
+      ? "category:vendor_categories!inner(name, slug)"
+      : "category:vendor_categories(name, slug)";
+
     let query = supabase
       .from("vendor_profiles")
       .select(
-        `*, category:vendor_categories(name, slug), services:vendor_services(id, name, description, service_scope, base_price, max_price, unit, event_type_fit, inclusions, deliverables, add_ons, items:vendor_service_items(id, item_type, name, description, dietary_tags, image_urls, reference_url, sort_order))`,
+        `*, ${categoryRelation}, services:vendor_services(id, name, description, service_scope, base_price, max_price, unit, event_type_fit, inclusions, deliverables, add_ons, items:vendor_service_items(id, item_type, name, description, dietary_tags, image_urls, reference_url, sort_order))`,
         { count: "exact" }
       )
       .order("is_featured", { ascending: false })
@@ -83,8 +87,8 @@ export async function GET(request: NextRequest) {
       query = query.in("id", vendorIdsFilter);
     }
 
-    if (category) {
-      query = query.eq("category.slug", category);
+    if (category?.trim()) {
+      query = query.eq("category.slug", category.trim());
     }
 
     const search = searchRaw ? sanitizeSearchQuery(searchRaw) : "";

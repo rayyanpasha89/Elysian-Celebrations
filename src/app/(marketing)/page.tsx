@@ -9,6 +9,7 @@ import { FoundersSection } from "@/components/marketing/about/founders-section";
 import { PlanningManifesto } from "@/components/marketing/home/planning-manifesto";
 import { ContactForm } from "@/components/marketing/contact/contact-form";
 import {
+  OrnamentRule,
   SectionEyebrow,
   SectionHeader,
 } from "@/components/marketing/shared/marketing-primitives";
@@ -144,20 +145,37 @@ function AtmosphereGallery() {
     <section className="relative overflow-hidden bg-ivory px-[var(--section-padding-x)] py-12 md:py-[calc(var(--section-padding-y)*0.95)]">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(201,169,110,0.08),transparent_24%),radial-gradient(circle_at_82%_26%,rgba(123,167,201,0.07),transparent_26%)]" />
       <div className="relative z-10 mx-auto max-w-7xl">
-        <div className="mb-10 grid gap-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-end">
-          <div>
-            <SectionEyebrow label="Signature moments" size="lg" />
-            <h2
-              className="mt-5 font-display font-bold leading-[0.96] text-charcoal"
-              style={{ fontSize: "var(--text-h1)" }}
-            >
-              Three frames the rest of the planning has to live up to.
-            </h2>
+        <div className="mb-10 grid gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,0.75fr)] lg:items-end">
+          <SectionHeader
+            eyebrow="Signature moments"
+            title="Three frames the rest of the planning has to live up to."
+            intro="One ceremony, one table, one portrait — each a brief in itself. The rest of the event gets designed against these three references."
+            align="start"
+            titleMaxWidth="max-w-3xl"
+          />
+
+          <div className="border border-charcoal/8 bg-cream/70 p-5">
+            <p className="font-accent text-[10px] uppercase tracking-[0.22em] text-gold-primary">
+              Direction notes
+            </p>
+            <div className="mt-4 grid gap-3">
+              {[
+                "Venue light must support the procession.",
+                "Hospitality pacing should feel invisible.",
+                "Portrait direction leaves space for family.",
+              ].map((note, index) => (
+                <div
+                  key={note}
+                  className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 border-t border-charcoal/8 pt-3 first:border-t-0 first:pt-0"
+                >
+                  <span className="font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal/32">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <p className="text-sm leading-relaxed text-slate">{note}</p>
+                </div>
+              ))}
+            </div>
           </div>
-          <p className="max-w-2xl font-heading text-lg font-light leading-relaxed text-slate">
-            One ceremony, one table, one portrait — each a brief in itself. The
-            rest of the weekend gets designed against these three references.
-          </p>
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-[1fr_0.85fr_1fr]">
@@ -193,7 +211,7 @@ function AtmosphereGallery() {
                   <p className="mt-3 max-w-sm text-sm leading-relaxed text-ivory/78">
                     {moment.copy}
                   </p>
-                  <div className="mt-4 h-px w-10 bg-gradient-to-r from-gold-primary/60 to-transparent transition-all duration-700 group-hover:w-24" />
+                  <span className="mt-4 block h-px w-10 bg-gold-primary/60 transition-all duration-700 group-hover:w-24" />
                 </div>
               </div>
             </div>
@@ -208,17 +226,13 @@ function SectionDivider({ variant }: { variant: "soft" | "gold" }) {
   if (variant === "gold") {
     return (
       <div className="mx-[var(--section-padding-x)] py-4">
-        <div className="relative flex items-center">
-          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gold-primary/30 to-gold-primary/30" />
-          <span className="mx-3 inline-block h-1.5 w-1.5 rotate-45 bg-gold-primary/55" />
-          <div className="h-px flex-1 bg-gradient-to-l from-transparent via-gold-primary/30 to-gold-primary/30" />
-        </div>
+        <OrnamentRule width={240} />
       </div>
     );
   }
   return (
     <div className="mx-[var(--section-padding-x)] py-4">
-      <div className="h-px bg-gradient-to-r from-transparent via-charcoal/12 to-transparent" />
+      <OrnamentRule width={180} />
     </div>
   );
 }
