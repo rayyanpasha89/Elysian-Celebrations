@@ -2,12 +2,12 @@ const faqs = [
   {
     question: "What does Elysian actually handle?",
     answer:
-      "We combine destination planning, budget structure, vendor coordination, guest logistics, and timeline visibility so couples are not juggling separate tools and disconnected vendors.",
+      "We combine destination planning, budget structure, vendor coordination, guest logistics, and timeline visibility so hosts are not juggling separate tools and disconnected vendors.",
   },
   {
-    question: "Do you only work on destination weddings?",
+    question: "What kinds of events do you plan?",
     answer:
-      "Destination celebrations are the core focus. The experience, vendor curation, and planning system are all designed around multi-event wedding weekends and travel-heavy logistics.",
+      "Destination events of every kind — weddings, corporate launches and conferences, galas, milestone celebrations, and retreats. The experience, vendor curation, and planning system are built around multi-day programmes and travel-heavy logistics.",
   },
   {
     question: "Can we start before every detail is finalized?",

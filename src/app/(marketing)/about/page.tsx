@@ -8,7 +8,7 @@ import { CTASection } from "@/components/marketing/cta/cta-section";
 export const metadata: Metadata = {
   title: "About",
   description:
-    "The story behind Elysian Celebrations—mission, founders, and the principles that guide every destination wedding we plan.",
+    "The story behind Elysian Celebrations—mission, founders, and the principles that guide every destination event we plan.",
 };
 
 export default function AboutPage() {

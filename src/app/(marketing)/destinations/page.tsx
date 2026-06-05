@@ -4,7 +4,7 @@ import { DestinationsGrid } from "@/components/marketing/destinations/destinatio
 export const metadata: Metadata = {
   title: "Destinations | Elysian Celebrations",
   description:
-    "Explore luxury destination wedding locations across India and beyond—handpicked venues, transparent pricing, and unforgettable settings.",
+    "Explore luxury destination event locations across India and beyond—handpicked venues for weddings, galas, launches, and retreats with transparent pricing and unforgettable settings.",
 };
 
 export default function DestinationsPage() {
