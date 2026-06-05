@@ -438,14 +438,35 @@ function defaultRequirementCategoriesForBlock(
     return block.requirementCategories;
   }
 
-  return [
-    "food",
-    "decor",
-    "photo-video",
-    "entertainment",
-    "hospitality",
-    "logistics",
-  ];
+  const signature = `${block.title} ${block.eventType} ${block.slot}`.toLowerCase();
+  const hasAny = (...needles: string[]) =>
+    needles.some((needle) => signature.includes(needle));
+
+  if (hasAny("ceremony", "phera", "vow", "engagement", "roka")) {
+    return ["decor", "photo-video", "hospitality", "logistics"];
+  }
+
+  if (hasAny("breakfast", "brunch", "lunch", "dinner", "meal", "feast", "private dinner")) {
+    return ["food", "decor", "hospitality", "logistics"];
+  }
+
+  if (hasAny("cocktail", "sangeet", "after party", "after-party", "concert", "performance")) {
+    return ["food", "decor", "photo-video", "entertainment", "logistics"];
+  }
+
+  if (hasAny("conference", "corporate", "offsite", "retreat", "product launch")) {
+    return ["food", "decor", "photo-video", "entertainment", "hospitality", "logistics"];
+  }
+
+  if (hasAny("birthday", "anniversary", "festival", "social")) {
+    return ["food", "decor", "photo-video", "entertainment", "hospitality", "logistics"];
+  }
+
+  if (block.slot === "morning") {
+    return ["food", "hospitality", "logistics"];
+  }
+
+  return ["food", "decor", "photo-video", "logistics"];
 }
 
 export function mealPeriodForTimeBlock(

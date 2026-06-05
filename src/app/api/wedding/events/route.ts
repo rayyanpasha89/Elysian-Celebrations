@@ -125,21 +125,29 @@ export async function POST(request: NextRequest) {
       return apiError("Failed to create event", 500);
     }
 
-    const { error: menuInsertError } = await supabase
-      .from("wedding_event_menus")
-      .insert({
-        wedding_event_id: event.id,
-        name: `${event.name} Food and beverage plan`,
-        meal_period: mealPeriodForTimeBlock(event.time_block, event.start_time),
-        service_style: event.food_style ?? null,
-        notes:
-          event.menu_notes ??
-          "Use this starter menu to define drinks, pre-meal stations, mains, post-meal stations, live counters, and custom food requirements.",
-        sort_order: 0,
-      });
+    const requirementSeeds = buildDefaultRequirementsForEvent({
+      eventName: event.name,
+      timeBlock: event.time_block,
+      startTime: event.start_time,
+    });
 
-    if (menuInsertError) {
-      console.error("wedding_event_menus insert:", menuInsertError);
+    if (requirementSeeds.some((requirement) => requirement.category === "food")) {
+      const { error: menuInsertError } = await supabase
+        .from("wedding_event_menus")
+        .insert({
+          wedding_event_id: event.id,
+          name: `${event.name} Food and beverage plan`,
+          meal_period: mealPeriodForTimeBlock(event.time_block, event.start_time),
+          service_style: event.food_style ?? null,
+          notes:
+            event.menu_notes ??
+            "Use this starter menu to define drinks, pre-meal stations, mains, post-meal stations, live counters, and custom food requirements.",
+          sort_order: 0,
+        });
+
+      if (menuInsertError) {
+        console.error("wedding_event_menus insert:", menuInsertError);
+      }
     }
 
     const { error: taskInsertError } = await supabase
@@ -156,11 +164,7 @@ export async function POST(request: NextRequest) {
       console.error("wedding_event_tasks insert:", taskInsertError);
     }
 
-    const requirementRows = buildDefaultRequirementsForEvent({
-      eventName: event.name,
-      timeBlock: event.time_block,
-      startTime: event.start_time,
-    }).map((requirement) => ({
+    const requirementRows = requirementSeeds.map((requirement) => ({
       wedding_event_id: event.id,
       category: requirement.category,
       title: requirement.title,

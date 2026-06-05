@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { fadeUp, staggerContainer } from "@/animations/variants";
 import { FinalizationBoard } from "@/components/dashboard/finalization-board";
 import { ListEmptyState } from "@/components/dashboard/list-empty-state";
+import { ProgressRing } from "@/components/dashboard/ui-kit";
 import {
   CEREMONY_FLOW_OPTIONS,
   ChipMultiSelect,
@@ -258,6 +259,21 @@ type VenueOption = {
         country?: string | null;
       }[]
     | null;
+};
+
+type PriceRange = {
+  min: number;
+  max: number;
+  source: string;
+};
+
+type SpendEstimate = {
+  min: number;
+  max: number;
+  sourceCount: number;
+  missingCount: number;
+  sources: string[];
+  legacyFallback: boolean;
 };
 
 type VendorDraftSelection = {
@@ -855,17 +871,54 @@ function findEventDay(days: WeddingDay[], eventId: string | null) {
   return null;
 }
 
-function summarizeDayPlan(day: WeddingDay) {
+function eventReadinessPercent(event: WeddingEvent, venueOptions: VenueOption[]) {
+  const needsFood = (event.requirements ?? []).some(
+    (requirement) => requirement.category === "food"
+  );
+  const needsLogistics = (event.requirements ?? []).some(
+    (requirement) => requirement.category === "logistics"
+  );
+  const estimate = estimateEventSpend(event, venueOptions);
+  const checks = [
+    Boolean(event.name.trim()),
+    Boolean(event.date && event.start_time && event.end_time),
+    Boolean(event.venue?.trim()),
+    Boolean(event.guest_count && event.guest_count > 0),
+    (event.requirements ?? []).length > 0,
+    event.vendorSelections.length > 0 ||
+      (event.requirements ?? []).some(
+        (requirement) =>
+          Boolean(requirement.vendorProfileId) ||
+          Boolean(requirement.vendorServiceId)
+      ),
+    estimate.max > 0,
+    !needsFood || event.menus.length > 0,
+    !needsLogistics || hasLogisticsDetails(event.logistics),
+    event.tasks.length > 0,
+  ];
+  const complete = checks.filter(Boolean).length;
+  return Math.round((complete / checks.length) * 100);
+}
+
+function summarizeDayPlan(day: WeddingDay, venueOptions: VenueOption[]) {
   const eventCount = day.events.length;
-  const estimatedSpend = day.events.reduce(
-    (sum, event) => sum + (event.estimated_budget ?? 0),
-    0
+  const estimatedSpend = combineSpendEstimates(
+    day.events.map((event) => estimateEventSpend(event, venueOptions))
   );
   const vendorPicks = day.events.reduce(
     (sum, event) => sum + event.vendorSelections.length,
     0
   );
-  return { eventCount, estimatedSpend, vendorPicks };
+  const readiness =
+    eventCount > 0
+      ? Math.round(
+          day.events.reduce(
+            (sum, event) => sum + eventReadinessPercent(event, venueOptions),
+            0
+          ) / eventCount
+        )
+      : 0;
+  return { eventCount, estimatedSpend, vendorPicks, readiness };
 }
 
 function formatBookingStatus(status: string) {
@@ -889,6 +942,364 @@ function venueMatchesValue(venue: VenueOption, value: string) {
     venue.name.trim().toLowerCase() === normalized ||
     venue.slug.trim().toLowerCase() === normalized
   );
+}
+
+function findVenueByValue(venues: VenueOption[], value: string | null | undefined) {
+  if (!value) return null;
+  return venues.find((venue) => venueMatchesValue(venue, value)) ?? null;
+}
+
+function positiveNumber(value: number | null | undefined) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? value
+    : null;
+}
+
+function parseIndianMoneyToken(raw: string, inferredUnit?: string | null) {
+  const match = raw
+    .trim()
+    .toLowerCase()
+    .replace(/,/g, "")
+    .match(/(\d+(?:\.\d+)?)\s*(crores?|cr|lakhs?|lacs?|l|k)?/);
+  if (!match) return null;
+
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount)) return null;
+  const unit = match[2] ?? inferredUnit ?? "";
+
+  if (unit === "cr" || unit.startsWith("crore")) return Math.round(amount * 10000000);
+  if (unit === "l" || unit.startsWith("lakh") || unit.startsWith("lac")) {
+    return Math.round(amount * 100000);
+  }
+  if (unit === "k") return Math.round(amount * 1000);
+  return Math.round(amount);
+}
+
+function parseVenuePriceRange(value: string | null | undefined): PriceRange | null {
+  if (!value) return null;
+  const normalized = value
+    .replace(/[₹]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const unitMatch = normalized
+    .toLowerCase()
+    .match(/(crores?|cr|lakhs?|lacs?|l|k)\b/);
+  const parts = normalized
+    .split(/[–—-]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const parsed = parts
+    .map((part) => parseIndianMoneyToken(part, unitMatch?.[1]))
+    .filter((entry): entry is number => Boolean(entry));
+
+  if (parsed.length === 0) return null;
+  const min = Math.min(...parsed);
+  const max = Math.max(...parsed);
+  return { min, max: max > 0 ? max : min, source: "venue range" };
+}
+
+function rangeFromServicePrice({
+  base,
+  max,
+  unit,
+  guestCount,
+  source,
+}: {
+  base: number | null | undefined;
+  max: number | null | undefined;
+  unit?: string | null;
+  guestCount: number | null;
+  source: string;
+}): PriceRange | null {
+  const minPrice = positiveNumber(base);
+  if (!minPrice) return null;
+  const maxPrice = positiveNumber(max) ?? minPrice;
+  const unitLabel = unit?.toLowerCase() ?? "";
+  const isPerGuest =
+    guestCount != null &&
+    /guest|person|plate|pax|head/.test(unitLabel) &&
+    maxPrice < 50000;
+  const multiplier = isPerGuest ? guestCount : 1;
+
+  return {
+    min: Math.round(minPrice * multiplier),
+    max: Math.round(Math.max(maxPrice, minPrice) * multiplier),
+    source,
+  };
+}
+
+function combineSpendRanges(
+  ranges: PriceRange[],
+  {
+    missingCount = 0,
+    fallback,
+  }: {
+    missingCount?: number;
+    fallback?: PriceRange | null;
+  } = {}
+): SpendEstimate {
+  const usableRanges = ranges.filter((range) => range.min > 0 || range.max > 0);
+  const effectiveRanges = usableRanges.length > 0 ? usableRanges : fallback ? [fallback] : [];
+
+  return {
+    min: effectiveRanges.reduce((sum, range) => sum + range.min, 0),
+    max: effectiveRanges.reduce((sum, range) => sum + Math.max(range.max, range.min), 0),
+    sourceCount: effectiveRanges.length,
+    missingCount,
+    sources: uniqueList(effectiveRanges.map((range) => range.source)),
+    legacyFallback: usableRanges.length === 0 && Boolean(fallback),
+  };
+}
+
+function estimateEventSpend(
+  event: WeddingEvent,
+  venueOptions: VenueOption[]
+): SpendEstimate {
+  const guestCount = positiveNumber(event.guest_count);
+  const ranges: PriceRange[] = [];
+  let missingCount = 0;
+
+  const venue = findVenueByValue(venueOptions, event.venue);
+  const venueRange = parseVenuePriceRange(venue?.price_range);
+  if (venueRange) {
+    ranges.push({
+      ...venueRange,
+      source: `${venue?.name ?? "Venue"} catalogue`,
+    });
+  }
+
+  for (const selection of event.vendorSelections) {
+    const lockedAmount = positiveNumber(selection.totalAmount);
+    if (lockedAmount) {
+      ranges.push({
+        min: lockedAmount,
+        max: lockedAmount,
+        source: selection.vendor?.businessName ?? "Booked vendor",
+      });
+      continue;
+    }
+
+    const serviceRange = rangeFromServicePrice({
+      base: selection.service?.basePrice,
+      max: selection.service?.maxPrice,
+      unit: selection.service?.unit,
+      guestCount,
+      source:
+        selection.service?.name ??
+        selection.vendor?.businessName ??
+        "Vendor service",
+    });
+
+    if (serviceRange) ranges.push(serviceRange);
+    else missingCount += 1;
+  }
+
+  return combineSpendRanges(ranges, {
+    missingCount,
+    fallback: event.estimated_budget
+      ? {
+          min: event.estimated_budget,
+          max: event.estimated_budget,
+          source: "saved estimate",
+        }
+      : null,
+  });
+}
+
+function estimateDraftSpend({
+  draft,
+  event,
+  venueOptions,
+  vendorOptions,
+}: {
+  draft: EventDetailDraft;
+  event: WeddingEvent;
+  venueOptions: VenueOption[];
+  vendorOptions: Record<PlannerVendorCategoryKey, VendorPlannerOption[]>;
+}): SpendEstimate {
+  const guestCount = positiveNumber(Number(draft.guestCount));
+  const ranges: PriceRange[] = [];
+  let missingCount = 0;
+
+  const venue = findVenueByValue(venueOptions, draft.venue);
+  const venueRange = parseVenuePriceRange(venue?.price_range);
+  if (venueRange) {
+    ranges.push({
+      ...venueRange,
+      source: `${venue?.name ?? "Venue"} catalogue`,
+    });
+  }
+
+  for (const category of PLANNER_VENDOR_CATEGORIES) {
+    const selection = draft.vendorSelections[category.key];
+    if (!selection?.vendorProfileId) continue;
+    const vendor = (vendorOptions[category.key] ?? []).find(
+      (option) => option.id === selection.vendorProfileId
+    );
+    const service =
+      vendor?.services.find((entry) => entry.id === selection.vendorServiceId) ??
+      null;
+
+    if (!service) {
+      missingCount += 1;
+      continue;
+    }
+
+    const serviceRange = rangeFromServicePrice({
+      base: service.base_price,
+      max: service.max_price,
+      unit: service.unit,
+      guestCount,
+      source: service.name,
+    });
+    if (serviceRange) ranges.push(serviceRange);
+    else missingCount += 1;
+  }
+
+  const savedEstimate =
+    ranges.length === 0 ? estimateEventSpend(event, venueOptions) : null;
+  return combineSpendRanges(ranges, {
+    missingCount: missingCount + (savedEstimate?.missingCount ?? 0),
+    fallback:
+      savedEstimate && (savedEstimate.min > 0 || savedEstimate.max > 0)
+        ? {
+            min: savedEstimate.min,
+            max: savedEstimate.max,
+            source: savedEstimate.legacyFallback
+              ? "saved estimate"
+              : "saved vendor picks",
+          }
+        : null,
+  });
+}
+
+function combineSpendEstimates(estimates: SpendEstimate[]): SpendEstimate {
+  return {
+    min: estimates.reduce((sum, estimate) => sum + estimate.min, 0),
+    max: estimates.reduce((sum, estimate) => sum + estimate.max, 0),
+    sourceCount: estimates.reduce((sum, estimate) => sum + estimate.sourceCount, 0),
+    missingCount: estimates.reduce((sum, estimate) => sum + estimate.missingCount, 0),
+    sources: uniqueList(estimates.flatMap((estimate) => estimate.sources)),
+    legacyFallback: estimates.some((estimate) => estimate.legacyFallback),
+  };
+}
+
+function spendEstimateLabel(estimate: SpendEstimate) {
+  if (estimate.max <= 0) return "Estimate pending";
+  if (estimate.max === estimate.min) return formatCurrency(estimate.min);
+  return `${formatCurrency(estimate.min)} - ${formatCurrency(estimate.max)}`;
+}
+
+function spendEstimateCaption(estimate: SpendEstimate) {
+  if (estimate.max <= 0) {
+    return "Pick a venue and vendor services to generate a live estimate.";
+  }
+  const sourceLabel =
+    estimate.sourceCount === 1
+      ? "1 pricing source"
+      : `${estimate.sourceCount} pricing sources`;
+  const gapLabel =
+    estimate.missingCount > 0
+      ? ` · ${estimate.missingCount} price gap${estimate.missingCount === 1 ? "" : "s"}`
+      : "";
+  const fallbackLabel = estimate.legacyFallback ? " · fallback from saved estimate" : "";
+  return `${sourceLabel}${gapLabel}${fallbackLabel}`;
+}
+
+function nextBestPlannerAction(
+  event: WeddingEvent | null,
+  estimate: SpendEstimate | null
+): {
+  label: string;
+  value: string;
+  detail: string;
+  section: EditorSectionKey;
+} {
+  if (!event) {
+    return {
+      label: "Next best action",
+      value: "Open an event block",
+      detail: "Pick a morning, afternoon, or evening block before editing details.",
+      section: "basics",
+    };
+  }
+
+  const needsFood = (event.requirements ?? []).some(
+    (requirement) => requirement.category === "food"
+  );
+  const needsLogistics = (event.requirements ?? []).some(
+    (requirement) => requirement.category === "logistics"
+  );
+
+  if (!event.venue?.trim()) {
+    return {
+      label: "Next best action",
+      value: "Choose the venue card",
+      detail: "Venue selection unlocks capacity context and venue-based spend range.",
+      section: "basics",
+    };
+  }
+
+  if (!event.guest_count || event.guest_count <= 0) {
+    return {
+      label: "Next best action",
+      value: "Set the guest count",
+      detail: "Guest count powers catering, seating, rooming, and per-person estimates.",
+      section: "basics",
+    };
+  }
+
+  if (needsFood && event.menus.length === 0) {
+    return {
+      label: "Next best action",
+      value: "Apply a menu starter",
+      detail: "Use one-tap menu blueprints before customizing counters and diets.",
+      section: "food",
+    };
+  }
+
+  if (event.vendorSelections.length === 0) {
+    return {
+      label: "Next best action",
+      value: "Pick vendor packages",
+      detail: "Vendor cards pull real services and catalogue rows into this block.",
+      section: "vendors",
+    };
+  }
+
+  if (!estimate || estimate.max <= 0 || estimate.missingCount > 0) {
+    return {
+      label: "Next best action",
+      value: "Resolve pricing gaps",
+      detail: "Choose packages with published prices or confirm quotes in bookings.",
+      section: "vendors",
+    };
+  }
+
+  if (needsLogistics && !hasLogisticsDetails(event.logistics)) {
+    return {
+      label: "Next best action",
+      value: "Apply logistics preset",
+      detail: "Start with movement, rooming, weather, and load-in presets.",
+      section: "logistics",
+    };
+  }
+
+  if (event.tasks.length === 0) {
+    return {
+      label: "Next best action",
+      value: "Add task templates",
+      detail: "Drop in vendor handoff and run-of-show task packs.",
+      section: "tasks",
+    };
+  }
+
+  return {
+    label: "Next best action",
+    value: "Review finalization",
+    detail: "This block is ready for the Layer 3 gap board.",
+    section: "notes",
+  };
 }
 
 function servicePriceLabel(service: VendorPlannerService) {
@@ -930,9 +1341,6 @@ function uniqueList(values: string[]) {
 }
 
 const PLANNER_TAG_SEPARATOR = " · ";
-const EVENT_ESTIMATE_PRESETS = [
-  250000, 500000, 1000000, 2500000, 5000000, 7500000,
-];
 
 function splitPlannerTags(value: string | null | undefined) {
   const trimmed = value?.trim();
@@ -1317,16 +1725,38 @@ export default function ClientWeddingPage() {
 
   const estimatedSpend = useMemo(
     () =>
-      days.reduce(
-        (sum, day) =>
-          sum +
-          day.events.reduce(
-            (eventSum, event) => eventSum + (event.estimated_budget ?? 0),
-            0
-          ),
-        0
+      combineSpendEstimates(
+        days.flatMap((day) =>
+          day.events.map((event) => estimateEventSpend(event, venueOptions))
+        )
       ),
-    [days]
+    [days, venueOptions]
+  );
+
+  const overallReadiness = useMemo(() => {
+    const events = days.flatMap((day) => day.events);
+    if (events.length === 0) return 0;
+    return Math.round(
+      events.reduce(
+        (sum, event) => sum + eventReadinessPercent(event, venueOptions),
+        0
+      ) / events.length
+    );
+  }, [days, venueOptions]);
+
+  const detailSpendEstimate = useMemo(() => {
+    if (!selectedEvent || !detailDraft) return null;
+    return estimateDraftSpend({
+      draft: detailDraft,
+      event: selectedEvent,
+      venueOptions,
+      vendorOptions,
+    });
+  }, [detailDraft, selectedEvent, venueOptions, vendorOptions]);
+
+  const nextPlannerAction = useMemo(
+    () => nextBestPlannerAction(selectedEvent, detailSpendEstimate),
+    [detailSpendEstimate, selectedEvent]
   );
 
   // Needs the client picked for this block during the layered definition. We
@@ -1672,9 +2102,10 @@ export default function ClientWeddingPage() {
           guestCount: detailDraft.guestCount
             ? Number(detailDraft.guestCount)
             : null,
-          estimatedBudget: detailDraft.estimatedBudget
-            ? Number(detailDraft.estimatedBudget)
-            : null,
+          estimatedBudget:
+            detailSpendEstimate && detailSpendEstimate.min > 0
+              ? detailSpendEstimate.min
+              : null,
           foodStyle: detailDraft.foodStyle || null,
           foodPreferences: detailDraft.foodPreferences,
           menuNotes: detailDraft.menuNotes || null,
@@ -2386,18 +2817,26 @@ export default function ClientWeddingPage() {
         </div>
         <div className={dashCard}>
           <p className={dashLabel}>Events planned</p>
-          <p className="mt-3 font-display text-3xl text-charcoal">{totalEvents}</p>
+          <div className="mt-3 flex items-center justify-between gap-4">
+            <p className="font-display text-3xl text-charcoal">{totalEvents}</p>
+            <ProgressRing
+              percent={overallReadiness}
+              size={62}
+              stroke={4}
+              label=""
+            />
+          </div>
           <p className="mt-2 text-sm text-slate">
-            Build the weekend flow from welcome to after-party.
+            {overallReadiness}% planner readiness across all active event blocks.
           </p>
         </div>
         <div className={dashCard}>
-          <p className={dashLabel}>Estimated event spend</p>
+          <p className={dashLabel}>Derived event spend</p>
           <p className="mt-3 font-display text-3xl text-charcoal">
-            {formatCurrency(estimatedSpend)}
+            {spendEstimateLabel(estimatedSpend)}
           </p>
           <p className="mt-2 text-sm text-slate">
-            {totalSelections} vendor selections already mapped into the plan.
+            {totalSelections} vendor selections · {spendEstimateCaption(estimatedSpend)}
           </p>
         </div>
       </motion.div>
@@ -2457,6 +2896,7 @@ export default function ClientWeddingPage() {
       {layer === "finalization" ? (
         <FinalizationLayer
           days={days}
+          venueOptions={venueOptions}
           weddingDate={wedding.date}
           onResolveCheck={resolveFinalizationCheck}
         />
@@ -2469,6 +2909,8 @@ export default function ClientWeddingPage() {
         selectedDay={selectedDay}
         venueOptionsCount={venueOptions.length}
         savedVendorCount={savedVendorSlugs.length}
+        nextAction={nextPlannerAction}
+        onOpenSection={(section) => setEditorSection(section)}
       />
       <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_420px]">
         <div>
@@ -2570,7 +3012,7 @@ export default function ClientWeddingPage() {
                 .slice()
                 .sort((left, right) => left.sort_order - right.sort_order)
                 .map((day, dayIndex) => {
-                  const daySummary = summarizeDayPlan(day);
+                  const daySummary = summarizeDayPlan(day, venueOptions);
                   return (
                   <motion.section
                     key={day.id}
@@ -2654,7 +3096,9 @@ export default function ClientWeddingPage() {
                               {daySummary.eventCount}{" "}
                               {daySummary.eventCount === 1 ? "event" : "events"}
                               {" · "}
-                              {formatCurrency(daySummary.estimatedSpend)} estimated
+                              {spendEstimateLabel(daySummary.estimatedSpend)}
+                              {" · "}
+                              {daySummary.readiness}% ready
                               {" · "}
                               {daySummary.vendorPicks} vendor{" "}
                               {daySummary.vendorPicks === 1 ? "pick" : "picks"}
@@ -2859,7 +3303,17 @@ export default function ClientWeddingPage() {
                         {day.events
                           .slice()
                           .sort((left, right) => left.sort_order - right.sort_order)
-                          .map((event, eventIndex) => (
+                          .map((event, eventIndex) => {
+                            const eventEstimate = estimateEventSpend(
+                              event,
+                              venueOptions
+                            );
+                            const eventReadiness = eventReadinessPercent(
+                              event,
+                              venueOptions
+                            );
+
+                            return (
                             <article
                               key={event.id}
                               draggable
@@ -2881,13 +3335,21 @@ export default function ClientWeddingPage() {
                                     {event.name}
                                   </h5>
                                 </div>
-                                <button
-                                  type="button"
-                                  className={dashBtn}
-                                  onClick={() => setSelectedEventId(event.id)}
-                                >
-                                  Open
-                                </button>
+                                <div className="flex shrink-0 items-start gap-3">
+                                  <ProgressRing
+                                    percent={eventReadiness}
+                                    size={66}
+                                    stroke={4}
+                                    label=""
+                                  />
+                                  <button
+                                    type="button"
+                                    className={dashBtn}
+                                    onClick={() => setSelectedEventId(event.id)}
+                                  >
+                                    Open
+                                  </button>
+                                </div>
                               </div>
 
                               <div className="mt-4 space-y-2 text-sm text-charcoal">
@@ -2901,6 +3363,12 @@ export default function ClientWeddingPage() {
                                         year: "numeric",
                                       })
                                     : "Date still flexible"}
+                                </p>
+                                <p className="border-t border-charcoal/8 pt-2 font-heading text-xs text-slate">
+                                  <span className="text-charcoal">
+                                    {spendEstimateLabel(eventEstimate)}
+                                  </span>{" "}
+                                  · {spendEstimateCaption(eventEstimate)}
                                 </p>
                               </div>
 
@@ -2945,7 +3413,8 @@ export default function ClientWeddingPage() {
                                 </p>
                               </div>
                             </article>
-                          ))}
+                            );
+                          })}
                       </div>
                     )}
                   </motion.section>
@@ -3035,7 +3504,7 @@ export default function ClientWeddingPage() {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
                   <div className="border border-charcoal/8 bg-cream/35 p-3">
                     <p className={dashLabel}>Menus</p>
                     <p className="mt-1 font-display text-lg text-charcoal">
@@ -3046,6 +3515,23 @@ export default function ClientWeddingPage() {
                     <p className={dashLabel}>Vendors</p>
                     <p className="mt-1 font-display text-lg text-charcoal">
                       {Object.values(detailDraft.vendorSelections).filter(Boolean).length}
+                    </p>
+                  </div>
+                  <div className="border border-charcoal/8 bg-cream/35 p-3">
+                    <p className={dashLabel}>Ready</p>
+                    <p className="mt-1 font-display text-lg text-charcoal">
+                      {selectedEvent
+                        ? eventReadinessPercent(selectedEvent, venueOptions)
+                        : 0}
+                      %
+                    </p>
+                  </div>
+                  <div className="border border-charcoal/8 bg-cream/35 p-3">
+                    <p className={dashLabel}>Spend</p>
+                    <p className="mt-1 font-display text-base leading-tight text-charcoal">
+                      {detailSpendEstimate
+                        ? spendEstimateLabel(detailSpendEstimate)
+                        : "Pending"}
                     </p>
                   </div>
                   <div className="border border-charcoal/8 bg-cream/35 p-3">
@@ -3185,29 +3671,31 @@ export default function ClientWeddingPage() {
                       }
                     />
                   </Field>
-                  <Field label="Estimated spend (INR)">
-                    <Stepper
-                      value={
-                        detailDraft.estimatedBudget
-                          ? Number(detailDraft.estimatedBudget)
-                          : null
-                      }
-                      min={0}
-                      max={50000000}
-                      step={50000}
-                      presets={EVENT_ESTIMATE_PRESETS}
-                      formatValue={formatCurrency}
-                      onChange={(estimatedBudget) =>
-                        setDetailDraft((current) =>
-                          current
-                            ? {
-                                ...current,
-                                estimatedBudget: String(estimatedBudget),
-                              }
-                            : current
-                        )
-                      }
-                    />
+                  <Field label="Derived spend estimate">
+                    <div className="border border-gold-primary/25 bg-gold-primary/8 p-4">
+                      <p className="font-display text-2xl text-charcoal">
+                        {detailSpendEstimate
+                          ? spendEstimateLabel(detailSpendEstimate)
+                          : "Estimate pending"}
+                      </p>
+                      <p className="mt-2 text-xs leading-relaxed text-slate">
+                        {detailSpendEstimate
+                          ? spendEstimateCaption(detailSpendEstimate)
+                          : "Pick a venue and packages to generate this."}
+                      </p>
+                      {detailSpendEstimate?.sources.length ? (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {detailSpendEstimate.sources.slice(0, 4).map((source) => (
+                            <span
+                              key={source}
+                              className="border border-charcoal/10 bg-ivory/60 px-2 py-1 font-heading text-[10px] text-slate"
+                            >
+                              {source}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
                   </Field>
                 </div>
 
@@ -4093,11 +4581,15 @@ function LayerTwoGuidance({
   selectedDay,
   venueOptionsCount,
   savedVendorCount,
+  nextAction,
+  onOpenSection,
 }: {
   selectedEvent: WeddingEvent | null;
   selectedDay: WeddingDay | null;
   venueOptionsCount: number;
   savedVendorCount: number;
+  nextAction: ReturnType<typeof nextBestPlannerAction>;
+  onOpenSection: (section: EditorSectionKey) => void;
 }) {
   const guidance = [
     {
@@ -4128,23 +4620,43 @@ function LayerTwoGuidance({
       detail:
         "Vendor and package cards import real catalogue rows into menus, decor, and notes.",
     },
+    {
+      label: nextAction.label,
+      value: nextAction.value,
+      detail: nextAction.detail,
+      action: true,
+    },
   ];
 
   return (
     <motion.section
       variants={fadeUp}
-      className="mt-8 grid gap-3 md:grid-cols-3"
+      className="mt-8 grid gap-3 md:grid-cols-4"
     >
       {guidance.map((item, index) => (
         <article
           key={item.label}
-          className="border border-gold-primary/20 bg-gold-primary/5 p-4"
+          className={cn(
+            "border p-4",
+            item.action
+              ? "border-gold-primary bg-gold-primary/10"
+              : "border-gold-primary/20 bg-gold-primary/5"
+          )}
         >
           <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-gold-dark">
             {String(index + 1).padStart(2, "0")} · {item.label}
           </p>
           <p className="mt-2 font-display text-lg text-charcoal">{item.value}</p>
           <p className="mt-2 text-xs leading-relaxed text-slate">{item.detail}</p>
+          {item.action ? (
+            <button
+              type="button"
+              onClick={() => onOpenSection(nextAction.section)}
+              className="mt-3 border border-gold-primary bg-gold-primary px-3 py-2 font-accent text-[10px] uppercase tracking-[0.16em] text-midnight transition-colors hover:bg-gold-dark"
+            >
+              Open section
+            </button>
+          ) : null}
         </article>
       ))}
     </motion.section>
@@ -4832,6 +5344,7 @@ type CheckResult = {
 
 function computeFinalizationChecks(
   days: WeddingDay[],
+  venueOptions: VenueOption[],
   weddingDate: string | null
 ): CheckResult[] {
   const allEvents = days.flatMap((day) => day.events);
@@ -4870,9 +5383,17 @@ function computeFinalizationChecks(
   const missingLogistics = allEvents.filter(
     (event) => !hasLogisticsDetails(event.logistics)
   ).length;
-  const missingBudget = allEvents.filter(
-    (event) => !event.estimated_budget || event.estimated_budget <= 0
+  const spendEstimates = allEvents.map((event) =>
+    estimateEventSpend(event, venueOptions)
+  );
+  const missingBudget = spendEstimates.filter(
+    (estimate) => estimate.max <= 0
   ).length;
+  const pricingGaps = spendEstimates.reduce(
+    (sum, estimate) => sum + estimate.missingCount,
+    0
+  );
+  const totalSpendEstimate = combineSpendEstimates(spendEstimates);
   const missingGuestCount = allEvents.filter(
     (event) => !event.guest_count || event.guest_count <= 0
   ).length;
@@ -4955,7 +5476,10 @@ function computeFinalizationChecks(
           label: entry.label,
           description: entry.description,
           status: missingBudget === 0 && totalEvents > 0 ? "ok" : "partial",
-          detail: `${missingBudget} block(s) without an estimated spend.`,
+          detail:
+            missingBudget === 0 && totalEvents > 0
+              ? `${spendEstimateLabel(totalSpendEstimate)} derived · ${spendEstimateCaption(totalSpendEstimate)}.`
+              : `${missingBudget} block(s) need venue/package pricing · ${pricingGaps} service price gap(s).`,
         };
       case "guests-hotels":
         return {
@@ -5015,16 +5539,18 @@ function hasLogisticsDetails(logistics: EventLogistics | null) {
 
 function FinalizationLayer({
   days,
+  venueOptions,
   weddingDate,
   onResolveCheck,
 }: {
   days: WeddingDay[];
+  venueOptions: VenueOption[];
   weddingDate: string | null;
   onResolveCheck: (checkKey: string) => void;
 }) {
   const checks = useMemo(
-    () => computeFinalizationChecks(days, weddingDate),
-    [days, weddingDate]
+    () => computeFinalizationChecks(days, venueOptions, weddingDate),
+    [days, venueOptions, weddingDate]
   );
 
   return (
