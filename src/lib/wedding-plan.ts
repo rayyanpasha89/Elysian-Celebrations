@@ -92,6 +92,18 @@ export const PLANNER_VENDOR_CATEGORIES = [
     label: "Entertainment",
     hint: "Plan the sound, performances, and energy for the room.",
   },
+  {
+    key: "logistics",
+    slug: "travel",
+    label: "Travel and logistics",
+    hint: "Assign transport, guest movement, access, and on-ground operations support.",
+  },
+  {
+    key: "hospitality",
+    slug: "planning",
+    label: "Hospitality support",
+    hint: "Choose the team handling guest care, rooming, welcome moments, and family movement.",
+  },
 ] as const;
 
 export type PlannerVendorCategory = (typeof PLANNER_VENDOR_CATEGORIES)[number];

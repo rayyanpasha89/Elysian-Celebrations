@@ -72,7 +72,9 @@ insert into users (id, email, name, role) values
   ('seed-client-aisha', 'aisha@elysian.test', 'Aisha Khan', 'CLIENT'),
   ('seed-vendor-saffron', 'hello@saffronfilms.test', 'Saffron Films', 'VENDOR'),
   ('seed-vendor-amber', 'bookings@amberflora.test', 'Amber Flora Atelier', 'VENDOR'),
-  ('seed-vendor-wave', 'events@wavemotion.test', 'Wave Motion DJs', 'VENDOR');
+  ('seed-vendor-wave', 'events@wavemotion.test', 'Wave Motion DJs', 'VENDOR'),
+  ('seed-vendor-pravaah', 'menus@pravaah.test', 'Pravaah Hospitality Kitchens', 'VENDOR'),
+  ('seed-vendor-atlas', 'ops@atlasguest.test', 'Atlas Guest Logistics', 'VENDOR');
 
 insert into client_profiles (user_id, partner_name, wedding_date, estimated_budget, guest_count, notes) values
   ('seed-client-priya', 'Priya & Arjun', now() + interval '120 days', 4200000, 180, 'Primary cloud-testing workspace with an active planning flow.'),
@@ -129,6 +131,38 @@ insert into vendor_profiles (
     false,
     4.6,
     9
+  ),
+  (
+    'seed-vendor-pravaah',
+    'Pravaah Hospitality Kitchens',
+    'pravaah-hospitality-kitchens',
+    (select id from vendor_categories where slug = 'catering'),
+    'Destination catering with live counters, regional menus, and service teams for multi-day events.',
+    'Menu systems, tasting-led hospitality, and live-counter service for destination events.',
+    'Udaipur',
+    'Rajasthan',
+    'India',
+    12,
+    true,
+    true,
+    4.8,
+    16
+  ),
+  (
+    'seed-vendor-atlas',
+    'Atlas Guest Logistics',
+    'atlas-guest-logistics',
+    (select id from vendor_categories where slug = 'travel'),
+    'Guest transport, arrival manifests, airport pickups, rooming handoffs, and on-ground movement control.',
+    'Travel and guest-flow operators for events where movement must feel effortless.',
+    'Jaipur',
+    'Rajasthan',
+    'India',
+    10,
+    true,
+    false,
+    4.7,
+    11
   );
 
 insert into vendor_services (vendor_profile_id, name, description, base_price, max_price, unit) values
@@ -171,6 +205,80 @@ insert into vendor_services (vendor_profile_id, name, description, base_price, m
     95000,
     180000,
     'per event'
+  ),
+  (
+    (select id from vendor_profiles where slug = 'pravaah-hospitality-kitchens'),
+    'Live Counter Dinner',
+    'Regional mains, pre-meal stations, live counters, beverages, and service staffing.',
+    520000,
+    980000,
+    'per event'
+  ),
+  (
+    (select id from vendor_profiles where slug = 'pravaah-hospitality-kitchens'),
+    'Welcome Brunch Service',
+    'Relaxed brunch with fresh beverage stations, breakfast counters, and light mains.',
+    240000,
+    460000,
+    'per event'
+  ),
+  (
+    (select id from vendor_profiles where slug = 'atlas-guest-logistics'),
+    'Guest Movement Matrix',
+    'Airport pickups, shuttle loops, buggy plans, driver holding, and family movement desk.',
+    180000,
+    360000,
+    'per event'
+  );
+
+insert into vendor_service_items (vendor_service_id, item_type, name, description, dietary_tags, sort_order) values
+  (
+    (select id from vendor_services where vendor_profile_id = (select id from vendor_profiles where slug = 'pravaah-hospitality-kitchens') and name = 'Live Counter Dinner'),
+    'menu',
+    'Pre-meal welcome station',
+    'Chaat, kebab, or regional tasting counter sized for guest arrival.',
+    array['Vegetarian', 'Non-vegetarian'],
+    0
+  ),
+  (
+    (select id from vendor_services where vendor_profile_id = (select id from vendor_profiles where slug = 'pravaah-hospitality-kitchens') and name = 'Live Counter Dinner'),
+    'addon',
+    'Live main-course counters',
+    'Two chef-led counters with vegetarian, Jain, and non-vegetarian rotation.',
+    array['Vegetarian', 'Jain', 'Non-vegetarian'],
+    1
+  ),
+  (
+    (select id from vendor_services where vendor_profile_id = (select id from vendor_profiles where slug = 'pravaah-hospitality-kitchens') and name = 'Live Counter Dinner'),
+    'beverage',
+    'Mocktail and hydration bar',
+    'Signature mocktails, infused water, tea, coffee, and bar handoff.',
+    array['Vegetarian'],
+    2
+  ),
+  (
+    (select id from vendor_services where vendor_profile_id = (select id from vendor_profiles where slug = 'atlas-guest-logistics') and name = 'Guest Movement Matrix'),
+    'inclusion',
+    'Airport pickup manifest',
+    'Arrival tracking, driver assignment, guest grouping, and escalation contact.',
+    array[]::text[],
+    0
+  ),
+  (
+    (select id from vendor_services where vendor_profile_id = (select id from vendor_profiles where slug = 'atlas-guest-logistics') and name = 'Guest Movement Matrix'),
+    'inclusion',
+    'Venue shuttle loop',
+    'Buggy, shuttle, valet, and elder-access routing across event spaces.',
+    array[]::text[],
+    1
+  ),
+  (
+    (select id from vendor_services where vendor_profile_id = (select id from vendor_profiles where slug = 'atlas-guest-logistics') and name = 'Guest Movement Matrix'),
+    'deliverable',
+    'Movement command sheet',
+    'One-page guest movement sheet with timings, owners, and backup paths.',
+    array[]::text[],
+    2
   );
 
 insert into vendor_destinations (vendor_profile_id, destination_id) values
@@ -178,7 +286,11 @@ insert into vendor_destinations (vendor_profile_id, destination_id) values
   ((select id from vendor_profiles where slug = 'saffron-films'), (select id from destinations where slug = 'jaipur')),
   ((select id from vendor_profiles where slug = 'amber-flora-atelier'), (select id from destinations where slug = 'jaipur')),
   ((select id from vendor_profiles where slug = 'amber-flora-atelier'), (select id from destinations where slug = 'udaipur')),
-  ((select id from vendor_profiles where slug = 'wave-motion-djs'), (select id from destinations where slug = 'goa'));
+  ((select id from vendor_profiles where slug = 'wave-motion-djs'), (select id from destinations where slug = 'goa')),
+  ((select id from vendor_profiles where slug = 'pravaah-hospitality-kitchens'), (select id from destinations where slug = 'udaipur')),
+  ((select id from vendor_profiles where slug = 'pravaah-hospitality-kitchens'), (select id from destinations where slug = 'jaipur')),
+  ((select id from vendor_profiles where slug = 'atlas-guest-logistics'), (select id from destinations where slug = 'udaipur')),
+  ((select id from vendor_profiles where slug = 'atlas-guest-logistics'), (select id from destinations where slug = 'jaipur'));
 
 insert into weddings (client_profile_id, name, date, destination_id, package_tier_id, status) values
   (

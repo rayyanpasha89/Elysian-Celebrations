@@ -45,6 +45,8 @@ import {
   EVENT_FINALIZATION_CHECKLIST,
   EVENT_PLATFORM_TYPES,
   EVENT_REQUIREMENT_CATEGORIES,
+  EVENT_REQUIREMENT_PRIORITY_OPTIONS,
+  EVENT_REQUIREMENT_STATUS_OPTIONS,
   EVENT_TIME_BLOCKS,
   type EventRequirementCategoryKey,
   type EventTimeBlockKey,
@@ -369,11 +371,12 @@ type EventDetailDraft = {
 
 type EditorSectionKey =
   | "basics"
-  | "requirements"
   | "food"
   | "design"
-  | "vendors"
+  | "media"
+  | "entertainment"
   | "logistics"
+  | "special"
   | "tasks"
   | "notes";
 
@@ -385,32 +388,37 @@ const EDITOR_SECTIONS: {
   {
     key: "basics",
     label: "Basics",
-    helper: "Name, day, time, venue, guests, and budget.",
+    helper: "Name, day, time, venue, guests, and derived spend context.",
   },
-  // The standalone "Needs" tab was removed to cut redundancy — food, decor,
-  // vendors, and logistics each have their own dedicated section below, so a
-  // separate generic needs-checklist repeated the same categories. The
-  // underlying requirement drafts are still loaded and saved; they're just no
-  // longer surfaced as a duplicate tab.
   {
     key: "food",
     label: "Food",
-    helper: "Menus, counters, dietary notes, and service style.",
+    helper: "Pick a caterer first, then import their catalogue into menus.",
   },
   {
     key: "design",
     label: "Design",
-    helper: "Decor direction, atmosphere, and styling cues.",
+    helper: "Pick decor partners first, then shape palette and styling.",
   },
   {
-    key: "vendors",
-    label: "Vendors",
-    helper: "Pick real vendors and packages for this event.",
+    key: "media",
+    label: "Photo & film",
+    helper: "Assign the storyteller, coverage style, and visual deliverables.",
+  },
+  {
+    key: "entertainment",
+    label: "Entertainment",
+    helper: "Assign artists, music direction, production, and energy cues.",
   },
   {
     key: "logistics",
     label: "Logistics",
-    helper: "Guest movement, load-in, rooms, and backup plans.",
+    helper: "Select operations partners, transport, rooming, and backup plans.",
+  },
+  {
+    key: "special",
+    label: "Special",
+    helper: "Capture custom needs that do not fit the standard sections.",
   },
   {
     key: "tasks",
@@ -530,6 +538,53 @@ const TASK_BLUEPRINTS = [
   },
 ] as const;
 
+const MEDIA_COVERAGE_OPTIONS = [
+  { value: "Editorial prep coverage", label: "Editorial prep coverage" },
+  { value: "Family portraits", label: "Family portraits" },
+  { value: "Candid guest moments", label: "Candid guest moments" },
+  { value: "Drone / aerials", label: "Drone / aerials" },
+  { value: "Short-form reels", label: "Short-form reels" },
+  { value: "Same-day edit", label: "Same-day edit" },
+  { value: "Couple portraits", label: "Couple portraits" },
+  { value: "Aftermovie story arc", label: "Aftermovie story arc" },
+] as const;
+
+const ENTERTAINMENT_DIRECTION_OPTIONS = [
+  { value: "Welcome music", label: "Welcome music" },
+  { value: "DJ-led dance floor", label: "DJ-led dance floor" },
+  { value: "Live singer / band", label: "Live singer / band" },
+  { value: "Dhol / baraat energy", label: "Dhol / baraat energy" },
+  { value: "Emcee / host cues", label: "Emcee / host cues" },
+  { value: "Sound and lights rider", label: "Sound and lights rider" },
+  { value: "Artist green room", label: "Artist green room" },
+  { value: "After-party handoff", label: "After-party handoff" },
+] as const;
+
+const SPECIAL_REQUIREMENT_OPTIONS = [
+  { value: "VIP security", label: "VIP security" },
+  { value: "Fireworks / cold pyro", label: "Fireworks / cold pyro" },
+  { value: "Pet-friendly access", label: "Pet-friendly access" },
+  { value: "Accessibility support", label: "Accessibility support" },
+  { value: "Branding and signage", label: "Branding and signage" },
+  { value: "Kids zone", label: "Kids zone" },
+  { value: "Permit or license", label: "Permit or license" },
+  { value: "Private gifting", label: "Private gifting" },
+  { value: "Live streaming", label: "Live streaming" },
+  { value: "Cultural protocol", label: "Cultural protocol" },
+] as const;
+
+const REQUIREMENT_STATUS_CHIPS = EVENT_REQUIREMENT_STATUS_OPTIONS.map((status) => ({
+  value: status,
+  label: requirementOptionLabel(status),
+}));
+
+const REQUIREMENT_PRIORITY_CHIPS = EVENT_REQUIREMENT_PRIORITY_OPTIONS.map(
+  (priority) => ({
+    value: priority,
+    label: requirementOptionLabel(priority),
+  })
+);
+
 function blockPurposeOptionsWithCurrent(value: string) {
   return value && !BLOCK_PURPOSE_OPTIONS.includes(value)
     ? [value, ...BLOCK_PURPOSE_OPTIONS]
@@ -608,9 +663,9 @@ function createRequirementDraft(
 }
 
 function defaultRequirementDrafts() {
-  return EVENT_REQUIREMENT_CATEGORIES.map((category) =>
-    createRequirementDraft(category.key)
-  );
+  return EVENT_REQUIREMENT_CATEGORIES.filter(
+    (category) => category.key !== "custom"
+  ).map((category) => createRequirementDraft(category.key));
 }
 
 function nextAvailableTimeBlockForDay(day: WeddingDay): EventTimeBlockKey {
@@ -652,12 +707,21 @@ function emptyVendorSelections(): Record<
   PlannerVendorCategoryKey,
   VendorDraftSelection | null
 > {
-  return {
-    catering: null,
-    decor: null,
-    photography: null,
-    entertainment: null,
-  };
+  return Object.fromEntries(
+    PLANNER_VENDOR_CATEGORIES.map((category) => [category.key, null])
+  ) as Record<PlannerVendorCategoryKey, VendorDraftSelection | null>;
+}
+
+function emptyVendorOptions(): Record<
+  PlannerVendorCategoryKey,
+  VendorPlannerOption[]
+> {
+  return Object.fromEntries(
+    PLANNER_VENDOR_CATEGORIES.map((category) => [
+      category.key,
+      [] as VendorPlannerOption[],
+    ])
+  ) as Record<PlannerVendorCategoryKey, VendorPlannerOption[]>;
 }
 
 function buildDetailDraft(event: WeddingEvent): EventDetailDraft {
@@ -1206,6 +1270,87 @@ function spendEstimateCaption(estimate: SpendEstimate) {
   return `${sourceLabel}${gapLabel}${fallbackLabel}`;
 }
 
+function vendorCategorySection(
+  categoryKey: PlannerVendorCategoryKey
+): EditorSectionKey {
+  if (categoryKey === "catering") return "food";
+  if (categoryKey === "decor") return "design";
+  if (categoryKey === "photography") return "media";
+  if (categoryKey === "entertainment") return "entertainment";
+  if (categoryKey === "logistics" || categoryKey === "hospitality") {
+    return "logistics";
+  }
+  return "special";
+}
+
+function vendorCategoryForRequirement(
+  category: EventRequirementCategoryKey
+): PlannerVendorCategoryKey | null {
+  if (category === "food") return "catering";
+  if (category === "decor") return "decor";
+  if (category === "photo-video") return "photography";
+  if (category === "entertainment") return "entertainment";
+  if (category === "logistics") return "logistics";
+  if (category === "hospitality") return "hospitality";
+  return null;
+}
+
+function requirementCategoriesForVendorPlanning(event: WeddingEvent) {
+  const categories = uniqueList(
+    (event.requirements ?? []).map((requirement) => requirement.category)
+  ) as EventRequirementCategoryKey[];
+
+  if (categories.length > 0) return categories;
+
+  // Legacy events without requirement rows should still surface the main
+  // partner lanes so a user is never trapped with an empty vendor flow.
+  return [
+    "food",
+    "decor",
+    "photo-video",
+    "entertainment",
+    "hospitality",
+    "logistics",
+  ] satisfies EventRequirementCategoryKey[];
+}
+
+function vendorSelectionForCategory(
+  event: WeddingEvent,
+  categoryKey: PlannerVendorCategoryKey
+) {
+  const plannerCategory = PLANNER_VENDOR_CATEGORIES.find(
+    (category) => category.key === categoryKey
+  );
+  if (!plannerCategory) return null;
+
+  return (
+    event.vendorSelections
+      .filter((selection) => selection.vendor?.categorySlug === plannerCategory.slug)
+      .at(-1) ?? null
+  );
+}
+
+function firstMissingVendorCategory(event: WeddingEvent | null) {
+  if (!event) return null;
+
+  const requiredVendorCategories = uniqueList(
+    requirementCategoriesForVendorPlanning(event)
+      .map(vendorCategoryForRequirement)
+      .filter((category): category is PlannerVendorCategoryKey => Boolean(category))
+  ) as PlannerVendorCategoryKey[];
+
+  return (
+    requiredVendorCategories.find(
+      (categoryKey) => !vendorSelectionForCategory(event, categoryKey)
+    ) ?? null
+  );
+}
+
+function firstVendorGapSection(event: WeddingEvent | null): EditorSectionKey {
+  const missingCategory = firstMissingVendorCategory(event);
+  return missingCategory ? vendorCategorySection(missingCategory) : "food";
+}
+
 function nextBestPlannerAction(
   event: WeddingEvent | null,
   estimate: SpendEstimate | null
@@ -1252,18 +1397,24 @@ function nextBestPlannerAction(
   if (needsFood && event.menus.length === 0) {
     return {
       label: "Next best action",
-      value: "Apply a menu starter",
-      detail: "Use one-tap menu blueprints before customizing counters and diets.",
+      value: "Pick the caterer first",
+      detail:
+        "Choose a catering partner or package, then import their catalogue rows into menus.",
       section: "food",
     };
   }
 
-  if (event.vendorSelections.length === 0) {
+  const missingVendorCategory = firstMissingVendorCategory(event);
+  if (missingVendorCategory) {
+    const category = PLANNER_VENDOR_CATEGORIES.find(
+      (entry) => entry.key === missingVendorCategory
+    );
     return {
       label: "Next best action",
-      value: "Pick vendor packages",
-      detail: "Vendor cards pull real services and catalogue rows into this block.",
-      section: "vendors",
+      value: `Choose ${category?.label.toLowerCase() ?? "partner"} package`,
+      detail:
+        "Each section now starts with its own partner cards, then customization happens under that choice.",
+      section: vendorCategorySection(missingVendorCategory),
     };
   }
 
@@ -1271,8 +1422,8 @@ function nextBestPlannerAction(
     return {
       label: "Next best action",
       value: "Resolve pricing gaps",
-      detail: "Choose packages with published prices or confirm quotes in bookings.",
-      section: "vendors",
+      detail: "Choose packages with published prices inside each requirement section.",
+      section: firstVendorGapSection(event),
     };
   }
 
@@ -1325,6 +1476,13 @@ function orderVendorOptionsByShortlist(
       if (leftSaved !== rightSaved) return leftSaved - rightSaved;
       return (right.rating ?? 0) - (left.rating ?? 0);
     });
+}
+
+function requirementOptionLabel(value: string) {
+  return value
+    .toLowerCase()
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function uniqueList(values: string[]) {
@@ -1449,9 +1607,7 @@ function menuDraftFromVendorService({
 }
 
 function importTargetSection(categoryKey: PlannerVendorCategoryKey): EditorSectionKey {
-  if (categoryKey === "catering") return "food";
-  if (categoryKey === "decor") return "design";
-  return "notes";
+  return vendorCategorySection(categoryKey);
 }
 
 export default function ClientWeddingPage() {
@@ -1488,12 +1644,7 @@ export default function ClientWeddingPage() {
   const [vendorOptionsLoading, setVendorOptionsLoading] = useState(false);
   const [vendorOptions, setVendorOptions] = useState<
     Record<PlannerVendorCategoryKey, VendorPlannerOption[]>
-  >({
-    catering: [],
-    decor: [],
-    photography: [],
-    entertainment: [],
-  });
+  >(emptyVendorOptions);
   const [savedVendorSlugs, setSavedVendorSlugs] = useState<string[]>([]);
   const [venueOptionsLoading, setVenueOptionsLoading] = useState(false);
   const [venueOptions, setVenueOptions] = useState<VenueOption[]>([]);
@@ -1610,14 +1761,12 @@ export default function ClientWeddingPage() {
         );
 
         if (!cancelled) {
-          setVendorOptions({
-            catering: entries.find((entry) => entry[0] === "catering")?.[1] ?? [],
-            decor: entries.find((entry) => entry[0] === "decor")?.[1] ?? [],
-            photography:
-              entries.find((entry) => entry[0] === "photography")?.[1] ?? [],
-            entertainment:
-              entries.find((entry) => entry[0] === "entertainment")?.[1] ?? [],
-          });
+          setVendorOptions(
+            Object.fromEntries(entries) as Record<
+              PlannerVendorCategoryKey,
+              VendorPlannerOption[]
+            >
+          );
         }
       } catch (error) {
         if (!cancelled) {
@@ -1772,7 +1921,7 @@ export default function ClientWeddingPage() {
   }, [selectedEvent]);
 
   // Hide the dedicated sections for needs the client didn't ask for. Cross-cutting
-  // sections (basics, vendors, tasks, notes) always show. If the event carries no
+  // sections (basics, special, tasks, notes) always show. If the event carries no
   // requirement rows at all — legacy plans, or a block created with zero needs —
   // we show everything so nothing is silently unreachable.
   const visibleEditorSections = useMemo(() => {
@@ -1781,8 +1930,15 @@ export default function ClientWeddingPage() {
       if (section.key === "food") return activeRequirementCategories.has("food");
       if (section.key === "design")
         return activeRequirementCategories.has("decor");
+      if (section.key === "media")
+        return activeRequirementCategories.has("photo-video");
+      if (section.key === "entertainment")
+        return activeRequirementCategories.has("entertainment");
       if (section.key === "logistics")
-        return activeRequirementCategories.has("logistics");
+        return (
+          activeRequirementCategories.has("logistics") ||
+          activeRequirementCategories.has("hospitality")
+        );
       return true;
     });
   }, [activeRequirementCategories]);
@@ -1802,10 +1958,11 @@ export default function ClientWeddingPage() {
       if (!selectedEventId && firstEvent) {
         setSelectedEventId(firstEvent.id);
       }
+      const targetEvent = selectedEvent ?? firstEvent;
 
       const sectionByCheck: Record<string, EditorSectionKey> = {
         requirements: "food",
-        vendors: "vendors",
+        vendors: firstVendorGapSection(targetEvent),
         budget: "basics",
         "guests-hotels": "logistics",
         "run-of-show": "tasks",
@@ -1814,7 +1971,7 @@ export default function ClientWeddingPage() {
       setLayer("requirements");
       setEditorSection(sectionByCheck[checkKey] ?? "basics");
     },
-    [days, selectedEventId]
+    [days, selectedEvent, selectedEventId]
   );
 
   // Keep the active section within the set the selected event actually exposes,
@@ -2340,6 +2497,68 @@ export default function ClientWeddingPage() {
     );
   };
 
+  const addPlanningNoteBlock = (title: string, lines: string[]) => {
+    setDetailDraft((current) =>
+      current
+        ? {
+            ...current,
+            notes: appendPlanningBlock(current.notes, title, lines),
+          }
+        : current
+    );
+    toast.success(`${title} added to planning notes`);
+  };
+
+  const addSpecialRequirement = (title?: string) => {
+    setDetailDraft((current) => {
+      if (!current) return current;
+      const baseRequirement = createRequirementDraft("custom");
+      return {
+        ...current,
+        requirements: [
+          ...current.requirements,
+          {
+            ...baseRequirement,
+            title: title ?? baseRequirement.title,
+            priority: "HIGH",
+            notes:
+              title && title !== baseRequirement.title
+                ? "Describe the exact owner, approval, vendor, or operating detail needed for this special requirement."
+                : baseRequirement.notes,
+          },
+        ],
+      };
+    });
+  };
+
+  const updateRequirementDraft = (
+    clientId: string,
+    updates: Partial<EventRequirementDraft>
+  ) => {
+    setDetailDraft((current) =>
+      current
+        ? {
+            ...current,
+            requirements: current.requirements.map((requirement) =>
+              requirement.clientId === clientId
+                ? { ...requirement, ...updates }
+                : requirement
+            ),
+          }
+        : current
+    );
+  };
+
+  const removeRequirementDraft = (clientId: string) => {
+    setDetailDraft((current) => {
+      if (!current) return current;
+      const nextRequirements = current.requirements.filter(
+        (requirement) => requirement.clientId !== clientId
+      );
+      return { ...current, requirements: nextRequirements };
+    });
+  };
+
   const addMenu = () => {
     setDetailDraft((current) =>
       current
@@ -2460,6 +2679,36 @@ export default function ClientWeddingPage() {
         return {
           ...current,
           decorNotes: appendPlanningBlock(current.decorNotes, title, lines),
+          tasks: nextTasks,
+        };
+      }
+
+      if (categoryKey === "logistics") {
+        return {
+          ...current,
+          logistics: {
+            ...current.logistics,
+            transportNotes: appendPlanningBlock(
+              current.logistics.transportNotes,
+              title,
+              lines
+            ),
+          },
+          tasks: nextTasks,
+        };
+      }
+
+      if (categoryKey === "hospitality") {
+        return {
+          ...current,
+          logistics: {
+            ...current.logistics,
+            roomingNotes: appendPlanningBlock(
+              current.logistics.roomingNotes,
+              title,
+              lines
+            ),
+          },
           tasks: nextTasks,
         };
       }
@@ -3512,7 +3761,7 @@ export default function ClientWeddingPage() {
                     </p>
                   </div>
                   <div className="border border-charcoal/8 bg-cream/35 p-3">
-                    <p className={dashLabel}>Vendors</p>
+                    <p className={dashLabel}>Partners</p>
                     <p className="mt-1 font-display text-lg text-charcoal">
                       {Object.values(detailDraft.vendorSelections).filter(Boolean).length}
                     </p>
@@ -3706,15 +3955,41 @@ export default function ClientWeddingPage() {
 	                  <div>
 	                    <p className={dashLabel}>Food and menu</p>
 	                    <p className="mt-1 text-sm text-slate">
-	                      Shape how hospitality should feel for this function.
+	                      Start with the caterer&apos;s real catalogue, then
+                        customize menus and dietary details below.
 	                    </p>
 	                  </div>
+
+                  <EmbeddedVendorPlanner
+                    categoryKey="catering"
+                    selectedEvent={selectedEvent}
+                    selection={detailDraft.vendorSelections.catering}
+                    options={vendorOptions.catering ?? []}
+                    savedSlugs={savedVendorSlugs}
+                    loading={vendorOptionsLoading}
+                    intro="Pick a catering partner or package before editing dishes. Imported catalogue rows become menu items, dietary tags, and menu notes."
+                    onSelectVendor={(vendor) =>
+                      selectPlannerVendor("catering", vendor)
+                    }
+                    onClearVendor={() => selectPlannerVendor("catering", null)}
+                    onSelectService={(serviceId) =>
+                      selectPlannerService("catering", serviceId)
+                    }
+                    onApplyService={(vendor, service, selectedItemIds) =>
+                      applyVendorServiceToPlan({
+                        categoryKey: "catering",
+                        vendor,
+                        service,
+                        selectedItemIds,
+                      })
+                    }
+                  />
 
                   <div className="border border-gold-primary/20 bg-gold-primary/5 p-3">
                     <p className={dashLabel}>Quick menu starters</p>
                     <p className="mt-1 text-xs leading-relaxed text-slate">
-                      Add a complete menu skeleton first, then fine-tune instead
-                      of typing every station from zero.
+                      If no caterer package is ready yet, use a skeleton and
+                      fine-tune instead of typing every station from zero.
                     </p>
                     <div className="mt-3 grid gap-2 md:grid-cols-3">
                       {MENU_BLUEPRINTS.map((blueprint) => (
@@ -3969,9 +4244,35 @@ export default function ClientWeddingPage() {
                   <div>
                     <p className={dashLabel}>Decor and atmosphere</p>
                     <p className="mt-1 text-sm text-slate">
-                      Translate the mood into something vendors can execute.
+                      Choose the design partner first, then translate the mood
+                      into palette, installations, and styling cues.
                     </p>
                   </div>
+
+                  <EmbeddedVendorPlanner
+                    categoryKey="decor"
+                    selectedEvent={selectedEvent}
+                    selection={detailDraft.vendorSelections.decor}
+                    options={vendorOptions.decor ?? []}
+                    savedSlugs={savedVendorSlugs}
+                    loading={vendorOptionsLoading}
+                    intro="Pick the decor or floral partner before styling the block. Imported setups are added to the design brief."
+                    onSelectVendor={(vendor) =>
+                      selectPlannerVendor("decor", vendor)
+                    }
+                    onClearVendor={() => selectPlannerVendor("decor", null)}
+                    onSelectService={(serviceId) =>
+                      selectPlannerService("decor", serviceId)
+                    }
+                    onApplyService={(vendor, service, selectedItemIds) =>
+                      applyVendorServiceToPlan({
+                        categoryKey: "decor",
+                        vendor,
+                        service,
+                        selectedItemIds,
+                      })
+                    }
+                  />
 
                   <Field label="Decor direction">
                     <ChipSingleSelect
@@ -4068,149 +4369,130 @@ export default function ClientWeddingPage() {
 
                 ) : null}
 
-                {editorSection === "vendors" ? (
-                <div className="space-y-4 border-t border-charcoal/8 pt-5">
-                  <div className="flex items-start justify-between gap-3">
+                {editorSection === "media" ? (
+                  <div className="space-y-4 border-t border-charcoal/8 pt-5">
                     <div>
-                      <p className={dashLabel}>Vendor planning</p>
+                      <p className={dashLabel}>Photo and film</p>
                       <p className="mt-1 text-sm text-slate">
-                        Match real vendors and services to this event.
+                        Choose the storyteller first, then define the exact
+                        coverage moments this block needs.
                       </p>
                     </div>
-                    {vendorOptionsLoading ? (
-                      <p className="text-xs text-slate">Loading vendors...</p>
-                    ) : null}
-                  </div>
 
-	                  {PLANNER_VENDOR_CATEGORIES.map((category) => {
-	                    const selection = detailDraft.vendorSelections[category.key];
-	                    const options = orderVendorOptionsByShortlist(
-	                      vendorOptions[category.key] ?? [],
-	                      savedVendorSlugs
-	                    );
-	                    const currentBookingSelection =
-	                      selectedEvent?.vendorSelections
-	                        .filter(
-                          (entry) => entry.vendor?.categorySlug === category.slug
-                        )
-                        .at(-1) ?? null;
-                    const selectedVendor =
-                      options.find(
-                        (option) => option.id === selection?.vendorProfileId
-                      ) ?? null;
+                    <EmbeddedVendorPlanner
+                      categoryKey="photography"
+                      selectedEvent={selectedEvent}
+                      selection={detailDraft.vendorSelections.photography}
+                      options={vendorOptions.photography ?? []}
+                      savedSlugs={savedVendorSlugs}
+                      loading={vendorOptionsLoading}
+                      intro="Pick the photo/film team before adding coverage notes. Imported rows become a concrete coverage brief."
+                      onSelectVendor={(vendor) =>
+                        selectPlannerVendor("photography", vendor)
+                      }
+                      onClearVendor={() =>
+                        selectPlannerVendor("photography", null)
+                      }
+                      onSelectService={(serviceId) =>
+                        selectPlannerService("photography", serviceId)
+                      }
+                      onApplyService={(vendor, service, selectedItemIds) =>
+                        applyVendorServiceToPlan({
+                          categoryKey: "photography",
+                          vendor,
+                          service,
+                          selectedItemIds,
+                        })
+                      }
+                    />
 
-                    return (
-	                      <div key={category.key} className="border border-charcoal/10 p-4">
-	                        <p className="font-display text-lg text-charcoal">
-	                          {category.label}
-	                        </p>
-	                        <p className="mt-1 text-sm text-slate">{category.hint}</p>
-
-	                        <div className="mt-3 space-y-3">
-	                          <VendorOptionCards
-	                            categoryLabel={category.label}
-	                            options={options}
-	                            savedSlugs={savedVendorSlugs}
-	                            selectedVendorId={selection?.vendorProfileId ?? ""}
-	                            onSelect={(vendor) =>
-	                              selectPlannerVendor(category.key, vendor)
-	                            }
-	                            onClear={() => selectPlannerVendor(category.key, null)}
-	                          />
-
-	                          {selectedVendor ? (
-	                            <>
-	                              <div className="border border-charcoal/10 bg-cream/35 p-3">
-                                <div className="flex flex-wrap items-start justify-between gap-2">
-                                  <div className="min-w-0">
-                                    <p className="font-heading text-sm text-charcoal">
-                                      {selectedVendor.business_name}
-                                    </p>
-                                    <p className="mt-1 text-xs text-slate">
-                                      {selectedVendor.city ?? "Destination ready"}
-                                      {selectedVendor.rating
-                                        ? ` · ${selectedVendor.rating.toFixed(1)} rating`
-                                        : ""}
-                                    </p>
-                                  </div>
-                                  <span className="font-accent border border-gold-primary/40 bg-gold-primary/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-gold-dark">
-                                    {selectedVendor.services.length}{" "}
-                                    {selectedVendor.services.length === 1
-                                      ? "service"
-                                      : "services"}
-                                  </span>
-                                </div>
-                                {currentBookingSelection ? (
-                                  <p className="mt-2 text-xs text-slate">
-                                    Current booking status:{" "}
-                                    {formatBookingStatus(currentBookingSelection.status)}
-	                                  </p>
-	                                ) : null}
-	                              </div>
-
-	                              <ServiceOptionCards
-	                                services={selectedVendor.services}
-	                                selectedServiceId={selection?.vendorServiceId ?? ""}
-	                                onSelect={(serviceId) =>
-	                                  selectPlannerService(category.key, serviceId)
-	                                }
-	                              />
-
-	                              {selection?.vendorServiceId ? (
-	                                <div className="border border-charcoal/10 p-3">
-                                  {selectedVendor.services
-                                    .filter(
-                                      (service) =>
-                                        service.id === selection.vendorServiceId
-                                    )
-                                    .map((service) => (
-                                      <ServiceOfferingPreview
-                                        key={service.id}
-                                        categoryKey={category.key}
-                                        vendorName={selectedVendor.business_name}
-                                        service={service}
-                                        onUseSelection={(selectedItemIds) =>
-                                          applyVendorServiceToPlan({
-                                            categoryKey: category.key,
-                                            vendor: selectedVendor,
-                                            service,
-                                            selectedItemIds,
-                                          })
-                                        }
-                                      />
-                                    ))}
-                                </div>
-                              ) : (
-                                <div className="border border-dashed border-charcoal/15 bg-cream/25 p-3">
-                                  <p className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
-                                    Pick a service
-                                  </p>
-                                  <p className="mt-1 text-xs leading-relaxed text-slate">
-                                    Choose a package above to see {selectedVendor.business_name}&apos;s scope,
-                                    inclusions, deliverables, and itemized rows
-                                    you can pull into this event.
-                                  </p>
-                                </div>
-                              )}
-                            </>
-                          ) : (
-                            <div className="border border-dashed border-charcoal/15 bg-cream/25 p-4">
-                              <p className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
-                                No vendor picked yet
-                              </p>
-                              <p className="mt-2 text-xs leading-relaxed text-slate">
-                                {category.hint} Once selected, their real
-                                catalogue rows can be imported into this event
-                                plan.
-                              </p>
-                            </div>
-                          )}
-                        </div>
+                    <div className="border border-charcoal/10 bg-cream/30 p-4">
+                      <p className={dashLabel}>Coverage cues</p>
+                      <p className="mt-1 text-xs leading-relaxed text-slate">
+                        Tap the moments you want captured. These are added to
+                        planning notes without needing a blank brief.
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {MEDIA_COVERAGE_OPTIONS.map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() =>
+                              addPlanningNoteBlock("Photo and film coverage", [
+                                option.label,
+                              ])
+                            }
+                            className="border border-charcoal/10 bg-ivory/75 px-3 py-2 font-heading text-xs text-charcoal transition-colors hover:border-gold-primary/45"
+                          >
+                            + {option.label}
+                          </button>
+                        ))}
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  </div>
+                ) : null}
 
+                {editorSection === "entertainment" ? (
+                  <div className="space-y-4 border-t border-charcoal/8 pt-5">
+                    <div>
+                      <p className={dashLabel}>Entertainment and production</p>
+                      <p className="mt-1 text-sm text-slate">
+                        Select the energy partner first, then define show flow,
+                        artist needs, and technical cues.
+                      </p>
+                    </div>
+
+                    <EmbeddedVendorPlanner
+                      categoryKey="entertainment"
+                      selectedEvent={selectedEvent}
+                      selection={detailDraft.vendorSelections.entertainment}
+                      options={vendorOptions.entertainment ?? []}
+                      savedSlugs={savedVendorSlugs}
+                      loading={vendorOptionsLoading}
+                      intro="Pick the entertainment or production partner before customizing music direction and show flow."
+                      onSelectVendor={(vendor) =>
+                        selectPlannerVendor("entertainment", vendor)
+                      }
+                      onClearVendor={() =>
+                        selectPlannerVendor("entertainment", null)
+                      }
+                      onSelectService={(serviceId) =>
+                        selectPlannerService("entertainment", serviceId)
+                      }
+                      onApplyService={(vendor, service, selectedItemIds) =>
+                        applyVendorServiceToPlan({
+                          categoryKey: "entertainment",
+                          vendor,
+                          service,
+                          selectedItemIds,
+                        })
+                      }
+                    />
+
+                    <div className="border border-charcoal/10 bg-cream/30 p-4">
+                      <p className={dashLabel}>Energy and show cues</p>
+                      <p className="mt-1 text-xs leading-relaxed text-slate">
+                        Add performance, sound, and flow requirements from
+                        presets before writing anything custom.
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {ENTERTAINMENT_DIRECTION_OPTIONS.map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() =>
+                              addPlanningNoteBlock("Entertainment direction", [
+                                option.label,
+                              ])
+                            }
+                            className="border border-charcoal/10 bg-ivory/75 px-3 py-2 font-heading text-xs text-charcoal transition-colors hover:border-gold-primary/45"
+                          >
+                            + {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 ) : null}
 
                 {editorSection === "logistics" ? (
@@ -4218,10 +4500,62 @@ export default function ClientWeddingPage() {
 	                  <div>
 	                    <p className={dashLabel}>Logistics</p>
 	                    <p className="mt-1 text-sm text-slate">
-	                      Keep guest movement, vendor access, and family timing tied
-	                      to this event.
+	                      Select operations support first, then define guest
+                        movement, rooming, vendor access, and backup plans.
 	                    </p>
 	                  </div>
+
+                  <EmbeddedVendorPlanner
+                    categoryKey="logistics"
+                    selectedEvent={selectedEvent}
+                    selection={detailDraft.vendorSelections.logistics}
+                    options={vendorOptions.logistics ?? []}
+                    savedSlugs={savedVendorSlugs}
+                    loading={vendorOptionsLoading}
+                    intro="Pick a travel or logistics partner before adjusting transport, access, and movement details."
+                    onSelectVendor={(vendor) =>
+                      selectPlannerVendor("logistics", vendor)
+                    }
+                    onClearVendor={() => selectPlannerVendor("logistics", null)}
+                    onSelectService={(serviceId) =>
+                      selectPlannerService("logistics", serviceId)
+                    }
+                    onApplyService={(vendor, service, selectedItemIds) =>
+                      applyVendorServiceToPlan({
+                        categoryKey: "logistics",
+                        vendor,
+                        service,
+                        selectedItemIds,
+                      })
+                    }
+                  />
+
+                  <EmbeddedVendorPlanner
+                    categoryKey="hospitality"
+                    selectedEvent={selectedEvent}
+                    selection={detailDraft.vendorSelections.hospitality}
+                    options={vendorOptions.hospitality ?? []}
+                    savedSlugs={savedVendorSlugs}
+                    loading={vendorOptionsLoading}
+                    intro="Use this for rooming, welcome amenities, family movement, on-ground guest care, and planning-led hospitality."
+                    onSelectVendor={(vendor) =>
+                      selectPlannerVendor("hospitality", vendor)
+                    }
+                    onClearVendor={() =>
+                      selectPlannerVendor("hospitality", null)
+                    }
+                    onSelectService={(serviceId) =>
+                      selectPlannerService("hospitality", serviceId)
+                    }
+                    onApplyService={(vendor, service, selectedItemIds) =>
+                      applyVendorServiceToPlan({
+                        categoryKey: "hospitality",
+                        vendor,
+                        service,
+                        selectedItemIds,
+                      })
+                    }
+                  />
 
                   <div className="border border-gold-primary/20 bg-gold-primary/5 p-3">
                     <p className={dashLabel}>Logistics presets</p>
@@ -4349,6 +4683,156 @@ export default function ClientWeddingPage() {
                   </div>
                 </div>
 
+                ) : null}
+
+                {editorSection === "special" ? (
+                  <div className="space-y-4 border-t border-charcoal/8 pt-5">
+                    <div>
+                      <p className={dashLabel}>Special requirements</p>
+                      <p className="mt-1 text-sm text-slate">
+                        Use this only for unusual needs that do not fit food,
+                        design, photo/film, entertainment, or logistics.
+                      </p>
+                    </div>
+
+                    <div className="border border-gold-primary/20 bg-gold-primary/5 p-4">
+                      <p className={dashLabel}>Add a special need</p>
+                      <p className="mt-1 text-xs leading-relaxed text-slate">
+                        Start from a preset so the plan stays structured. Custom
+                        is still available for truly unique requests.
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {SPECIAL_REQUIREMENT_OPTIONS.map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => addSpecialRequirement(option.label)}
+                            className="border border-charcoal/10 bg-ivory/75 px-3 py-2 font-heading text-xs text-charcoal transition-colors hover:border-gold-primary/45"
+                          >
+                            + {option.label}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        className="mt-3 border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.16em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark"
+                        onClick={() => addSpecialRequirement()}
+                      >
+                        Add custom special need
+                      </button>
+                    </div>
+
+                    <div className="border border-charcoal/10 bg-cream/30 p-4">
+                      <p className={dashLabel}>Standard needs active</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {detailDraft.requirements
+                          .filter((requirement) => requirement.category !== "custom")
+                          .map((requirement) => (
+                            <span
+                              key={requirement.clientId}
+                              className="border border-charcoal/10 bg-ivory/75 px-2 py-1 font-heading text-[11px] text-slate"
+                            >
+                              {requirement.title}
+                            </span>
+                          ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      {detailDraft.requirements.filter(
+                        (requirement) => requirement.category === "custom"
+                      ).length === 0 ? (
+                        <div className="border border-dashed border-charcoal/15 bg-cream/25 p-4">
+                          <p className={dashLabel}>No special needs yet</p>
+                          <p className="mt-2 text-xs leading-relaxed text-slate">
+                            That is good. Keep this section empty unless the
+                            event needs something outside the standard flow.
+                          </p>
+                        </div>
+                      ) : null}
+
+                      {detailDraft.requirements
+                        .filter((requirement) => requirement.category === "custom")
+                        .map((requirement, requirementIndex) => (
+                          <div
+                            key={requirement.clientId}
+                            className="space-y-3 border border-charcoal/10 bg-cream/30 p-4"
+                          >
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div>
+                                <p className={dashLabel}>
+                                  Special need {requirementIndex + 1}
+                                </p>
+                                <p className="mt-1 text-xs text-slate">
+                                  Keep ownership, vendor, permit, and approval
+                                  details in one card.
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                className="border border-rose/30 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.16em] text-rose transition-colors hover:bg-rose hover:text-ivory"
+                                onClick={() =>
+                                  removeRequirementDraft(requirement.clientId)
+                                }
+                              >
+                                Remove
+                              </button>
+                            </div>
+
+                            <PresetTagInput
+                              suggestions={[...SPECIAL_REQUIREMENT_OPTIONS]}
+                              value={requirement.title ? [requirement.title] : []}
+                              onChange={(titles) =>
+                                updateRequirementDraft(requirement.clientId, {
+                                  title: titles.at(-1) ?? "",
+                                })
+                              }
+                              placeholder="Name this special need"
+                            />
+
+                            <div className="grid gap-3 md:grid-cols-2">
+                              <Field label="Status">
+                                <ChipSingleSelect
+                                  options={REQUIREMENT_STATUS_CHIPS}
+                                  value={requirement.status}
+                                  allowClear={false}
+                                  onChange={(status) =>
+                                    updateRequirementDraft(requirement.clientId, {
+                                      status: status ?? "DRAFT",
+                                    })
+                                  }
+                                />
+                              </Field>
+                              <Field label="Priority">
+                                <ChipSingleSelect
+                                  options={REQUIREMENT_PRIORITY_CHIPS}
+                                  value={requirement.priority}
+                                  allowClear={false}
+                                  onChange={(priority) =>
+                                    updateRequirementDraft(requirement.clientId, {
+                                      priority: priority ?? "NORMAL",
+                                    })
+                                  }
+                                />
+                              </Field>
+                            </div>
+
+                            <Field label="Specific instruction">
+                              <textarea
+                                value={requirement.notes}
+                                onChange={(event) =>
+                                  updateRequirementDraft(requirement.clientId, {
+                                    notes: event.target.value,
+                                  })
+                                }
+                                className="min-h-[88px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                                placeholder="Who owns it, which vendor or permit is needed, timing, approvals, and any non-negotiables..."
+                              />
+                            </Field>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
                 ) : null}
 
                 {editorSection === "tasks" ? (
@@ -4549,9 +5033,10 @@ export default function ClientWeddingPage() {
                   What to do next
                 </p>
                 <p className="mt-2 font-heading text-sm text-charcoal">
-                  Pick an event from the day cards above to open the seven-step
+                  Pick an event from the day cards above to open the guided
                   editor — start with <span className="text-gold-dark">Basics</span>{" "}
-                  for guest count and venue, then move down to vendors and tasks.
+                  for guest count and venue, then move through each requirement&apos;s
+                  partner and customization flow.
                 </p>
               </div>
             )}
@@ -4610,7 +5095,7 @@ function LayerTwoGuidance({
         "Choose a venue card first; only use custom text for unpublished spaces.",
     },
     {
-      label: "Select vendors",
+      label: "Choose partners in-section",
       value:
         savedVendorCount > 0
           ? `${savedVendorCount} shortlisted vendor${
@@ -4618,7 +5103,7 @@ function LayerTwoGuidance({
             } prioritized`
           : "Curated vendors ready",
       detail:
-        "Vendor and package cards import real catalogue rows into menus, decor, and notes.",
+        "Food, design, photo/film, entertainment, and logistics each start with partner cards.",
     },
     {
       label: nextAction.label,
@@ -4804,6 +5289,146 @@ function VenuePicker({
           Selected from venue catalogue: {selectedVenue.name}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+function EmbeddedVendorPlanner({
+  categoryKey,
+  selectedEvent,
+  selection,
+  options,
+  savedSlugs,
+  loading,
+  intro,
+  onSelectVendor,
+  onClearVendor,
+  onSelectService,
+  onApplyService,
+}: {
+  categoryKey: PlannerVendorCategoryKey;
+  selectedEvent: WeddingEvent | null;
+  selection: VendorDraftSelection | null;
+  options: VendorPlannerOption[];
+  savedSlugs: string[];
+  loading: boolean;
+  intro: string;
+  onSelectVendor: (vendor: VendorPlannerOption) => void;
+  onClearVendor: () => void;
+  onSelectService: (serviceId: string) => void;
+  onApplyService: (
+    vendor: VendorPlannerOption,
+    service: VendorPlannerService,
+    selectedItemIds: string[]
+  ) => void;
+}) {
+  const category = PLANNER_VENDOR_CATEGORIES.find(
+    (entry) => entry.key === categoryKey
+  );
+  if (!category) return null;
+
+  const orderedOptions = orderVendorOptionsByShortlist(options, savedSlugs);
+  const currentBookingSelection =
+    selectedEvent?.vendorSelections
+      .filter((entry) => entry.vendor?.categorySlug === category.slug)
+      .at(-1) ?? null;
+  const selectedVendor =
+    orderedOptions.find((option) => option.id === selection?.vendorProfileId) ??
+    null;
+  const selectedService = selectedVendor?.services.find(
+    (service) => service.id === selection?.vendorServiceId
+  );
+
+  return (
+    <div className="border border-gold-primary/20 bg-gold-primary/5 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className={dashLabel}>{category.label} partner</p>
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate">
+            {intro}
+          </p>
+        </div>
+        {loading ? (
+          <span className="border border-charcoal/10 bg-ivory/70 px-2 py-1 font-heading text-[11px] text-slate">
+            Loading partners...
+          </span>
+        ) : currentBookingSelection ? (
+          <span className="border border-gold-primary/35 bg-ivory/80 px-2 py-1 font-heading text-[11px] text-gold-dark">
+            {formatBookingStatus(currentBookingSelection.status)}
+          </span>
+        ) : null}
+      </div>
+
+      <div className="mt-4 space-y-3">
+        <VendorOptionCards
+          categoryLabel={category.label}
+          options={orderedOptions}
+          savedSlugs={savedSlugs}
+          selectedVendorId={selection?.vendorProfileId ?? ""}
+          onSelect={onSelectVendor}
+          onClear={onClearVendor}
+        />
+
+        {selectedVendor ? (
+          <>
+            <div className="border border-charcoal/10 bg-ivory/70 p-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-heading text-sm text-charcoal">
+                    {selectedVendor.business_name}
+                  </p>
+                  <p className="mt-1 text-xs text-slate">
+                    {selectedVendor.city ?? "Destination ready"}
+                    {selectedVendor.rating
+                      ? ` · ${selectedVendor.rating.toFixed(1)} rating`
+                      : ""}
+                  </p>
+                </div>
+                <span className="border border-gold-primary/40 bg-gold-primary/8 px-2 py-1 font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark">
+                  {selectedVendor.services.length}{" "}
+                  {selectedVendor.services.length === 1 ? "service" : "services"}
+                </span>
+              </div>
+            </div>
+
+            <ServiceOptionCards
+              services={selectedVendor.services}
+              selectedServiceId={selection?.vendorServiceId ?? ""}
+              onSelect={onSelectService}
+            />
+
+            {selectedService ? (
+              <div className="border border-charcoal/10 bg-ivory/75 p-3">
+                <ServiceOfferingPreview
+                  categoryKey={category.key}
+                  vendorName={selectedVendor.business_name}
+                  service={selectedService}
+                  onUseSelection={(selectedItemIds) =>
+                    onApplyService(selectedVendor, selectedService, selectedItemIds)
+                  }
+                />
+              </div>
+            ) : (
+              <div className="border border-dashed border-charcoal/15 bg-ivory/60 p-3">
+                <p className={dashLabel}>Pick a package</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate">
+                  Choose one of {selectedVendor.business_name}&apos;s packages to
+                  see scope, inclusions, deliverables, and catalogue rows that
+                  can be imported into this event.
+                </p>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="border border-dashed border-charcoal/15 bg-ivory/60 p-4">
+            <p className={dashLabel}>No partner selected yet</p>
+            <p className="mt-2 text-xs leading-relaxed text-slate">
+              {category.hint} Shortlisted partners appear first, so the couple
+              can choose from real options instead of typing vendor names.
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -5210,6 +5835,8 @@ function importActionLabel(
   if (categoryKey === "catering") return "Add selected rows to menu";
   if (categoryKey === "decor") return "Add selected setups to design";
   if (categoryKey === "photography") return "Add selected coverage to notes";
+  if (categoryKey === "logistics") return "Add selected logistics to plan";
+  if (categoryKey === "hospitality") return "Add selected hospitality to plan";
   return "Add selected sets to notes";
 }
 
@@ -5365,14 +5992,8 @@ function computeFinalizationChecks(
   const draftHospitalityRequirements = hospitalityRequirements.filter(
     (requirement) => requirement.status === "DRAFT"
   ).length;
-  const missingVendors = allEvents.filter(
-    (event) =>
-      event.vendorSelections.length === 0 &&
-      !(event.requirements ?? []).some(
-        (requirement) =>
-          Boolean(requirement.vendorProfileId) ||
-          Boolean(requirement.vendorServiceId)
-      )
+  const missingVendors = allEvents.filter((event) =>
+    Boolean(firstMissingVendorCategory(event))
   ).length;
   const missingFoodMenus = allEvents.filter((event) => {
     const needsFood = (event.requirements ?? []).some(
@@ -5468,7 +6089,7 @@ function computeFinalizationChecks(
           label: entry.label,
           description: entry.description,
           status: missingVendors === 0 && totalEvents > 0 ? "ok" : "partial",
-          detail: `${missingVendors} of ${totalEvents} block(s) still need a vendor or service link.`,
+          detail: `${missingVendors} of ${totalEvents} block(s) still have a partner or package gap.`,
         };
       case "budget":
         return {

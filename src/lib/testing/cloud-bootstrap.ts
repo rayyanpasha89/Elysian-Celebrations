@@ -794,6 +794,52 @@ const VENDOR_FIXTURES: VendorFixture[] = [
     ],
   },
   {
+    key: "atlas-guest-logistics",
+    label: "Atlas Guest Logistics",
+    email: "testing+atlas-logistics@elysiancelebrations.app",
+    firstName: "Aarav",
+    lastName: "Mehta",
+    role: "VENDOR",
+    defaultRoute: "/vendor",
+    businessName: "Atlas Guest Logistics",
+    slug: "atlas-guest-logistics",
+    categorySlug: "travel",
+    description:
+      "Guest movement, airport pickups, rooming handoffs, driver manifests, and on-ground access control for destination events.",
+    shortBio: "Travel and logistics operators for guest-heavy destination programmes.",
+    city: "Jaipur",
+    state: "Rajasthan",
+    experience: 10,
+    isVerified: true,
+    isFeatured: false,
+    coverImage:
+      "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=1400&q=80",
+    portfolio: [
+      "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1519003722824-194d4455a60c?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80",
+    ],
+    destinations: ["udaipur", "jaipur", "jodhpur"],
+    services: [
+      {
+        name: "Guest Movement Matrix",
+        description:
+          "Airport pickups, shuttle loops, buggy routing, driver holding, and family movement desk.",
+        basePrice: 180000,
+        maxPrice: 360000,
+        unit: "event",
+      },
+      {
+        name: "Arrival Desk Operations",
+        description:
+          "Welcome-desk staffing, guest manifests, room key handoff, and escalation support.",
+        basePrice: 95000,
+        maxPrice: 180000,
+        unit: "day",
+      },
+    ],
+  },
+  {
     key: "noor-bridal-atelier",
     label: "Noor Bridal Atelier",
     email: "testing+noor-bridal@elysiancelebrations.app",
