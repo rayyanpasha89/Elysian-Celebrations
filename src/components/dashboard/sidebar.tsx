@@ -4,6 +4,32 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  BarChart3,
+  Building2,
+  Calendar,
+  CalendarCheck,
+  CalendarClock,
+  CalendarRange,
+  Contact,
+  Inbox,
+  Images,
+  LayoutDashboard,
+  MapPin,
+  MessageSquare,
+  Newspaper,
+  Package,
+  Palette,
+  Quote,
+  Settings,
+  SlidersHorizontal,
+  Star,
+  Store,
+  UserCircle,
+  Users,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface NavItem {
@@ -11,6 +37,61 @@ export interface NavItem {
   href: string;
   badge?: number;
 }
+
+/**
+ * Central route → icon map so the four portal layouts don't each have to wire
+ * icons. Any href not listed falls back to a neutral marker.
+ */
+const ICON_BY_HREF: Record<string, LucideIcon> = {
+  // Client
+  "/client": LayoutDashboard,
+  "/client/wedding": CalendarRange,
+  "/client/budget": Wallet,
+  "/client/vendors": Store,
+  "/client/guests": Users,
+  "/client/timeline": CalendarClock,
+  "/client/mood-board": Palette,
+  "/client/messages": MessageSquare,
+  "/client/bookings": CalendarCheck,
+  "/client/settings": Settings,
+  // Vendor
+  "/vendor": LayoutDashboard,
+  "/vendor/profile": UserCircle,
+  "/vendor/services": Package,
+  "/vendor/bookings": CalendarCheck,
+  "/vendor/reviews": Star,
+  "/vendor/analytics": BarChart3,
+  "/vendor/portfolio": Images,
+  "/vendor/inquiries": Inbox,
+  "/vendor/calendar": Calendar,
+  "/vendor/messages": MessageSquare,
+  "/vendor/settings": Settings,
+  // Admin
+  "/admin": LayoutDashboard,
+  "/admin/vendors": Store,
+  "/admin/destinations": MapPin,
+  "/admin/users": Users,
+  "/admin/clients": Contact,
+  "/admin/bookings": CalendarCheck,
+  "/admin/inquiries": Inbox,
+  "/admin/analytics": BarChart3,
+  "/admin/packages": Package,
+  "/admin/venues": Building2,
+  "/admin/blog": Newspaper,
+  "/admin/testimonials": Quote,
+  "/admin/settings": Settings,
+  // Manager
+  "/manager": LayoutDashboard,
+  "/manager/inquiries": Inbox,
+  "/manager/bookings": CalendarCheck,
+  "/manager/messages": MessageSquare,
+  "/manager/clients": Users,
+  "/manager/vendors": Store,
+  "/manager/weddings": CalendarRange,
+  "/manager/configurator": SlidersHorizontal,
+  "/manager/destinations": MapPin,
+  "/manager/settings": Settings,
+};
 
 export interface NavGroup {
   title: string;
@@ -160,7 +241,7 @@ function NavSections({
   onNavigate?: () => void;
 }) {
   return (
-    <div className="flex min-h-full w-full flex-col justify-center gap-2 py-2">
+    <div className="flex w-full flex-col gap-2 py-3">
       {groups.map((group, groupIndex) => (
         <section
           key={group.title}
@@ -177,13 +258,14 @@ function NavSections({
           <ul className="list-none space-y-1 pl-0">
             {group.items.map((item) => {
               const isActive = isActivePath(pathname, item.href);
+              const Icon = ICON_BY_HREF[item.href];
               return (
                 <li key={item.href}>
                   <Link
                     href={item.href}
                     onClick={onNavigate}
                     className={cn(
-                      "group relative isolate flex items-center justify-between overflow-hidden px-3 py-1.5 font-heading text-[12px] transition-all duration-300",
+                      "group relative isolate flex items-center justify-between overflow-hidden px-3 py-2 font-heading text-[12.5px] transition-all duration-300",
                       isActive
                         ? "text-ivory"
                         : "text-ivory/58 hover:bg-ivory/[0.04] hover:text-ivory"
@@ -200,15 +282,26 @@ function NavSections({
                         }}
                       />
                     ) : null}
-                    <span className="flex min-w-0 items-center gap-2">
-                      <span
-                        className={cn(
-                          "h-1.5 w-1.5 shrink-0 border transition-colors",
-                          isActive
-                            ? "border-gold-primary bg-gold-primary"
-                            : "border-ivory/20 group-hover:border-gold-primary/50"
-                        )}
-                      />
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      {Icon ? (
+                        <Icon
+                          className={cn(
+                            "h-4 w-4 shrink-0 transition-colors",
+                            isActive
+                              ? "text-gold-primary"
+                              : "text-ivory/40 group-hover:text-gold-primary/70"
+                          )}
+                        />
+                      ) : (
+                        <span
+                          className={cn(
+                            "h-1.5 w-1.5 shrink-0 border transition-colors",
+                            isActive
+                              ? "border-gold-primary bg-gold-primary"
+                              : "border-ivory/20 group-hover:border-gold-primary/50"
+                          )}
+                        />
+                      )}
                       <span className="truncate">{item.label}</span>
                     </span>
                     {item.badge ? (

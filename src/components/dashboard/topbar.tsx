@@ -5,7 +5,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useClerk } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
+import { Bell, ChevronDown, ExternalLink, LogOut, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const PORTAL_LABELS: Record<string, string> = {
+  client: "Client Portal",
+  vendor: "Vendor Portal",
+  manager: "Manager Console",
+  admin: "Admin Console",
+};
 
 /** Exact pathname → title (no trailing slash). Covers client, vendor, and admin dashboards. */
 const DASHBOARD_ROUTE_TITLES: Record<string, string> = {
@@ -200,7 +208,10 @@ export function Topbar({
     <header className="sticky top-0 z-30 border-b border-charcoal/8 bg-cream/78 shadow-[0_16px_48px_rgba(24,24,20,0.04)] backdrop-blur-xl">
       <div className="flex items-center justify-between px-6 py-4 lg:px-8">
         <div className="pl-12 lg:pl-0">
-          <h1 className="font-display text-xl font-semibold text-charcoal">{displayTitle}</h1>
+          <p className="font-accent text-[9px] uppercase tracking-[0.22em] text-gold-dark">
+            {PORTAL_LABELS[portalRoot] ?? "Portal"}
+          </p>
+          <h1 className="mt-0.5 font-display text-xl font-semibold text-charcoal">{displayTitle}</h1>
           {subtitle && (
             <p className="mt-0.5 font-accent text-[10px] uppercase tracking-[0.2em] text-slate">{subtitle}</p>
           )}
@@ -218,13 +229,7 @@ export function Topbar({
               aria-label="Notifications"
               aria-expanded={showNotifications}
             >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path
-                  d="M8 1.5a4.5 4.5 0 00-4.5 4.5v3L2 10.5V12h12v-1.5L12.5 9V6A4.5 4.5 0 008 1.5zM6.5 13a1.5 1.5 0 003 0"
-                  stroke="currentColor"
-                  strokeWidth="1.2"
-                />
-              </svg>
+              <Bell className="h-4 w-4" />
               {unreadCount > 0 ? (
                 <span className="absolute -right-1 -top-1 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-gold-primary px-1 font-accent text-[8px] leading-none text-midnight">
                   {unreadCount > 9 ? "9+" : unreadCount}
@@ -326,6 +331,12 @@ export function Topbar({
                 <p className="text-sm font-medium leading-tight text-charcoal">{userName}</p>
                 <p className="font-accent text-[9px] uppercase tracking-[0.15em] text-slate">{userRole}</p>
               </div>
+              <ChevronDown
+                className={cn(
+                  "hidden h-3.5 w-3.5 text-slate transition-transform md:block",
+                  showDropdown && "rotate-180"
+                )}
+              />
             </button>
 
             <AnimatePresence>
@@ -344,8 +355,8 @@ export function Topbar({
                       <p className="font-accent text-[10px] uppercase tracking-[0.15em] text-slate">{userRole}</p>
                     </div>
                     <div className="py-1">
-                      <DropdownItem label="Settings" href={settingsHref} />
-                      <DropdownItem label="Back to Site" href="/" />
+                      <DropdownItem label="Settings" href={settingsHref} icon={Settings} />
+                      <DropdownItem label="Back to Site" href="/" icon={ExternalLink} />
                       <div className="my-1 h-px bg-charcoal/8" />
                       <button
                         type="button"
@@ -357,8 +368,9 @@ export function Topbar({
                           }
                           void signOut({ redirectUrl: "/" });
                         }}
-                        className="block w-full px-4 py-2 text-left font-accent text-[11px] uppercase tracking-[0.15em] text-red-600/70 transition-colors hover:bg-red-50 hover:text-red-700"
+                        className="flex w-full items-center gap-2.5 px-4 py-2 text-left font-accent text-[11px] uppercase tracking-[0.15em] text-red-600/70 transition-colors hover:bg-red-50 hover:text-red-700"
                       >
+                        <LogOut className="h-3.5 w-3.5" />
                         {testAuthEnabled ? "Exit Test View" : "Sign Out"}
                       </button>
                     </div>
@@ -436,21 +448,24 @@ function DropdownItem({
   label,
   href,
   danger,
+  icon: Icon,
 }: {
   label: string;
   href: string;
   danger?: boolean;
+  icon?: React.ComponentType<{ className?: string }>;
 }) {
   return (
     <Link
       href={href}
       className={cn(
-        "block px-4 py-2 font-accent text-[11px] uppercase tracking-[0.15em] transition-colors",
+        "flex items-center gap-2.5 px-4 py-2 font-accent text-[11px] uppercase tracking-[0.15em] transition-colors",
         danger
           ? "text-red-600/70 hover:bg-red-50 hover:text-red-700"
           : "text-charcoal/70 hover:bg-cream hover:text-charcoal",
       )}
     >
+      {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
       {label}
     </Link>
   );
