@@ -1,13 +1,19 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useInView } from "framer-motion";
-import { Camera, Image as ImageIcon, X } from "lucide-react";
-import { useRef } from "react";
+import { Camera, ChevronLeft, ChevronRight, Image as ImageIcon, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type GalleryImage = { src: string; alt: string };
+export type GalleryCategory =
+  | "Weddings"
+  | "Corporate"
+  | "Galas & Social"
+  | "Destinations"
+  | "Decor & Tablescapes";
+
+export type GalleryImage = { src: string; alt: string; category: GalleryCategory };
 
 const aspectCycle = ["aspect-[3/4]", "aspect-square", "aspect-[4/5]", "aspect-[5/6]", "aspect-[2/3]"];
 
@@ -23,15 +29,13 @@ function MasonryItem({
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, amount: 0.3 });
   const aspectClass = aspectCycle[index % aspectCycle.length];
-  const isWideFrame = index % 4 === 1;
 
   return (
     <div ref={ref} className="mb-4 break-inside-avoid">
       <div
         className={cn(
           "relative w-full overflow-hidden border border-charcoal/8 bg-cream shadow-[0_18px_55px_rgba(26,26,46,0.08)]",
-          aspectClass,
-          isWideFrame && "md:scale-[1.01]"
+          aspectClass
         )}
       >
         <button
@@ -50,7 +54,7 @@ function MasonryItem({
           <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(17,24,39,0.02),rgba(17,24,39,0.05)_42%,rgba(17,24,39,0.78)_100%)] opacity-70 transition-opacity duration-500 group-hover:opacity-100" />
           <div className="absolute left-4 top-4 inline-flex items-center gap-2 border border-ivory/14 bg-midnight/42 px-3 py-2 text-[9px] uppercase tracking-[0.18em] text-ivory/78 backdrop-blur-md">
             <Camera className="h-3.5 w-3.5 text-gold-light" />
-            {item.alt.split(" — ")[0]}
+            {item.category}
           </div>
           <div className="absolute bottom-0 left-0 right-0 p-4">
             <div className="flex items-end justify-between gap-4">
@@ -68,7 +72,7 @@ function MasonryItem({
             animate={inView ? { scaleX: 0 } : { scaleX: 1 }}
             transition={{
               duration: 0.85,
-              delay: index * 0.06,
+              delay: (index % 8) * 0.06,
               ease: [0.16, 1, 0.3, 1],
             }}
             style={{ transformOrigin: "right" }}
@@ -80,12 +84,40 @@ function MasonryItem({
 }
 
 export function GalleryMasonry({ images }: { images: GalleryImage[] }) {
-  const [active, setActive] = useState<GalleryImage | null>(null);
+  const [category, setCategory] = useState<GalleryCategory | "all">("all");
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+
+  // Category chips with live counts, ordered by how many frames each holds.
+  const categories = useMemo(() => {
+    const counts = new Map<GalleryCategory, number>();
+    for (const image of images) {
+      counts.set(image.category, (counts.get(image.category) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([value, count]) => ({ value, count }));
+  }, [images]);
+
+  const filtered = useMemo(
+    () => (category === "all" ? images : images.filter((image) => image.category === category)),
+    [images, category]
+  );
+
+  const active = activeIndex == null ? null : filtered[activeIndex] ?? null;
+
+  const step = (delta: number) => {
+    setActiveIndex((current) => {
+      if (current == null) return current;
+      return (current + delta + filtered.length) % filtered.length;
+    });
+  };
 
   useEffect(() => {
-    if (!active) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setActive(null);
+    if (active == null) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setActiveIndex(null);
+      if (event.key === "ArrowRight") step(1);
+      if (event.key === "ArrowLeft") step(-1);
     };
     window.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
@@ -94,41 +126,43 @@ export function GalleryMasonry({ images }: { images: GalleryImage[] }) {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [active]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, filtered.length]);
 
   return (
     <>
-      <div className="mb-6 grid gap-4 border border-charcoal/8 bg-ivory/70 p-4 md:grid-cols-3">
-        <div className="border border-charcoal/8 bg-white/80 p-4">
-          <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-gold-primary">
-            Portfolio
-          </p>
-          <p className="mt-2 text-sm leading-relaxed text-slate">
-            A visual archive of atmosphere, composition, and the kind of detail that makes a
-            celebration feel directed rather than decorated.
-          </p>
+      <div className="mb-8 flex flex-col gap-4 border-b border-charcoal/10 pb-6 sm:flex-row sm:items-end sm:justify-between">
+        <div className="-mx-1 flex flex-wrap gap-2">
+          <FilterChip
+            label="All"
+            count={images.length}
+            active={category === "all"}
+            onClick={() => setCategory("all")}
+          />
+          {categories.map((entry) => (
+            <FilterChip
+              key={entry.value}
+              label={entry.value}
+              count={entry.count}
+              active={category === entry.value}
+              onClick={() => setCategory(entry.value)}
+            />
+          ))}
         </div>
-        <div className="border border-charcoal/8 bg-white/80 p-4">
-          <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-gold-primary">
-            Curation
-          </p>
-          <p className="mt-2 text-sm leading-relaxed text-slate">
-            Each frame should feel like part of a story, not a random image dump.
-          </p>
-        </div>
-        <div className="border border-charcoal/8 bg-white/80 p-4">
-          <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-gold-primary">
-            Interaction
-          </p>
-          <p className="mt-2 text-sm leading-relaxed text-slate">
-            Tap any card to open a larger preview and inspect the mood in detail.
-          </p>
-        </div>
+        <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-slate">
+          {filtered.length} {filtered.length === 1 ? "frame" : "frames"}
+        </p>
       </div>
 
-      <div className="columns-2 gap-4 md:columns-3 lg:columns-4" role="list">
-        {images.map((item, index) => (
-          <MasonryItem key={item.src} item={item} index={index} onOpen={setActive} />
+      {/* Re-key by category so the reveal animation replays on each filter change. */}
+      <div key={category} className="columns-2 gap-4 md:columns-3 lg:columns-4" role="list">
+        {filtered.map((item, index) => (
+          <MasonryItem
+            key={item.src}
+            item={item}
+            index={index}
+            onOpen={() => setActiveIndex(index)}
+          />
         ))}
       </div>
 
@@ -143,42 +177,69 @@ export function GalleryMasonry({ images }: { images: GalleryImage[] }) {
             role="dialog"
             aria-modal="true"
             aria-label="Image preview"
-            onClick={() => setActive(null)}
+            onClick={() => setActiveIndex(null)}
           >
-            <motion.button
+            <button
               type="button"
               data-cursor="pointer"
               className="absolute right-4 top-4 z-[110] rounded-full bg-ivory/10 p-2 text-ivory backdrop-blur-md transition hover:bg-ivory/20"
-              onClick={(e) => {
-                e.stopPropagation();
-                setActive(null);
+              onClick={(event) => {
+                event.stopPropagation();
+                setActiveIndex(null);
               }}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
               aria-label="Close"
             >
               <X className="h-6 w-6" />
-            </motion.button>
+            </button>
+
+            {filtered.length > 1 ? (
+              <>
+                <button
+                  type="button"
+                  aria-label="Previous"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    step(-1);
+                  }}
+                  className="absolute left-3 top-1/2 z-[110] hidden -translate-y-1/2 rounded-full bg-ivory/10 p-3 text-ivory backdrop-blur-md transition hover:bg-ivory/20 sm:block"
+                >
+                  <ChevronLeft className="h-6 w-6" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Next"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    step(1);
+                  }}
+                  className="absolute right-3 top-1/2 z-[110] hidden -translate-y-1/2 rounded-full bg-ivory/10 p-3 text-ivory backdrop-blur-md transition hover:bg-ivory/20 sm:block"
+                >
+                  <ChevronRight className="h-6 w-6" />
+                </button>
+              </>
+            ) : null}
+
             <motion.div
+              key={active.src}
               className="relative max-h-[90vh] max-w-[min(96vw,1200px)]"
               initial={{ opacity: 0, scale: 0.96, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 12 }}
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-              onClick={(e) => e.stopPropagation()}
+              onClick={(event) => event.stopPropagation()}
             >
-              <div className="relative">
-                <Image
-                  src={active.src}
-                  alt={active.alt}
-                  width={1600}
-                  height={1200}
-                  className="max-h-[85vh] w-auto max-w-full rounded-lg border border-white/10 object-contain shadow-2xl"
-                />
-              </div>
-              <div className="mt-4 flex items-center justify-center gap-2 text-sm text-ivory/80">
-                <ImageIcon className="h-4 w-4 text-gold-light" />
+              <Image
+                src={active.src}
+                alt={active.alt}
+                width={1600}
+                height={1200}
+                className="max-h-[85vh] w-auto max-w-full rounded-lg border border-white/10 object-contain shadow-2xl"
+              />
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-sm text-ivory/80">
+                <span className="inline-flex items-center gap-1.5 border border-ivory/14 px-2.5 py-1 font-accent text-[9px] uppercase tracking-[0.16em] text-gold-light">
+                  <Camera className="h-3 w-3" />
+                  {active.category}
+                </span>
                 <p className="font-heading">{active.alt}</p>
               </div>
             </motion.div>
@@ -186,5 +247,36 @@ export function GalleryMasonry({ images }: { images: GalleryImage[] }) {
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+function FilterChip({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "inline-flex items-center gap-2 border px-3.5 py-2 font-accent text-[10px] uppercase tracking-[0.16em] transition-colors",
+        active
+          ? "border-gold-primary bg-gold-primary/12 text-charcoal"
+          : "border-charcoal/12 bg-ivory text-slate hover:border-gold-primary/45 hover:text-charcoal"
+      )}
+    >
+      {label}
+      <span className={cn("text-[9px]", active ? "text-gold-dark" : "text-slate/60")}>
+        {count}
+      </span>
+    </button>
   );
 }
