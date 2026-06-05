@@ -189,7 +189,7 @@ export function ContactForm() {
               dateLabelFloating && "top-3 -translate-y-0 text-xs text-gold-dark",
             )}
           >
-            Wedding date
+            Event date
           </label>
           {errors.weddingDate && (
             <p className="font-sans mt-1 text-xs text-error" role="alert">

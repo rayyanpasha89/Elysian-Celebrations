@@ -60,7 +60,7 @@ export function CTASection() {
                 className="mt-5 max-w-3xl font-display font-bold leading-[0.94] text-ivory"
                 style={{ fontSize: "var(--text-display)" }}
               >
-                Build the wedding with the calm of a studio, not the chaos of a spreadsheet.
+                Build the event with the calm of a studio, not the chaos of a spreadsheet.
               </h2>
               <p className="mt-5 max-w-2xl font-heading text-lg font-light leading-relaxed text-ivory/70">
                 The point is not just a beautiful event. It is a planning experience that keeps the

@@ -15,7 +15,7 @@ const pillars = [
     icon: Sparkles,
     title: "Vendor Curation",
     description:
-      "Evaluate creative fit, service mix, and pricing without losing the aesthetic thread of the wedding.",
+      "Evaluate creative fit, service mix, and pricing without losing the aesthetic thread of the event.",
     href: "/#vendors",
   },
   {
@@ -40,7 +40,7 @@ export function PlanningManifesto() {
           <SectionHeader
             chapter="01"
             eyebrow="Planning manifesto"
-            title="The wedding should feel composed before it feels expensive."
+            title="The event should feel composed before it feels expensive."
             intro="We’re building a planning surface for couples who care about atmosphere, precision, and control. That means transparent financial structure, curated vendors, and a weekend narrative that is designed, not improvised."
             align="start"
             titleMaxWidth="max-w-2xl"

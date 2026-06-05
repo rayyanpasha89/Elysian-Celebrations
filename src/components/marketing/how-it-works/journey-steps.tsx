@@ -33,7 +33,7 @@ const steps = [
   {
     title: "Assemble the cast",
     body:
-      "Photographers, florists, hospitality teams, and production partners are chosen for chemistry, not just availability, so the wedding feels coherent instead of crowded.",
+      "Photographers, florists, hospitality teams, and production partners are chosen for chemistry, not just availability, so the event feels coherent instead of crowded.",
     icon: UsersRound,
   },
   {
@@ -97,7 +97,7 @@ export function JourneySteps() {
             chapter="03"
             eyebrow="How it works"
             title="The planning unfolds in five deliberate acts."
-            intro="Each act reduces noise, strengthens taste, and keeps the wedding readable from the first brief through the final dance."
+            intro="Each act reduces noise, strengthens taste, and keeps the event readable from the first brief through the final moment."
             align="center"
           />
         </motion.div>

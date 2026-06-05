@@ -3,7 +3,7 @@ const collageMoments = [
     label: "Arrival",
     title: "Guests should feel the world before they reach the ceremony.",
     copy:
-      "Rooming, welcome notes, transport, and first-night mood all shape how the wedding begins to live in memory.",
+      "Rooming, welcome notes, transport, and first-night mood all shape how the event begins to live in memory.",
     image:
       "https://images.unsplash.com/photo-1519225421980-715cb0215aed?auto=format&fit=crop&w=1200&q=80",
   },
@@ -45,7 +45,7 @@ export function ExperienceCollage() {
               <span className="text-gold-primary">A sequence of feelings.</span>
             </h2>
             <p className="mt-6 max-w-xl font-heading text-lg leading-relaxed text-ivory/68">
-              The strongest destination weddings feel cinematic because the planning
+              The strongest destination events feel cinematic because the planning
               behind them is spatial, emotional, and ruthlessly clear. Every guest
               transition, every vendor handoff, and every money decision should serve
               the same atmosphere.

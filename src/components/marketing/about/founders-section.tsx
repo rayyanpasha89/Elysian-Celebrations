@@ -31,7 +31,7 @@ const principles = [
   {
     icon: UsersRound,
     title: "Vendor chemistry",
-    body: "The right team is not just skilled, it is aligned with the tone of the wedding.",
+    body: "The right team is not just skilled, it is aligned with the tone of the event.",
   },
 ];
 
@@ -136,7 +136,7 @@ export function FoundersSection() {
 
             <div className="space-y-4 font-heading text-base font-light leading-relaxed text-slate">
               <p className="first-letter:float-left first-letter:mr-2 first-letter:mt-1 first-letter:font-display first-letter:text-4xl first-letter:font-bold first-letter:text-gold-primary">
-                Elysian Celebrations is led by Deeksha and Nithin, who treat each wedding like a
+                Elysian Celebrations is led by Deeksha and Nithin, who treat each event like a
                 composed production: the mood, the logistics, the vendor mix, and the guest
                 experience all need to belong to the same story.
               </p>

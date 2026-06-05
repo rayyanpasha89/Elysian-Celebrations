@@ -116,7 +116,7 @@ export function TestimonialCarousel() {
             <SectionHeader
               chapter="07"
               eyebrow="Couple notes"
-              title="Proof that the planning can feel as considered as the wedding itself."
+              title="Proof that the planning can feel as considered as the event itself."
               intro="Couples come to us for clarity, taste, and calm execution. These stories reflect the real outcome: less noise, stronger direction, and a weekend that feels intentional in every frame."
               align="start"
               tone="light"

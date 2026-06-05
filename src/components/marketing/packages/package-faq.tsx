@@ -23,7 +23,7 @@ const faqs = [
     a: "Absolutely. Royal and many Grand engagements include international vendor coordination, travel logistics, and on-site leadership.",
   },
   {
-    q: "What does coordination include on the wedding day?",
+    q: "What does coordination include on the event day?",
     a: "Cueing, vendor management, guest movement, contingency handling, and a single command chain so you are never the point of contact in a crisis.",
   },
   {
