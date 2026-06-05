@@ -7,7 +7,7 @@ import { PackagesHero } from "@/components/marketing/packages/packages-hero";
 export const metadata: Metadata = {
   title: "Packages | Elysian Celebrations",
   description:
-    "Intimate, Grand, and Royal destination wedding packages—transparent tiers, curated vendors, and planning depth that matches your celebration.",
+    "Intimate, Grand, and Royal destination event packages—weddings, corporate, galas, and retreats with transparent tiers, curated vendors, and planning depth that matches your event.",
 };
 
 export default function PackagesPage() {
