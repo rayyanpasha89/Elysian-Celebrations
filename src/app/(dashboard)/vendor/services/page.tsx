@@ -14,9 +14,19 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer, staggerItem } from "@/animations/variants";
 import { ListEmptyState } from "@/components/dashboard/list-empty-state";
+import {
+  PresetTagInput,
+  DIETARY_TAG_OPTIONS,
+  type PlannerOption,
+} from "@/components/dashboard/planner-inputs";
 import { dashBtn, dashCard, dashLabel } from "@/lib/dashboard-styles";
 import { categoryCopy } from "@/lib/vendor-offering";
 import { cn } from "@/lib/utils";
+
+/** Turn the example string lists into PresetTagInput suggestions. */
+function toOptions(values: string[]): PlannerOption[] {
+  return values.map((label) => ({ value: label, label }));
+}
 
 type ServiceItem = {
   id?: string;
@@ -721,25 +731,29 @@ function ServiceEditor({
       <div className="grid gap-4 md:grid-cols-2">
         <ListField
           label="Best fit events"
-          hint={`Example: ${copy.exampleEventFit.join(", ")}`}
+          hint="Tap the event types this service suits."
+          suggestions={toOptions(copy.exampleEventFit)}
           value={draft.eventTypeFit}
           onChange={(value) => updateField("eventTypeFit", value)}
         />
         <ListField
           label="Inclusions"
-          hint={`Example: ${copy.exampleInclusions.join(", ")}`}
+          hint="What's covered. Tap a suggestion or add your own."
+          suggestions={toOptions(copy.exampleInclusions)}
           value={draft.inclusions}
           onChange={(value) => updateField("inclusions", value)}
         />
         <ListField
           label="Deliverables"
-          hint={`Example: ${copy.exampleDeliverables.join(", ")}`}
+          hint="What the client receives."
+          suggestions={toOptions(copy.exampleDeliverables)}
           value={draft.deliverables}
           onChange={(value) => updateField("deliverables", value)}
         />
         <ListField
           label="Add-ons"
-          hint={`Example: ${copy.exampleAddOns.join(", ")}`}
+          hint="Optional extras they can layer on."
+          suggestions={toOptions(copy.exampleAddOns)}
           value={draft.addOns}
           onChange={(value) => updateField("addOns", value)}
         />
@@ -864,16 +878,19 @@ function ServiceEditor({
                   }
                 />
                 {copy.showDietary ? (
-                  <input
-                    className={cn(inputBase, "mt-3 py-2")}
-                    placeholder="Dietary tags (comma separated, e.g. Vegetarian, Jain)"
-                    value={item.dietaryTags.join(", ")}
-                    onChange={(e) =>
-                      updateItem(index, {
-                        dietaryTags: splitToList(e.target.value),
-                      })
-                    }
-                  />
+                  <div className="mt-3">
+                    <span className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
+                      Dietary tags
+                    </span>
+                    <div className="mt-2">
+                      <PresetTagInput
+                        suggestions={DIETARY_TAG_OPTIONS}
+                        value={item.dietaryTags}
+                        onChange={(tags) => updateItem(index, { dietaryTags: tags })}
+                        placeholder="Add a dietary tag"
+                      />
+                    </div>
+                  </div>
                 ) : null}
                 <ItemMediaEditor
                   imageUrls={item.imageUrls}
@@ -1135,24 +1152,30 @@ function ListField({
   hint,
   value,
   onChange,
+  suggestions = [],
 }: {
   label: string;
   hint: string;
   value: string;
   onChange: (value: string) => void;
+  suggestions?: PlannerOption[];
 }) {
+  // Keep the string-backed draft contract: tap chips in, store as a list.
   return (
-    <label className="block">
+    <div className="block">
       <span className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
         {label}
       </span>
-      <textarea
-        className={cn(textareaBase, "mt-2 min-h-[100px]")}
-        placeholder={`One per line or comma separated.\n${hint}`}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </label>
+      <p className="mt-1 text-[11px] leading-relaxed text-slate/70">{hint}</p>
+      <div className="mt-2">
+        <PresetTagInput
+          suggestions={suggestions}
+          value={splitToList(value)}
+          onChange={(next) => onChange(next.join("\n"))}
+          placeholder={`Add a ${label.toLowerCase()} item`}
+        />
+      </div>
+    </div>
   );
 }
 
