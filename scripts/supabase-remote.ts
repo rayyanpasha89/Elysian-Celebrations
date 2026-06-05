@@ -5,6 +5,11 @@ import process from "node:process";
 import { Client } from "pg";
 
 type Command = "link" | "push" | "push:seed" | "pull" | "list" | "query";
+type QueryResultSummary = {
+  rows?: Record<string, unknown>[];
+  command?: string;
+  rowCount?: number | null;
+};
 
 function fail(message: string): never {
   console.error(message);
@@ -82,18 +87,36 @@ async function runQuery(args: string[]) {
   await client.connect();
 
   try {
-    const result = await client.query(sql);
-    if (result.rows.length > 0) {
-      console.log(JSON.stringify(result.rows, null, 2));
+    const result = (await client.query(sql)) as
+      | QueryResultSummary
+      | QueryResultSummary[];
+    const results = Array.isArray(result) ? result : [result];
+
+    if (results.length === 1) {
+      const [single] = results;
+      console.log(
+        JSON.stringify(
+          single.rows && single.rows.length > 0
+            ? single.rows
+            : {
+                command: single.command,
+                rowCount: single.rowCount ?? 0,
+              },
+          null,
+          2,
+        ),
+      );
       return;
     }
 
     console.log(
       JSON.stringify(
-        {
-          command: result.command,
-          rowCount: result.rowCount ?? 0,
-        },
+        results.map((entry, index) => ({
+          index,
+          command: entry.command,
+          rowCount: entry.rowCount ?? 0,
+          ...(entry.rows && entry.rows.length > 0 ? { rows: entry.rows } : {}),
+        })),
         null,
         2,
       ),
