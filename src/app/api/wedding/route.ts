@@ -11,6 +11,7 @@ import {
   hasExplicitEventDefinition,
   mealPeriodForTimeBlock,
   normalizeDayCount as normalizeEventDayCount,
+  type EventRequirementCategoryKey,
 } from "@/lib/event-platform";
 import {
   getAuthSession,
@@ -907,6 +908,27 @@ export async function POST(request: NextRequest) {
       dayIdBySortOrder.set(day.sort_order, day.id);
     }
 
+    // Map each planned event to the needs the client picked for it during the
+    // layered definition. Key is `${dayId}:${eventSortOrder}` so it survives the
+    // round-trip through the insert. Blocks with no explicit selection are absent
+    // here and fall back to the full default requirement set.
+    const requirementCategoriesByKey = new Map<
+      string,
+      EventRequirementCategoryKey[]
+    >();
+    for (const day of celebrationPlan) {
+      const dayId = dayIdBySortOrder.get(day.sortOrder);
+      if (!dayId) continue;
+      for (const event of day.events) {
+        const categories = (
+          event as { requirementCategories?: EventRequirementCategoryKey[] }
+        ).requirementCategories;
+        if (Array.isArray(categories)) {
+          requirementCategoriesByKey.set(`${dayId}:${event.sortOrder}`, categories);
+        }
+      }
+    }
+
     const eventsToInsert = celebrationPlan.flatMap((day) =>
       day.events.map((event) => ({
         wedding_id: wedding.id,
@@ -932,13 +954,24 @@ export async function POST(request: NextRequest) {
       const { data: createdEvents, error: eventsInsertError } = await supabase
         .from("wedding_events")
         .insert(eventsToInsert)
-        .select("id, name, event_type, time_block, start_time, end_time, food_style, menu_notes, sort_order");
+        .select("id, wedding_day_id, name, event_type, time_block, start_time, end_time, food_style, menu_notes, sort_order");
 
       if (eventsInsertError) {
         console.error("wedding_events insert:", eventsInsertError);
       } else if (createdEvents && createdEvents.length > 0) {
         const menuRows = createdEvents
-          .filter((event) => useLayeredDefinition || event.food_style)
+          .filter((event) => {
+            // Only seed a food & beverage plan when this block actually wants
+            // food. For the layered definition we honor the client's pick; for
+            // legacy plans we keep the old "has a food style" behavior.
+            if (useLayeredDefinition) {
+              const categories = requirementCategoriesByKey.get(
+                `${event.wedding_day_id}:${event.sort_order}`
+              );
+              return categories ? categories.includes("food") : true;
+            }
+            return Boolean(event.food_style);
+          })
           .map((event) => ({
             wedding_event_id: event.id,
             name: useLayeredDefinition
@@ -979,11 +1012,22 @@ export async function POST(request: NextRequest) {
           console.error("wedding_event_tasks insert:", taskInsertError);
         }
 
-        const requirementRows = createdEvents.flatMap((event) =>
-          buildDefaultRequirementsForEvent({
+        const requirementRows = createdEvents.flatMap((event) => {
+          const key = `${event.wedding_day_id}:${event.sort_order}`;
+          const hasExplicitNeeds = requirementCategoriesByKey.has(key);
+          const selectedNeeds = requirementCategoriesByKey.get(key) ?? [];
+
+          // Layered definition with an empty selection means the client wants no
+          // services for this block — seed nothing so the planner stays clean.
+          if (hasExplicitNeeds && selectedNeeds.length === 0) {
+            return [];
+          }
+
+          return buildDefaultRequirementsForEvent({
             eventName: event.name,
             timeBlock: event.time_block,
             startTime: event.start_time,
+            categories: hasExplicitNeeds ? selectedNeeds : undefined,
           }).map((requirement) => ({
             wedding_event_id: event.id,
             category: requirement.category,
@@ -993,8 +1037,8 @@ export async function POST(request: NextRequest) {
             payload: requirement.payload,
             notes: requirement.notes,
             sort_order: requirement.sortOrder,
-          }))
-        );
+          }));
+        });
 
         if (requirementRows.length > 0) {
           const { error: requirementsInsertError } = await supabase

@@ -1038,9 +1038,47 @@ export default function ClientWeddingPage() {
     [days]
   );
 
+  // Needs the client picked for this block during the layered definition. We
+  // read them from the event's saved requirement rows (the source of truth),
+  // not the editable draft — the draft falls back to "all categories" when a
+  // block has no rows, which would defeat the filtering.
+  const activeRequirementCategories = useMemo(() => {
+    const set = new Set<EventRequirementCategoryKey>();
+    for (const requirement of selectedEvent?.requirements ?? []) {
+      set.add(requirement.category);
+    }
+    return set;
+  }, [selectedEvent]);
+
+  // Hide the dedicated sections for needs the client didn't ask for. Cross-cutting
+  // sections (basics, vendors, tasks, notes) always show. If the event carries no
+  // requirement rows at all — legacy plans, or a block created with zero needs —
+  // we show everything so nothing is silently unreachable.
+  const visibleEditorSections = useMemo(() => {
+    if (activeRequirementCategories.size === 0) return EDITOR_SECTIONS;
+    return EDITOR_SECTIONS.filter((section) => {
+      if (section.key === "food") return activeRequirementCategories.has("food");
+      if (section.key === "design")
+        return activeRequirementCategories.has("decor");
+      if (section.key === "logistics")
+        return activeRequirementCategories.has("logistics");
+      return true;
+    });
+  }, [activeRequirementCategories]);
+
   const activeEditorSection =
-    EDITOR_SECTIONS.find((section) => section.key === editorSection) ??
-    EDITOR_SECTIONS[0];
+    visibleEditorSections.find((section) => section.key === editorSection) ??
+    visibleEditorSections[0];
+
+  // Keep the active section within the set the selected event actually exposes,
+  // so a hidden need-section can never become a dead/blank tab.
+  useEffect(() => {
+    if (
+      !visibleEditorSections.some((section) => section.key === editorSection)
+    ) {
+      setEditorSection(visibleEditorSections[0]?.key ?? "basics");
+    }
+  }, [visibleEditorSections, editorSection]);
 
   const createDay = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -2561,17 +2599,17 @@ export default function ClientWeddingPage() {
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
                       Step{" "}
-                      {EDITOR_SECTIONS.findIndex(
+                      {visibleEditorSections.findIndex(
                         (entry) => entry.key === editorSection
                       ) + 1}{" "}
-                      of {EDITOR_SECTIONS.length}
+                      of {visibleEditorSections.length}
                     </p>
                     <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-gold-dark">
                       {activeEditorSection.label}
                     </p>
                   </div>
                   <div className="mt-3 -mx-1 flex gap-1.5 overflow-x-auto pb-1">
-                    {EDITOR_SECTIONS.map((section, index) => {
+                    {visibleEditorSections.map((section, index) => {
                       const active = editorSection === section.key;
                       return (
                         <button
@@ -3653,14 +3691,14 @@ export default function ClientWeddingPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      const index = EDITOR_SECTIONS.findIndex(
+                      const index = visibleEditorSections.findIndex(
                         (entry) => entry.key === editorSection
                       );
-                      const prev = EDITOR_SECTIONS[Math.max(0, index - 1)];
+                      const prev = visibleEditorSections[Math.max(0, index - 1)];
                       if (prev) setEditorSection(prev.key);
                     }}
                     disabled={
-                      EDITOR_SECTIONS.findIndex(
+                      visibleEditorSections.findIndex(
                         (entry) => entry.key === editorSection
                       ) === 0
                     }
@@ -3669,28 +3707,28 @@ export default function ClientWeddingPage() {
                     ← Prev
                   </button>
                   <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
-                    {EDITOR_SECTIONS.findIndex(
+                    {visibleEditorSections.findIndex(
                       (entry) => entry.key === editorSection
                     ) + 1}{" "}
-                    / {EDITOR_SECTIONS.length}
+                    / {visibleEditorSections.length}
                   </p>
                   <button
                     type="button"
                     onClick={() => {
-                      const index = EDITOR_SECTIONS.findIndex(
+                      const index = visibleEditorSections.findIndex(
                         (entry) => entry.key === editorSection
                       );
                       const next =
-                        EDITOR_SECTIONS[
-                          Math.min(EDITOR_SECTIONS.length - 1, index + 1)
+                        visibleEditorSections[
+                          Math.min(visibleEditorSections.length - 1, index + 1)
                         ];
                       if (next) setEditorSection(next.key);
                     }}
                     disabled={
-                      EDITOR_SECTIONS.findIndex(
+                      visibleEditorSections.findIndex(
                         (entry) => entry.key === editorSection
                       ) ===
-                      EDITOR_SECTIONS.length - 1
+                      visibleEditorSections.length - 1
                     }
                     className="font-accent inline-flex items-center justify-center border border-charcoal/15 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-charcoal/15 disabled:hover:text-charcoal"
                   >

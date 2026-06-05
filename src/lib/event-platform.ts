@@ -257,6 +257,7 @@ export type EventDefinitionPlanDay = {
     endTime: string | null;
     timeBlock: EventTimeBlockKey | null;
     guestCount: number | null;
+    requirementCategories: EventRequirementCategoryKey[];
     notes: string | null;
     sortOrder: number;
   }[];
@@ -745,6 +746,7 @@ export function buildCelebrationPlanFromEventDefinition(
         endTime: block.endTime,
         timeBlock: block.slot,
         guestCount: block.guestCount,
+        requirementCategories: block.requirementCategories,
         notes: block.notes,
         sortOrder: index,
       })),

@@ -3,19 +3,19 @@
 /**
  * Layer 1 — Definition.
  *
- * A 4-step guided flow that captures the new event-platform model:
+ * A 5-step guided flow that captures the new event-platform model:
  *   Step 1 — profile name
  *   Step 2 — event type (14 presets + Custom)
- *   Step 3 — number of days
- *   Step 4 — per-day morning / afternoon / evening time blocks (toggle + rename)
+ *   Step 3 — number of days + primary date
+ *   Step 4 — per-day dates
+ *   Step 5 — per-day morning / afternoon / evening time blocks (needs + timing)
  *
  * Submits to the existing /api/wedding POST. The request includes the richer
  * `definitionPayload` (event type, custom name, full day/block plan); when
  * Codex's API slice wires this through, the backend persists every field
- * into the new columns (`event_type`, `custom_event_type`, `definition_payload`,
- * `wedding_events.time_block`). Until then the API only consumes name + day
- * count and ignores the rest — the planner editor will still pick the model
- * up via Layer 2.
+ * into the event-platform columns (`event_type`, `custom_event_type`,
+ * `definition_payload`, `wedding_events.time_block`, `guest_count`) and seeds
+ * Layer 2 requirements from the needs selected here.
  */
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
@@ -27,6 +27,7 @@ import { dashBtn, dashCard, dashLabel } from "@/lib/dashboard-styles";
 import {
   CUSTOM_EVENT_TYPE_VALUE,
   EVENT_PLATFORM_TYPES,
+  EVENT_REQUIREMENT_CATEGORIES,
   EVENT_TIME_BLOCKS,
   buildEventDefinitionPayload,
   normalizeDayCount,
@@ -34,9 +35,22 @@ import {
   type EventDefinitionPayload,
   type EventDefinitionTimeBlock,
   type EventPlatformType,
+  type EventRequirementCategoryKey,
   type EventTimeBlockKey,
 } from "@/lib/event-platform";
 import { cn } from "@/lib/utils";
+
+// Needs a couple can pick per time block. "custom" is intentionally excluded —
+// custom needs are added later inside the planner, not during definition.
+const NEED_OPTIONS = EVENT_REQUIREMENT_CATEGORIES.filter(
+  (c) => c.key !== "custom"
+);
+// Sensible defaults so a block is useful out of the box; couples toggle the rest.
+const DEFAULT_NEEDS: EventRequirementCategoryKey[] = [
+  "food",
+  "decor",
+  "photo-video",
+];
 
 type Step = 0 | 1 | 2 | 3 | 4;
 
@@ -54,6 +68,7 @@ type LocalDay = {
       startTime: string;
       endTime: string;
       guestCount: number;
+      needs: EventRequirementCategoryKey[];
     }
   >;
 };
@@ -83,6 +98,7 @@ function createEmptyDay(
           startTime: block.defaultStartTime,
           endTime: block.defaultEndTime,
           guestCount: DEFAULT_GUESTS,
+          needs: [...DEFAULT_NEEDS],
         };
         return acc;
       },
@@ -147,7 +163,7 @@ function toEventDefinitionDay(day: LocalDay): EventDefinitionDay {
           startTime: local.startTime || null,
           endTime: local.endTime || null,
           guestCount: local.guestCount || null,
-          requirementCategories: [],
+          requirementCategories: local.needs,
           notes: null,
         };
       }
@@ -900,6 +916,41 @@ function BlocksStep({
                             className="mt-1 w-full border border-charcoal/12 bg-ivory px-2 py-1 font-heading text-sm outline-none focus:border-gold-primary"
                           />
                         </label>
+                        <div className="mt-3">
+                          <span className="block text-[11px] text-slate">
+                            What this block needs
+                          </span>
+                          <div className="mt-1.5 flex flex-wrap gap-1.5">
+                            {NEED_OPTIONS.map((need) => {
+                              const active = block.needs.includes(need.key);
+                              return (
+                                <button
+                                  key={need.key}
+                                  type="button"
+                                  onClick={() =>
+                                    onBlockPatch(dayIndex, blockKey, {
+                                      needs: active
+                                        ? block.needs.filter((n) => n !== need.key)
+                                        : [...block.needs, need.key],
+                                    })
+                                  }
+                                  className={cn(
+                                    "border px-2 py-1 font-accent text-[10px] uppercase tracking-[0.12em] transition-colors",
+                                    active
+                                      ? "border-gold-primary bg-gold-primary/15 text-charcoal"
+                                      : "border-charcoal/15 bg-ivory text-slate hover:border-gold-primary/40"
+                                  )}
+                                >
+                                  {need.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <p className="mt-1.5 text-[10px] leading-relaxed text-slate/70">
+                            Only what you pick here shows up in the planner. Add more
+                            later anytime.
+                          </p>
+                        </div>
                       </>
                     ) : (
                       <p className="mt-3 text-[11px] leading-relaxed text-slate/80">
