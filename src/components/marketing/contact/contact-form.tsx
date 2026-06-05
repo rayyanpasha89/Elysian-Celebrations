@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAnimation } from "framer-motion";
@@ -28,6 +28,22 @@ const contactSchema = z.object({
 type FormInput = z.input<typeof contactSchema>;
 type FormOutput = z.output<typeof contactSchema>;
 
+const EVENT_TYPE_OPTIONS = [
+  { value: "wedding", label: "Wedding" },
+  { value: "corporate", label: "Corporate" },
+  { value: "social", label: "Social & Gala" },
+  { value: "retreat", label: "Retreat" },
+  { value: "other", label: "Other" },
+] as const;
+
+// Maps the ?type= value the packages CTA sends to our chip values.
+const TYPE_PARAM_MAP: Record<string, string> = {
+  weddings: "wedding",
+  corporate: "corporate",
+  social: "social",
+  retreats: "retreat",
+};
+
 const fieldClass =
   "peer w-full border border-charcoal/10 bg-ivory/60 px-4 pb-2.5 pt-6 text-charcoal outline-none transition-all duration-300 focus:border-gold-primary/60 focus:bg-ivory focus:shadow-[0_0_0_3px_rgba(201,169,110,0.08)]";
 
@@ -37,6 +53,22 @@ const labelClass =
 export function ContactForm() {
   const controls = useAnimation();
   const [status, setStatus] = useState<"idle" | "loading" | "success">("idle");
+  const [eventType, setEventType] = useState<string>("");
+  const [tierInterest, setTierInterest] = useState<string>("");
+
+  // Prefill the concierge brief from the packages CTA (?type=&tier=). Reading
+  // the URL is a one-time sync from an external system on mount; state starts
+  // empty so SSR/hydration stay aligned.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const type = params.get("type");
+    const tier = params.get("tier");
+    const nextType = type && TYPE_PARAM_MAP[type] ? TYPE_PARAM_MAP[type] : "";
+    /* eslint-disable react-hooks/set-state-in-effect -- one-time read of the browser URL */
+    if (nextType) setEventType(nextType);
+    if (tier) setTierInterest(tier);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
 
   const {
     register,
@@ -67,6 +99,19 @@ export function ContactForm() {
 
   const onSubmit = async (data: FormOutput) => {
     setStatus("loading");
+    // Thread the concierge selections into the message so they reach the team
+    // without changing the inquiry schema.
+    const contextLines: string[] = [];
+    const typeLabel = EVENT_TYPE_OPTIONS.find((opt) => opt.value === eventType)?.label;
+    if (typeLabel) contextLines.push(`Event type: ${typeLabel}`);
+    if (tierInterest) {
+      contextLines.push(
+        `Interested in: ${tierInterest.charAt(0).toUpperCase()}${tierInterest.slice(1)} package`
+      );
+    }
+    const message = contextLines.length
+      ? `${contextLines.join("\n")}\n\n${data.message}`
+      : data.message;
     try {
       const res = await fetch("/api/contact", {
         method: "POST",
@@ -78,7 +123,7 @@ export function ContactForm() {
           destination: data.destination,
           weddingDate: data.weddingDate,
           guestCount: data.guestCount,
-          message: data.message,
+          message,
         }),
       });
       const json = (await res.json().catch(() => ({}))) as { error?: string };
@@ -113,6 +158,33 @@ export function ContactForm() {
       className="mx-auto max-w-xl space-y-6"
       noValidate
     >
+      <div>
+        <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-slate">
+          What are you planning?
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {EVENT_TYPE_OPTIONS.map((opt) => {
+            const active = eventType === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setEventType(active ? "" : opt.value)}
+                className={cn(
+                  "border px-3.5 py-2 font-accent text-[10px] uppercase tracking-[0.16em] transition-colors",
+                  active
+                    ? "border-gold-primary bg-gold-primary/12 text-charcoal"
+                    : "border-charcoal/12 bg-ivory/60 text-slate hover:border-gold-primary/45 hover:text-charcoal"
+                )}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="grid gap-6 sm:grid-cols-2">
         <div className="relative">
           <input
