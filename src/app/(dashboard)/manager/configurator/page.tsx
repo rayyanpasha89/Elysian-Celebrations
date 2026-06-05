@@ -3,6 +3,11 @@
 import { useEffect, useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { fadeUp, staggerContainer } from "@/animations/variants";
+import {
+  ChipSingleSelect,
+  Stepper,
+  type PlannerOption,
+} from "@/components/dashboard/planner-inputs";
 import { dashCard, dashLabel } from "@/lib/dashboard-styles";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +28,19 @@ const decorThemes = ["Classic Elegance", "Bohemian Garden", "Royal Heritage", "M
 const cateringStyles = ["Plated Fine Dining", "Buffet (Multi-Cuisine)", "Live Stations", "Family-Style"];
 const entertainmentOptions = ["DJ & Dance Floor", "Live Band", "Traditional Performers", "Both Live & DJ"];
 const photoOptions = ["Photography Only", "Photo + Video", "Full Cinematic Package"];
+
+const toOpts = (values: string[]): PlannerOption[] =>
+  values.map((value) => ({ value, label: value }));
+const tierOptions: PlannerOption[] = packageTiers.map((tier) => ({
+  value: tier.name,
+  label: tier.name,
+  hint: tier.desc,
+}));
+const decorOptions = toOpts(decorThemes);
+const cateringOptions = toOpts(cateringStyles);
+const entertainmentOpts = toOpts(entertainmentOptions);
+const photoOpts = toOpts(photoOptions);
+const GUEST_STEPS = [50, 100, 150, 200, 300, 500];
 
 function formatINR(amount: number) {
   if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(1)} Cr`;
@@ -107,81 +125,67 @@ export default function EventConfiguratorPage() {
               </select>
             </div>
             <div>
-              <label className={dashLabel}>Package Tier</label>
-              <select
-                value={selectedTier}
-                onChange={(e) => setSelectedTier(e.target.value)}
-                className="mt-3 w-full border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm outline-none focus:border-gold-primary"
-              >
-                <option value="">Select tier</option>
-                {packageTiers.map((t) => (
-                  <option key={t.name} value={t.name}>
-                    {t.name} — {t.desc}
-                  </option>
-                ))}
-              </select>
+              <p className={dashLabel}>Package Tier</p>
+              <div className="mt-3">
+                <ChipSingleSelect
+                  options={tierOptions}
+                  value={selectedTier || null}
+                  onChange={(value) => setSelectedTier(value ?? "")}
+                />
+              </div>
             </div>
             <div>
-              <label className={dashLabel}>Guest Count</label>
-              <input
-                type="number"
-                min={1}
-                value={guestCount}
-                onChange={(e) => setGuestCount(Number(e.target.value) || 1)}
-                className="mt-3 w-full border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm outline-none focus:border-gold-primary"
-              />
+              <p className={dashLabel}>Guest Count</p>
+              <div className="mt-3">
+                <Stepper
+                  value={guestCount}
+                  onChange={setGuestCount}
+                  min={1}
+                  step={10}
+                  presets={GUEST_STEPS}
+                  suffix="guests"
+                />
+              </div>
             </div>
             <div>
-              <label className={dashLabel}>Decor Theme</label>
-              <select
-                value={decorTheme}
-                onChange={(e) => setDecorTheme(e.target.value)}
-                className="mt-3 w-full border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm outline-none focus:border-gold-primary"
-              >
-                <option value="">Select theme</option>
-                {decorThemes.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
+              <p className={dashLabel}>Decor Theme</p>
+              <div className="mt-3">
+                <ChipSingleSelect
+                  options={decorOptions}
+                  value={decorTheme || null}
+                  onChange={(value) => setDecorTheme(value ?? "")}
+                />
+              </div>
             </div>
             <div>
-              <label className={dashLabel}>Catering Style</label>
-              <select
-                value={catering}
-                onChange={(e) => setCatering(e.target.value)}
-                className="mt-3 w-full border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm outline-none focus:border-gold-primary"
-              >
-                <option value="">Select catering</option>
-                {cateringStyles.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
+              <p className={dashLabel}>Catering Style</p>
+              <div className="mt-3">
+                <ChipSingleSelect
+                  options={cateringOptions}
+                  value={catering || null}
+                  onChange={(value) => setCatering(value ?? "")}
+                />
+              </div>
             </div>
             <div>
-              <label className={dashLabel}>Entertainment</label>
-              <select
-                value={entertainment}
-                onChange={(e) => setEntertainment(e.target.value)}
-                className="mt-3 w-full border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm outline-none focus:border-gold-primary"
-              >
-                <option value="">Select entertainment</option>
-                {entertainmentOptions.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </select>
+              <p className={dashLabel}>Entertainment</p>
+              <div className="mt-3">
+                <ChipSingleSelect
+                  options={entertainmentOpts}
+                  value={entertainment || null}
+                  onChange={(value) => setEntertainment(value ?? "")}
+                />
+              </div>
             </div>
             <div>
-              <label className={dashLabel}>Photography</label>
-              <select
-                value={photography}
-                onChange={(e) => setPhotography(e.target.value)}
-                className="mt-3 w-full border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm outline-none focus:border-gold-primary"
-              >
-                <option value="">Select package</option>
-                {photoOptions.map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
+              <p className={dashLabel}>Photography</p>
+              <div className="mt-3">
+                <ChipSingleSelect
+                  options={photoOpts}
+                  value={photography || null}
+                  onChange={(value) => setPhotography(value ?? "")}
+                />
+              </div>
             </div>
           </div>
         </div>
