@@ -6,14 +6,34 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer } from "@/animations/variants";
+import { FinalizationBoard } from "@/components/dashboard/finalization-board";
 import { ListEmptyState } from "@/components/dashboard/list-empty-state";
+import {
+  CEREMONY_FLOW_OPTIONS,
+  ChipMultiSelect,
+  ChipSingleSelect,
+  CUISINE_OPTIONS,
+  DECOR_PALETTES,
+  DECOR_STYLE_OPTIONS as PLANNER_DECOR_STYLE_OPTIONS,
+  DIETARY_TAG_OPTIONS,
+  DRESS_CODE_OPTIONS,
+  FOOD_SERVICE_STYLES,
+  GUEST_PRESETS,
+  OwnerSelect,
+  PresetTagInput,
+  ROOMING_OPTIONS,
+  SIGNATURE_COUNTER_OPTIONS,
+  Stepper,
+  SwatchPalette,
+  TASK_OWNER_OPTIONS,
+  TASK_TEMPLATES,
+  TRANSPORT_OPTIONS,
+  WEATHER_BACKUP_OPTIONS,
+} from "@/components/dashboard/planner-inputs";
 import { dashBtn, dashCard, dashLabel } from "@/lib/dashboard-styles";
 import {
-  DECOR_STYLE_OPTIONS,
   EVENT_TASK_STATUS_OPTIONS,
   EVENT_TYPE_OPTIONS,
-  FOOD_PREFERENCE_OPTIONS,
-  FOOD_STYLE_OPTIONS,
   MEAL_PERIOD_OPTIONS,
   MENU_COURSE_OPTIONS,
   PLANNER_VENDOR_CATEGORIES,
@@ -24,8 +44,6 @@ import {
   EVENT_FINALIZATION_CHECKLIST,
   EVENT_PLATFORM_TYPES,
   EVENT_REQUIREMENT_CATEGORIES,
-  EVENT_REQUIREMENT_PRIORITY_OPTIONS,
-  EVENT_REQUIREMENT_STATUS_OPTIONS,
   EVENT_TIME_BLOCKS,
   type EventRequirementCategoryKey,
   type EventTimeBlockKey,
@@ -909,6 +927,44 @@ function uniqueList(values: string[]) {
       seen.add(key);
       return true;
     });
+}
+
+const PLANNER_TAG_SEPARATOR = " · ";
+const EVENT_ESTIMATE_PRESETS = [
+  250000, 500000, 1000000, 2500000, 5000000, 7500000,
+];
+
+function splitPlannerTags(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  if (!trimmed) return [];
+  if (trimmed.includes("\n")) {
+    return trimmed
+      .split(/\n{2,}/)
+      .map((block) => block.trim())
+      .filter((block) => block && !block.includes("\n"));
+  }
+  return uniqueList(trimmed.split(PLANNER_TAG_SEPARATOR));
+}
+
+function joinPlannerTags(tags: string[]) {
+  return uniqueList(tags).join(PLANNER_TAG_SEPARATOR);
+}
+
+function labelValueOptions<T extends { label: string; value: string; hint?: string }>(
+  options: T[]
+) {
+  return options.map((option) => ({ ...option, value: option.label }));
+}
+
+function mergePlannerTagsWithBlocks(
+  existing: string | null | undefined,
+  tags: string[]
+) {
+  const preservedBlocks = (existing ?? "")
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter((block) => block && block.includes("\n"));
+  return [...preservedBlocks, joinPlannerTags(tags)].filter(Boolean).join("\n\n");
 }
 
 function appendPlanningBlock(current: string, title: string, lines: string[]) {
@@ -2188,37 +2244,6 @@ export default function ClientWeddingPage() {
     );
   };
 
-  const toggleMenuItemTag = (
-    menuClientId: string,
-    itemClientId: string,
-    tag: string
-  ) => {
-    setDetailDraft((current) =>
-      current
-        ? {
-            ...current,
-            menus: current.menus.map((menu) =>
-              menu.clientId === menuClientId
-                ? {
-                    ...menu,
-                    items: menu.items.map((item) => {
-                      if (item.clientId !== itemClientId) return item;
-                      const active = item.dietaryTags.includes(tag);
-                      return {
-                        ...item,
-                        dietaryTags: active
-                          ? item.dietaryTags.filter((entry) => entry !== tag)
-                          : [...item.dietaryTags, tag],
-                      };
-                    }),
-                  }
-                : menu
-            ),
-          }
-        : current
-    );
-  };
-
   const addTask = () => {
     setDetailDraft((current) =>
       current
@@ -2255,58 +2280,6 @@ export default function ClientWeddingPage() {
               current.tasks.length > 1
                 ? current.tasks.filter((task) => task.clientId !== taskClientId)
                 : current.tasks,
-          }
-        : current
-    );
-  };
-
-  const updateRequirement = (
-    requirementClientId: string,
-    updates: Partial<Omit<EventRequirementDraft, "clientId">>
-  ) => {
-    setDetailDraft((current) =>
-      current
-        ? {
-            ...current,
-            requirements: current.requirements.map((requirement) =>
-              requirement.clientId === requirementClientId
-                ? { ...requirement, ...updates }
-                : requirement
-            ),
-          }
-        : current
-    );
-  };
-
-  const addRequirement = () => {
-    setDetailDraft((current) =>
-      current
-        ? {
-            ...current,
-            requirements: [
-              ...current.requirements,
-              {
-                ...createRequirementDraft("custom"),
-                title: "Custom requirement",
-                notes: "",
-              },
-            ],
-          }
-        : current
-    );
-  };
-
-  const removeRequirement = (requirementClientId: string) => {
-    setDetailDraft((current) =>
-      current
-        ? {
-            ...current,
-            requirements:
-              current.requirements.length > 1
-                ? current.requirements.filter(
-                    (requirement) => requirement.clientId !== requirementClientId
-                  )
-                : current.requirements,
           }
         : current
     );
@@ -3192,174 +3165,52 @@ export default function ClientWeddingPage() {
                     />
                   </Field>
                   <Field label="Guest count">
-                    <input
-                      type="number"
-                      min={1}
-                      value={detailDraft.guestCount}
-                      onChange={(event) =>
+                    <Stepper
+                      value={
+                        detailDraft.guestCount
+                          ? Number(detailDraft.guestCount)
+                          : null
+                      }
+                      min={0}
+                      max={5000}
+                      step={25}
+                      presets={GUEST_PRESETS}
+                      suffix="guests"
+                      onChange={(guestCount) =>
                         setDetailDraft((current) =>
                           current
-                            ? { ...current, guestCount: event.target.value }
+                            ? { ...current, guestCount: String(guestCount) }
                             : current
                         )
                       }
-                      className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
                     />
                   </Field>
                   <Field label="Estimated spend (INR)">
-                    <input
-                      type="number"
+                    <Stepper
+                      value={
+                        detailDraft.estimatedBudget
+                          ? Number(detailDraft.estimatedBudget)
+                          : null
+                      }
                       min={0}
-                      step={1000}
-                      value={detailDraft.estimatedBudget}
-                      onChange={(event) =>
+                      max={50000000}
+                      step={50000}
+                      presets={EVENT_ESTIMATE_PRESETS}
+                      formatValue={formatCurrency}
+                      onChange={(estimatedBudget) =>
                         setDetailDraft((current) =>
                           current
                             ? {
                                 ...current,
-                                estimatedBudget: event.target.value,
+                                estimatedBudget: String(estimatedBudget),
                               }
                             : current
                         )
                       }
-                      className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
                     />
                   </Field>
                 </div>
 
-                ) : null}
-
-                {editorSection === "requirements" ? (
-                <div className="space-y-4 border-t border-charcoal/8 pt-5">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className={dashLabel}>Block requirements</p>
-                      <p className="mt-1 text-sm text-slate">
-                        Decide what this time block actually needs before picking vendors.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.16em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark"
-                      onClick={addRequirement}
-                    >
-                      Add custom need
-                    </button>
-                  </div>
-
-                  <div className="space-y-3">
-                    {detailDraft.requirements.map((requirement) => {
-                      const category = requirementCategoryCopy(requirement.category);
-                      return (
-                        <div
-                          key={requirement.clientId}
-                          className="border border-charcoal/10 bg-cream/25 p-4"
-                        >
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                              <p className="font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark">
-                                {category.label}
-                              </p>
-                              <p className="mt-1 text-xs leading-relaxed text-slate">
-                                {category.description}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate transition-colors hover:text-rose"
-                              onClick={() => removeRequirement(requirement.clientId)}
-                            >
-                              Remove
-                            </button>
-                          </div>
-
-                          <div className="mt-4 grid gap-3 md:grid-cols-2">
-                            <Field label="Need title">
-                              <input
-                                type="text"
-                                value={requirement.title}
-                                onChange={(event) =>
-                                  updateRequirement(requirement.clientId, {
-                                    title: event.target.value,
-                                  })
-                                }
-                                className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                              />
-                            </Field>
-                            <Field label="Category">
-                              <select
-                                value={requirement.category}
-                                onChange={(event) =>
-                                  updateRequirement(requirement.clientId, {
-                                    category: event.target.value as EventRequirementCategoryKey,
-                                  })
-                                }
-                                className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                              >
-                                {EVENT_REQUIREMENT_CATEGORIES.map((option) => (
-                                  <option key={option.key} value={option.key}>
-                                    {option.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </Field>
-                            <Field label="Status">
-                              <select
-                                value={requirement.status}
-                                onChange={(event) =>
-                                  updateRequirement(requirement.clientId, {
-                                    status: event.target.value,
-                                  })
-                                }
-                                className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                              >
-                                {EVENT_REQUIREMENT_STATUS_OPTIONS.map((option) => (
-                                  <option key={option} value={option}>
-                                    {option.replaceAll("_", " ")}
-                                  </option>
-                                ))}
-                              </select>
-                            </Field>
-                            <Field label="Priority">
-                              <select
-                                value={requirement.priority}
-                                onChange={(event) =>
-                                  updateRequirement(requirement.clientId, {
-                                    priority: event.target.value,
-                                  })
-                                }
-                                className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                              >
-                                {EVENT_REQUIREMENT_PRIORITY_OPTIONS.map((option) => (
-                                  <option key={option} value={option}>
-                                    {option}
-                                  </option>
-                                ))}
-                              </select>
-                            </Field>
-                          </div>
-
-                          <Field label="Structured starting points" className="mt-4">
-                            <RequirementPayloadPreview payload={requirement.payload} />
-                          </Field>
-
-                          <Field label="Requirement notes" className="mt-4">
-                            <textarea
-                              value={requirement.notes}
-                              onChange={(event) =>
-                                updateRequirement(requirement.clientId, {
-                                  notes: event.target.value,
-                                })
-                              }
-                              className="min-h-[86px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                              placeholder="Specific choices, constraints, questions for vendors, references..."
-                            />
-                          </Field>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
                 ) : null}
 
                 {editorSection === "food" ? (
@@ -3397,74 +3248,56 @@ export default function ClientWeddingPage() {
                   </div>
 
 	                  <Field label="Service format">
-                    <select
+                    <ChipSingleSelect
+                      options={labelValueOptions(FOOD_SERVICE_STYLES)}
                       value={detailDraft.foodStyle}
-                      onChange={(event) =>
+                      onChange={(foodStyle) =>
                         setDetailDraft((current) =>
                           current
-                            ? { ...current, foodStyle: event.target.value }
+                            ? { ...current, foodStyle: foodStyle ?? "" }
                             : current
                         )
                       }
-                      className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                    >
-                      <option value="">Choose a food format</option>
-                      {FOOD_STYLE_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </Field>
 
                   <div>
                     <p className={dashLabel}>Food preferences</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {FOOD_PREFERENCE_OPTIONS.map((option) => {
-                        const active = detailDraft.foodPreferences.includes(option);
-                        return (
-                          <button
-                            key={option}
-                            type="button"
-                            onClick={() =>
-                              setDetailDraft((current) => {
-                                if (!current) return current;
-                                return {
-                                  ...current,
-                                  foodPreferences: active
-                                    ? current.foodPreferences.filter(
-                                        (entry) => entry !== option
-                                      )
-                                    : [...current.foodPreferences, option],
-                                };
-                              })
-                            }
-                            className={cn(
-                              "border px-3 py-2 font-heading text-xs transition-colors",
-                              active
-                                ? "border-gold-primary bg-gold-primary/10 text-charcoal"
-                                : "border-charcoal/15 text-slate"
-                            )}
-                          >
-                            {option}
-                          </button>
-                        );
-                      })}
-                    </div>
+                    <p className="mt-1 text-xs leading-relaxed text-slate">
+                      Pick dietary needs, cuisines, and counters first. Custom
+                      entries are still available when the event needs them.
+                    </p>
+                    <PresetTagInput
+                      className="mt-3"
+                      suggestions={[...DIETARY_TAG_OPTIONS, ...CUISINE_OPTIONS]}
+                      value={detailDraft.foodPreferences}
+                      onChange={(foodPreferences) =>
+                        setDetailDraft((current) =>
+                          current ? { ...current, foodPreferences } : current
+                        )
+                      }
+                      placeholder="Add cuisine or dietary need"
+                    />
                   </div>
 
                   <Field label="Menu notes">
-                    <textarea
-                      value={detailDraft.menuNotes}
-                      onChange={(event) =>
+                    <PresetTagInput
+                      suggestions={[...CUISINE_OPTIONS, ...SIGNATURE_COUNTER_OPTIONS]}
+                      value={splitPlannerTags(detailDraft.menuNotes)}
+                      onChange={(tags) =>
                         setDetailDraft((current) =>
                           current
-                            ? { ...current, menuNotes: event.target.value }
+                            ? {
+                                ...current,
+                                menuNotes: mergePlannerTagsWithBlocks(
+                                  current.menuNotes,
+                                  tags
+                                ),
+                              }
                             : current
                         )
                       }
-                      className="min-h-[96px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                      placeholder="Cuisine mix, guest diet needs, signature counters, late-night snacks..."
+                      placeholder="Add menu note"
                     />
                   </Field>
 
@@ -3531,30 +3364,28 @@ export default function ClientWeddingPage() {
                             </select>
                           </Field>
                           <Field label="Service style" className="md:col-span-2">
-                            <input
-                              type="text"
+                            <ChipSingleSelect
+                              options={labelValueOptions(FOOD_SERVICE_STYLES)}
                               value={menu.serviceStyle}
-                              onChange={(event) =>
+                              onChange={(serviceStyle) =>
                                 updateMenuDraft(menu.clientId, {
-                                  serviceStyle: event.target.value,
+                                  serviceStyle: serviceStyle ?? "",
                                 })
                               }
-                              className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                              placeholder="Buffet, plated, live counters, family style..."
                             />
                           </Field>
                         </div>
 
                         <Field label="Menu brief">
-                          <textarea
-                            value={menu.notes}
-                            onChange={(event) =>
+                          <PresetTagInput
+                            suggestions={[...CUISINE_OPTIONS, ...SIGNATURE_COUNTER_OPTIONS]}
+                            value={splitPlannerTags(menu.notes)}
+                            onChange={(tags) =>
                               updateMenuDraft(menu.clientId, {
-                                notes: event.target.value,
+                                notes: mergePlannerTagsWithBlocks(menu.notes, tags),
                               })
                             }
-                            className="min-h-[80px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                            placeholder="Menu story, cuisines, service pacing, chef notes..."
+                            placeholder="Add menu brief"
                           />
                         </Field>
 
@@ -3576,16 +3407,15 @@ export default function ClientWeddingPage() {
                               className="space-y-3 border border-charcoal/10 bg-ivory/70 p-3"
                             >
                               <div className="grid gap-3 md:grid-cols-2">
-                                <input
-                                  type="text"
-                                  value={item.name}
-                                  onChange={(event) =>
+                                <PresetTagInput
+                                  suggestions={SIGNATURE_COUNTER_OPTIONS}
+                                  value={item.name ? [item.name] : []}
+                                  onChange={(tags) =>
                                     updateMenuItem(menu.clientId, item.clientId, {
-                                      name: event.target.value,
+                                      name: tags.at(-1) ?? "",
                                     })
                                   }
-                                  className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                                  placeholder="Dish, counter, drink, or station"
+                                  placeholder="Add dish or station"
                                 />
                                 <select
                                   value={item.course}
@@ -3605,32 +3435,15 @@ export default function ClientWeddingPage() {
                                 </select>
                               </div>
 
-                              <div className="flex flex-wrap gap-2">
-                                {FOOD_PREFERENCE_OPTIONS.slice(0, 5).map((tag) => {
-                                  const active = item.dietaryTags.includes(tag);
-                                  return (
-                                    <button
-                                      key={`${item.clientId}-${tag}`}
-                                      type="button"
-                                      onClick={() =>
-                                        toggleMenuItemTag(
-                                          menu.clientId,
-                                          item.clientId,
-                                          tag
-                                        )
-                                      }
-                                      className={cn(
-                                        "border px-2 py-1 font-heading text-[11px] transition-colors",
-                                        active
-                                          ? "border-gold-primary bg-gold-primary/10 text-charcoal"
-                                          : "border-charcoal/15 text-slate"
-                                      )}
-                                    >
-                                      {tag}
-                                    </button>
-                                  );
-                                })}
-                              </div>
+                              <ChipMultiSelect
+                                options={labelValueOptions(DIETARY_TAG_OPTIONS)}
+                                value={item.dietaryTags}
+                                onChange={(dietaryTags) =>
+                                  updateMenuItem(menu.clientId, item.clientId, {
+                                    dietaryTags,
+                                  })
+                                }
+                              />
 
                               <textarea
                                 value={item.notes}
@@ -3673,54 +3486,94 @@ export default function ClientWeddingPage() {
                   </div>
 
                   <Field label="Decor direction">
-                    <select
+                    <ChipSingleSelect
+                      options={labelValueOptions(PLANNER_DECOR_STYLE_OPTIONS)}
                       value={detailDraft.decorStyle}
-                      onChange={(event) =>
+                      onChange={(decorStyle) =>
                         setDetailDraft((current) =>
                           current
-                            ? { ...current, decorStyle: event.target.value }
+                            ? { ...current, decorStyle: decorStyle ?? "" }
                             : current
                         )
                       }
-                      className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                    >
-                      <option value="">Choose a decor style</option>
-                      {DECOR_STYLE_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-
-                  <Field label="Decor notes">
-                    <textarea
-                      value={detailDraft.decorNotes}
-                      onChange={(event) =>
-                        setDetailDraft((current) =>
-                          current
-                            ? { ...current, decorNotes: event.target.value }
-                            : current
-                        )
-                      }
-                      className="min-h-[96px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                      placeholder="Stage mood, florals, palettes, guest tables, aisle, lighting..."
                     />
                   </Field>
 
+                  <Field label="Palette and atmosphere">
+                    <div className="space-y-4">
+                      <SwatchPalette
+                        swatches={DECOR_PALETTES}
+                        value={splitPlannerTags(detailDraft.decorNotes)}
+                        onChange={(paletteTags) =>
+                          setDetailDraft((current) => {
+                            if (!current) return current;
+                            const nonPaletteTags = splitPlannerTags(
+                              current.decorNotes
+                            ).filter(
+                              (tag) =>
+                                !DECOR_PALETTES.some(
+                                  (swatch) => swatch.value === tag
+                                )
+                            );
+                            return {
+                              ...current,
+                              decorNotes: mergePlannerTagsWithBlocks(
+                                current.decorNotes,
+                                [...nonPaletteTags, ...paletteTags]
+                              ),
+                            };
+                          })
+                        }
+                      />
+                      <PresetTagInput
+                        suggestions={labelValueOptions(PLANNER_DECOR_STYLE_OPTIONS)}
+                        value={splitPlannerTags(detailDraft.decorNotes).filter(
+                          (tag) =>
+                            !DECOR_PALETTES.some(
+                              (swatch) => swatch.value === tag
+                            )
+                        )}
+                        onChange={(decorTags) =>
+                          setDetailDraft((current) => {
+                            if (!current) return current;
+                            const paletteTags = splitPlannerTags(
+                              current.decorNotes
+                            ).filter((tag) =>
+                              DECOR_PALETTES.some(
+                                (swatch) => swatch.value === tag
+                              )
+                            );
+                            return {
+                              ...current,
+                              decorNotes: mergePlannerTagsWithBlocks(
+                                current.decorNotes,
+                                [...paletteTags, ...decorTags]
+                              ),
+                            };
+                          })
+                        }
+                        placeholder="Add decor cue"
+                      />
+                    </div>
+                  </Field>
+
                   <Field label="Dress code or styling cues">
-                    <input
-                      type="text"
-                      value={detailDraft.attireNotes}
-                      onChange={(event) =>
+                    <ChipMultiSelect
+                      options={labelValueOptions(DRESS_CODE_OPTIONS)}
+                      value={splitPlannerTags(detailDraft.attireNotes)}
+                      onChange={(attireTags) =>
                         setDetailDraft((current) =>
                           current
-                            ? { ...current, attireNotes: event.target.value }
+                            ? {
+                                ...current,
+                                attireNotes: mergePlannerTagsWithBlocks(
+                                  current.attireNotes,
+                                  attireTags
+                                ),
+                              }
                             : current
                         )
                       }
-                      className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                      placeholder="Pastels, festive jewel tones, black tie, beach chic..."
                     />
                   </Field>
                 </div>
@@ -3942,54 +3795,67 @@ export default function ClientWeddingPage() {
                   </div>
 
                   <Field label="Transport plan">
-                    <textarea
-                      value={detailDraft.logistics.transportNotes}
-                      onChange={(event) =>
+                    <ChipMultiSelect
+                      options={labelValueOptions(TRANSPORT_OPTIONS)}
+                      value={splitPlannerTags(
+                        detailDraft.logistics.transportNotes
+                      )}
+                      onChange={(transportTags) =>
                         updateLogisticsDraft({
-                          transportNotes: event.target.value,
+                          transportNotes: mergePlannerTagsWithBlocks(
+                            detailDraft.logistics.transportNotes,
+                            transportTags
+                          ),
                         })
                       }
-                      className="min-h-[76px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                      placeholder="Pickups, shuttle loops, valet, driver holding area..."
                     />
                   </Field>
 
                   <Field label="Rooms and family movement">
-                    <textarea
-                      value={detailDraft.logistics.roomingNotes}
-                      onChange={(event) =>
+                    <ChipMultiSelect
+                      options={labelValueOptions(ROOMING_OPTIONS)}
+                      value={splitPlannerTags(detailDraft.logistics.roomingNotes)}
+                      onChange={(roomingTags) =>
                         updateLogisticsDraft({
-                          roomingNotes: event.target.value,
+                          roomingNotes: mergePlannerTagsWithBlocks(
+                            detailDraft.logistics.roomingNotes,
+                            roomingTags
+                          ),
                         })
                       }
-                      className="min-h-[76px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                      placeholder="Getting-ready rooms, family holding rooms, elder access..."
                     />
                   </Field>
 
                   <div className="grid gap-3 md:grid-cols-2">
                     <Field label="Weather backup">
-                      <textarea
-                        value={detailDraft.logistics.weatherPlan}
-                        onChange={(event) =>
+                      <ChipMultiSelect
+                        options={labelValueOptions(WEATHER_BACKUP_OPTIONS)}
+                        value={splitPlannerTags(detailDraft.logistics.weatherPlan)}
+                        onChange={(weatherTags) =>
                           updateLogisticsDraft({
-                            weatherPlan: event.target.value,
+                            weatherPlan: mergePlannerTagsWithBlocks(
+                              detailDraft.logistics.weatherPlan,
+                              weatherTags
+                            ),
                           })
                         }
-                        className="min-h-[88px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                        placeholder="Indoor move, tenting, heat/rain plan..."
                       />
                     </Field>
                     <Field label="Ceremony or sequence notes">
-                      <textarea
-                        value={detailDraft.logistics.ceremonyNotes}
-                        onChange={(event) =>
+                      <PresetTagInput
+                        suggestions={CEREMONY_FLOW_OPTIONS}
+                        value={splitPlannerTags(
+                          detailDraft.logistics.ceremonyNotes
+                        )}
+                        onChange={(ceremonyTags) =>
                           updateLogisticsDraft({
-                            ceremonyNotes: event.target.value,
+                            ceremonyNotes: mergePlannerTagsWithBlocks(
+                              detailDraft.logistics.ceremonyNotes,
+                              ceremonyTags
+                            ),
                           })
                         }
-                        className="min-h-[88px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                        placeholder="Procession order, cue points, family moments..."
+                        placeholder="Add sequence moment"
                       />
                     </Field>
                   </div>
@@ -4041,28 +3907,25 @@ export default function ClientWeddingPage() {
                         key={task.clientId}
                         className="space-y-3 border border-charcoal/10 bg-cream/30 p-3"
                       >
-                        <input
-                          type="text"
-                          value={task.title}
-                          onChange={(event) =>
+                        <PresetTagInput
+                          suggestions={TASK_TEMPLATES}
+                          value={task.title ? [task.title] : []}
+                          onChange={(titles) =>
                             updateTask(task.clientId, {
-                              title: event.target.value,
+                              title: titles.at(-1) ?? "",
                             })
                           }
-                          className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                          placeholder="Task title"
+                          placeholder="Add task title"
                         />
                         <div className="grid gap-3 md:grid-cols-3">
-                          <input
-                            type="text"
+                          <OwnerSelect
                             value={task.owner}
-                            onChange={(event) =>
+                            options={labelValueOptions(TASK_OWNER_OPTIONS)}
+                            onChange={(owner) =>
                               updateTask(task.clientId, {
-                                owner: event.target.value,
+                                owner,
                               })
                             }
-                            className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                            placeholder="Owner"
                           />
                           <select
                             value={task.status}
@@ -4844,64 +4707,6 @@ function serviceItemTypeLabel(value: string) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function requirementCategoryCopy(categoryKey: EventRequirementCategoryKey) {
-  return (
-    EVENT_REQUIREMENT_CATEGORIES.find((category) => category.key === categoryKey) ??
-    EVENT_REQUIREMENT_CATEGORIES.at(-1)!
-  );
-}
-
-function payloadValueToLabel(value: unknown) {
-  if (Array.isArray(value)) {
-    return value.length > 0 ? value.join(", ") : "To be decided";
-  }
-  if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (typeof value === "string" && value.trim()) return value;
-  if (typeof value === "number") return String(value);
-  return "To be decided";
-}
-
-function payloadKeyToLabel(key: string) {
-  return key
-    .replace(/([A-Z])/g, " $1")
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function RequirementPayloadPreview({
-  payload,
-}: {
-  payload: Record<string, unknown>;
-}) {
-  const entries = Object.entries(payload)
-    .filter(([key]) => key !== "enabled")
-    .slice(0, 8);
-
-  if (entries.length === 0) {
-    return (
-      <p className="border border-dashed border-charcoal/15 bg-ivory/50 px-3 py-2 text-xs leading-relaxed text-slate">
-        No structured fields yet. Use notes for now, and this requirement can
-        still be matched to vendors and quotes.
-      </p>
-    );
-  }
-
-  return (
-    <div className="grid gap-2 md:grid-cols-2">
-      {entries.map(([key, value]) => (
-        <div key={key} className="border border-charcoal/8 bg-ivory/60 p-3">
-          <p className="font-accent text-[9px] uppercase tracking-[0.16em] text-slate">
-            {payloadKeyToLabel(key)}
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-charcoal">
-            {payloadValueToLabel(value)}
-          </p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 const TIME_BLOCK_LABEL_BY_KEY = new Map<EventTimeBlockKey, string>(
   EVENT_TIME_BLOCKS.map((block) => [block.key, block.label])
 );
@@ -5221,92 +5026,12 @@ function FinalizationLayer({
     () => computeFinalizationChecks(days, weddingDate),
     [days, weddingDate]
   );
-  const okCount = checks.filter((check) => check.status === "ok").length;
-  const readyPercent = Math.round((okCount / checks.length) * 100);
 
   return (
-    <motion.section variants={fadeUp} className="mt-8 space-y-5">
-      <div className={cn(dashCard, "border-gold-primary/25 bg-gold-primary/5")}>
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className={dashLabel}>Layer 3 · Finalization</p>
-            <h3 className="mt-2 font-display text-2xl text-charcoal">
-              Finish the gaps before execution.
-            </h3>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate">
-              This is the readiness pass for vendors, menus, budgets, guests,
-              hotels, logistics, and the final run of show.
-            </p>
-          </div>
-          <div className="border border-charcoal/10 bg-ivory/70 px-4 py-3 text-right">
-            <p className="font-display text-3xl text-charcoal">{readyPercent}%</p>
-            <p className={dashLabel}>Ready</p>
-          </div>
-        </div>
-        <button
-          type="button"
-          className={cn(dashBtn, "mt-5")}
-          onClick={() => onResolveCheck("requirements")}
-        >
-          Open next gap
-        </button>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {checks.map((check) => (
-          <article
-            key={check.key}
-            className={cn(
-              dashCard,
-              check.status === "ok"
-                ? "border-sage/25 bg-sage/5"
-                : check.status === "missing"
-                  ? "border-rose/25 bg-rose/5"
-                  : "border-gold-primary/25 bg-gold-primary/5"
-            )}
-          >
-            <p className={dashLabel}>{check.status}</p>
-            <h4 className="mt-2 font-display text-lg text-charcoal">
-              {check.label}
-            </h4>
-            <p className="mt-2 text-xs leading-relaxed text-slate">
-              {check.description}
-            </p>
-            <p className="mt-4 border-t border-charcoal/10 pt-3 text-xs text-charcoal">
-              {check.detail}
-            </p>
-            <button
-              type="button"
-              onClick={() => onResolveCheck(check.key)}
-              className="font-accent mt-4 inline-flex border border-charcoal/15 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark"
-            >
-              {finalizationActionLabel(check)}
-            </button>
-          </article>
-        ))}
-      </div>
-    </motion.section>
+    <motion.div variants={fadeUp}>
+      <FinalizationBoard checks={checks} onResolve={onResolveCheck} />
+    </motion.div>
   );
-}
-
-function finalizationActionLabel(check: CheckResult) {
-  if (check.status === "ok") return "Review";
-  switch (check.key) {
-    case "definition":
-      return "Review structure";
-    case "requirements":
-      return "Fill requirements";
-    case "vendors":
-      return "Pick vendors";
-    case "budget":
-      return "Set estimates";
-    case "guests-hotels":
-      return "Plan hospitality";
-    case "run-of-show":
-      return "Open tasks";
-    default:
-      return "Resolve";
-  }
 }
 
 function Field({

@@ -353,6 +353,7 @@ export function Stepper({
   step = 10,
   presets,
   suffix,
+  formatValue,
   className,
 }: {
   value: number | null;
@@ -362,10 +363,12 @@ export function Stepper({
   step?: number;
   presets?: number[];
   suffix?: string;
+  formatValue?: (value: number) => string;
   className?: string;
 }) {
   const current = typeof value === "number" && Number.isFinite(value) ? value : min;
   const clamp = (next: number) => Math.min(max, Math.max(min, next));
+  const displayValue = (next: number) => formatValue?.(next) ?? String(next);
 
   return (
     <div className={cn("space-y-3", className)}>
@@ -379,7 +382,9 @@ export function Stepper({
           <Minus className="h-4 w-4" />
         </button>
         <div className="flex min-w-[5.5rem] items-baseline justify-center gap-1 px-4 py-2">
-          <span className="font-display text-xl text-charcoal">{current}</span>
+          <span className="font-display text-xl text-charcoal">
+            {displayValue(current)}
+          </span>
           {suffix ? (
             <span className="font-accent text-[9px] uppercase tracking-[0.16em] text-slate">
               {suffix}
@@ -404,7 +409,7 @@ export function Stepper({
               onClick={() => onChange(clamp(preset))}
               className={cn(chipBase, current === preset ? chipOn : chipOff)}
             >
-              {preset}
+              {displayValue(preset)}
             </button>
           ))}
         </div>
