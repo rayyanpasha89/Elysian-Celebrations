@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { fadeUp, staggerContainer } from "@/animations/variants";
 import { StatCard } from "@/components/dashboard/stat-card";
+import { DonutChart, type DonutSegment } from "@/components/dashboard/ui-kit";
 import { dashCard, dashLabel } from "@/lib/dashboard-styles";
 import { cn } from "@/lib/utils";
 
@@ -50,6 +51,15 @@ export default function AdminAnalyticsPage() {
   }, [data]);
 
   const totalBookings = bookingStatusRows.reduce((sum, [, count]) => sum + count, 0);
+
+  const accountSegments = useMemo<DonutSegment[]>(
+    () => [
+      { label: "Clients", value: data?.usersByRole.client ?? 0, color: "#c9a96e" },
+      { label: "Vendors", value: data?.usersByRole.vendor ?? 0, color: "#9bae8f" },
+      { label: "Admins", value: data?.usersByRole.admin ?? 0, color: "#7ba7c9" },
+    ],
+    [data]
+  );
 
   if (loading) {
     return (
@@ -107,25 +117,11 @@ export default function AdminAnalyticsPage() {
 
       <motion.div variants={fadeUp} className={cn(dashCard, "mt-10")}>
         <h3 className="font-display text-lg text-charcoal">Account mix</h3>
-        <div className="mt-6 grid gap-4 sm:grid-cols-3">
-          <div className="border border-charcoal/8 bg-ivory p-4">
-            <p className={dashLabel}>Clients</p>
-            <p className="mt-2 font-display text-2xl text-charcoal">
-              {data?.usersByRole.client ?? 0}
-            </p>
-          </div>
-          <div className="border border-charcoal/8 bg-ivory p-4">
-            <p className={dashLabel}>Vendors</p>
-            <p className="mt-2 font-display text-2xl text-charcoal">
-              {data?.usersByRole.vendor ?? 0}
-            </p>
-          </div>
-          <div className="border border-charcoal/8 bg-ivory p-4">
-            <p className={dashLabel}>Admins</p>
-            <p className="mt-2 font-display text-2xl text-charcoal">
-              {data?.usersByRole.admin ?? 0}
-            </p>
-          </div>
+        <p className="font-heading mt-2 text-sm text-slate">
+          Registered accounts across the platform by role.
+        </p>
+        <div className="mt-6">
+          <DonutChart segments={accountSegments} centerLabel="Accounts" />
         </div>
       </motion.div>
 
