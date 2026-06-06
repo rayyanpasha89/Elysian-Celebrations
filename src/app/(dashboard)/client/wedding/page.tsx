@@ -366,7 +366,7 @@ type EventDetailDraft = {
   logistics: LogisticsDraft;
   tasks: EventTaskDraft[];
   requirements: EventRequirementDraft[];
-  vendorSelections: Record<PlannerVendorCategoryKey, VendorDraftSelection | null>;
+  vendorSelections: Record<PlannerVendorCategoryKey, VendorDraftSelection[]>;
 };
 
 type EditorSectionKey =
@@ -585,6 +585,20 @@ const REQUIREMENT_PRIORITY_CHIPS = EVENT_REQUIREMENT_PRIORITY_OPTIONS.map(
   })
 );
 
+const TASK_STATUS_CHIPS = EVENT_TASK_STATUS_OPTIONS.map((status) => ({
+  value: status,
+  label: requirementOptionLabel(status),
+}));
+
+const NOTE_PROMPTS = [
+  "Family priority",
+  "Vendor question",
+  "Approval needed",
+  "Weather concern",
+  "Payment reminder",
+  "On-site instruction",
+] as const;
+
 function blockPurposeOptionsWithCurrent(value: string) {
   return value && !BLOCK_PURPOSE_OPTIONS.includes(value)
     ? [value, ...BLOCK_PURPOSE_OPTIONS]
@@ -705,11 +719,14 @@ function createEventDraftForDay(day?: WeddingDay): EventCreationDraft {
 
 function emptyVendorSelections(): Record<
   PlannerVendorCategoryKey,
-  VendorDraftSelection | null
+  VendorDraftSelection[]
 > {
   return Object.fromEntries(
-    PLANNER_VENDOR_CATEGORIES.map((category) => [category.key, null])
-  ) as Record<PlannerVendorCategoryKey, VendorDraftSelection | null>;
+    PLANNER_VENDOR_CATEGORIES.map((category) => [
+      category.key,
+      [] as VendorDraftSelection[],
+    ])
+  ) as Record<PlannerVendorCategoryKey, VendorDraftSelection[]>;
 }
 
 function emptyVendorOptions(): Record<
@@ -736,11 +753,11 @@ function buildDetailDraft(event: WeddingEvent): EventDetailDraft {
     );
     if (!plannerCategory || !selection.vendor) continue;
 
-    vendorSelections[plannerCategory.key] = {
+    vendorSelections[plannerCategory.key].push({
       vendorProfileId: selection.vendor.id,
       vendorSlug: selection.vendor.slug,
       vendorServiceId: selection.service?.id ?? "",
-    };
+    });
   }
 
   return {
@@ -1195,29 +1212,30 @@ function estimateDraftSpend({
   }
 
   for (const category of PLANNER_VENDOR_CATEGORIES) {
-    const selection = draft.vendorSelections[category.key];
-    if (!selection?.vendorProfileId) continue;
-    const vendor = (vendorOptions[category.key] ?? []).find(
-      (option) => option.id === selection.vendorProfileId
-    );
-    const service =
-      vendor?.services.find((entry) => entry.id === selection.vendorServiceId) ??
-      null;
+    for (const selection of draft.vendorSelections[category.key]) {
+      if (!selection.vendorProfileId) continue;
+      const vendor = (vendorOptions[category.key] ?? []).find(
+        (option) => option.id === selection.vendorProfileId
+      );
+      const service =
+        vendor?.services.find((entry) => entry.id === selection.vendorServiceId) ??
+        null;
 
-    if (!service) {
-      missingCount += 1;
-      continue;
+      if (!service) {
+        missingCount += 1;
+        continue;
+      }
+
+      const serviceRange = rangeFromServicePrice({
+        base: service.base_price,
+        max: service.max_price,
+        unit: service.unit,
+        guestCount,
+        source: service.name,
+      });
+      if (serviceRange) ranges.push(serviceRange);
+      else missingCount += 1;
     }
-
-    const serviceRange = rangeFromServicePrice({
-      base: service.base_price,
-      max: service.max_price,
-      unit: service.unit,
-      guestCount,
-      source: service.name,
-    });
-    if (serviceRange) ranges.push(serviceRange);
-    else missingCount += 1;
   }
 
   const savedEstimate =
@@ -1349,6 +1367,46 @@ function firstMissingVendorCategory(event: WeddingEvent | null) {
 function firstVendorGapSection(event: WeddingEvent | null): EditorSectionKey {
   const missingCategory = firstMissingVendorCategory(event);
   return missingCategory ? vendorCategorySection(missingCategory) : "food";
+}
+
+function vendorDraftSelectionKey(selection: VendorDraftSelection) {
+  return `${selection.vendorProfileId}:${selection.vendorServiceId || "no-service"}`;
+}
+
+function eventVendorSelectionKey(selection: EventVendorSelection) {
+  return `${selection.vendor?.id ?? ""}:${selection.service?.id ?? "no-service"}`;
+}
+
+function uniqueVendorDraftSelections(selections: VendorDraftSelection[]) {
+  const seen = new Set<string>();
+  return selections.filter((selection) => {
+    if (!selection.vendorProfileId) return false;
+    const key = vendorDraftSelectionKey(selection);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function upsertVendorDraftSelection(
+  selections: VendorDraftSelection[],
+  nextSelection: VendorDraftSelection
+) {
+  return uniqueVendorDraftSelections([
+    ...selections.filter(
+      (selection) => vendorDraftSelectionKey(selection) !== vendorDraftSelectionKey(nextSelection)
+    ),
+    nextSelection,
+  ]);
+}
+
+function removeVendorDraftSelection(
+  selections: VendorDraftSelection[],
+  selectionKey: string
+) {
+  return selections.filter(
+    (selection) => vendorDraftSelectionKey(selection) !== selectionKey
+  );
 }
 
 function nextBestPlannerAction(
@@ -1604,10 +1662,6 @@ function menuDraftFromVendorService({
       notes: item.description ?? "",
     })),
   };
-}
-
-function importTargetSection(categoryKey: PlannerVendorCategoryKey): EditorSectionKey {
-  return vendorCategorySection(categoryKey);
 }
 
 export default function ClientWeddingPage() {
@@ -2179,33 +2233,37 @@ export default function ClientWeddingPage() {
     const currentSelectionsByCategory = Object.fromEntries(
       PLANNER_VENDOR_CATEGORIES.map((category) => [
         category.key,
-        event.vendorSelections
-          .filter((selection) => selection.vendor?.categorySlug === category.slug)
-          .at(-1) ?? null,
+        event.vendorSelections.filter(
+          (selection) => selection.vendor?.categorySlug === category.slug
+        ),
       ])
-    ) as Record<PlannerVendorCategoryKey, EventVendorSelection | null>;
+    ) as Record<PlannerVendorCategoryKey, EventVendorSelection[]>;
 
     for (const category of PLANNER_VENDOR_CATEGORIES) {
-      const currentSelection = currentSelectionsByCategory[category.key];
-      const nextSelection = draft.vendorSelections[category.key];
+      const currentSelections = currentSelectionsByCategory[category.key];
+      const nextSelections = uniqueVendorDraftSelections(
+        draft.vendorSelections[category.key]
+      );
+      const currentByKey = new Map(
+        currentSelections.map((selection) => [
+          eventVendorSelectionKey(selection),
+          selection,
+        ])
+      );
+      const nextKeys = new Set(nextSelections.map(vendorDraftSelectionKey));
 
-      const selectionChanged =
-        (currentSelection?.vendor?.id ?? "") !==
-          (nextSelection?.vendorProfileId ?? "") ||
-        (currentSelection?.service?.id ?? "") !==
-          (nextSelection?.vendorServiceId ?? "");
+      for (const currentSelection of currentSelections) {
+        const currentKey = eventVendorSelectionKey(currentSelection);
+        if (nextKeys.has(currentKey)) continue;
 
-      if (!selectionChanged) continue;
+        if (currentSelection.status !== "INQUIRY") {
+          throw new Error(
+            `${category.label} is already ${formatBookingStatus(
+              currentSelection.status
+            )}. Update that booking from the bookings area instead.`
+          );
+        }
 
-      if (currentSelection && currentSelection.status !== "INQUIRY") {
-        throw new Error(
-          `${category.label} is already ${formatBookingStatus(
-            currentSelection.status
-          )}. Update that booking from the bookings area instead.`
-        );
-      }
-
-      if (currentSelection?.id) {
         const deleteResponse = await fetch(`/api/bookings/${currentSelection.id}`, {
           method: "DELETE",
         });
@@ -2217,7 +2275,9 @@ export default function ClientWeddingPage() {
         }
       }
 
-      if (nextSelection?.vendorProfileId) {
+      for (const nextSelection of nextSelections) {
+        if (currentByKey.has(vendorDraftSelectionKey(nextSelection))) continue;
+
         const createResponse = await fetch("/api/bookings", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -2639,6 +2699,17 @@ export default function ClientWeddingPage() {
     setDetailDraft((current) => {
       if (!current) return current;
 
+      const nextVendorSelections = {
+        ...current.vendorSelections,
+        [categoryKey]: upsertVendorDraftSelection(
+          current.vendorSelections[categoryKey],
+          {
+            vendorProfileId: vendor.id,
+            vendorSlug: vendor.slug,
+            vendorServiceId: service.id,
+          }
+        ),
+      };
       const nextTasks = current.tasks.some((task) => task.title === taskTitle)
         ? current.tasks
         : [
@@ -2657,6 +2728,7 @@ export default function ClientWeddingPage() {
 
         return {
           ...current,
+          vendorSelections: nextVendorSelections,
           menus: [
             ...current.menus,
             menuDraftFromVendorService({
@@ -2678,6 +2750,7 @@ export default function ClientWeddingPage() {
       if (categoryKey === "decor") {
         return {
           ...current,
+          vendorSelections: nextVendorSelections,
           decorNotes: appendPlanningBlock(current.decorNotes, title, lines),
           tasks: nextTasks,
         };
@@ -2686,6 +2759,7 @@ export default function ClientWeddingPage() {
       if (categoryKey === "logistics") {
         return {
           ...current,
+          vendorSelections: nextVendorSelections,
           logistics: {
             ...current.logistics,
             transportNotes: appendPlanningBlock(
@@ -2701,6 +2775,7 @@ export default function ClientWeddingPage() {
       if (categoryKey === "hospitality") {
         return {
           ...current,
+          vendorSelections: nextVendorSelections,
           logistics: {
             ...current.logistics,
             roomingNotes: appendPlanningBlock(
@@ -2715,16 +2790,16 @@ export default function ClientWeddingPage() {
 
       return {
         ...current,
+        vendorSelections: nextVendorSelections,
         notes: appendPlanningBlock(current.notes, title, lines),
         tasks: nextTasks,
       };
     });
 
-    setEditorSection(importTargetSection(categoryKey));
     toast.success(
       categoryKey === "catering"
-        ? "Vendor catalogue added to the food plan"
-        : "Vendor offering added to the event plan"
+        ? "Catalogue rows added. Keep editing this menu or add another package."
+        : "Offering added. Keep editing this section or add another package."
     );
   };
 
@@ -2791,28 +2866,59 @@ export default function ClientWeddingPage() {
     categoryKey: PlannerVendorCategoryKey,
     vendor: VendorPlannerOption | null
   ) => {
-    setDetailDraft((current) =>
-      current
-        ? {
-            ...current,
-            vendorSelections: {
-              ...current.vendorSelections,
-              [categoryKey]: vendor
-                ? {
-                    vendorProfileId: vendor.id,
-                    vendorSlug: vendor.slug,
-                    vendorServiceId: "",
-                  }
-                : null,
-            },
-          }
-        : current
-    );
+    setDetailDraft((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        vendorSelections: {
+          ...current.vendorSelections,
+          [categoryKey]: vendor
+            ? upsertVendorDraftSelection(current.vendorSelections[categoryKey], {
+                vendorProfileId: vendor.id,
+                vendorSlug: vendor.slug,
+                vendorServiceId: "",
+              })
+            : [],
+        },
+      };
+    });
   };
 
   const selectPlannerService = (
     categoryKey: PlannerVendorCategoryKey,
     vendorServiceId: string
+  ) => {
+    setDetailDraft((current) => {
+      if (!current) return current;
+      const selections = current.vendorSelections[categoryKey];
+      const activeSelection = selections.at(-1);
+      if (!activeSelection) return current;
+
+      return {
+        ...current,
+        vendorSelections: {
+          ...current.vendorSelections,
+          [categoryKey]: upsertVendorDraftSelection(
+            selections.filter(
+              (selection) =>
+                !(
+                  selection.vendorProfileId === activeSelection.vendorProfileId &&
+                  !selection.vendorServiceId
+                )
+            ),
+            {
+              ...activeSelection,
+              vendorServiceId,
+            }
+          ),
+        },
+      };
+    });
+  };
+
+  const removePlannerVendorSelection = (
+    categoryKey: PlannerVendorCategoryKey,
+    selectionKey: string
   ) => {
     setDetailDraft((current) =>
       current
@@ -2820,12 +2926,10 @@ export default function ClientWeddingPage() {
             ...current,
             vendorSelections: {
               ...current.vendorSelections,
-              [categoryKey]: current.vendorSelections[categoryKey]
-                ? {
-                    ...current.vendorSelections[categoryKey]!,
-                    vendorServiceId,
-                  }
-                : null,
+              [categoryKey]: removeVendorDraftSelection(
+                current.vendorSelections[categoryKey],
+                selectionKey
+              ),
             },
           }
         : current
@@ -3101,7 +3205,7 @@ export default function ClientWeddingPage() {
               {layer === "definition"
                 ? "Step 1 · Confirm the shape — name, days, time blocks."
                 : layer === "requirements"
-                  ? "Step 2 · Fill in what each block needs — food, decor, vendors."
+                  ? "Step 2 · Choose partners, import packages, then customize details."
                   : "Step 3 · Close the gaps before go-live."}
             </p>
           </div>
@@ -3161,11 +3265,11 @@ export default function ClientWeddingPage() {
         nextAction={nextPlannerAction}
         onOpenSection={(section) => setEditorSection(section)}
       />
-      <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_420px]">
-        <div>
+      <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1fr)_420px]">
+        <div className="xl:order-2 xl:sticky xl:top-6 xl:max-h-[calc(100vh-3rem)] xl:overflow-y-auto xl:pr-1">
           <motion.div
             variants={fadeUp}
-            className="flex flex-col gap-4 border-b border-charcoal/10 pb-6 sm:flex-row sm:items-end sm:justify-between"
+            className="flex flex-col gap-4 border-b border-charcoal/10 pb-5"
           >
             <div>
               <p className={dashLabel}>Celebration board</p>
@@ -3173,7 +3277,7 @@ export default function ClientWeddingPage() {
                 Days, events, and flow
               </h3>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 className={dashBtn}
@@ -3195,10 +3299,10 @@ export default function ClientWeddingPage() {
             <motion.form
               variants={fadeUp}
               onSubmit={createDay}
-              className="mt-6 border border-charcoal/10 bg-ivory p-5"
+              className="mt-5 border border-charcoal/10 bg-ivory p-4"
             >
               <p className={dashLabel}>New celebration day</p>
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div className="mt-4 grid gap-3">
                 <input
                   type="text"
                   value={dayDraft.name}
@@ -3256,7 +3360,7 @@ export default function ClientWeddingPage() {
               <ListEmptyState hint="Create your first celebration day to start planning event by event." />
             </div>
           ) : (
-            <div className="mt-8 space-y-6">
+            <div className="mt-6 space-y-4">
               {days
                 .slice()
                 .sort((left, right) => left.sort_order - right.sort_order)
@@ -3269,11 +3373,11 @@ export default function ClientWeddingPage() {
                     onDragOver={(event) => event.preventDefault()}
                     onDrop={() => void handleDropOnDay(day.id)}
                     className={cn(
-                      "border bg-ivory p-5 transition-colors",
+                      "border bg-ivory p-4 transition-colors",
                       draggedEventId ? "border-gold-primary/35" : "border-charcoal/10"
                     )}
                   >
-                    <div className="flex flex-col gap-4 border-b border-charcoal/8 pb-5 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="flex flex-col gap-4 border-b border-charcoal/8 pb-4">
                       <div>
                         {editingDayId === day.id ? (
                           <div className="space-y-3">
@@ -3338,7 +3442,7 @@ export default function ClientWeddingPage() {
                                 {formatDayDate(day.date)}
                               </p>
                             </div>
-                            <h4 className="mt-2 font-display text-2xl text-charcoal">
+                            <h4 className="mt-2 font-display text-xl text-charcoal">
                               {day.name}
                             </h4>
                             <p className="mt-2 font-heading text-xs text-slate">
@@ -3357,7 +3461,7 @@ export default function ClientWeddingPage() {
                                 {day.notes}
                               </p>
                             ) : null}
-                            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate">
+                            <p className="mt-3 text-sm leading-relaxed text-slate">
                               Drop an event here to move it into this day, or add a new
                               function specifically for this part of the celebration.
                             </p>
@@ -3428,7 +3532,7 @@ export default function ClientWeddingPage() {
                           will automatically get starter requirements, menu,
                           logistics, and run-of-show tasks.
                         </p>
-                        <div className="mt-4 grid gap-3 md:grid-cols-2">
+                        <div className="mt-4 grid gap-3">
                           <input
                             type="text"
                             value={eventDraft.name}
@@ -3510,7 +3614,7 @@ export default function ClientWeddingPage() {
                             }
                             className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
                           />
-                          <div className="md:col-span-2">
+                          <div>
                             <p className={dashLabel}>Venue or area</p>
                             <VenuePicker
                               venues={venueOptions}
@@ -3548,7 +3652,7 @@ export default function ClientWeddingPage() {
                         </p>
                       </div>
                     ) : (
-                      <div className="mt-5 grid gap-4 md:grid-cols-2">
+                      <div className="mt-5 grid gap-4">
                         {day.events
                           .slice()
                           .sort((left, right) => left.sort_order - right.sort_order)
@@ -3673,8 +3777,8 @@ export default function ClientWeddingPage() {
           )}
         </div>
 
-        <motion.aside variants={fadeUp} className="self-start">
-          <div className="sticky top-6 border border-charcoal/10 bg-ivory p-5">
+        <motion.aside variants={fadeUp} className="self-start xl:order-1">
+          <div className="border border-charcoal/10 bg-ivory p-5 md:p-6">
             <p className={dashLabel}>Event editor</p>
             {selectedEvent && detailDraft ? (
               <div className="mt-4 space-y-5">
@@ -3763,7 +3867,7 @@ export default function ClientWeddingPage() {
                   <div className="border border-charcoal/8 bg-cream/35 p-3">
                     <p className={dashLabel}>Partners</p>
                     <p className="mt-1 font-display text-lg text-charcoal">
-                      {Object.values(detailDraft.vendorSelections).filter(Boolean).length}
+                      {Object.values(detailDraft.vendorSelections).flat().length}
                     </p>
                   </div>
                   <div className="border border-charcoal/8 bg-cream/35 p-3">
@@ -3963,7 +4067,7 @@ export default function ClientWeddingPage() {
                   <EmbeddedVendorPlanner
                     categoryKey="catering"
                     selectedEvent={selectedEvent}
-                    selection={detailDraft.vendorSelections.catering}
+                    selections={detailDraft.vendorSelections.catering}
                     options={vendorOptions.catering ?? []}
                     savedSlugs={savedVendorSlugs}
                     loading={vendorOptionsLoading}
@@ -3974,6 +4078,9 @@ export default function ClientWeddingPage() {
                     onClearVendor={() => selectPlannerVendor("catering", null)}
                     onSelectService={(serviceId) =>
                       selectPlannerService("catering", serviceId)
+                    }
+                    onRemoveSelection={(selectionKey) =>
+                      removePlannerVendorSelection("catering", selectionKey)
                     }
                     onApplyService={(vendor, service, selectedItemIds) =>
                       applyVendorServiceToPlan({
@@ -4252,7 +4359,7 @@ export default function ClientWeddingPage() {
                   <EmbeddedVendorPlanner
                     categoryKey="decor"
                     selectedEvent={selectedEvent}
-                    selection={detailDraft.vendorSelections.decor}
+                    selections={detailDraft.vendorSelections.decor}
                     options={vendorOptions.decor ?? []}
                     savedSlugs={savedVendorSlugs}
                     loading={vendorOptionsLoading}
@@ -4263,6 +4370,9 @@ export default function ClientWeddingPage() {
                     onClearVendor={() => selectPlannerVendor("decor", null)}
                     onSelectService={(serviceId) =>
                       selectPlannerService("decor", serviceId)
+                    }
+                    onRemoveSelection={(selectionKey) =>
+                      removePlannerVendorSelection("decor", selectionKey)
                     }
                     onApplyService={(vendor, service, selectedItemIds) =>
                       applyVendorServiceToPlan({
@@ -4382,7 +4492,7 @@ export default function ClientWeddingPage() {
                     <EmbeddedVendorPlanner
                       categoryKey="photography"
                       selectedEvent={selectedEvent}
-                      selection={detailDraft.vendorSelections.photography}
+                      selections={detailDraft.vendorSelections.photography}
                       options={vendorOptions.photography ?? []}
                       savedSlugs={savedVendorSlugs}
                       loading={vendorOptionsLoading}
@@ -4395,6 +4505,9 @@ export default function ClientWeddingPage() {
                       }
                       onSelectService={(serviceId) =>
                         selectPlannerService("photography", serviceId)
+                      }
+                      onRemoveSelection={(selectionKey) =>
+                        removePlannerVendorSelection("photography", selectionKey)
                       }
                       onApplyService={(vendor, service, selectedItemIds) =>
                         applyVendorServiceToPlan({
@@ -4445,7 +4558,7 @@ export default function ClientWeddingPage() {
                     <EmbeddedVendorPlanner
                       categoryKey="entertainment"
                       selectedEvent={selectedEvent}
-                      selection={detailDraft.vendorSelections.entertainment}
+                      selections={detailDraft.vendorSelections.entertainment}
                       options={vendorOptions.entertainment ?? []}
                       savedSlugs={savedVendorSlugs}
                       loading={vendorOptionsLoading}
@@ -4458,6 +4571,9 @@ export default function ClientWeddingPage() {
                       }
                       onSelectService={(serviceId) =>
                         selectPlannerService("entertainment", serviceId)
+                      }
+                      onRemoveSelection={(selectionKey) =>
+                        removePlannerVendorSelection("entertainment", selectionKey)
                       }
                       onApplyService={(vendor, service, selectedItemIds) =>
                         applyVendorServiceToPlan({
@@ -4508,7 +4624,7 @@ export default function ClientWeddingPage() {
                   <EmbeddedVendorPlanner
                     categoryKey="logistics"
                     selectedEvent={selectedEvent}
-                    selection={detailDraft.vendorSelections.logistics}
+                    selections={detailDraft.vendorSelections.logistics}
                     options={vendorOptions.logistics ?? []}
                     savedSlugs={savedVendorSlugs}
                     loading={vendorOptionsLoading}
@@ -4519,6 +4635,9 @@ export default function ClientWeddingPage() {
                     onClearVendor={() => selectPlannerVendor("logistics", null)}
                     onSelectService={(serviceId) =>
                       selectPlannerService("logistics", serviceId)
+                    }
+                    onRemoveSelection={(selectionKey) =>
+                      removePlannerVendorSelection("logistics", selectionKey)
                     }
                     onApplyService={(vendor, service, selectedItemIds) =>
                       applyVendorServiceToPlan({
@@ -4533,7 +4652,7 @@ export default function ClientWeddingPage() {
                   <EmbeddedVendorPlanner
                     categoryKey="hospitality"
                     selectedEvent={selectedEvent}
-                    selection={detailDraft.vendorSelections.hospitality}
+                    selections={detailDraft.vendorSelections.hospitality}
                     options={vendorOptions.hospitality ?? []}
                     savedSlugs={savedVendorSlugs}
                     loading={vendorOptionsLoading}
@@ -4546,6 +4665,9 @@ export default function ClientWeddingPage() {
                     }
                     onSelectService={(serviceId) =>
                       selectPlannerService("hospitality", serviceId)
+                    }
+                    onRemoveSelection={(selectionKey) =>
+                      removePlannerVendorSelection("hospitality", selectionKey)
                     }
                     onApplyService={(vendor, service, selectedItemIds) =>
                       applyVendorServiceToPlan({
@@ -4841,7 +4963,8 @@ export default function ClientWeddingPage() {
                     <div>
                       <p className={dashLabel}>Event tasks</p>
                       <p className="mt-1 text-sm text-slate">
-                        Track the action items that belong specifically to this function.
+                        Keep this light: choose a template, assign an owner,
+                        then mark the next visible action.
                       </p>
                     </div>
 	                    <button
@@ -4852,6 +4975,39 @@ export default function ClientWeddingPage() {
 	                      Add task
 	                    </button>
 	                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div className="border border-charcoal/8 bg-cream/35 p-3">
+                      <p className={dashLabel}>Open</p>
+                      <p className="mt-1 font-display text-xl text-charcoal">
+                        {
+                          detailDraft.tasks.filter(
+                            (task) => task.status !== "DONE"
+                          ).length
+                        }
+                      </p>
+                    </div>
+                    <div className="border border-charcoal/8 bg-cream/35 p-3">
+                      <p className={dashLabel}>Done</p>
+                      <p className="mt-1 font-display text-xl text-charcoal">
+                        {
+                          detailDraft.tasks.filter(
+                            (task) => task.status === "DONE"
+                          ).length
+                        }
+                      </p>
+                    </div>
+                    <div className="border border-charcoal/8 bg-cream/35 p-3">
+                      <p className={dashLabel}>Owners</p>
+                      <p className="mt-1 font-display text-xl text-charcoal">
+                        {
+                          uniqueList(
+                            detailDraft.tasks.map((task) => task.owner)
+                          ).length
+                        }
+                      </p>
+                    </div>
+                  </div>
 
                   <div className="border border-gold-primary/20 bg-gold-primary/5 p-3">
                     <p className={dashLabel}>Task templates</p>
@@ -4877,19 +5033,66 @@ export default function ClientWeddingPage() {
                     {detailDraft.tasks.map((task) => (
                       <div
                         key={task.clientId}
-                        className="space-y-3 border border-charcoal/10 bg-cream/30 p-3"
+                        className="space-y-3 border border-charcoal/10 bg-cream/30 p-4"
                       >
-                        <PresetTagInput
-                          suggestions={TASK_TEMPLATES}
-                          value={task.title ? [task.title] : []}
-                          onChange={(titles) =>
-                            updateTask(task.clientId, {
-                              title: titles.at(-1) ?? "",
-                            })
-                          }
-                          placeholder="Add task title"
-                        />
-                        <div className="grid gap-3 md:grid-cols-3">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <PresetTagInput
+                              suggestions={TASK_TEMPLATES}
+                              value={task.title ? [task.title] : []}
+                              onChange={(titles) =>
+                                updateTask(task.clientId, {
+                                  title: titles.at(-1) ?? "",
+                                })
+                              }
+                              placeholder="Add task title"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            className={cn(
+                              "border px-3 py-2 font-accent text-[10px] uppercase tracking-[0.16em] transition-colors",
+                              task.status === "DONE"
+                                ? "border-charcoal/15 text-charcoal hover:border-gold-primary"
+                                : "border-sage/30 text-sage hover:bg-sage hover:text-ivory"
+                            )}
+                            onClick={() =>
+                              updateTask(task.clientId, {
+                                status:
+                                  task.status === "DONE" ? "OPEN" : "DONE",
+                              })
+                            }
+                          >
+                            {task.status === "DONE" ? "Reopen" : "Mark done"}
+                          </button>
+                        </div>
+                        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+                          <Field label="Status">
+                            <ChipSingleSelect
+                              options={TASK_STATUS_CHIPS}
+                              value={task.status}
+                              allowClear={false}
+                              onChange={(status) =>
+                                updateTask(task.clientId, {
+                                  status: status ?? "OPEN",
+                                })
+                              }
+                            />
+                          </Field>
+                          <Field label="Due date">
+                            <input
+                              type="date"
+                              value={task.dueDate}
+                              onChange={(event) =>
+                                updateTask(task.clientId, {
+                                  dueDate: event.target.value,
+                                })
+                              }
+                              className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                            />
+                          </Field>
+                        </div>
+                        <Field label="Owner">
                           <OwnerSelect
                             value={task.owner}
                             options={labelValueOptions(TASK_OWNER_OPTIONS)}
@@ -4899,40 +5102,17 @@ export default function ClientWeddingPage() {
                               })
                             }
                           />
-                          <select
-                            value={task.status}
-                            onChange={(event) =>
-                              updateTask(task.clientId, {
-                                status: event.target.value,
-                              })
-                            }
-                            className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                        </Field>
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate transition-colors hover:text-rose disabled:cursor-not-allowed disabled:text-slate/40"
+                            onClick={() => removeTask(task.clientId)}
+                            disabled={detailDraft.tasks.length === 1}
                           >
-                            {EVENT_TASK_STATUS_OPTIONS.map((option) => (
-                              <option key={option} value={option}>
-                                {option.replace("_", " ")}
-                              </option>
-                            ))}
-                          </select>
-                          <input
-                            type="date"
-                            value={task.dueDate}
-                            onChange={(event) =>
-                              updateTask(task.clientId, {
-                                dueDate: event.target.value,
-                              })
-                            }
-                            className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                          />
+                            Remove task
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal"
-                          onClick={() => removeTask(task.clientId)}
-                          disabled={detailDraft.tasks.length === 1}
-                        >
-                          Remove task
-                        </button>
                       </div>
                     ))}
                   </div>
@@ -4941,7 +5121,31 @@ export default function ClientWeddingPage() {
                 ) : null}
 
                 {editorSection === "notes" ? (
-                  <div>
+                  <div className="space-y-4 border-t border-charcoal/8 pt-5">
+                    <div>
+                      <p className={dashLabel}>Planning notes</p>
+                      <p className="mt-1 text-sm text-slate">
+                        Use chips for common reminders, then keep the freeform
+                        notes for only the details that need words.
+                      </p>
+                    </div>
+                    <div className="border border-gold-primary/20 bg-gold-primary/5 p-4">
+                      <p className={dashLabel}>Quick note prompts</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {NOTE_PROMPTS.map((prompt) => (
+                          <button
+                            key={prompt}
+                            type="button"
+                            onClick={() =>
+                              addPlanningNoteBlock("Planning note", [prompt])
+                            }
+                            className="border border-charcoal/10 bg-ivory/75 px-3 py-2 font-heading text-xs text-charcoal transition-colors hover:border-gold-primary/45"
+                          >
+                            + {prompt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     <Field label="Planning notes">
                       <textarea
                         value={detailDraft.notes}
@@ -5296,7 +5500,7 @@ function VenuePicker({
 function EmbeddedVendorPlanner({
   categoryKey,
   selectedEvent,
-  selection,
+  selections,
   options,
   savedSlugs,
   loading,
@@ -5304,11 +5508,12 @@ function EmbeddedVendorPlanner({
   onSelectVendor,
   onClearVendor,
   onSelectService,
+  onRemoveSelection,
   onApplyService,
 }: {
   categoryKey: PlannerVendorCategoryKey;
   selectedEvent: WeddingEvent | null;
-  selection: VendorDraftSelection | null;
+  selections: VendorDraftSelection[];
   options: VendorPlannerOption[];
   savedSlugs: string[];
   loading: boolean;
@@ -5316,6 +5521,7 @@ function EmbeddedVendorPlanner({
   onSelectVendor: (vendor: VendorPlannerOption) => void;
   onClearVendor: () => void;
   onSelectService: (serviceId: string) => void;
+  onRemoveSelection: (selectionKey: string) => void;
   onApplyService: (
     vendor: VendorPlannerOption,
     service: VendorPlannerService,
@@ -5328,16 +5534,55 @@ function EmbeddedVendorPlanner({
   if (!category) return null;
 
   const orderedOptions = orderVendorOptionsByShortlist(options, savedSlugs);
-  const currentBookingSelection =
-    selectedEvent?.vendorSelections
-      .filter((entry) => entry.vendor?.categorySlug === category.slug)
-      .at(-1) ?? null;
+  const currentBookingSelections =
+    selectedEvent?.vendorSelections.filter(
+      (entry) => entry.vendor?.categorySlug === category.slug
+    ) ?? [];
+  const currentBookingByKey = new Map(
+    currentBookingSelections.map((selection) => [
+      eventVendorSelectionKey(selection),
+      selection,
+    ])
+  );
+  const activeSelection = selections.at(-1) ?? null;
   const selectedVendor =
-    orderedOptions.find((option) => option.id === selection?.vendorProfileId) ??
+    orderedOptions.find((option) => option.id === activeSelection?.vendorProfileId) ??
     null;
   const selectedService = selectedVendor?.services.find(
-    (service) => service.id === selection?.vendorServiceId
+    (service) => service.id === activeSelection?.vendorServiceId
   );
+  const selectedVendorIds = uniqueList(
+    selections.map((selection) => selection.vendorProfileId)
+  );
+  const selectedServiceIds = uniqueList(
+    selections.map((selection) => selection.vendorServiceId).filter(Boolean)
+  );
+  const selectedPackages = selections.map((selection) => {
+    const key = vendorDraftSelectionKey(selection);
+    const vendor =
+      orderedOptions.find((option) => option.id === selection.vendorProfileId) ??
+      null;
+    const service =
+      vendor?.services.find((entry) => entry.id === selection.vendorServiceId) ??
+      null;
+    const bookingSelection = currentBookingByKey.get(key) ?? null;
+    return {
+      key,
+      vendorName:
+        vendor?.business_name ??
+        bookingSelection?.vendor?.businessName ??
+        "Selected partner",
+      serviceName:
+        service?.name ??
+        bookingSelection?.service?.name ??
+        (selection.vendorServiceId ? "Selected package" : "Package pending"),
+      priceLabel: service ? servicePriceLabel(service) : null,
+      status: bookingSelection?.status ?? "DRAFT",
+      locked: Boolean(
+        bookingSelection && bookingSelection.status !== "INQUIRY"
+      ),
+    };
+  });
 
   return (
     <div className="border border-gold-primary/20 bg-gold-primary/5 p-4">
@@ -5352,9 +5597,10 @@ function EmbeddedVendorPlanner({
           <span className="border border-charcoal/10 bg-ivory/70 px-2 py-1 font-heading text-[11px] text-slate">
             Loading partners...
           </span>
-        ) : currentBookingSelection ? (
+        ) : currentBookingSelections.length > 0 ? (
           <span className="border border-gold-primary/35 bg-ivory/80 px-2 py-1 font-heading text-[11px] text-gold-dark">
-            {formatBookingStatus(currentBookingSelection.status)}
+            {currentBookingSelections.length} booking
+            {currentBookingSelections.length === 1 ? "" : "s"} synced
           </span>
         ) : null}
       </div>
@@ -5364,10 +5610,65 @@ function EmbeddedVendorPlanner({
           categoryLabel={category.label}
           options={orderedOptions}
           savedSlugs={savedSlugs}
-          selectedVendorId={selection?.vendorProfileId ?? ""}
+          selectedVendorIds={selectedVendorIds}
           onSelect={onSelectVendor}
           onClear={onClearVendor}
+          clearDisabled={selectedPackages.some((selection) => selection.locked)}
         />
+
+        {selectedPackages.length > 0 ? (
+          <div className="border border-gold-primary/25 bg-ivory/80 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className={dashLabel}>Selected for this event</p>
+              <span className="font-heading text-[11px] text-gold-dark">
+                {selectedPackages.length} package
+                {selectedPackages.length === 1 ? "" : "s"}
+              </span>
+            </div>
+            <div className="mt-3 grid gap-2">
+              {selectedPackages.map((packageSelection) => (
+                <div
+                  key={packageSelection.key}
+                  className="flex flex-wrap items-center justify-between gap-3 border border-charcoal/8 bg-cream/25 px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="font-heading text-sm text-charcoal">
+                      {packageSelection.vendorName}
+                    </p>
+                    <p className="mt-1 text-xs text-slate">
+                      {packageSelection.serviceName}
+                      {packageSelection.priceLabel
+                        ? ` · ${packageSelection.priceLabel}`
+                        : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="border border-charcoal/10 bg-ivory/70 px-2 py-1 font-heading text-[10px] text-slate">
+                      {formatBookingStatus(packageSelection.status)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => onRemoveSelection(packageSelection.key)}
+                      disabled={packageSelection.locked}
+                      className="font-accent text-[10px] uppercase tracking-[0.16em] text-rose transition-colors hover:text-charcoal disabled:cursor-not-allowed disabled:text-slate/50"
+                      title={
+                        packageSelection.locked
+                          ? "Confirmed bookings must be changed from bookings."
+                          : "Remove this package from the draft."
+                      }
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 text-[11px] leading-relaxed text-slate">
+              You can keep adding partners or packages here. Save the event plan
+              when the shortlist for this block feels right.
+            </p>
+          </div>
+        ) : null}
 
         {selectedVendor ? (
           <>
@@ -5393,13 +5694,15 @@ function EmbeddedVendorPlanner({
 
             <ServiceOptionCards
               services={selectedVendor.services}
-              selectedServiceId={selection?.vendorServiceId ?? ""}
+              activeServiceId={activeSelection?.vendorServiceId ?? ""}
+              selectedServiceIds={selectedServiceIds}
               onSelect={onSelectService}
             />
 
             {selectedService ? (
               <div className="border border-charcoal/10 bg-ivory/75 p-3">
                 <ServiceOfferingPreview
+                  key={selectedService.id}
                   categoryKey={category.key}
                   vendorName={selectedVendor.business_name}
                   service={selectedService}
@@ -5437,18 +5740,21 @@ function VendorOptionCards({
   categoryLabel,
   options,
   savedSlugs,
-  selectedVendorId,
+  selectedVendorIds,
   onSelect,
   onClear,
+  clearDisabled = false,
 }: {
   categoryLabel: string;
   options: VendorPlannerOption[];
   savedSlugs: string[];
-  selectedVendorId: string;
+  selectedVendorIds: string[];
   onSelect: (vendor: VendorPlannerOption) => void;
   onClear: () => void;
+  clearDisabled?: boolean;
 }) {
   const savedSet = new Set(savedSlugs);
+  const selectedSet = new Set(selectedVendorIds);
 
   if (options.length === 0) {
     return (
@@ -5472,7 +5778,7 @@ function VendorOptionCards({
     <div className="space-y-3">
       <div className="grid gap-3 md:grid-cols-2">
         {options.map((option) => {
-          const active = selectedVendorId === option.id;
+          const active = selectedSet.has(option.id);
           const saved = savedSet.has(option.slug);
           const firstService = option.services[0];
           return (
@@ -5497,9 +5803,16 @@ function VendorOptionCards({
                     {option.rating ? ` · ${option.rating.toFixed(1)} rating` : ""}
                   </span>
                 </span>
-                {saved ? (
-                  <span className="border border-gold-primary/40 bg-gold-primary/10 px-2 py-1 font-accent text-[9px] uppercase tracking-[0.14em] text-gold-dark">
-                    Shortlisted
+                {saved || active ? (
+                  <span
+                    className={cn(
+                      "border px-2 py-1 font-accent text-[9px] uppercase tracking-[0.14em]",
+                      active
+                        ? "border-charcoal bg-charcoal text-ivory"
+                        : "border-gold-primary/40 bg-gold-primary/10 text-gold-dark"
+                    )}
+                  >
+                    {active ? "Selected" : "Shortlisted"}
                   </span>
                 ) : null}
               </span>
@@ -5521,11 +5834,17 @@ function VendorOptionCards({
           );
         })}
       </div>
-      {selectedVendorId ? (
+      {selectedVendorIds.length > 0 ? (
         <button
           type="button"
           onClick={onClear}
-          className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate transition-colors hover:text-rose"
+          disabled={clearDisabled}
+          className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate transition-colors hover:text-rose disabled:cursor-not-allowed disabled:text-slate/40 disabled:hover:text-slate/40"
+          title={
+            clearDisabled
+              ? "Confirmed bookings must be changed from bookings."
+              : "Clear this category selection."
+          }
         >
           Clear {categoryLabel.toLowerCase()} selection
         </button>
@@ -5536,11 +5855,13 @@ function VendorOptionCards({
 
 function ServiceOptionCards({
   services,
-  selectedServiceId,
+  activeServiceId,
+  selectedServiceIds,
   onSelect,
 }: {
   services: VendorPlannerService[];
-  selectedServiceId: string;
+  activeServiceId: string;
+  selectedServiceIds: string[];
   onSelect: (serviceId: string) => void;
 }) {
   if (services.length === 0) {
@@ -5560,7 +5881,8 @@ function ServiceOptionCards({
       <p className={dashLabel}>Choose service or package</p>
       <div className="mt-2 grid gap-2 md:grid-cols-2">
         {services.map((service) => {
-          const active = selectedServiceId === service.id;
+          const active = activeServiceId === service.id;
+          const selected = selectedServiceIds.includes(service.id);
           return (
             <button
               key={service.id}
@@ -5573,8 +5895,15 @@ function ServiceOptionCards({
                   : "border-charcoal/10"
               )}
             >
-              <span className="font-heading text-sm text-charcoal">
-                {service.name}
+              <span className="flex items-start justify-between gap-2">
+                <span className="font-heading text-sm text-charcoal">
+                  {service.name}
+                </span>
+                {selected ? (
+                  <span className="border border-gold-primary/35 bg-gold-primary/10 px-2 py-1 font-accent text-[9px] uppercase tracking-[0.14em] text-gold-dark">
+                    Added
+                  </span>
+                ) : null}
               </span>
               <span className="mt-1 block font-accent text-[10px] uppercase tracking-[0.14em] text-gold-dark">
                 {servicePriceLabel(service)}
@@ -5646,6 +5975,9 @@ function ServiceOfferingPreview({
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>(() =>
     allCatalogueItems.map((item) => item.id)
   );
+  const [appliedSelectionCount, setAppliedSelectionCount] = useState<
+    number | null
+  >(null);
 
   const toggleItem = (itemId: string) => {
     setSelectedItemIds((current) =>
@@ -5797,11 +6129,28 @@ function ServiceOfferingPreview({
       <button
         type="button"
         className="font-accent w-full border border-gold-primary/45 bg-gold-primary/10 px-3 py-2.5 text-[10px] uppercase tracking-[0.18em] text-gold-dark transition-colors hover:bg-gold-primary/15 disabled:cursor-not-allowed disabled:opacity-50"
-        onClick={() => onUseSelection(selectedItemIds)}
+        onClick={() => {
+          onUseSelection(selectedItemIds);
+          setAppliedSelectionCount(
+            allCatalogueItems.length > 0 ? selectedCount : 1
+          );
+        }}
         disabled={allCatalogueItems.length > 0 && selectedCount === 0}
       >
         {importActionLabel(categoryKey, allCatalogueItems.length > 0)}
       </button>
+      {appliedSelectionCount !== null ? (
+        <div className="border border-sage/25 bg-sage/10 p-3">
+          <p className="font-accent text-[10px] uppercase tracking-[0.16em] text-sage">
+            Added to this event
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-charcoal">
+            {appliedSelectionCount} row
+            {appliedSelectionCount === 1 ? "" : "s"} applied. Keep editing this
+            section or choose another package without losing your place.
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }
