@@ -5,7 +5,7 @@ import { blogPosts } from "@/data/blog";
 export const metadata: Metadata = {
   title: "Journal | Elysian Celebrations",
   description:
-    "Ideas, planning notes, and destination inspiration from the Elysian team—written for couples who care about craft.",
+    "Ideas, planning notes, and destination inspiration from the Elysian team—written for anyone planning an event with craft and care.",
 };
 
 export default function BlogPage() {
