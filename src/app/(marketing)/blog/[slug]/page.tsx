@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { blogPosts, getPostBySlug } from "@/data/blog";
@@ -28,20 +27,22 @@ export default async function BlogPostPage({ params }: Props) {
   if (!post) notFound();
 
   const related = blogPosts.filter((p) => p.slug !== post.slug).slice(0, 2);
+  // No cover images ship in /public, so derive a deterministic editorial
+  // gradient from the slug instead of rendering a broken <Image>.
+  const hue = Array.from(post.slug).reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % 360;
 
   return (
     <main className="min-h-screen bg-ivory text-charcoal">
       <article>
         <header className="relative bg-midnight">
           <div className="relative aspect-[21/10] min-h-[220px] w-full md:min-h-[320px]">
-            <Image
-              src={post.coverImage}
-              alt=""
-              fill
-              className="object-cover opacity-90"
-              priority
-              sizes="100vw"
+            <div
+              className="absolute inset-0"
+              style={{
+                background: `linear-gradient(135deg, hsl(${hue}, 26%, 18%) 0%, hsl(${(hue + 36) % 360}, 24%, 11%) 100%)`,
+              }}
             />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(201,169,110,0.18),transparent_45%)]" />
             <div className="absolute inset-0 bg-gradient-to-t from-midnight via-midnight/55 to-midnight/20" />
             <div className="absolute bottom-0 left-0 w-full px-[var(--section-padding-x)] pb-10 pt-16 md:pb-14">
               <p className="font-accent text-xs uppercase tracking-[0.35em] text-gold-light">
@@ -77,7 +78,16 @@ export default async function BlogPostPage({ params }: Props) {
 
           <div className="font-heading mt-10 space-y-6 text-lg font-light leading-relaxed text-slate">
             {post.body.map((para, i) => (
-              <p key={i}>{para}</p>
+              <p
+                key={i}
+                className={
+                  i === 0
+                    ? "first-letter:float-left first-letter:mr-3 first-letter:mt-1 first-letter:font-display first-letter:text-5xl first-letter:font-bold first-letter:leading-[0.8] first-letter:text-gold-primary"
+                    : undefined
+                }
+              >
+                {para}
+              </p>
             ))}
           </div>
 
