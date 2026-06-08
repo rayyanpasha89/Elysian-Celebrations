@@ -7,6 +7,15 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer } from "@/animations/variants";
 import { FinalizationBoard } from "@/components/dashboard/finalization-board";
+import {
+  FlowEmptyState,
+  FlowNode,
+  MindMapGuide,
+  MindMapLegend,
+  StepOrbit,
+  type FlowStatus,
+  type FlowStep,
+} from "@/components/dashboard/event-flow";
 import { ListEmptyState } from "@/components/dashboard/list-empty-state";
 import { ProgressRing } from "@/components/dashboard/ui-kit";
 import {
@@ -601,6 +610,24 @@ const NOTE_PROMPTS = [
   "On-site instruction",
 ] as const;
 
+const MIND_MAP_BRANCH_POSITIONS = [
+  "lg:left-[5%] lg:top-[7%] lg:w-[38%] lg:-rotate-1",
+  "lg:right-[5%] lg:top-[7%] lg:w-[38%] lg:rotate-1",
+  "lg:right-[2%] lg:top-[40%] lg:w-[34%]",
+  "lg:right-[8%] lg:bottom-[6%] lg:w-[38%] lg:-rotate-1",
+  "lg:left-[8%] lg:bottom-[6%] lg:w-[38%] lg:rotate-1",
+  "lg:left-[2%] lg:top-[40%] lg:w-[34%]",
+] as const;
+
+const MIND_MAP_CONNECTOR_PATHS = [
+  "M50 50 C42 34 32 22 22 18",
+  "M50 50 C58 34 68 22 78 18",
+  "M50 50 C65 50 80 45 91 48",
+  "M50 50 C58 66 68 78 78 84",
+  "M50 50 C42 66 32 78 22 84",
+  "M50 50 C35 50 20 45 9 48",
+] as const;
+
 function draftId(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -923,25 +950,21 @@ function eventSummaryChips(event: WeddingEvent) {
   ].filter(Boolean) as string[];
 }
 
-function sectionNodeShape(section: EditorSectionKey) {
-  const shapes: Record<EditorSectionKey, string> = {
-    basics: "rounded-full",
-    food: "rounded-[1.25rem]",
-    design: "rounded-tl-3xl rounded-br-3xl",
-    media: "rounded-tr-3xl rounded-bl-3xl",
-    entertainment: "rounded-[999px_999px_999px_0]",
-    logistics: "rounded-[0_999px_999px_999px]",
-    special: "rotate-[-1deg] rounded-lg",
-    tasks: "rounded-sm",
-    notes: "rotate-[1deg] rounded-2xl",
-  };
-  return shapes[section];
-}
-
 function readinessTone(percent: number) {
   if (percent >= 100) return "border-sage/35 bg-sage/10 text-sage";
   if (percent >= 70) return "border-gold-primary/35 bg-gold-primary/10 text-gold-dark";
   return "border-charcoal/12 bg-cream/50 text-slate";
+}
+
+function mindMapBranchClass(index: number) {
+  return MIND_MAP_BRANCH_POSITIONS[index % MIND_MAP_BRANCH_POSITIONS.length];
+}
+
+function mindMapStroke(status: FlowStatus) {
+  if (status === "ready") return "stroke-sage/45";
+  if (status === "gap") return "stroke-rose/40";
+  if (status === "active") return "stroke-gold-primary/45";
+  return "stroke-charcoal/18";
 }
 
 function findEventById(days: WeddingDay[], eventId: string | null) {
@@ -1404,6 +1427,90 @@ function vendorSelectionForCategory(
   );
 }
 
+function flowStatusFromReadiness(percent: number, hasContent = true): FlowStatus {
+  if (!hasContent) return "planned";
+  if (percent >= 100) return "ready";
+  if (percent >= 60) return "active";
+  return "gap";
+}
+
+function sectionFlowStatus(
+  event: WeddingEvent,
+  sectionKey: EditorSectionKey
+): FlowStatus {
+  if (sectionKey === "basics") {
+    return event.name.trim() &&
+      event.start_time &&
+      event.end_time &&
+      event.venue?.trim() &&
+      event.guest_count
+      ? "ready"
+      : "active";
+  }
+
+  if (sectionKey === "food") {
+    const hasCaterer = Boolean(vendorSelectionForCategory(event, "catering"));
+    if (hasCaterer && event.menus.length > 0) return "ready";
+    if (hasCaterer || event.menus.length > 0 || event.menu_notes?.trim()) {
+      return "active";
+    }
+    return "gap";
+  }
+
+  if (sectionKey === "design") {
+    const hasDecor = Boolean(vendorSelectionForCategory(event, "decor"));
+    if (hasDecor && (event.decor_style || event.decor_notes?.trim())) return "ready";
+    if (hasDecor || event.decor_style || event.decor_notes?.trim()) return "active";
+    return "gap";
+  }
+
+  if (sectionKey === "media") {
+    const hasPhoto = Boolean(vendorSelectionForCategory(event, "photography"));
+    return hasPhoto ? "ready" : "gap";
+  }
+
+  if (sectionKey === "entertainment") {
+    const hasEntertainment = Boolean(
+      vendorSelectionForCategory(event, "entertainment")
+    );
+    return hasEntertainment ? "ready" : "gap";
+  }
+
+  if (sectionKey === "logistics") {
+    const hasOperationsPartner =
+      Boolean(vendorSelectionForCategory(event, "logistics")) ||
+      Boolean(vendorSelectionForCategory(event, "hospitality"));
+    if (hasOperationsPartner && hasLogisticsDetails(event.logistics)) return "ready";
+    if (hasOperationsPartner || hasLogisticsDetails(event.logistics)) return "active";
+    return "gap";
+  }
+
+  if (sectionKey === "special") {
+    return event.requirements.some((requirement) => requirement.category === "custom")
+      ? "active"
+      : "planned";
+  }
+
+  if (sectionKey === "tasks") {
+    if (event.tasks.length === 0) return "gap";
+    return event.tasks.every((task) => task.status === "DONE") ? "ready" : "active";
+  }
+
+  if (sectionKey === "notes") {
+    return event.notes?.trim() || event.attire_notes?.trim() ? "ready" : "planned";
+  }
+
+  return "planned";
+}
+
+function eventFlowSteps(event: WeddingEvent): FlowStep[] {
+  return editorSectionsForEvent(event).map((section) => ({
+    id: section.key,
+    label: section.label,
+    status: sectionFlowStatus(event, section.key),
+  }));
+}
+
 function firstMissingVendorCategory(event: WeddingEvent | null) {
   if (!event) return null;
 
@@ -1747,6 +1854,7 @@ export default function ClientWeddingPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<WeddingPayload | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [focusedDayId, setFocusedDayId] = useState<string | null>(null);
   // Layer tab — Definition (what we're planning), Requirements (the existing
   // 7-step per-block editor, default), Finalization (gap checklist before
   // launch). Requirements is the primary work surface; the other two are
@@ -1832,6 +1940,7 @@ export default function ClientWeddingPage() {
     const allEvents = data.days.flatMap((day) => day.events);
     if (allEvents.length === 0) {
       setSelectedEventId(null);
+      setFocusedDayId(data.days[0]?.id ?? null);
       return;
     }
 
@@ -1845,6 +1954,12 @@ export default function ClientWeddingPage() {
   const days = data?.days ?? EMPTY_DAYS;
   const selectedEvent = findEventById(days, selectedEventId);
   const selectedDay = findEventDay(days, selectedEventId);
+
+  useEffect(() => {
+    if (selectedDay) {
+      setFocusedDayId(selectedDay.id);
+    }
+  }, [selectedDay]);
 
   useEffect(() => {
     if (!selectedEvent) {
@@ -2498,6 +2613,7 @@ export default function ClientWeddingPage() {
 
       setData({ wedding: null, days: [] });
       setSelectedEventId(null);
+      setFocusedDayId(null);
       setDetailDraft(null);
       setLayer("definition");
       toast.success("Event plan deleted. Start a fresh structure when you're ready.");
@@ -3447,7 +3563,12 @@ export default function ClientWeddingPage() {
 
           {days.length === 0 ? (
             <div className="mt-8">
-              <ListEmptyState hint="Create your first celebration day to start planning event by event." />
+              <FlowEmptyState
+                title="Map your event structure"
+                description="Start with one day, then branch into morning, afternoon, and evening functions before opening the editor."
+                actionLabel="Create day"
+                onAction={() => setShowDayForm(true)}
+              />
             </div>
           ) : (
             <div className="mt-6 space-y-4">
@@ -3463,7 +3584,7 @@ export default function ClientWeddingPage() {
                     onDragOver={(event) => event.preventDefault()}
                     onDrop={() => void handleDropOnDay(day.id)}
                     className={cn(
-                      "relative overflow-hidden border bg-ivory p-4 transition-colors before:absolute before:left-5 before:top-24 before:h-[calc(100%-7rem)] before:w-px before:bg-gradient-to-b before:from-gold-primary/35 before:via-charcoal/10 before:to-transparent",
+                      "relative overflow-hidden border bg-ivory p-4 transition-colors",
                       draggedEventId ? "border-gold-primary/35" : "border-charcoal/10"
                     )}
                   >
@@ -3526,32 +3647,32 @@ export default function ClientWeddingPage() {
                           </div>
                         ) : (
                           <>
-                            <div className="flex items-center gap-3">
-                              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-gold-primary/35 bg-gold-primary/10 font-display text-lg text-charcoal">
-                                {dayIndex + 1}
+                            <div className="flex flex-wrap items-start justify-between gap-4">
+                              <div>
+                                <p className={dashLabel}>
+                                  Mind map center · Day {dayIndex + 1}
+                                </p>
+                                <h4 className="mt-2 font-display text-2xl text-charcoal">
+                                  {day.name}
+                                </h4>
+                                <p className="mt-2 font-heading text-xs text-slate">
+                                  {formatDayDate(day.date)} ·{" "}
+                                  {daySummary.eventCount}{" "}
+                                  {daySummary.eventCount === 1
+                                    ? "function"
+                                    : "functions"}{" "}
+                                  · {daySummary.readiness}% ready
+                                </p>
+                              </div>
+                              <span
+                                className={cn(
+                                  "border px-3 py-2 font-accent text-[10px] uppercase tracking-[0.16em]",
+                                  readinessTone(daySummary.readiness)
+                                )}
+                              >
+                                Select a branch below
                               </span>
-                              <p className={dashLabel}>Day node</p>
-                              <p className="font-heading text-xs text-slate">
-                                {formatDayDate(day.date)}
-                              </p>
                             </div>
-                            <h4 className="mt-2 font-display text-xl text-charcoal">
-                              {day.name}
-                            </h4>
-                            <p className="mt-2 font-heading text-xs text-slate">
-                              {daySummary.eventCount}{" "}
-                              {daySummary.eventCount === 1 ? "event" : "events"}
-                              {" · "}
-                              {gatedSpendEstimateLabel(
-                                daySummary.estimatedSpend,
-                                daySummary.readiness
-                              )}
-                              {" · "}
-                              {daySummary.readiness}% ready
-                              {" · "}
-                              {daySummary.vendorPicks} vendor{" "}
-                              {daySummary.vendorPicks === 1 ? "pick" : "picks"}
-                            </p>
                             {day.notes ? (
                               <p className="mt-3 max-w-2xl border-l-2 border-gold-primary/40 pl-4 text-sm leading-relaxed text-charcoal">
                                 {day.notes}
@@ -3727,13 +3848,74 @@ export default function ClientWeddingPage() {
                     ) : null}
 
                     {day.events.length === 0 ? (
-                      <div className="mt-5 border border-dashed border-charcoal/15 bg-cream/30 px-5 py-8 text-center">
-                        <p className="font-heading text-sm text-slate">
-                          No events in this day yet. Add one or drag an existing event here.
-                        </p>
+                      <div className="mt-5">
+                        <FlowEmptyState
+                          title="No branches on this day yet"
+                          description="Add a morning, afternoon, or evening function. It will become a branch from the day center."
+                          actionLabel="Add function"
+                          onAction={() => openEventFormForDay(day)}
+                        />
                       </div>
                     ) : (
-                      <div className="mt-5 grid gap-4">
+                      <div className="relative mt-5 min-h-[620px] overflow-hidden border border-charcoal/10 bg-[radial-gradient(circle_at_center,rgba(201,169,110,0.14),transparent_28%),linear-gradient(135deg,rgba(255,255,255,0.72),rgba(245,240,231,0.5))] p-4 md:p-6 lg:min-h-[720px]">
+                        <svg
+                          className="pointer-events-none absolute inset-0 hidden h-full w-full lg:block"
+                          viewBox="0 0 100 100"
+                          preserveAspectRatio="none"
+                          aria-hidden
+                        >
+                          {day.events
+                            .slice()
+                            .sort((left, right) => left.sort_order - right.sort_order)
+                            .map((event, eventIndex) => {
+                              const eventStatus = flowStatusFromReadiness(
+                                eventReadinessPercent(event, venueOptions)
+                              );
+                              return (
+                                <path
+                                  key={`${event.id}-connector`}
+                                  d={
+                                    MIND_MAP_CONNECTOR_PATHS[
+                                      eventIndex % MIND_MAP_CONNECTOR_PATHS.length
+                                    ]
+                                  }
+                                  className={cn(
+                                    "fill-none stroke-[0.42] [stroke-linecap:round] [stroke-dasharray:1.4_1.2]",
+                                    mindMapStroke(eventStatus),
+                                    selectedEventId === event.id &&
+                                      "stroke-[0.62] [stroke-dasharray:0]"
+                                  )}
+                                />
+                              );
+                            })}
+                        </svg>
+
+                        <div className="relative z-10 mx-auto max-w-md lg:absolute lg:left-1/2 lg:top-1/2 lg:w-[34%] lg:-translate-x-1/2 lg:-translate-y-1/2">
+                          <FlowNode
+                            variant="day"
+                            index={dayIndex + 1}
+                            eyebrow={formatDayDate(day.date)}
+                            title={day.name}
+                            meta={`${daySummary.eventCount} ${
+                              daySummary.eventCount === 1 ? "function" : "functions"
+                            } · ${daySummary.readiness}% ready`}
+                            status={flowStatusFromReadiness(
+                              daySummary.readiness,
+                              daySummary.eventCount > 0
+                            )}
+                            selected={focusedDayId === day.id}
+                            ariaLabel={`Select ${day.name}`}
+                            onClick={() =>
+                              setFocusedDayId((current) =>
+                                current === day.id ? null : day.id
+                              )
+                            }
+                          />
+                        </div>
+
+                        <MindMapLegend className="relative z-10 mt-4 bg-ivory/90 p-4 lg:absolute lg:bottom-4 lg:left-4 lg:mt-0 lg:w-64 lg:backdrop-blur" />
+
+                        <div className="relative z-10 mt-8 grid gap-4 lg:mt-0 lg:block lg:min-h-[640px]">
                         {day.events
                           .slice()
                           .sort((left, right) => left.sort_order - right.sort_order)
@@ -3747,158 +3929,155 @@ export default function ClientWeddingPage() {
                               venueOptions
                             );
 
-                            const eventSections = editorSectionsForEvent(event);
+                            const eventSteps = eventFlowSteps(event);
+                            const eventStatus = flowStatusFromReadiness(eventReadiness);
+                            const isEventSelected = selectedEventId === event.id;
 
                             return (
-                            <article
+                            <div
                               key={event.id}
+                              className={cn(
+                                "relative transition-all duration-300 lg:absolute",
+                                mindMapBranchClass(eventIndex),
+                                isEventSelected
+                                  ? "z-20 scale-[1.02]"
+                                  : "z-10"
+                              )}
+                            >
+                            <article
                               draggable
                               onDragStart={() => setDraggedEventId(event.id)}
                               onDragEnd={() => setDraggedEventId(null)}
                               className={cn(
-                                "relative ml-6 border bg-ivory p-4 transition-all before:absolute before:-left-6 before:top-8 before:h-px before:w-6 before:bg-gold-primary/35 hover:-translate-y-0.5 hover:border-gold-primary/45 hover:shadow-[0_18px_40px_rgba(26,26,46,0.08)]",
-                                selectedEventId === event.id
+                                "relative ml-0 border bg-ivory p-4 transition-all hover:-translate-y-0.5 hover:border-gold-primary/45 hover:shadow-[0_18px_40px_rgba(26,26,46,0.08)]",
+                                isEventSelected
                                   ? "border-gold-primary/55 shadow-[0_18px_40px_rgba(201,169,110,0.14)]"
                                   : "border-charcoal/10"
                               )}
                             >
-                              <div className="flex items-start justify-between gap-4">
-                                <div>
-                                  <p className={dashLabel}>
-                                    Function node
-                                  </p>
-                                  <h5 className="mt-2 font-display text-xl text-charcoal">
-                                    {event.name}
-                                  </h5>
-                                  {event.event_type && event.event_type !== event.name ? (
-                                    <p className="mt-1 text-xs text-slate">
-                                      {event.event_type}
-                                    </p>
-                                  ) : null}
-                                </div>
-                                <div className="flex shrink-0 items-start gap-3">
-                                  <span
-                                    className={cn(
-                                      "border px-2 py-1 font-accent text-[10px] uppercase tracking-[0.16em]",
-                                      readinessTone(eventReadiness)
-                                    )}
-                                  >
-                                    {eventReadiness}% ready
-                                  </span>
-                                  <button
-                                    type="button"
-                                    className={dashBtn}
-                                    onClick={() => openEventSection(event.id, "basics")}
-                                  >
-                                    Open
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div className="mt-4 space-y-2 text-sm text-charcoal">
-                                <p>{formatEventWindow(event)}</p>
-                                <p>{event.venue ?? "Venue to be decided"}</p>
-                                <p className="text-slate">
-                                  {event.date
+                              <FlowNode
+                                variant="event"
+                                eyebrow={formatEventWindow(event)}
+                                title={event.name}
+                                index={`${dayIndex + 1}.${eventIndex + 1}`}
+                                meta={`${event.venue ?? "Venue to be decided"} · ${
+                                  event.date
                                     ? new Date(event.date).toLocaleDateString("en-IN", {
                                         day: "numeric",
                                         month: "short",
                                         year: "numeric",
                                       })
-                                    : "Date still flexible"}
-                                </p>
-                                <p className="border-t border-charcoal/8 pt-2 font-heading text-xs text-slate">
-                                  <span className="text-charcoal">
-                                    {gatedSpendEstimateLabel(
-                                      eventEstimate,
-                                      eventReadiness
-                                    )}
-                                  </span>{" "}
-                                  ·{" "}
-                                  {gatedSpendEstimateCaption(
-                                    eventEstimate,
-                                    eventReadiness
-                                  )}
-                                </p>
-                              </div>
+                                    : "Date flexible"
+                                } · ${event.guest_count ?? 0} guests`}
+                                status={eventStatus}
+                                selected={isEventSelected}
+                                ariaLabel={`Open ${event.name}`}
+                                onClick={() => {
+                                  setFocusedDayId(day.id);
+                                  openEventSection(event.id, "basics");
+                                }}
+                              />
 
-                              <div className="mt-4 flex flex-wrap gap-2">
-                                {eventSummaryChips(event).map((chip) => (
-                                  <span
-                                    key={`${event.id}-${chip}`}
-                                    className="border border-charcoal/10 px-2 py-1 font-heading text-[11px] text-slate"
-                                  >
-                                    {chip}
-                                  </span>
-                                ))}
-                              </div>
+                              {isEventSelected ? (
+                                <>
+                                  <div className="mt-4 border-l-2 border-gold-primary/20 pl-4">
+                                    <p className="font-heading text-xs leading-relaxed text-slate">
+                                      <span className="text-charcoal">
+                                        {gatedSpendEstimateLabel(
+                                          eventEstimate,
+                                          eventReadiness
+                                        )}
+                                      </span>{" "}
+                                      ·{" "}
+                                      {gatedSpendEstimateCaption(
+                                        eventEstimate,
+                                        eventReadiness
+                                      )}
+                                    </p>
+                                  </div>
 
-                              <div className="mt-4 border-t border-charcoal/8 pt-4">
-                                <p className={dashLabel}>Breakdown steps</p>
-                                <div className="mt-3 grid grid-cols-2 gap-2">
-                                  {eventSections.map((section, sectionIndex) => {
-                                    const active =
-                                      selectedEventId === event.id &&
-                                      editorSection === section.key;
-                                    return (
-                                      <button
-                                        key={`${event.id}-${section.key}`}
-                                        type="button"
-                                        onClick={() =>
-                                          openEventSection(event.id, section.key)
-                                        }
+                                  <div className="mt-4 flex flex-wrap gap-2">
+                                    {eventSummaryChips(event).map((chip) => (
+                                      <span
+                                        key={`${event.id}-${chip}`}
+                                        className="border border-charcoal/10 px-2 py-1 font-heading text-[11px] text-slate"
+                                      >
+                                        {chip}
+                                      </span>
+                                    ))}
+                                  </div>
+
+                                  <div className="mt-4 border-t border-charcoal/8 pt-4">
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                      <p className={dashLabel}>Step orbit</p>
+                                      <span
                                         className={cn(
-                                          "min-h-12 border px-3 py-2 text-left transition-all hover:-translate-y-0.5 hover:border-gold-primary/45",
-                                          sectionNodeShape(section.key),
-                                          active
-                                            ? "border-charcoal bg-charcoal text-ivory shadow-[0_14px_34px_rgba(26,26,46,0.16)]"
-                                            : "border-charcoal/10 bg-cream/35 text-charcoal"
+                                          "border px-2 py-1 font-accent text-[10px] uppercase tracking-[0.16em]",
+                                          readinessTone(eventReadiness)
                                         )}
                                       >
-                                        <span className="font-accent text-[9px] uppercase tracking-[0.16em] opacity-70">
-                                          {String(sectionIndex + 1).padStart(2, "0")}
-                                        </span>
-                                        <span className="mt-1 block font-heading text-xs">
-                                          {section.label}
-                                        </span>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              </div>
+                                        {eventReadiness}% ready
+                                      </span>
+                                    </div>
+                                    <StepOrbit
+                                      className="mt-3"
+                                      steps={eventSteps}
+                                      selectedId={editorSection}
+                                      onSelect={(sectionId) => {
+                                        setFocusedDayId(day.id);
+                                        openEventSection(
+                                          event.id,
+                                          sectionId as EditorSectionKey
+                                        );
+                                      }}
+                                    />
+                                  </div>
 
-                              <div className="mt-4 flex flex-wrap gap-2 border-t border-charcoal/8 pt-4">
-                                <button
-                                  type="button"
-                                  className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal"
-                                  onClick={() => nudgeEvent(event.id, -1)}
-                                  disabled={eventIndex === 0}
-                                >
-                                  Up
-                                </button>
-                                <button
-                                  type="button"
-                                  className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal"
-                                  onClick={() => nudgeEvent(event.id, 1)}
-                                  disabled={eventIndex === day.events.length - 1}
-                                >
-                                  Down
-                                </button>
-                                <button
-                                  type="button"
-                                  className="border border-rose/35 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-rose transition-colors hover:bg-rose hover:text-ivory"
-                                  onClick={() => void deleteEvent(event.id)}
-                                  disabled={savingDetail}
-                                >
-                                  Delete
-                                </button>
-                                <p className="ml-auto font-heading text-xs text-slate">
-                                  {event.vendorSelections.length} vendor picks
-                                </p>
-                              </div>
+                                  <div className="mt-4 flex flex-wrap gap-2 border-t border-charcoal/8 pt-4">
+                                    <button
+                                      type="button"
+                                      className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal"
+                                      onClick={() => nudgeEvent(event.id, -1)}
+                                      disabled={eventIndex === 0}
+                                    >
+                                      Up
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal"
+                                      onClick={() => nudgeEvent(event.id, 1)}
+                                      disabled={eventIndex === day.events.length - 1}
+                                    >
+                                      Down
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="border border-rose/35 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-rose transition-colors hover:bg-rose hover:text-ivory"
+                                      onClick={() => void deleteEvent(event.id)}
+                                      disabled={savingDetail}
+                                    >
+                                      Delete
+                                    </button>
+                                    <p className="ml-auto font-heading text-xs text-slate">
+                                      {event.vendorSelections.length} vendor picks
+                                    </p>
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-charcoal/8 pt-3">
+                                  <p className="font-heading text-xs text-slate">
+                                    Click branch to reveal steps
+                                  </p>
+                                  <span className="font-accent text-[10px] uppercase tracking-[0.14em] text-gold-dark">
+                                    {eventReadiness}% ready
+                                  </span>
+                                </div>
+                              )}
                             </article>
+                            </div>
                             );
                           })}
+                      </div>
                       </div>
                     )}
                   </motion.section>
@@ -5437,17 +5616,11 @@ export default function ClientWeddingPage() {
                 </div>
               </div>
             ) : (
-              <div className="mt-4 border border-dashed border-gold-primary/30 bg-gold-primary/8 p-5">
-                <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-gold-dark">
-                  What to do next
-                </p>
-                <p className="mt-2 font-heading text-sm text-charcoal">
-                  Pick a function node from the flow map, or tap one of its
-                  shaped breakdown nodes to jump directly into{" "}
-                  <span className="text-gold-dark">Food, Design, Logistics, Tasks,</span>{" "}
-                  or another section. The editor stays closed until a node is selected.
-                </p>
-              </div>
+              <MindMapGuide
+                className="mt-4 border-dashed border-gold-primary/30 bg-gold-primary/8"
+                title="Choose a branch to edit"
+                description="The editor stays closed until you pick a function branch. Once open, use the orbit to jump between food, design, vendors, logistics, tasks, and notes."
+              />
             )}
 
             {selectedDay ? (
