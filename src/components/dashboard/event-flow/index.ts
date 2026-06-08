@@ -22,7 +22,7 @@ export {
   type FlowConnectorTone,
 } from "./flow-connector";
 
-export { StepOrbit, type StepOrbitProps, type FlowStep } from "./step-orbit";
+export { StepOrbit, type StepOrbitProps, type FlowStep, type FlowStepShape } from "./step-orbit";
 
 export { FlowEmptyState, type FlowEmptyStateProps } from "./flow-empty-state";
 

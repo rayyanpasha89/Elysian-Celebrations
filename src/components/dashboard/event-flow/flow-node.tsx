@@ -13,6 +13,7 @@
  */
 
 import type { ComponentType, ReactNode } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 export type FlowStatus = "planned" | "active" | "ready" | "gap";
@@ -95,6 +96,7 @@ export function FlowNode({
 }: FlowNodeProps) {
   const tone = FLOW_STATUS_META[status];
   const interactive = Boolean(onClick);
+  const reduce = useReducedMotion();
 
   if (variant === "day") {
     const body = (
@@ -120,11 +122,13 @@ export function FlowNode({
     return (
       <div className={cn("relative", className)}>
         {interactive ? (
-          <button
+          <motion.button
             type="button"
             onClick={onClick}
             aria-pressed={selected}
             aria-label={ariaLabel ?? title}
+            whileHover={reduce ? undefined : { scale: 1.01 }}
+            whileTap={reduce ? undefined : { scale: 0.99 }}
             className={cn(
               "group flex w-full items-center gap-4 border-l-[3px] bg-ivory px-4 py-3.5 text-left transition-all duration-300",
               FOCUS_RING,
@@ -134,7 +138,7 @@ export function FlowNode({
             )}
           >
             {body}
-          </button>
+          </motion.button>
         ) : (
           <div className="flex w-full items-center gap-4 border-l-[3px] border-l-gold-primary/60 border-y border-r border-y-charcoal/8 border-r-charcoal/8 bg-ivory px-4 py-3.5">
             {body}
@@ -184,12 +188,14 @@ export function FlowNode({
   return (
     <div className={cn("relative", className)}>
       {interactive ? (
-        <button
+        <motion.button
           type="button"
           onClick={onClick}
           aria-pressed={selected}
           aria-label={ariaLabel ?? title}
           style={clip}
+          whileHover={reduce ? undefined : { y: -2 }}
+          whileTap={reduce ? undefined : { scale: 0.985 }}
           className={cn(
             "group flex w-full overflow-hidden border bg-ivory text-left transition-all duration-300",
             FOCUS_RING,
@@ -199,7 +205,7 @@ export function FlowNode({
           )}
         >
           {eventBody}
-        </button>
+        </motion.button>
       ) : (
         <div
           style={clip}
