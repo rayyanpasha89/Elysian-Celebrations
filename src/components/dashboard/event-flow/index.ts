@@ -25,3 +25,7 @@ export {
 export { StepOrbit, type StepOrbitProps, type FlowStep } from "./step-orbit";
 
 export { FlowEmptyState, type FlowEmptyStateProps } from "./flow-empty-state";
+
+export { MindMapLegend } from "./mind-map-legend";
+
+export { MindMapGuide, type MindMapGuideProps } from "./mind-map-guide";
