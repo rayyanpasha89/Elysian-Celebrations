@@ -3,14 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer } from "@/animations/variants";
 import { FinalizationBoard } from "@/components/dashboard/finalization-board";
 import {
   FlowEmptyState,
   FlowNode,
-  MindMapGuide,
   MindMapLegend,
   StepOrbit,
   type FlowStatus,
@@ -1876,6 +1875,12 @@ export default function ClientWeddingPage() {
   );
   const [detailDraft, setDetailDraft] = useState<EventDetailDraft | null>(null);
   const [editorSection, setEditorSection] = useState<EditorSectionKey>("basics");
+  // Layer 2 editor is a zoom-open overlay: it appears only when a step is
+  // picked, animating out of the tapped step's screen position so the map
+  // stays put behind it (no stacked editor, far less scrolling).
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorOrigin, setEditorOrigin] = useState<{ x: number; y: number } | null>(null);
+  const prefersReducedMotion = useReducedMotion();
   const [savingDay, setSavingDay] = useState(false);
   const [savingEvent, setSavingEvent] = useState(false);
   const [savingDetail, setSavingDetail] = useState(false);
@@ -2159,6 +2164,59 @@ export default function ClientWeddingPage() {
     []
   );
 
+  // Open the editor overlay on a step pick, remembering where the tap came from
+  // so the panel can zoom out of that exact point.
+  const openEditorStep = useCallback(
+    (
+      eventId: string,
+      section: EditorSectionKey,
+      origin?: { x: number; y: number } | null
+    ) => {
+      openEventSection(eventId, section);
+      setEditorOrigin(origin ?? null);
+      setEditorOpen(true);
+    },
+    [openEventSection]
+  );
+
+  const closeEditor = useCallback(() => setEditorOpen(false), []);
+
+  // The panel grows from the tapped step toward the centre of the screen.
+  const editorMotion = useMemo(() => {
+    const spring = { type: "spring" as const, stiffness: 280, damping: 30 };
+    if (!editorOrigin || prefersReducedMotion || typeof window === "undefined") {
+      return {
+        initial: { opacity: 0, scale: 0.96, y: 10 },
+        animate: { opacity: 1, scale: 1, y: 0 },
+        exit: { opacity: 0, scale: 0.97, y: 10 },
+        transition: prefersReducedMotion ? { duration: 0 } : spring,
+      };
+    }
+    const dx = editorOrigin.x - window.innerWidth / 2;
+    const dy = editorOrigin.y - window.innerHeight / 2;
+    return {
+      initial: { opacity: 0, scale: 0.2, x: dx, y: dy },
+      animate: { opacity: 1, scale: 1, x: 0, y: 0 },
+      exit: { opacity: 0, scale: 0.25, x: dx, y: dy },
+      transition: spring,
+    };
+  }, [editorOrigin, prefersReducedMotion]);
+
+  // Esc closes the editor; lock background scroll while it is open.
+  useEffect(() => {
+    if (!editorOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setEditorOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [editorOpen]);
+
   // Hide the dedicated sections for needs the client didn't ask for. Cross-cutting
   // sections (basics, special, tasks, notes) always show. If the event carries no
   // requirement rows at all — legacy plans, or a block created with zero needs —
@@ -2199,6 +2257,8 @@ export default function ClientWeddingPage() {
 
       setLayer("requirements");
       setEditorSection(sectionByCheck[checkKey] ?? "basics");
+      setEditorOrigin(null);
+      setEditorOpen(true);
     },
     [days, selectedEvent, selectedEventId]
   );
@@ -3465,10 +3525,14 @@ export default function ClientWeddingPage() {
         venueOptionsCount={venueOptions.length}
         savedVendorCount={savedVendorSlugs.length}
         nextAction={nextPlannerAction}
-        onOpenSection={(section) => setEditorSection(section)}
+        onOpenSection={(section) => {
+          setEditorSection(section);
+          setEditorOrigin(null);
+          setEditorOpen(true);
+        }}
       />
-      <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1fr)_420px]">
-        <div className="xl:order-2 xl:sticky xl:top-6 xl:max-h-[calc(100vh-3rem)] xl:overflow-y-auto xl:pr-1">
+      <div className="relative mt-8">
+        <div className="relative">
           <motion.div
             variants={fadeUp}
             className="flex flex-col gap-4 border-b border-charcoal/10 pb-5"
@@ -3975,6 +4039,7 @@ export default function ClientWeddingPage() {
                                 onClick={() => {
                                   setFocusedDayId(day.id);
                                   openEventSection(event.id, "basics");
+                                  setEditorOpen(false);
                                 }}
                               />
 
@@ -4023,11 +4088,12 @@ export default function ClientWeddingPage() {
                                       className="mt-3"
                                       steps={eventSteps}
                                       selectedId={editorSection}
-                                      onSelect={(sectionId) => {
+                                      onSelect={(sectionId, origin) => {
                                         setFocusedDayId(day.id);
-                                        openEventSection(
+                                        openEditorStep(
                                           event.id,
-                                          sectionId as EditorSectionKey
+                                          sectionId as EditorSectionKey,
+                                          origin
                                         );
                                       }}
                                     />
@@ -4087,11 +4153,46 @@ export default function ClientWeddingPage() {
           )}
         </div>
 
-        <motion.aside variants={fadeUp} className="self-start xl:order-1">
-          <div className="border border-charcoal/10 bg-ivory p-5 md:p-6">
-            <p className={dashLabel}>Event editor</p>
-            {selectedEvent && detailDraft ? (
-              <div className="mt-4 space-y-5">
+        <AnimatePresence>
+          {editorOpen && selectedEvent && detailDraft ? (
+            <motion.div
+              key="event-editor-overlay"
+              className="fixed inset-0 z-[120] flex items-stretch justify-center bg-midnight/45 backdrop-blur-sm sm:items-center sm:p-4 md:p-6"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={closeEditor}
+              role="dialog"
+              aria-modal="true"
+              aria-label={`${selectedEvent.name} editor`}
+            >
+              <motion.div
+                onClick={(event) => event.stopPropagation()}
+                initial={editorMotion.initial}
+                animate={editorMotion.animate}
+                exit={editorMotion.exit}
+                transition={editorMotion.transition}
+                className="relative flex max-h-[100dvh] w-full max-w-3xl flex-col overflow-hidden border border-charcoal/12 bg-ivory shadow-[0_40px_120px_rgba(17,24,39,0.35)] sm:max-h-[92vh]"
+              >
+                <div className="flex items-center justify-between gap-3 border-b border-charcoal/10 bg-ivory/95 px-5 py-4 backdrop-blur">
+                  <div className="min-w-0">
+                    <p className={dashLabel}>Event editor</p>
+                    <p className="mt-0.5 truncate font-display text-lg text-charcoal">
+                      {selectedEvent.name}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={closeEditor}
+                    aria-label="Close editor"
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center border border-charcoal/15 text-lg leading-none text-slate transition-colors hover:border-gold-primary hover:text-gold-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-charcoal"
+                  >
+                    <span aria-hidden>×</span>
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto px-5 py-5 md:px-6">
+                  <div className="space-y-5">
                 <div>
                   <h4 className="font-display text-2xl text-charcoal">
                     {selectedEvent.name}
@@ -5615,27 +5716,11 @@ export default function ClientWeddingPage() {
                   </button>
                 </div>
               </div>
-            ) : (
-              <MindMapGuide
-                className="mt-4 border-dashed border-gold-primary/30 bg-gold-primary/8"
-                title="Choose a branch to edit"
-                description="The editor stays closed until you pick a function branch. Once open, use the orbit to jump between food, design, vendors, logistics, tasks, and notes."
-              />
-            )}
-
-            {selectedDay ? (
-              <div className="mt-6 border-t border-charcoal/8 pt-5">
-                <p className={dashLabel}>Current day</p>
-                <h5 className="mt-2 font-display text-xl text-charcoal">
-                  {selectedDay.name}
-                </h5>
-                <p className="mt-2 text-sm text-slate">
-                  {formatDayDate(selectedDay.date)}
-                </p>
-              </div>
-            ) : null}
-          </div>
-        </motion.aside>
+                </div>
+              </motion.div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </div>
       </>
       ) : null}

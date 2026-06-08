@@ -82,7 +82,8 @@ const FOCUS_RING =
 export type StepOrbitProps = {
   steps: FlowStep[];
   selectedId?: string | null;
-  onSelect?: (id: string) => void;
+  /** Second arg is the tapped token's screen-centre, for origin-zoom transitions. */
+  onSelect?: (id: string, origin?: { x: number; y: number }) => void;
   size?: "sm" | "md";
   emptyLabel?: string;
   className?: string;
@@ -165,7 +166,10 @@ export function StepOrbit({
             {interactive ? (
               <motion.button
                 type="button"
-                onClick={() => onSelect?.(step.id)}
+                onClick={(event) => {
+                  const r = event.currentTarget.getBoundingClientRect();
+                  onSelect?.(step.id, { x: r.left + r.width / 2, y: r.top + r.height / 2 });
+                }}
                 aria-pressed={active}
                 aria-label={`${step.label} — ${tone.label}`}
                 title={`${step.label} · ${tone.label}`}
