@@ -34,7 +34,6 @@ import {
 import { dashBtn, dashCard, dashLabel } from "@/lib/dashboard-styles";
 import {
   EVENT_TASK_STATUS_OPTIONS,
-  EVENT_TYPE_OPTIONS,
   MEAL_PERIOD_OPTIONS,
   MENU_COURSE_OPTIONS,
   PLANNER_VENDOR_CATEGORIES,
@@ -43,7 +42,6 @@ import {
 import { categoryCopy } from "@/lib/vendor-offering";
 import {
   EVENT_FINALIZATION_CHECKLIST,
-  EVENT_PLATFORM_TYPES,
   EVENT_REQUIREMENT_CATEGORIES,
   EVENT_REQUIREMENT_PRIORITY_OPTIONS,
   EVENT_REQUIREMENT_STATUS_OPTIONS,
@@ -432,13 +430,6 @@ const EDITOR_SECTIONS: {
   },
 ];
 
-const BLOCK_PURPOSE_OPTIONS: string[] = Array.from(
-  new Set([
-    ...EVENT_TYPE_OPTIONS,
-    ...EVENT_PLATFORM_TYPES.map((eventType) => eventType.label),
-  ])
-);
-
 const MENU_BLUEPRINTS = [
   {
     label: "Cocktail flow",
@@ -549,6 +540,17 @@ const MEDIA_COVERAGE_OPTIONS = [
   { value: "Aftermovie story arc", label: "Aftermovie story arc" },
 ] as const;
 
+const FOOD_QUOTE_ONLY_OPTIONS = [
+  "Imported ingredient station",
+  "Celebrity chef counter",
+  "Custom dessert room",
+  "Premium bar upgrade",
+  "Late-night after-party menu",
+  "Regional live counter",
+  "Kids / elder special meals",
+  "Allergy-safe service line",
+] as const;
+
 const ENTERTAINMENT_DIRECTION_OPTIONS = [
   { value: "Welcome music", label: "Welcome music" },
   { value: "DJ-led dance floor", label: "DJ-led dance floor" },
@@ -598,12 +600,6 @@ const NOTE_PROMPTS = [
   "Payment reminder",
   "On-site instruction",
 ] as const;
-
-function blockPurposeOptionsWithCurrent(value: string) {
-  return value && !BLOCK_PURPOSE_OPTIONS.includes(value)
-    ? [value, ...BLOCK_PURPOSE_OPTIONS]
-    : BLOCK_PURPOSE_OPTIONS;
-}
 
 function draftId(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -925,6 +921,27 @@ function eventSummaryChips(event: WeddingEvent) {
     event.decor_style,
     event.guest_count ? `${event.guest_count} guests` : null,
   ].filter(Boolean) as string[];
+}
+
+function sectionNodeShape(section: EditorSectionKey) {
+  const shapes: Record<EditorSectionKey, string> = {
+    basics: "rounded-full",
+    food: "rounded-[1.25rem]",
+    design: "rounded-tl-3xl rounded-br-3xl",
+    media: "rounded-tr-3xl rounded-bl-3xl",
+    entertainment: "rounded-[999px_999px_999px_0]",
+    logistics: "rounded-[0_999px_999px_999px]",
+    special: "rotate-[-1deg] rounded-lg",
+    tasks: "rounded-sm",
+    notes: "rotate-[1deg] rounded-2xl",
+  };
+  return shapes[section];
+}
+
+function readinessTone(percent: number) {
+  if (percent >= 100) return "border-sage/35 bg-sage/10 text-sage";
+  if (percent >= 70) return "border-gold-primary/35 bg-gold-primary/10 text-gold-dark";
+  return "border-charcoal/12 bg-cream/50 text-slate";
 }
 
 function findEventById(days: WeddingDay[], eventId: string | null) {
@@ -1288,6 +1305,24 @@ function spendEstimateCaption(estimate: SpendEstimate) {
   return `${sourceLabel}${gapLabel}${fallbackLabel}`;
 }
 
+function gatedSpendEstimateLabel(
+  estimate: SpendEstimate,
+  readinessPercent: number
+) {
+  return readinessPercent >= 100
+    ? spendEstimateLabel(estimate)
+    : "Unlocks at 100%";
+}
+
+function gatedSpendEstimateCaption(
+  estimate: SpendEstimate,
+  readinessPercent: number
+) {
+  return readinessPercent >= 100
+    ? spendEstimateCaption(estimate)
+    : "Finish venue, guests, partners, menu/logistics, and tasks to reveal the estimate.";
+}
+
 function vendorCategorySection(
   categoryKey: PlannerVendorCategoryKey
 ): EditorSectionKey {
@@ -1330,6 +1365,27 @@ function requirementCategoriesForVendorPlanning(event: WeddingEvent) {
     "hospitality",
     "logistics",
   ] satisfies EventRequirementCategoryKey[];
+}
+
+function editorSectionsForEvent(event: WeddingEvent | null) {
+  const categories = new Set<EventRequirementCategoryKey>(
+    (event?.requirements ?? []).map((requirement) => requirement.category)
+  );
+
+  if (categories.size === 0) return EDITOR_SECTIONS;
+
+  return EDITOR_SECTIONS.filter((section) => {
+    if (section.key === "food") return categories.has("food");
+    if (section.key === "design") return categories.has("decor");
+    if (section.key === "media") return categories.has("photo-video");
+    if (section.key === "entertainment") {
+      return categories.has("entertainment");
+    }
+    if (section.key === "logistics") {
+      return categories.has("logistics") || categories.has("hospitality");
+    }
+    return true;
+  });
 }
 
 function vendorSelectionForCategory(
@@ -1591,6 +1647,28 @@ function mergePlannerTagsWithBlocks(
   return [...preservedBlocks, joinPlannerTags(tags)].filter(Boolean).join("\n\n");
 }
 
+function planningBlocksFromText(value: string | null | undefined) {
+  return (value ?? "")
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter((block) => block && block.includes("\n"))
+    .map((block) => {
+      const [title = "Planning note", ...lines] = block.split("\n");
+      return {
+        title,
+        lines: lines.map((line) => line.replace(/^-\s*/, "")).filter(Boolean),
+      };
+    });
+}
+
+function removePlanningBlock(current: string, title: string) {
+  return current
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter((block) => block && block.split("\n")[0] !== title)
+    .join("\n\n");
+}
+
 function appendPlanningBlock(current: string, title: string, lines: string[]) {
   const cleanedLines = lines.map((line) => line.trim()).filter(Boolean);
   if (cleanedLines.length === 0) return current;
@@ -1758,8 +1836,8 @@ export default function ClientWeddingPage() {
     }
 
     const stillExists = allEvents.some((event) => event.id === selectedEventId);
-    if (!stillExists) {
-      setSelectedEventId(allEvents[0]?.id ?? null);
+    if (selectedEventId && !stillExists) {
+      setSelectedEventId(null);
     }
   }, [data, selectedEventId]);
 
@@ -1776,10 +1854,6 @@ export default function ClientWeddingPage() {
 
     setDetailDraft(buildDetailDraft(selectedEvent));
   }, [selectedEvent]);
-
-  useEffect(() => {
-    setEditorSection("basics");
-  }, [selectedEventId]);
 
   useEffect(() => {
     if (!wedding) return;
@@ -1962,40 +2036,26 @@ export default function ClientWeddingPage() {
     [detailSpendEstimate, selectedEvent]
   );
 
-  // Needs the client picked for this block during the layered definition. We
-  // read them from the event's saved requirement rows (the source of truth),
-  // not the editable draft — the draft falls back to "all categories" when a
-  // block has no rows, which would defeat the filtering.
-  const activeRequirementCategories = useMemo(() => {
-    const set = new Set<EventRequirementCategoryKey>();
-    for (const requirement of selectedEvent?.requirements ?? []) {
-      set.add(requirement.category);
-    }
-    return set;
-  }, [selectedEvent]);
+  const openEventSection = useCallback(
+    (eventId: string, section: EditorSectionKey = "basics") => {
+      setSelectedEventId(eventId);
+      setEditorSection(section);
+    },
+    []
+  );
 
   // Hide the dedicated sections for needs the client didn't ask for. Cross-cutting
   // sections (basics, special, tasks, notes) always show. If the event carries no
   // requirement rows at all — legacy plans, or a block created with zero needs —
   // we show everything so nothing is silently unreachable.
-  const visibleEditorSections = useMemo(() => {
-    if (activeRequirementCategories.size === 0) return EDITOR_SECTIONS;
-    return EDITOR_SECTIONS.filter((section) => {
-      if (section.key === "food") return activeRequirementCategories.has("food");
-      if (section.key === "design")
-        return activeRequirementCategories.has("decor");
-      if (section.key === "media")
-        return activeRequirementCategories.has("photo-video");
-      if (section.key === "entertainment")
-        return activeRequirementCategories.has("entertainment");
-      if (section.key === "logistics")
-        return (
-          activeRequirementCategories.has("logistics") ||
-          activeRequirementCategories.has("hospitality")
-        );
-      return true;
-    });
-  }, [activeRequirementCategories]);
+  const visibleEditorSections = useMemo(
+    () => editorSectionsForEvent(selectedEvent),
+    [selectedEvent]
+  );
+  const menuPlanningBlocks = useMemo(
+    () => planningBlocksFromText(detailDraft?.menuNotes),
+    [detailDraft?.menuNotes]
+  );
 
   const activeEditorSection =
     visibleEditorSections.find((section) => section.key === editorSection) ??
@@ -2674,6 +2734,31 @@ export default function ClientWeddingPage() {
     toast.success(`${blueprint.label} starter added`);
   };
 
+  const addFoodQuoteOnlyItem = (item: string) => {
+    setDetailDraft((current) =>
+      current
+        ? {
+            ...current,
+            menuNotes: appendPlanningBlock(current.menuNotes, `Quote-only: ${item}`, [
+              "Exclude this from estimate until vendor quote is received.",
+            ]),
+          }
+        : current
+    );
+    toast.success(`${item} marked as quote-only`);
+  };
+
+  const removeMenuPlanningBlock = (title: string) => {
+    setDetailDraft((current) =>
+      current
+        ? {
+            ...current,
+            menuNotes: removePlanningBlock(current.menuNotes, title),
+          }
+        : current
+    );
+  };
+
   const applyVendorServiceToPlan = ({
     categoryKey,
     vendor,
@@ -3186,10 +3271,11 @@ export default function ClientWeddingPage() {
         <div className={dashCard}>
           <p className={dashLabel}>Derived event spend</p>
           <p className="mt-3 font-display text-3xl text-charcoal">
-            {spendEstimateLabel(estimatedSpend)}
+            {gatedSpendEstimateLabel(estimatedSpend, overallReadiness)}
           </p>
           <p className="mt-2 text-sm text-slate">
-            {totalSelections} vendor selections · {spendEstimateCaption(estimatedSpend)}
+            {totalSelections} vendor selections ·{" "}
+            {gatedSpendEstimateCaption(estimatedSpend, overallReadiness)}
           </p>
         </div>
       </motion.div>
@@ -3272,10 +3358,14 @@ export default function ClientWeddingPage() {
             className="flex flex-col gap-4 border-b border-charcoal/10 pb-5"
           >
             <div>
-              <p className={dashLabel}>Celebration board</p>
+              <p className={dashLabel}>Celebration flow map</p>
               <h3 className="mt-2 font-display text-2xl text-charcoal">
-                Days, events, and flow
+                Pick a day, function, or step
               </h3>
+              <p className="mt-2 text-xs leading-relaxed text-slate">
+                The editor opens only after you choose a function. Use the small
+                step nodes to jump straight into Basics, Food, Design, and more.
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
@@ -3373,7 +3463,7 @@ export default function ClientWeddingPage() {
                     onDragOver={(event) => event.preventDefault()}
                     onDrop={() => void handleDropOnDay(day.id)}
                     className={cn(
-                      "border bg-ivory p-4 transition-colors",
+                      "relative overflow-hidden border bg-ivory p-4 transition-colors before:absolute before:left-5 before:top-24 before:h-[calc(100%-7rem)] before:w-px before:bg-gradient-to-b before:from-gold-primary/35 before:via-charcoal/10 before:to-transparent",
                       draggedEventId ? "border-gold-primary/35" : "border-charcoal/10"
                     )}
                   >
@@ -3437,7 +3527,10 @@ export default function ClientWeddingPage() {
                         ) : (
                           <>
                             <div className="flex items-center gap-3">
-                              <p className={dashLabel}>Day {dayIndex + 1}</p>
+                              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-gold-primary/35 bg-gold-primary/10 font-display text-lg text-charcoal">
+                                {dayIndex + 1}
+                              </span>
+                              <p className={dashLabel}>Day node</p>
                               <p className="font-heading text-xs text-slate">
                                 {formatDayDate(day.date)}
                               </p>
@@ -3449,7 +3542,10 @@ export default function ClientWeddingPage() {
                               {daySummary.eventCount}{" "}
                               {daySummary.eventCount === 1 ? "event" : "events"}
                               {" · "}
-                              {spendEstimateLabel(daySummary.estimatedSpend)}
+                              {gatedSpendEstimateLabel(
+                                daySummary.estimatedSpend,
+                                daySummary.readiness
+                              )}
                               {" · "}
                               {daySummary.readiness}% ready
                               {" · "}
@@ -3540,27 +3636,12 @@ export default function ClientWeddingPage() {
                               setEventDraft((current) => ({
                                 ...current,
                                 name: event.target.value,
+                                eventType: event.target.value || current.eventType,
                               }))
                             }
-                            placeholder="Event name"
+                            placeholder="Function name / type"
                             className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
                           />
-                          <select
-                            value={eventDraft.eventType}
-                            onChange={(event) =>
-                              setEventDraft((current) => ({
-                                ...current,
-                                eventType: event.target.value,
-                              }))
-                            }
-                            className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                          >
-                            {blockPurposeOptionsWithCurrent(eventDraft.eventType).map((option) => (
-                              <option key={option} value={option}>
-                                {option}
-                              </option>
-                            ))}
-                          </select>
                           <select
                             value={eventDraft.timeBlock}
                             onChange={(event) => {
@@ -3666,6 +3747,8 @@ export default function ClientWeddingPage() {
                               venueOptions
                             );
 
+                            const eventSections = editorSectionsForEvent(event);
+
                             return (
                             <article
                               key={event.id}
@@ -3673,32 +3756,39 @@ export default function ClientWeddingPage() {
                               onDragStart={() => setDraggedEventId(event.id)}
                               onDragEnd={() => setDraggedEventId(null)}
                               className={cn(
-                                "border bg-ivory p-4 transition-all",
+                                "relative ml-6 border bg-ivory p-4 transition-all before:absolute before:-left-6 before:top-8 before:h-px before:w-6 before:bg-gold-primary/35 hover:-translate-y-0.5 hover:border-gold-primary/45 hover:shadow-[0_18px_40px_rgba(26,26,46,0.08)]",
                                 selectedEventId === event.id
-                                  ? "border-gold-primary/45 shadow-[0_18px_40px_rgba(201,169,110,0.12)]"
+                                  ? "border-gold-primary/55 shadow-[0_18px_40px_rgba(201,169,110,0.14)]"
                                   : "border-charcoal/10"
                               )}
                             >
                               <div className="flex items-start justify-between gap-4">
                                 <div>
                                   <p className={dashLabel}>
-                                    {event.event_type ?? "Custom event"}
+                                    Function node
                                   </p>
                                   <h5 className="mt-2 font-display text-xl text-charcoal">
                                     {event.name}
                                   </h5>
+                                  {event.event_type && event.event_type !== event.name ? (
+                                    <p className="mt-1 text-xs text-slate">
+                                      {event.event_type}
+                                    </p>
+                                  ) : null}
                                 </div>
                                 <div className="flex shrink-0 items-start gap-3">
-                                  <ProgressRing
-                                    percent={eventReadiness}
-                                    size={66}
-                                    stroke={4}
-                                    label=""
-                                  />
+                                  <span
+                                    className={cn(
+                                      "border px-2 py-1 font-accent text-[10px] uppercase tracking-[0.16em]",
+                                      readinessTone(eventReadiness)
+                                    )}
+                                  >
+                                    {eventReadiness}% ready
+                                  </span>
                                   <button
                                     type="button"
                                     className={dashBtn}
-                                    onClick={() => setSelectedEventId(event.id)}
+                                    onClick={() => openEventSection(event.id, "basics")}
                                   >
                                     Open
                                   </button>
@@ -3719,9 +3809,16 @@ export default function ClientWeddingPage() {
                                 </p>
                                 <p className="border-t border-charcoal/8 pt-2 font-heading text-xs text-slate">
                                   <span className="text-charcoal">
-                                    {spendEstimateLabel(eventEstimate)}
+                                    {gatedSpendEstimateLabel(
+                                      eventEstimate,
+                                      eventReadiness
+                                    )}
                                   </span>{" "}
-                                  · {spendEstimateCaption(eventEstimate)}
+                                  ·{" "}
+                                  {gatedSpendEstimateCaption(
+                                    eventEstimate,
+                                    eventReadiness
+                                  )}
                                 </p>
                               </div>
 
@@ -3734,6 +3831,40 @@ export default function ClientWeddingPage() {
                                     {chip}
                                   </span>
                                 ))}
+                              </div>
+
+                              <div className="mt-4 border-t border-charcoal/8 pt-4">
+                                <p className={dashLabel}>Breakdown steps</p>
+                                <div className="mt-3 grid grid-cols-2 gap-2">
+                                  {eventSections.map((section, sectionIndex) => {
+                                    const active =
+                                      selectedEventId === event.id &&
+                                      editorSection === section.key;
+                                    return (
+                                      <button
+                                        key={`${event.id}-${section.key}`}
+                                        type="button"
+                                        onClick={() =>
+                                          openEventSection(event.id, section.key)
+                                        }
+                                        className={cn(
+                                          "min-h-12 border px-3 py-2 text-left transition-all hover:-translate-y-0.5 hover:border-gold-primary/45",
+                                          sectionNodeShape(section.key),
+                                          active
+                                            ? "border-charcoal bg-charcoal text-ivory shadow-[0_14px_34px_rgba(26,26,46,0.16)]"
+                                            : "border-charcoal/10 bg-cream/35 text-charcoal"
+                                        )}
+                                      >
+                                        <span className="font-accent text-[9px] uppercase tracking-[0.16em] opacity-70">
+                                          {String(sectionIndex + 1).padStart(2, "0")}
+                                        </span>
+                                        <span className="mt-1 block font-heading text-xs">
+                                          {section.label}
+                                        </span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
                               </div>
 
                               <div className="mt-4 flex flex-wrap gap-2 border-t border-charcoal/8 pt-4">
@@ -3883,7 +4014,12 @@ export default function ClientWeddingPage() {
                     <p className={dashLabel}>Spend</p>
                     <p className="mt-1 font-display text-base leading-tight text-charcoal">
                       {detailSpendEstimate
-                        ? spendEstimateLabel(detailSpendEstimate)
+                        ? gatedSpendEstimateLabel(
+                            detailSpendEstimate,
+                            selectedEvent
+                              ? eventReadinessPercent(selectedEvent, venueOptions)
+                              : 0
+                          )
                         : "Pending"}
                     </p>
                   </div>
@@ -3897,38 +4033,27 @@ export default function ClientWeddingPage() {
 
                 {editorSection === "basics" ? (
                 <div className="grid gap-3 md:grid-cols-2">
-                  <Field label="Event name">
+                  <Field label="Function name / type" className="md:col-span-2">
                     <input
                       type="text"
                       value={detailDraft.name}
                       onChange={(event) =>
                         setDetailDraft((current) =>
                           current
-                            ? { ...current, name: event.target.value }
+                            ? {
+                                ...current,
+                                name: event.target.value,
+                                eventType: event.target.value,
+                              }
                             : current
                         )
                       }
                       className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
                     />
-                  </Field>
-                  <Field label="Event type">
-                    <select
-                      value={detailDraft.eventType}
-                      onChange={(event) =>
-                        setDetailDraft((current) =>
-                          current
-                            ? { ...current, eventType: event.target.value }
-                            : current
-                        )
-                      }
-                      className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                    >
-                      {blockPurposeOptionsWithCurrent(detailDraft.eventType).map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
+                    <p className="mt-2 text-xs leading-relaxed text-slate">
+                      This single name defines the function and its type across
+                      the flow map, budget sync, and vendor briefs.
+                    </p>
                   </Field>
                   <Field label="Celebration day">
                     <select
@@ -4028,15 +4153,27 @@ export default function ClientWeddingPage() {
                     <div className="border border-gold-primary/25 bg-gold-primary/8 p-4">
                       <p className="font-display text-2xl text-charcoal">
                         {detailSpendEstimate
-                          ? spendEstimateLabel(detailSpendEstimate)
+                          ? gatedSpendEstimateLabel(
+                              detailSpendEstimate,
+                              selectedEvent
+                                ? eventReadinessPercent(selectedEvent, venueOptions)
+                                : 0
+                            )
                           : "Estimate pending"}
                       </p>
                       <p className="mt-2 text-xs leading-relaxed text-slate">
                         {detailSpendEstimate
-                          ? spendEstimateCaption(detailSpendEstimate)
+                          ? gatedSpendEstimateCaption(
+                              detailSpendEstimate,
+                              selectedEvent
+                                ? eventReadinessPercent(selectedEvent, venueOptions)
+                                : 0
+                            )
                           : "Pick a venue and packages to generate this."}
                       </p>
-                      {detailSpendEstimate?.sources.length ? (
+                      {detailSpendEstimate?.sources.length &&
+                      selectedEvent &&
+                      eventReadinessPercent(selectedEvent, venueOptions) >= 100 ? (
                         <div className="mt-3 flex flex-wrap gap-1.5">
                           {detailSpendEstimate.sources.slice(0, 4).map((source) => (
                             <span
@@ -4056,13 +4193,13 @@ export default function ClientWeddingPage() {
 
                 {editorSection === "food" ? (
                 <div className="space-y-4 border-t border-charcoal/8 pt-5">
-	                  <div>
-	                    <p className={dashLabel}>Food and menu</p>
-	                    <p className="mt-1 text-sm text-slate">
-	                      Start with the caterer&apos;s real catalogue, then
+                  <div>
+                    <p className={dashLabel}>Food and menu</p>
+                    <p className="mt-1 text-sm text-slate">
+                      Start with the caterer&apos;s real catalogue, then
                         customize menus and dietary details below.
-	                    </p>
-	                  </div>
+                    </p>
+                  </div>
 
                   <EmbeddedVendorPlanner
                     categoryKey="catering"
@@ -4112,6 +4249,33 @@ export default function ClientWeddingPage() {
                           <span className="mt-1 block text-[11px] leading-relaxed text-slate">
                             {blueprint.mealPeriod} · {blueprint.items.length} rows
                           </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border border-dashed border-charcoal/15 bg-cream/30 p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className={dashLabel}>Special food add-ons</p>
+                        <p className="mt-1 text-xs leading-relaxed text-slate">
+                          Add custom requests that need vendor quote approval.
+                          These stay out of the estimate until priced.
+                        </p>
+                      </div>
+                      <span className="border border-gold-primary/25 bg-gold-primary/8 px-2 py-1 font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark">
+                        Quote only
+                      </span>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {FOOD_QUOTE_ONLY_OPTIONS.map((item) => (
+                        <button
+                          key={item}
+                          type="button"
+                          onClick={() => addFoodQuoteOnlyItem(item)}
+                          className="border border-charcoal/10 bg-ivory/75 px-3 py-2 font-heading text-xs text-charcoal transition-colors hover:border-gold-primary/45"
+                        >
+                          + {item}
                         </button>
                       ))}
                     </div>
@@ -4169,6 +4333,47 @@ export default function ClientWeddingPage() {
                       }
                       placeholder="Add menu note"
                     />
+                    {menuPlanningBlocks.length > 0 ? (
+                      <div className="mt-3 space-y-2">
+                        {menuPlanningBlocks.map((block) => (
+                          <div
+                            key={block.title}
+                            className="border border-dashed border-charcoal/15 bg-cream/35 p-3"
+                          >
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div>
+                                <p className="font-heading text-sm text-charcoal">
+                                  {block.title}
+                                </p>
+                                {block.lines.length > 0 ? (
+                                  <ul className="mt-1 space-y-1 text-xs leading-relaxed text-slate">
+                                    {block.lines.map((line) => (
+                                      <li key={line}>{line}</li>
+                                    ))}
+                                  </ul>
+                                ) : null}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {block.title
+                                  .toLowerCase()
+                                  .includes("quote-only") ? (
+                                  <span className="border border-gold-primary/25 bg-gold-primary/8 px-2 py-1 font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark">
+                                    Quote only
+                                  </span>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  onClick={() => removeMenuPlanningBlock(block.title)}
+                                  className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate transition-colors hover:text-charcoal"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                   </Field>
 
                   <div className="space-y-3">
@@ -5237,10 +5442,10 @@ export default function ClientWeddingPage() {
                   What to do next
                 </p>
                 <p className="mt-2 font-heading text-sm text-charcoal">
-                  Pick an event from the day cards above to open the guided
-                  editor — start with <span className="text-gold-dark">Basics</span>{" "}
-                  for guest count and venue, then move through each requirement&apos;s
-                  partner and customization flow.
+                  Pick a function node from the flow map, or tap one of its
+                  shaped breakdown nodes to jump directly into{" "}
+                  <span className="text-gold-dark">Food, Design, Logistics, Tasks,</span>{" "}
+                  or another section. The editor stays closed until a node is selected.
                 </p>
               </div>
             )}

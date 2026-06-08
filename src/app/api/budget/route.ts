@@ -225,6 +225,51 @@ async function getAllowedWeddingEventIds(profileId: string) {
   return new Set((events ?? []).map((event) => event.id));
 }
 
+async function syncWeddingEventEstimatesFromBudgetItems(
+  supabase: ReturnType<typeof createAdminSupabaseClient>,
+  allowedEventIds: Set<string>
+) {
+  const eventIds = Array.from(allowedEventIds);
+  if (eventIds.length === 0) return;
+
+  const totals = new Map(eventIds.map((eventId) => [eventId, 0]));
+  const { data: items, error } = await supabase
+    .from("budget_items")
+    .select("wedding_event_id, estimated_cost, actual_cost, quantity")
+    .in("wedding_event_id", eventIds);
+
+  if (error) {
+    throw error;
+  }
+
+  for (const item of items ?? []) {
+    const eventId = item.wedding_event_id;
+    if (!eventId || !totals.has(eventId)) continue;
+    const quantity =
+      typeof item.quantity === "number" && Number.isFinite(item.quantity)
+        ? Math.max(1, item.quantity)
+        : 1;
+    const unitAmount = Math.max(
+      item.actual_cost ?? 0,
+      item.estimated_cost ?? 0
+    );
+    totals.set(eventId, (totals.get(eventId) ?? 0) + unitAmount * quantity);
+  }
+
+  await Promise.all(
+    eventIds.map(async (eventId) => {
+      const { error: updateError } = await supabase
+        .from("wedding_events")
+        .update({ estimated_budget: Math.round(totals.get(eventId) ?? 0) })
+        .eq("id", eventId);
+
+      if (updateError) {
+        throw updateError;
+      }
+    })
+  );
+}
+
 async function getOrCreateBudget(profileId: string) {
   const supabase = createAdminSupabaseClient();
   const { data: existing, error } = await supabase
@@ -617,6 +662,8 @@ export async function PUT(request: NextRequest) {
         throw categoryDeleteErr;
       }
     }
+
+    await syncWeddingEventEstimatesFromBudgetItems(supabase, allowedEventIds);
 
     const [refreshed, eventPlanSpend] = await Promise.all([
       loadBudgetPayload(profileId),

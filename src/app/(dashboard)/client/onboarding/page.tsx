@@ -6,9 +6,9 @@
  * A 5-step guided flow that captures the new event-platform model:
  *   Step 1 — profile name
  *   Step 2 — event type (14 presets + Custom)
- *   Step 3 — number of days + primary date
- *   Step 4 — per-day dates
- *   Step 5 — per-day morning / afternoon / evening time blocks (needs + timing)
+ *   Step 3 — number of days
+ *   Step 4 — optional per-day dates
+ *   Step 5 — per-day morning / afternoon / evening time blocks (needs + timing + guests)
  *
  * Submits to the existing /api/wedding POST. The request includes the richer
  * `definitionPayload` (event type, custom name, full day/block plan); when
@@ -107,28 +107,6 @@ function createEmptyDay(
   };
 }
 
-function dateForDayFromPrimaryDate(
-  primaryDate: string,
-  index: number,
-  count: number
-) {
-  const [year, month, day] = primaryDate.split("-").map(Number);
-  if (!year || !month || !day) return null;
-
-  const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
-  date.setUTCDate(date.getUTCDate() + index - (count - 1));
-  return date.toISOString().slice(0, 10);
-}
-
-function applyPrimaryDateToDays(days: LocalDay[], primaryDate: string) {
-  if (!primaryDate) return days;
-
-  return days.map((day, index) => ({
-    ...day,
-    date: dateForDayFromPrimaryDate(primaryDate, index, days.length),
-  }));
-}
-
 function rebuildDays(
   current: LocalDay[],
   targetCount: number,
@@ -183,8 +161,6 @@ export default function ClientOnboardingPage() {
   const [customEventType, setCustomEventType] = useState("");
   // Step 3 — scale
   const [dayCount, setDayCount] = useState(3);
-  const [eventDate, setEventDate] = useState("");
-  const [guestCount, setGuestCount] = useState(DEFAULT_GUESTS);
   // Step 4
   const eventTypeLabel = useMemo(() => {
     const match = EVENT_PLATFORM_TYPES.find((t) => t.value === eventType);
@@ -197,33 +173,14 @@ export default function ClientOnboardingPage() {
     Array.from({ length: 3 }, (_, i) => createEmptyDay(i, 3, "Wedding"))
   );
 
-  // Re-shape the days array when day count changes, refresh default copy when
-  // event type shifts, and derive a visible date for every day from the main date.
+  // Re-shape the days array when day count changes and refresh default copy
+  // when event type shifts. Dates are intentionally not forced at Layer 1;
+  // users can set each day independently now or later in Layer 2.
   useEffect(() => {
     setDays((current) =>
-      applyPrimaryDateToDays(
-        rebuildDays(current, normalizeDayCount(dayCount), eventTypeLabel),
-        eventDate
-      )
+      rebuildDays(current, normalizeDayCount(dayCount), eventTypeLabel)
     );
-  }, [dayCount, eventTypeLabel, eventDate]);
-
-  // The overall guest estimate seeds every block. Editing a block's guest
-  // count on the Time-blocks step overrides it; changing the overall number
-  // re-seeds all blocks (expected, since the overall is set earlier in flow).
-  useEffect(() => {
-    setDays((current) =>
-      current.map((day) => ({
-        ...day,
-        blocks: Object.fromEntries(
-          Object.entries(day.blocks).map(([key, block]) => [
-            key,
-            { ...block, guestCount },
-          ])
-        ) as LocalDay["blocks"],
-      }))
-    );
-  }, [guestCount]);
+  }, [dayCount, eventTypeLabel]);
 
   const definition = useMemo<EventDefinitionPayload>(
     () =>
@@ -231,11 +188,11 @@ export default function ClientOnboardingPage() {
         eventName: profileName,
         eventType,
         customEventType: eventType === CUSTOM_EVENT_TYPE_VALUE ? customEventType : null,
-        eventDate: eventDate || null,
+        eventDate: null,
         dayCount,
         days: days.map(toEventDefinitionDay),
       }),
-    [profileName, eventType, customEventType, eventDate, dayCount, days]
+    [profileName, eventType, customEventType, dayCount, days]
   );
 
   const canAdvance = (): boolean => {
@@ -244,18 +201,14 @@ export default function ClientOnboardingPage() {
       if (eventType === CUSTOM_EVENT_TYPE_VALUE) return customEventType.trim().length >= 2;
       return true;
     }
-    if (step === 2) return dayCount >= 1 && dayCount <= 14 && Boolean(eventDate);
-    if (step === 3) return days.length > 0 && days.every((day) => Boolean(day.date));
+    if (step === 2) return dayCount >= 1 && dayCount <= 14;
+    if (step === 3) return days.length > 0;
     return true;
   };
 
   const next = () => {
     if (!canAdvance()) {
-      if (step === 3) {
-        toast.error("Pick a date for every day before continuing.");
-      } else {
-        toast.error("Please complete this step before continuing.");
-      }
+      toast.error("Please complete this step before continuing.");
       return;
     }
     setStep((s) => (s < 4 ? ((s + 1) as Step) : s));
@@ -284,10 +237,6 @@ export default function ClientOnboardingPage() {
       (sum, day) => sum + Object.values(day.blocks).filter((b) => b.enabled).length,
       0
     );
-    if (days.some((day) => !day.date)) {
-      toast.error("Choose a date for every event day before finishing.");
-      return;
-    }
     if (enabledCount === 0) {
       toast.error("Enable at least one time block before finishing.");
       return;
@@ -300,12 +249,8 @@ export default function ClientOnboardingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           coupleName: profileName.trim(),
-          weddingDate: eventDate || null,
+          weddingDate: days.find((day) => day.date)?.date ?? null,
           dayCount,
-          // Guest estimate sizes catering/seating. No budget is collected —
-          // Elysian provides an estimated spend after the plan is built, so the
-          // API falls back to its own default budget cap (editable later).
-          guestCount,
           eventType,
           customEventType:
             eventType === CUSTOM_EVENT_TYPE_VALUE ? customEventType.trim() : null,
@@ -391,11 +336,7 @@ export default function ClientOnboardingPage() {
           {step === 2 ? (
             <DaysStep
               dayCount={dayCount}
-              eventDate={eventDate}
-              guestCount={guestCount}
               onDayCountChange={(value) => setDayCount(normalizeDayCount(value))}
-              onEventDateChange={setEventDate}
-              onGuestCountChange={setGuestCount}
               eventTypeLabel={eventTypeLabel}
             />
           ) : null}
@@ -556,39 +497,15 @@ function TypeStep({
 
 function DaysStep({
   dayCount,
-  eventDate,
-  guestCount,
   eventTypeLabel,
   onDayCountChange,
-  onEventDateChange,
-  onGuestCountChange,
 }: {
   dayCount: number;
-  eventDate: string;
-  guestCount: number;
   eventTypeLabel: string;
   onDayCountChange: (v: number) => void;
-  onEventDateChange: (v: string) => void;
-  onGuestCountChange: (v: number) => void;
 }) {
   return (
     <div className="space-y-5">
-      <div>
-        <label htmlFor="eventDate" className={dashLabel}>
-          Main / final date
-        </label>
-        <input
-          id="eventDate"
-          type="date"
-          value={eventDate}
-          onChange={(e) => onEventDateChange(e.target.value)}
-          className="mt-3 w-full border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm outline-none focus:border-gold-primary"
-        />
-        <p className="mt-2 text-xs text-slate">
-          For multi-day events, this is the final or main day. The next step
-          assigns dates to every day, and you can still adjust each one.
-        </p>
-      </div>
       <div>
         <label htmlFor="dayCount" className={dashLabel}>
           How many days does this {eventTypeLabel.toLowerCase()} run?
@@ -624,42 +541,24 @@ function DaysStep({
         </div>
         <p className="mt-3 text-xs leading-relaxed text-slate">
           Pick a quick preset or type your own (up to 14). Continue to set each
-          day&apos;s date and morning / afternoon / evening blocks before anything is created.
-        </p>
-      </div>
-
-      <div className="border-t border-charcoal/8 pt-5">
-        <label htmlFor="guestCount" className={dashLabel}>
-          Typical guests per function
-        </label>
-        <input
-          id="guestCount"
-          type="number"
-          min={1}
-          max={100000}
-          value={guestCount}
-          onChange={(e) =>
-            onGuestCountChange(Math.max(1, Number(e.target.value) || 1))
-          }
-          className="mt-3 w-full max-w-xs border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm outline-none focus:border-gold-primary"
-        />
-        <p className="mt-2 text-xs leading-relaxed text-slate">
-          A rough number is enough — it sizes catering, seating, and hotel
-          blocks. It pre-fills every time block, and you can set a different
-          guest count for each block on the next steps.
+          day&apos;s optional date and morning / afternoon / evening blocks before
+          anything is created.
         </p>
       </div>
 
       <div className="border border-gold-primary/25 bg-gold-primary/5 p-4">
-        <p className={cn(dashLabel, "text-gold-dark")}>No budget needed yet</p>
+        <p className={cn(dashLabel, "text-gold-dark")}>
+          Dates and guests come next
+        </p>
         <p className="mt-2 text-xs leading-relaxed text-slate">
-          Don&apos;t worry about a budget now. Build the structure, choose what
-          each block needs, and{" "}
+          No final/main date is required here. You can set each day&apos;s date
+          independently on the next screen, then enter guest counts per actual
+          time block so food and seating estimates use the right number.
+          Don&apos;t worry about a budget now —{" "}
           <span className="text-charcoal">
             Elysian prepares an estimated spend for you
           </span>{" "}
-          once it&apos;s planned. You can keep editing days, dates, venues, and
-          menus after you see the estimate.
+          once the event has enough detail.
         </p>
       </div>
     </div>
@@ -678,8 +577,8 @@ function formatDayDateLabel(value: string | null): string {
   });
 }
 
-// Step 4 (Dates) — one date per day. Pre-filled from the main date in Step 3,
-// the user fine-tunes each. Dedicated step so it can't be missed.
+// Step 4 (Dates) — optional one date per day. Dedicated step keeps dates
+// visible without forcing a single "final day" model.
 function DatesStep({
   days,
   onDayPatch,
@@ -692,8 +591,8 @@ function DatesStep({
       <div>
         <p className={dashLabel}>Set each day&apos;s date</p>
         <p className="mt-2 text-xs leading-relaxed text-slate">
-          We pre-filled dates counting back from your main date. Adjust any of
-          them — give each day its own date and a name you recognise.
+          Add dates if you know them, or leave them flexible and fill them in
+          from Layer 2. Give each day a name you recognise.
         </p>
       </div>
 
