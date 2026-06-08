@@ -609,24 +609,6 @@ const NOTE_PROMPTS = [
   "On-site instruction",
 ] as const;
 
-const MIND_MAP_BRANCH_POSITIONS = [
-  "lg:left-[5%] lg:top-[7%] lg:w-[38%] lg:-rotate-1",
-  "lg:right-[5%] lg:top-[7%] lg:w-[38%] lg:rotate-1",
-  "lg:right-[2%] lg:top-[40%] lg:w-[34%]",
-  "lg:right-[8%] lg:bottom-[6%] lg:w-[38%] lg:-rotate-1",
-  "lg:left-[8%] lg:bottom-[6%] lg:w-[38%] lg:rotate-1",
-  "lg:left-[2%] lg:top-[40%] lg:w-[34%]",
-] as const;
-
-const MIND_MAP_CONNECTOR_PATHS = [
-  "M50 50 C42 34 32 22 22 18",
-  "M50 50 C58 34 68 22 78 18",
-  "M50 50 C65 50 80 45 91 48",
-  "M50 50 C58 66 68 78 78 84",
-  "M50 50 C42 66 32 78 22 84",
-  "M50 50 C35 50 20 45 9 48",
-] as const;
-
 function draftId(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -953,17 +935,6 @@ function readinessTone(percent: number) {
   if (percent >= 100) return "border-sage/35 bg-sage/10 text-sage";
   if (percent >= 70) return "border-gold-primary/35 bg-gold-primary/10 text-gold-dark";
   return "border-charcoal/12 bg-cream/50 text-slate";
-}
-
-function mindMapBranchClass(index: number) {
-  return MIND_MAP_BRANCH_POSITIONS[index % MIND_MAP_BRANCH_POSITIONS.length];
-}
-
-function mindMapStroke(status: FlowStatus) {
-  if (status === "ready") return "stroke-sage/45";
-  if (status === "gap") return "stroke-rose/40";
-  if (status === "active") return "stroke-gold-primary/45";
-  return "stroke-charcoal/18";
 }
 
 function findEventById(days: WeddingDay[], eventId: string | null) {
@@ -3625,6 +3596,10 @@ export default function ClientWeddingPage() {
             </motion.form>
           ) : null}
 
+          {days.length > 0 ? (
+            <MindMapLegend className="mt-6 bg-ivory/80" />
+          ) : null}
+
           {days.length === 0 ? (
             <div className="mt-8">
               <FlowEmptyState
@@ -3649,7 +3624,11 @@ export default function ClientWeddingPage() {
                     onDrop={() => void handleDropOnDay(day.id)}
                     className={cn(
                       "relative overflow-hidden border bg-ivory p-4 transition-colors",
-                      draggedEventId ? "border-gold-primary/35" : "border-charcoal/10"
+                      draggedEventId
+                        ? "border-gold-primary/35"
+                        : focusedDayId === day.id
+                          ? "border-gold-primary/40 shadow-[0_14px_40px_rgba(201,169,110,0.1)]"
+                          : "border-charcoal/10"
                     )}
                   >
                     <div className="flex flex-col gap-4 border-b border-charcoal/8 pb-4">
@@ -3713,9 +3692,7 @@ export default function ClientWeddingPage() {
                           <>
                             <div className="flex flex-wrap items-start justify-between gap-4">
                               <div>
-                                <p className={dashLabel}>
-                                  Mind map center · Day {dayIndex + 1}
-                                </p>
+                                <p className={dashLabel}>Day {dayIndex + 1}</p>
                                 <h4 className="mt-2 font-display text-2xl text-charcoal">
                                   {day.name}
                                 </h4>
@@ -3734,7 +3711,7 @@ export default function ClientWeddingPage() {
                                   readinessTone(daySummary.readiness)
                                 )}
                               >
-                                Select a branch below
+                                {daySummary.readiness}% ready
                               </span>
                             </div>
                             {day.notes ? (
@@ -3921,65 +3898,13 @@ export default function ClientWeddingPage() {
                         />
                       </div>
                     ) : (
-                      <div className="relative mt-5 min-h-[620px] overflow-hidden border border-charcoal/10 bg-[radial-gradient(circle_at_center,rgba(201,169,110,0.14),transparent_28%),linear-gradient(135deg,rgba(255,255,255,0.72),rgba(245,240,231,0.5))] p-4 md:p-6 lg:min-h-[720px]">
-                        <svg
-                          className="pointer-events-none absolute inset-0 hidden h-full w-full lg:block"
-                          viewBox="0 0 100 100"
-                          preserveAspectRatio="none"
-                          aria-hidden
-                        >
-                          {day.events
-                            .slice()
-                            .sort((left, right) => left.sort_order - right.sort_order)
-                            .map((event, eventIndex) => {
-                              const eventStatus = flowStatusFromReadiness(
-                                eventReadinessPercent(event, venueOptions)
-                              );
-                              return (
-                                <path
-                                  key={`${event.id}-connector`}
-                                  d={
-                                    MIND_MAP_CONNECTOR_PATHS[
-                                      eventIndex % MIND_MAP_CONNECTOR_PATHS.length
-                                    ]
-                                  }
-                                  className={cn(
-                                    "fill-none stroke-[0.42] [stroke-linecap:round] [stroke-dasharray:1.4_1.2]",
-                                    mindMapStroke(eventStatus),
-                                    selectedEventId === event.id &&
-                                      "stroke-[0.62] [stroke-dasharray:0]"
-                                  )}
-                                />
-                              );
-                            })}
-                        </svg>
-
-                        <div className="relative z-10 mx-auto max-w-md lg:absolute lg:left-1/2 lg:top-1/2 lg:w-[34%] lg:-translate-x-1/2 lg:-translate-y-1/2">
-                          <FlowNode
-                            variant="day"
-                            index={dayIndex + 1}
-                            eyebrow={formatDayDate(day.date)}
-                            title={day.name}
-                            meta={`${daySummary.eventCount} ${
-                              daySummary.eventCount === 1 ? "function" : "functions"
-                            } · ${daySummary.readiness}% ready`}
-                            status={flowStatusFromReadiness(
-                              daySummary.readiness,
-                              daySummary.eventCount > 0
-                            )}
-                            selected={focusedDayId === day.id}
-                            ariaLabel={`Select ${day.name}`}
-                            onClick={() =>
-                              setFocusedDayId((current) =>
-                                current === day.id ? null : day.id
-                              )
-                            }
-                          />
-                        </div>
-
-                        <MindMapLegend className="relative z-10 mt-4 bg-ivory/90 p-4 lg:absolute lg:bottom-4 lg:left-4 lg:mt-0 lg:w-64 lg:backdrop-blur" />
-
-                        <div className="relative z-10 mt-8 grid gap-4 lg:mt-0 lg:block lg:min-h-[640px]">
+                      <div className="mt-5">
+                        <p className="mb-3 font-accent text-[10px] uppercase tracking-[0.18em] text-slate/70">
+                          {daySummary.eventCount}{" "}
+                          {daySummary.eventCount === 1 ? "function" : "functions"} ·
+                          tap one to plan it
+                        </p>
+                        <div className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
                         {day.events
                           .slice()
                           .sort((left, right) => left.sort_order - right.sort_order)
@@ -4001,11 +3926,8 @@ export default function ClientWeddingPage() {
                             <div
                               key={event.id}
                               className={cn(
-                                "relative transition-all duration-300 lg:absolute",
-                                mindMapBranchClass(eventIndex),
-                                isEventSelected
-                                  ? "z-20 scale-[1.02]"
-                                  : "z-10"
+                                "transition-all duration-300",
+                                isEventSelected && "sm:col-span-2 xl:col-span-3"
                               )}
                             >
                             <article
