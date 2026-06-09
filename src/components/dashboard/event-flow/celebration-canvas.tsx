@@ -15,10 +15,49 @@
 
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowLeft, Plus } from "lucide-react";
+import {
+  ArrowLeft,
+  BedDouble,
+  Camera,
+  FileText,
+  Flower2,
+  Gem,
+  Gift,
+  ListChecks,
+  Music,
+  Palette,
+  Plus,
+  StickyNote,
+  Store,
+  Truck,
+  UtensilsCrossed,
+  Wand2,
+} from "lucide-react";
 import type { ComponentType } from "react";
 import { FLOW_STATUS_META, type FlowStatus } from "./flow-node";
 import { cn } from "@/lib/utils";
+
+/** Meaningful icon per step so each token reads as what it actually edits. */
+const STEP_ICON_BY_KEY: Record<string, ComponentType<{ className?: string }>> = {
+  basics: FileText,
+  food: UtensilsCrossed,
+  design: Palette,
+  decor: Flower2,
+  media: Camera,
+  "photo-video": Camera,
+  entertainment: Music,
+  logistics: Truck,
+  hospitality: BedDouble,
+  vendors: Store,
+  special: Gift,
+  tasks: ListChecks,
+  notes: StickyNote,
+  custom: Wand2,
+};
+
+function stepIconFor(id: string): ComponentType<{ className?: string }> {
+  return STEP_ICON_BY_KEY[id] ?? Gem;
+}
 
 export type CanvasStep = {
   id: string;
@@ -453,7 +492,7 @@ function StepLevel({
         const pos = positions[i];
         const tone = FLOW_STATUS_META[step.status ?? "planned"];
         const shape = stepShape(step.id, i);
-        const Icon = step.icon;
+        const Icon = step.icon ?? stepIconFor(step.id);
         return (
           <div
             key={step.id}

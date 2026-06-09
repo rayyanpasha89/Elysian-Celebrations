@@ -195,6 +195,172 @@ async function getEventPlanSpendSummary(
   };
 }
 
+// ─── Two-way sync: event-plan vendor picks → budget line items ──────────────
+
+/** Map a planner vendor category slug onto a budget category name. */
+const VENDOR_SLUG_TO_BUDGET_CATEGORY: Record<string, string> = {
+  catering: "Catering",
+  food: "Catering",
+  decor: "Decor & Design",
+  design: "Decor & Design",
+  floral: "Decor & Design",
+  flowers: "Decor & Design",
+  photography: "Photography & Video",
+  photo: "Photography & Video",
+  videography: "Photography & Video",
+  film: "Photography & Video",
+  entertainment: "Entertainment",
+  music: "Entertainment",
+  travel: "Travel & Logistics",
+  logistics: "Travel & Logistics",
+  transport: "Travel & Logistics",
+  planning: "Venue & Hospitality",
+  hospitality: "Venue & Hospitality",
+  venue: "Venue & Hospitality",
+  makeup: "Makeup & Styling",
+  beauty: "Makeup & Styling",
+  styling: "Makeup & Styling",
+};
+
+function budgetCategoryForVendorSlug(slug: string | null | undefined) {
+  if (!slug) return "Miscellaneous";
+  return VENDOR_SLUG_TO_BUDGET_CATEGORY[slug.toLowerCase()] ?? "Miscellaneous";
+}
+
+function firstRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+export type PlanLineItem = {
+  bookingId: string;
+  eventId: string;
+  eventName: string;
+  dayName: string | null;
+  categoryName: string;
+  vendorName: string;
+  serviceName: string | null;
+  name: string;
+  estimatedCost: number;
+};
+
+type RawBudgetBookingRow = {
+  id: string;
+  wedding_event_id: string | null;
+  total_amount: number | null;
+  vendor:
+    | {
+        business_name: string | null;
+        category:
+          | { slug: string | null }
+          | { slug: string | null }[]
+          | null;
+      }
+    | {
+        business_name: string | null;
+        category: { slug: string | null } | { slug: string | null }[] | null;
+      }[]
+    | null;
+  service:
+    | { name: string | null; base_price: number | null }
+    | { name: string | null; base_price: number | null }[]
+    | null;
+};
+
+/**
+ * Reads the latest wedding's vendor bookings and shapes them into budget line
+ * items the client can one-click import — the "event plan → budget" direction
+ * of the two-way sync. (The reverse direction already rolls budget items back
+ * into each event's estimated_budget on save.)
+ */
+async function getPlanVendorLineItems(profileId: string): Promise<PlanLineItem[]> {
+  const supabase = createAdminSupabaseClient();
+
+  const { data: wedding } = await supabase
+    .from("weddings")
+    .select("id")
+    .eq("client_profile_id", profileId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!wedding) return [];
+
+  const [{ data: dayRows }, { data: eventRows }] = await Promise.all([
+    supabase.from("wedding_days").select("id, name").eq("wedding_id", wedding.id),
+    supabase
+      .from("wedding_events")
+      .select("id, wedding_day_id, name")
+      .eq("wedding_id", wedding.id),
+  ]);
+
+  const dayNameById = new Map(
+    (dayRows ?? []).map((day) => [day.id as string, day.name as string])
+  );
+  const events = eventRows ?? [];
+  const eventInfo = new Map(
+    events.map((event) => [
+      event.id as string,
+      {
+        name: (event.name as string) ?? "Function",
+        dayName: event.wedding_day_id
+          ? dayNameById.get(event.wedding_day_id as string) ?? null
+          : null,
+      },
+    ])
+  );
+  const eventIds = events.map((event) => event.id as string);
+  if (eventIds.length === 0) return [];
+
+  const { data: bookings, error } = await supabase
+    .from("bookings")
+    .select(
+      `id, wedding_event_id, total_amount,
+       vendor:vendor_profiles(business_name, category:vendor_categories(slug)),
+       service:vendor_services(name, base_price)`
+    )
+    .in("wedding_event_id", eventIds)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("getPlanVendorLineItems bookings:", error);
+    return [];
+  }
+
+  const lineItems: PlanLineItem[] = [];
+  for (const row of (bookings ?? []) as RawBudgetBookingRow[]) {
+    const eventId = row.wedding_event_id;
+    if (!eventId) continue;
+    const info = eventInfo.get(eventId);
+    if (!info) continue;
+
+    const vendor = firstRelation(row.vendor);
+    const service = firstRelation(row.service);
+    const category = firstRelation(vendor?.category ?? null);
+
+    const vendorName = vendor?.business_name?.trim() || "Vendor";
+    const serviceName = service?.name?.trim() || null;
+    const estimatedCost = Math.max(
+      0,
+      Math.round(row.total_amount ?? service?.base_price ?? 0)
+    );
+
+    lineItems.push({
+      bookingId: row.id,
+      eventId,
+      eventName: info.name,
+      dayName: info.dayName,
+      categoryName: budgetCategoryForVendorSlug(category?.slug),
+      vendorName,
+      serviceName,
+      name: serviceName ? `${vendorName} · ${serviceName}` : vendorName,
+      estimatedCost,
+    });
+  }
+
+  return lineItems;
+}
+
 async function getAllowedWeddingEventIds(profileId: string) {
   const supabase = createAdminSupabaseClient();
   const { data: wedding, error: weddingError } = await supabase
@@ -421,11 +587,17 @@ export async function GET() {
       return apiSuccess({ needsOnboarding: true, budget: null });
     }
 
-    const [budget, eventPlanSpend] = await Promise.all([
+    const [budget, eventPlanSpend, planLineItems] = await Promise.all([
       loadBudgetPayload(profileId),
       getEventPlanSpendSummary(profileId),
+      getPlanVendorLineItems(profileId),
     ]);
-    return apiSuccess({ needsOnboarding: false, budget, eventPlanSpend });
+    return apiSuccess({
+      needsOnboarding: false,
+      budget,
+      eventPlanSpend,
+      planLineItems,
+    });
   } catch (error) {
     console.error("GET /api/budget", error);
     return apiError("Failed to load budget", 500);
@@ -665,11 +837,12 @@ export async function PUT(request: NextRequest) {
 
     await syncWeddingEventEstimatesFromBudgetItems(supabase, allowedEventIds);
 
-    const [refreshed, eventPlanSpend] = await Promise.all([
+    const [refreshed, eventPlanSpend, planLineItems] = await Promise.all([
       loadBudgetPayload(profileId),
       getEventPlanSpendSummary(profileId),
+      getPlanVendorLineItems(profileId),
     ]);
-    return apiSuccess({ budget: refreshed, eventPlanSpend });
+    return apiSuccess({ budget: refreshed, eventPlanSpend, planLineItems });
   } catch (error) {
     console.error("PUT /api/budget", error);
     return apiError("Failed to save budget", 500);
