@@ -4,13 +4,12 @@ import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { AnimatedCounter } from "@/components/shared/animated-counter";
 import { useBudgetStore } from "@/stores/budget-store";
-import { cn, formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 
 type CategoryInsight = {
   id: string;
   name: string;
   color: string;
-  allocated: number;
   quoted: number;
   actual: number;
   paid: number;
@@ -18,7 +17,6 @@ type CategoryInsight = {
 
 export function BudgetSummary() {
   const budgetName = useBudgetStore((state) => state.budgetName);
-  const totalBudget = useBudgetStore((state) => state.totalBudget);
   const categories = useBudgetStore((state) => state.categories);
 
   const metrics = useMemo(() => {
@@ -40,114 +38,72 @@ export function BudgetSummary() {
         id: category.id,
         name: category.name,
         color: category.color,
-        allocated: category.allocated,
         quoted,
         actual,
         paid,
       };
     });
 
-    const totalAllocated = categoryInsights.reduce(
-      (sum, category) => sum + category.allocated,
-      0
-    );
-    const totalQuoted = categoryInsights.reduce(
-      (sum, category) => sum + category.quoted,
-      0
-    );
-    const totalActual = categoryInsights.reduce(
-      (sum, category) => sum + category.actual,
-      0
-    );
-    const totalPaid = categoryInsights.reduce(
-      (sum, category) => sum + category.paid,
-      0
-    );
+    const totalQuoted = categoryInsights.reduce((s, c) => s + c.quoted, 0);
+    const totalActual = categoryInsights.reduce((s, c) => s + c.actual, 0);
+    const totalPaid = categoryInsights.reduce((s, c) => s + c.paid, 0);
     const activeSpend = Math.max(totalQuoted, totalActual);
-    const runway = totalBudget - activeSpend;
-    const usedPercent =
-      totalBudget > 0 ? Math.min(100, Math.round((activeSpend / totalBudget) * 100)) : 0;
+    const toPay = Math.max(0, activeSpend - totalPaid);
+    const paidPercent =
+      activeSpend > 0 ? Math.min(100, Math.round((totalPaid / activeSpend) * 100)) : 0;
 
     const attention = categoryInsights
       .map((category) => {
-        if (category.quoted > category.allocated) {
+        if (category.actual > category.quoted && category.quoted > 0) {
           return {
             ...category,
-            message: `${formatCurrency(
-              category.quoted - category.allocated
-            )} over target`,
-            severity: 2,
-          };
-        }
-
-        if (category.actual > category.quoted) {
-          return {
-            ...category,
-            message: `${formatCurrency(
-              category.actual - category.quoted
-            )} above quoted spend`,
+            message: `${formatCurrency(category.actual - category.quoted)} above the estimate`,
             severity: 1,
           };
         }
-
-        if (category.quoted === 0 && category.allocated > 0) {
-          return {
-            ...category,
-            message: "No quote captured yet",
-            severity: 0,
-          };
+        if (category.quoted === 0) {
+          return { ...category, message: "No cost captured yet", severity: 0 };
         }
-
         return null;
       })
-      .filter((value): value is CategoryInsight & { message: string; severity: number } =>
-        Boolean(value)
+      .filter((v): v is CategoryInsight & { message: string; severity: number } =>
+        Boolean(v)
       )
-      .sort((left, right) => right.severity - left.severity)
+      .sort((a, b) => b.severity - a.severity)
       .slice(0, 4);
 
     return {
       categoryInsights,
-      totalAllocated,
       totalQuoted,
       totalActual,
       totalPaid,
       activeSpend,
-      runway,
-      usedPercent,
+      toPay,
+      paidPercent,
       attention,
     };
-  }, [categories, totalBudget]);
-
-  const postureLabel =
-    metrics.activeSpend > totalBudget
-      ? "Overextended"
-      : metrics.activeSpend > totalBudget * 0.85
-        ? "Watch carefully"
-        : "Healthy runway";
+  }, [categories]);
 
   return (
     <div className="space-y-6">
       <div className="border border-charcoal/8 bg-cream/40 p-4">
         <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-slate">
-          Budget posture
+          Cost estimate
         </p>
-        <h3 className="mt-2 font-display text-2xl text-charcoal">
-          {budgetName}
-        </h3>
+        <h3 className="mt-2 font-display text-2xl text-charcoal">{budgetName}</h3>
         <p className="mt-2 text-sm leading-relaxed text-slate">
-          Your target plan, live quotes, and final spend are all visible in one
-          place so decisions stay grounded.
+          Estimated cost, what you&apos;ve locked, and what&apos;s paid — all in
+          one place. No fixed cap; just a clear running total.
         </p>
       </div>
 
       <div>
         <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-slate">
-          Total investment
+          Estimated total
         </p>
         <div className="mt-2 font-display text-4xl font-semibold text-charcoal">
           <AnimatedCounter
-            target={totalBudget}
+            target={metrics.totalQuoted}
             formatter={(value) => formatCurrency(value)}
           />
         </div>
@@ -157,57 +113,38 @@ export function BudgetSummary() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
-              Active spend
+              Paid so far
             </p>
-            <p className="mt-2 text-lg font-medium text-charcoal">
-              {formatCurrency(metrics.activeSpend)}
+            <p className="mt-2 text-lg font-medium text-sage">
+              {formatCurrency(metrics.totalPaid)}
             </p>
           </div>
           <div className="text-right">
             <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
-              Posture
+              Still to pay
             </p>
-            <p
-              className={cn(
-                "mt-2 text-sm font-medium",
-                postureLabel === "Overextended" && "text-error",
-                postureLabel === "Watch carefully" && "text-gold-dark",
-                postureLabel === "Healthy runway" && "text-sage"
-              )}
-            >
-              {postureLabel}
+            <p className="mt-2 text-lg font-medium text-charcoal">
+              {formatCurrency(metrics.toPay)}
             </p>
           </div>
         </div>
 
         <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-charcoal/8">
           <motion.div
-            className={cn(
-              "h-full rounded-full",
-              metrics.activeSpend > totalBudget
-                ? "bg-error"
-                : metrics.activeSpend > totalBudget * 0.85
-                  ? "bg-gold-primary"
-                  : "bg-sage"
-            )}
+            className="h-full rounded-full bg-sage"
             initial={{ width: 0 }}
-            animate={{ width: `${metrics.usedPercent}%` }}
+            animate={{ width: `${metrics.paidPercent}%` }}
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
           />
         </div>
-
         <div className="mt-3 flex items-center justify-between text-xs text-slate">
-          <span>{metrics.usedPercent}% of target committed</span>
-          <span>
-            {metrics.runway < 0 ? "-" : ""}
-            {formatCurrency(Math.abs(metrics.runway))} runway
-          </span>
+          <span>{metrics.paidPercent}% paid</span>
+          <span>{formatCurrency(metrics.activeSpend)} committed</span>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <SummaryCard label="Allocated" value={metrics.totalAllocated} />
-        <SummaryCard label="Quoted" value={metrics.totalQuoted} />
+      <div className="grid grid-cols-3 gap-3">
+        <SummaryCard label="Estimated" value={metrics.totalQuoted} />
         <SummaryCard label="Actual" value={metrics.totalActual} />
         <SummaryCard label="Paid" value={metrics.totalPaid} />
       </div>
@@ -222,7 +159,6 @@ export function BudgetSummary() {
               metrics.totalQuoted > 0
                 ? Math.max(4, Math.round((category.quoted / metrics.totalQuoted) * 100))
                 : 0;
-
             return (
               <div key={category.id}>
                 <div className="flex items-center justify-between gap-4 text-sm">
@@ -258,8 +194,8 @@ export function BudgetSummary() {
         </p>
         {metrics.attention.length === 0 ? (
           <p className="mt-3 text-sm leading-relaxed text-slate">
-            The plan is balanced right now. Keep capturing real quotes and actual
-            spends to protect this runway.
+            Your estimate looks complete. Keep capturing real quotes and actual
+            spends to keep it accurate.
           </p>
         ) : (
           <ul className="mt-4 list-none space-y-3 pl-0">
@@ -285,23 +221,14 @@ export function BudgetSummary() {
   );
 }
 
-function SummaryCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: number;
-}) {
+function SummaryCard({ label, value }: { label: string; value: number }) {
   return (
     <div className="border border-charcoal/8 p-4">
       <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
         {label}
       </p>
       <p className="mt-2 font-display text-lg text-charcoal">
-        <AnimatedCounter
-          target={value}
-          formatter={(amount) => formatCurrency(amount)}
-        />
+        <AnimatedCounter target={value} formatter={(amount) => formatCurrency(amount)} />
       </p>
     </div>
   );

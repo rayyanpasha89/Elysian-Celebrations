@@ -17,10 +17,10 @@ const navGroups: NavGroup[] = [
   {
     title: "Planning",
     items: [
-      { label: "Budget", href: "/client/budget" },
+      { label: "Cost Estimate", href: "/client/budget" },
       { label: "Vendors", href: "/client/vendors" },
       { label: "Guest List", href: "/client/guests" },
-      { label: "Timeline", href: "/client/timeline" },
+      { label: "Run of Show", href: "/client/timeline" },
       { label: "Mood Board", href: "/client/mood-board" },
     ],
   },

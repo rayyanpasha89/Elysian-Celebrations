@@ -19,7 +19,7 @@ const PORTAL_LABELS: Record<string, string> = {
 const DASHBOARD_ROUTE_TITLES: Record<string, string> = {
   "/client": "Dashboard",
   "/client/vendors": "Vendors",
-  "/client/budget": "Investment Plan",
+  "/client/budget": "Cost Estimation",
   "/client/guests": "Guest List",
   "/client/mood-board": "Mood Board",
   "/client/messages": "Messages",

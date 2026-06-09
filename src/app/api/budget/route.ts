@@ -242,12 +242,22 @@ export type PlanLineItem = {
   serviceName: string | null;
   name: string;
   estimatedCost: number;
+  status: string;
+  stage: "selected" | "booked" | "confirmed";
 };
+
+/** Map a raw booking status onto a simple 3-stage funnel. */
+function bookingStage(status: string | null): "selected" | "booked" | "confirmed" {
+  if (status === "CONFIRMED" || status === "COMPLETED") return "confirmed";
+  if (status === "DEPOSIT_PAID") return "booked";
+  return "selected";
+}
 
 type RawBudgetBookingRow = {
   id: string;
   wedding_event_id: string | null;
   total_amount: number | null;
+  status: string | null;
   vendor:
     | {
         business_name: string | null;
@@ -315,7 +325,7 @@ async function getPlanVendorLineItems(profileId: string): Promise<PlanLineItem[]
   const { data: bookings, error } = await supabase
     .from("bookings")
     .select(
-      `id, wedding_event_id, total_amount,
+      `id, wedding_event_id, total_amount, status,
        vendor:vendor_profiles(business_name, category:vendor_categories(slug)),
        service:vendor_services(name, base_price)`
     )
@@ -355,6 +365,8 @@ async function getPlanVendorLineItems(profileId: string): Promise<PlanLineItem[]
       serviceName,
       name: serviceName ? `${vendorName} · ${serviceName}` : vendorName,
       estimatedCost,
+      status: row.status ?? "INQUIRY",
+      stage: bookingStage(row.status),
     });
   }
 
