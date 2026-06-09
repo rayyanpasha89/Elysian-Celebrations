@@ -8,10 +8,10 @@ import { toast } from "sonner";
 import { fadeUp, staggerContainer } from "@/animations/variants";
 import { FinalizationBoard } from "@/components/dashboard/finalization-board";
 import {
+  CelebrationCanvas,
   FlowEmptyState,
-  FlowNode,
   MindMapLegend,
-  StepOrbit,
+  type CanvasDay,
   type FlowStatus,
   type FlowStep,
 } from "@/components/dashboard/event-flow";
@@ -1824,7 +1824,9 @@ export default function ClientWeddingPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<WeddingPayload | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  const [focusedDayId, setFocusedDayId] = useState<string | null>(null);
+  // Canvas tracks its own drill-down focus; we only keep the setter so the
+  // existing load/select flows can record the active day without a console warn.
+  const [, setFocusedDayId] = useState<string | null>(null);
   // Layer tab — Definition (what we're planning), Requirements (the existing
   // 7-step per-block editor, default), Finalization (gap checklist before
   // launch). Requirements is the primary work surface; the other two are
@@ -1856,7 +1858,6 @@ export default function ClientWeddingPage() {
   const [savingEvent, setSavingEvent] = useState(false);
   const [savingDetail, setSavingDetail] = useState(false);
   const [deletingPlan, setDeletingPlan] = useState(false);
-  const [draggedEventId, setDraggedEventId] = useState<string | null>(null);
   const [vendorOptionsLoading, setVendorOptionsLoading] = useState(false);
   const [vendorOptions, setVendorOptions] = useState<
     Record<PlannerVendorCategoryKey, VendorPlannerOption[]>
@@ -1930,6 +1931,54 @@ export default function ClientWeddingPage() {
   const days = data?.days ?? EMPTY_DAYS;
   const selectedEvent = findEventById(days, selectedEventId);
   const selectedDay = findEventDay(days, selectedEventId);
+  const editingDay = editingDayId
+    ? days.find((day) => day.id === editingDayId) ?? null
+    : null;
+  const editingDayIndex = editingDay
+    ? days.findIndex((day) => day.id === editingDay.id)
+    : -1;
+  const eventFormDay = eventFormDayId
+    ? days.find((day) => day.id === eventFormDayId) ?? null
+    : null;
+
+  // Shape the plan into the radial mind-map model the CelebrationCanvas consumes:
+  // Event hub → days orbit → each day's functions orbit → each function's steps.
+  const canvasDays: CanvasDay[] = useMemo(
+    () =>
+      days
+        .slice()
+        .sort((left, right) => left.sort_order - right.sort_order)
+        .map((day) => {
+          const summary = summarizeDayPlan(day, venueOptions);
+          return {
+            id: day.id,
+            title: day.name,
+            dateLabel: formatDayDate(day.date),
+            status: flowStatusFromReadiness(summary.readiness, summary.eventCount > 0),
+            readiness: summary.readiness,
+            events: day.events
+              .slice()
+              .sort((left, right) => left.sort_order - right.sort_order)
+              .map((event) => {
+                const readiness = eventReadinessPercent(event, venueOptions);
+                return {
+                  id: event.id,
+                  title: event.name,
+                  timeLabel: formatEventWindow(event),
+                  meta: `${event.guest_count ?? 0} guests`,
+                  status: flowStatusFromReadiness(readiness),
+                  readiness,
+                  steps: eventFlowSteps(event).map((step) => ({
+                    id: step.id,
+                    label: step.label,
+                    status: step.status,
+                  })),
+                };
+              }),
+          };
+        }),
+    [days, venueOptions]
+  );
 
   useEffect(() => {
     if (selectedDay) {
@@ -2656,100 +2705,6 @@ export default function ClientWeddingPage() {
       );
     } finally {
       setDeletingPlan(false);
-    }
-  };
-
-  const nudgeEvent = async (eventId: string, direction: -1 | 1) => {
-    const day = findEventDay(days, eventId);
-    if (!day) return;
-
-    const eventIndex = day.events.findIndex((entry) => entry.id === eventId);
-    const otherEvent = day.events[eventIndex + direction];
-    const currentEvent = day.events[eventIndex];
-    if (!currentEvent || !otherEvent) return;
-
-    try {
-      const [resA, resB] = await Promise.all([
-        fetch(`/api/wedding/events/${currentEvent.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            weddingDayId: day.id,
-            sortOrder: otherEvent.sort_order,
-          }),
-        }),
-        fetch(`/api/wedding/events/${otherEvent.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            weddingDayId: day.id,
-            sortOrder: currentEvent.sort_order,
-          }),
-        }),
-      ]);
-      const [jsonA, jsonB] = await Promise.all([
-        resA.json() as Promise<{ error?: string }>,
-        resB.json() as Promise<{ error?: string }>,
-      ]);
-      if (!resA.ok) {
-        throw new Error(jsonA.error ?? "Failed to reorder event");
-      }
-      if (!resB.ok) {
-        throw new Error(jsonB.error ?? "Failed to reorder event");
-      }
-
-      await refreshWedding();
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not reorder event"
-      );
-    }
-  };
-
-  const handleDropOnDay = async (dayId: string) => {
-    if (!draggedEventId) return;
-
-    const draggedEvent = findEventById(days, draggedEventId);
-    const targetDay = days.find((day) => day.id === dayId);
-    if (!draggedEvent || !targetDay) {
-      setDraggedEventId(null);
-      return;
-    }
-
-    if (draggedEvent.wedding_day_id === dayId) {
-      setDraggedEventId(null);
-      return;
-    }
-
-    const nextSortOrder =
-      targetDay.events.reduce(
-        (max, event) => Math.max(max, event.sort_order),
-        -1
-      ) + 1;
-
-    try {
-      const response = await fetch(`/api/wedding/events/${draggedEvent.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          weddingDayId: dayId,
-          sortOrder: nextSortOrder,
-        }),
-      });
-      const json = await response.json();
-      if (!response.ok) {
-        throw new Error(json.error ?? "Could not move event");
-      }
-
-      await refreshWedding();
-      setSelectedEventId(draggedEvent.id);
-      toast.success("Event moved to a new day");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not move event"
-      );
-    } finally {
-      setDraggedEventId(null);
     }
   };
 
@@ -3610,469 +3565,312 @@ export default function ClientWeddingPage() {
               />
             </div>
           ) : (
-            <div className="mt-6 space-y-4">
-              {days
-                .slice()
-                .sort((left, right) => left.sort_order - right.sort_order)
-                .map((day, dayIndex) => {
-                  const daySummary = summarizeDayPlan(day, venueOptions);
-                  return (
-                  <motion.section
-                    key={day.id}
-                    variants={fadeUp}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={() => void handleDropOnDay(day.id)}
-                    className={cn(
-                      "relative overflow-hidden border bg-ivory p-4 transition-colors",
-                      draggedEventId
-                        ? "border-gold-primary/35"
-                        : focusedDayId === day.id
-                          ? "border-gold-primary/40 shadow-[0_14px_40px_rgba(201,169,110,0.1)]"
-                          : "border-charcoal/10"
-                    )}
-                  >
-                    <div className="flex flex-col gap-4 border-b border-charcoal/8 pb-4">
-                      <div>
-                        {editingDayId === day.id ? (
-                          <div className="space-y-3">
-                            <input
-                              type="text"
-                              value={editingDayDraft.name}
-                              onChange={(event) =>
-                                setEditingDayDraft((current) => ({
-                                  ...current,
-                                  name: event.target.value,
-                                }))
-                              }
-                              className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-display text-lg text-charcoal outline-none focus:border-gold-primary"
-                            />
-                            <input
-                              type="date"
-                              value={editingDayDraft.date}
-                              onChange={(event) =>
-                                setEditingDayDraft((current) => ({
-                                  ...current,
-                                  date: event.target.value,
-                                }))
-                              }
-                              className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                            />
-                            <Field label="Day notes">
-                              <textarea
-                                value={editingDayDraft.notes}
-                                onChange={(event) =>
-                                  setEditingDayDraft((current) => ({
-                                    ...current,
-                                    notes: event.target.value,
-                                  }))
-                                }
-                                className="min-h-[88px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                                placeholder="Logistics, dress code, venue notes..."
-                              />
-                            </Field>
-                            <div className="flex flex-wrap gap-3">
-                              <button
-                                type="button"
-                                className={dashBtn}
-                                disabled={savingDay}
-                                onClick={() => void saveDayEdits(day.id)}
-                              >
-                                {savingDay ? "Saving..." : "Save day"}
-                              </button>
-                              <button
-                                type="button"
-                                className="border border-charcoal/15 px-4 py-3 font-accent text-[11px] uppercase tracking-[0.2em] text-charcoal"
-                                onClick={() => setEditingDayId(null)}
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="flex flex-wrap items-start justify-between gap-4">
-                              <div>
-                                <p className={dashLabel}>Day {dayIndex + 1}</p>
-                                <h4 className="mt-2 font-display text-2xl text-charcoal">
-                                  {day.name}
-                                </h4>
-                                <p className="mt-2 font-heading text-xs text-slate">
-                                  {formatDayDate(day.date)} ·{" "}
-                                  {daySummary.eventCount}{" "}
-                                  {daySummary.eventCount === 1
-                                    ? "function"
-                                    : "functions"}{" "}
-                                  · {daySummary.readiness}% ready
-                                </p>
-                              </div>
-                              <span
-                                className={cn(
-                                  "border px-3 py-2 font-accent text-[10px] uppercase tracking-[0.16em]",
-                                  readinessTone(daySummary.readiness)
-                                )}
-                              >
-                                {daySummary.readiness}% ready
-                              </span>
-                            </div>
-                            {day.notes ? (
-                              <p className="mt-3 max-w-2xl border-l-2 border-gold-primary/40 pl-4 text-sm leading-relaxed text-charcoal">
-                                {day.notes}
-                              </p>
-                            ) : null}
-                            <p className="mt-3 text-sm leading-relaxed text-slate">
-                              Drop an event here to move it into this day, or add a new
-                              function specifically for this part of the celebration.
-                            </p>
-                          </>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal"
-                          onClick={() => moveDay(day.id, -1)}
-                          disabled={dayIndex === 0 || savingDay}
-                        >
-                          Earlier
-                        </button>
-                        <button
-                          type="button"
-                          className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal"
-                          onClick={() => moveDay(day.id, 1)}
-                          disabled={dayIndex === days.length - 1 || savingDay}
-                        >
-                          Later
-                        </button>
-                        <button
-                          type="button"
-                          className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal"
-                          onClick={() => {
-                            setEditingDayId(day.id);
-                            setEditingDayDraft({
-                              name: day.name,
-                              date: day.date ? day.date.slice(0, 10) : "",
-                              notes: day.notes ?? "",
-                            });
-                          }}
-                        >
-                          Edit day
-                        </button>
-                        <button
-                          type="button"
-                          className="border border-gold-primary bg-gold-primary/10 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-gold-dark transition-colors hover:bg-gold-primary hover:text-midnight"
-                          onClick={() =>
-                            eventFormDayId === day.id
-                              ? setEventFormDayId(null)
-                              : openEventFormForDay(day)
-                          }
-                        >
-                          {eventFormDayId === day.id ? "Close event form" : "Add event"}
-                        </button>
-                        <button
-                          type="button"
-                          className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal"
-                          onClick={() => void deleteDay(day.id)}
-                          disabled={day.events.length > 0 || savingDay}
-                        >
-                          Delete day
-                        </button>
-                      </div>
-                    </div>
-
-                    {eventFormDayId === day.id ? (
-                      <form
-                        onSubmit={createEvent}
-                        className="mt-5 border border-charcoal/10 bg-cream/40 p-4"
-                      >
-                        <p className={dashLabel}>Add event to {day.name}</p>
-                        <p className="mt-2 text-sm leading-relaxed text-slate">
-                          Create a new morning, afternoon, or evening block. It
-                          will automatically get starter requirements, menu,
-                          logistics, and run-of-show tasks.
-                        </p>
-                        <div className="mt-4 grid gap-3">
-                          <input
-                            type="text"
-                            value={eventDraft.name}
-                            onChange={(event) =>
-                              setEventDraft((current) => ({
-                                ...current,
-                                name: event.target.value,
-                                eventType: event.target.value || current.eventType,
-                              }))
-                            }
-                            placeholder="Function name / type"
-                            className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                          />
-                          <select
-                            value={eventDraft.timeBlock}
-                            onChange={(event) => {
-                              const timeBlock = event.target.value as EventTimeBlockKey;
-                              const defaults = timeBlockDefaults(timeBlock);
-                              setEventDraft((current) => ({
-                                ...current,
-                                timeBlock,
-                                startTime: defaults.defaultStartTime,
-                                endTime: defaults.defaultEndTime,
-                              }));
-                            }}
-                            className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                          >
-                            {EVENT_TIME_BLOCKS.map((option) => (
-                              <option key={option.key} value={option.key}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-                          <input
-                            type="date"
-                            value={eventDraft.date}
-                            onChange={(event) =>
-                              setEventDraft((current) => ({
-                                ...current,
-                                date: event.target.value,
-                              }))
-                            }
-                            className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                          />
-                          <input
-                            type="time"
-                            value={eventDraft.startTime}
-                            onChange={(event) =>
-                              setEventDraft((current) => ({
-                                ...current,
-                                startTime: event.target.value,
-                              }))
-                            }
-                            className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                          />
-                          <input
-                            type="time"
-                            value={eventDraft.endTime}
-                            onChange={(event) =>
-                              setEventDraft((current) => ({
-                                ...current,
-                                endTime: event.target.value,
-                              }))
-                            }
-                            className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                          />
-                          <div>
-                            <p className={dashLabel}>Venue or area</p>
-                            <VenuePicker
-                              venues={venueOptions}
-                              loading={venueOptionsLoading}
-                              value={eventDraft.venue}
-                              compact
-                              onChange={(venue) =>
-                                setEventDraft((current) => ({
-                                  ...current,
-                                  venue,
-                                }))
-                              }
-                            />
-                          </div>
-                        </div>
-                        <div className="mt-4 flex flex-wrap gap-3">
-                          <button type="submit" className={dashBtn} disabled={savingEvent}>
-                            {savingEvent ? "Saving..." : "Create event"}
-                          </button>
-                          <button
-                            type="button"
-                            className="border border-charcoal/15 px-4 py-3 font-accent text-[11px] uppercase tracking-[0.2em] text-charcoal"
-                            onClick={() => setEventFormDayId(null)}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </form>
-                    ) : null}
-
-                    {day.events.length === 0 ? (
-                      <div className="mt-5">
-                        <FlowEmptyState
-                          title="No branches on this day yet"
-                          description="Add a morning, afternoon, or evening function. It will become a branch from the day center."
-                          actionLabel="Add function"
-                          onAction={() => openEventFormForDay(day)}
-                        />
-                      </div>
-                    ) : (
-                      <div className="mt-5">
-                        <p className="mb-3 font-accent text-[10px] uppercase tracking-[0.18em] text-slate/70">
-                          {daySummary.eventCount}{" "}
-                          {daySummary.eventCount === 1 ? "function" : "functions"} ·
-                          tap one to plan it
-                        </p>
-                        <div className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                        {day.events
-                          .slice()
-                          .sort((left, right) => left.sort_order - right.sort_order)
-                          .map((event, eventIndex) => {
-                            const eventEstimate = estimateEventSpend(
-                              event,
-                              venueOptions
-                            );
-                            const eventReadiness = eventReadinessPercent(
-                              event,
-                              venueOptions
-                            );
-
-                            const eventSteps = eventFlowSteps(event);
-                            const eventStatus = flowStatusFromReadiness(eventReadiness);
-                            const isEventSelected = selectedEventId === event.id;
-
-                            return (
-                            <div
-                              key={event.id}
-                              className={cn(
-                                "transition-all duration-300",
-                                isEventSelected && "sm:col-span-2 xl:col-span-3"
-                              )}
-                            >
-                            <article
-                              draggable
-                              onDragStart={() => setDraggedEventId(event.id)}
-                              onDragEnd={() => setDraggedEventId(null)}
-                              className={cn(
-                                "relative ml-0 border bg-ivory p-4 transition-all hover:-translate-y-0.5 hover:border-gold-primary/45 hover:shadow-[0_18px_40px_rgba(26,26,46,0.08)]",
-                                isEventSelected
-                                  ? "border-gold-primary/55 shadow-[0_18px_40px_rgba(201,169,110,0.14)]"
-                                  : "border-charcoal/10"
-                              )}
-                            >
-                              <FlowNode
-                                variant="event"
-                                eyebrow={formatEventWindow(event)}
-                                title={event.name}
-                                index={`${dayIndex + 1}.${eventIndex + 1}`}
-                                meta={`${event.venue ?? "Venue to be decided"} · ${
-                                  event.date
-                                    ? new Date(event.date).toLocaleDateString("en-IN", {
-                                        day: "numeric",
-                                        month: "short",
-                                        year: "numeric",
-                                      })
-                                    : "Date flexible"
-                                } · ${event.guest_count ?? 0} guests`}
-                                status={eventStatus}
-                                selected={isEventSelected}
-                                ariaLabel={`Open ${event.name}`}
-                                onClick={() => {
-                                  setFocusedDayId(day.id);
-                                  openEventSection(event.id, "basics");
-                                  setEditorOpen(false);
-                                }}
-                              />
-
-                              {isEventSelected ? (
-                                <>
-                                  <div className="mt-4 border-l-2 border-gold-primary/20 pl-4">
-                                    <p className="font-heading text-xs leading-relaxed text-slate">
-                                      <span className="text-charcoal">
-                                        {gatedSpendEstimateLabel(
-                                          eventEstimate,
-                                          eventReadiness
-                                        )}
-                                      </span>{" "}
-                                      ·{" "}
-                                      {gatedSpendEstimateCaption(
-                                        eventEstimate,
-                                        eventReadiness
-                                      )}
-                                    </p>
-                                  </div>
-
-                                  <div className="mt-4 flex flex-wrap gap-2">
-                                    {eventSummaryChips(event).map((chip) => (
-                                      <span
-                                        key={`${event.id}-${chip}`}
-                                        className="border border-charcoal/10 px-2 py-1 font-heading text-[11px] text-slate"
-                                      >
-                                        {chip}
-                                      </span>
-                                    ))}
-                                  </div>
-
-                                  <div className="mt-4 border-t border-charcoal/8 pt-4">
-                                    <div className="flex flex-wrap items-center justify-between gap-3">
-                                      <p className={dashLabel}>Step orbit</p>
-                                      <span
-                                        className={cn(
-                                          "border px-2 py-1 font-accent text-[10px] uppercase tracking-[0.16em]",
-                                          readinessTone(eventReadiness)
-                                        )}
-                                      >
-                                        {eventReadiness}% ready
-                                      </span>
-                                    </div>
-                                    <StepOrbit
-                                      className="mt-3"
-                                      steps={eventSteps}
-                                      selectedId={editorSection}
-                                      onSelect={(sectionId, origin) => {
-                                        setFocusedDayId(day.id);
-                                        openEditorStep(
-                                          event.id,
-                                          sectionId as EditorSectionKey,
-                                          origin
-                                        );
-                                      }}
-                                    />
-                                  </div>
-
-                                  <div className="mt-4 flex flex-wrap gap-2 border-t border-charcoal/8 pt-4">
-                                    <button
-                                      type="button"
-                                      className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal"
-                                      onClick={() => nudgeEvent(event.id, -1)}
-                                      disabled={eventIndex === 0}
-                                    >
-                                      Up
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal"
-                                      onClick={() => nudgeEvent(event.id, 1)}
-                                      disabled={eventIndex === day.events.length - 1}
-                                    >
-                                      Down
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="border border-rose/35 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-rose transition-colors hover:bg-rose hover:text-ivory"
-                                      onClick={() => void deleteEvent(event.id)}
-                                      disabled={savingDetail}
-                                    >
-                                      Delete
-                                    </button>
-                                    <p className="ml-auto font-heading text-xs text-slate">
-                                      {event.vendorSelections.length} vendor picks
-                                    </p>
-                                  </div>
-                                </>
-                              ) : (
-                                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-charcoal/8 pt-3">
-                                  <p className="font-heading text-xs text-slate">
-                                    Click branch to reveal steps
-                                  </p>
-                                  <span className="font-accent text-[10px] uppercase tracking-[0.14em] text-gold-dark">
-                                    {eventReadiness}% ready
-                                  </span>
-                                </div>
-                              )}
-                            </article>
-                            </div>
-                            );
-                          })}
-                      </div>
-                      </div>
-                    )}
-                  </motion.section>
-                  );
-                })}
+            <div className="mt-6">
+              <CelebrationCanvas
+                eventTitle={wedding?.name ?? "Your event"}
+                days={canvasDays}
+                onOpenStep={(eventId, stepId, origin) =>
+                  openEditorStep(eventId, stepId as EditorSectionKey, origin)
+                }
+                onAddDay={() => {
+                  setEventFormDayId(null);
+                  setEditingDayId(null);
+                  setShowDayForm(true);
+                }}
+                onAddFunction={(dayId) =>
+                  openEventFormForDay(days.find((day) => day.id === dayId) ?? null)
+                }
+                onEditDay={(dayId) => {
+                  const day = days.find((entry) => entry.id === dayId);
+                  if (!day) return;
+                  setShowDayForm(false);
+                  setEventFormDayId(null);
+                  setEditingDayId(day.id);
+                  setEditingDayDraft({
+                    name: day.name,
+                    date: day.date ? day.date.slice(0, 10) : "",
+                    notes: day.notes ?? "",
+                  });
+                }}
+                onDeleteDay={(dayId) => void deleteDay(dayId)}
+              />
             </div>
           )}
+
+          {/* Edit-day overlay — opened from the day hub on the canvas. */}
+          <AnimatePresence>
+            {editingDay ? (
+              <motion.div
+                key="edit-day-overlay"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[115] flex items-center justify-center bg-midnight/45 p-4 backdrop-blur"
+                onClick={() => setEditingDayId(null)}
+              >
+                <motion.div
+                  initial={
+                    prefersReducedMotion
+                      ? { opacity: 0 }
+                      : { opacity: 0, scale: 0.95, y: 12 }
+                  }
+                  animate={
+                    prefersReducedMotion
+                      ? { opacity: 1 }
+                      : { opacity: 1, scale: 1, y: 0 }
+                  }
+                  exit={
+                    prefersReducedMotion
+                      ? { opacity: 0 }
+                      : { opacity: 0, scale: 0.97, y: 8 }
+                  }
+                  transition={{ type: "spring", stiffness: 240, damping: 26 }}
+                  onClick={(event) => event.stopPropagation()}
+                  className="w-full max-w-lg border border-charcoal/12 bg-ivory p-5 shadow-[0_40px_120px_rgba(17,24,39,0.35)]"
+                >
+                  <div className="flex items-center justify-between gap-3 border-b border-charcoal/10 pb-3">
+                    <p className={dashLabel}>Edit day</p>
+                    <button
+                      type="button"
+                      onClick={() => setEditingDayId(null)}
+                      aria-label="Close"
+                      className="inline-flex h-8 w-8 items-center justify-center border border-charcoal/15 text-lg leading-none text-slate transition-colors hover:border-gold-primary hover:text-gold-dark"
+                    >
+                      <span aria-hidden>×</span>
+                    </button>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    <input
+                      type="text"
+                      value={editingDayDraft.name}
+                      onChange={(event) =>
+                        setEditingDayDraft((current) => ({
+                          ...current,
+                          name: event.target.value,
+                        }))
+                      }
+                      className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-display text-lg text-charcoal outline-none focus:border-gold-primary"
+                    />
+                    <input
+                      type="date"
+                      value={editingDayDraft.date}
+                      onChange={(event) =>
+                        setEditingDayDraft((current) => ({
+                          ...current,
+                          date: event.target.value,
+                        }))
+                      }
+                      className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                    />
+                    <Field label="Day notes">
+                      <textarea
+                        value={editingDayDraft.notes}
+                        onChange={(event) =>
+                          setEditingDayDraft((current) => ({
+                            ...current,
+                            notes: event.target.value,
+                          }))
+                        }
+                        className="min-h-[88px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                        placeholder="Logistics, dress code, venue notes..."
+                      />
+                    </Field>
+                  </div>
+                  <div className="mt-5 flex items-center gap-2 border-t border-charcoal/8 pt-4">
+                    <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
+                      Order
+                    </p>
+                    <button
+                      type="button"
+                      className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark disabled:cursor-not-allowed disabled:opacity-40"
+                      onClick={() => void moveDay(editingDay.id, -1)}
+                      disabled={editingDayIndex <= 0 || savingDay}
+                    >
+                      Earlier
+                    </button>
+                    <button
+                      type="button"
+                      className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark disabled:cursor-not-allowed disabled:opacity-40"
+                      onClick={() => void moveDay(editingDay.id, 1)}
+                      disabled={editingDayIndex >= days.length - 1 || savingDay}
+                    >
+                      Later
+                    </button>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      className={dashBtn}
+                      disabled={savingDay}
+                      onClick={() => void saveDayEdits(editingDay.id)}
+                    >
+                      {savingDay ? "Saving..." : "Save day"}
+                    </button>
+                    <button
+                      type="button"
+                      className="border border-charcoal/15 px-4 py-3 font-accent text-[11px] uppercase tracking-[0.2em] text-charcoal"
+                      onClick={() => setEditingDayId(null)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+
+          {/* Add-function overlay — opened from the day hub on the canvas. */}
+          <AnimatePresence>
+            {eventFormDay ? (
+              <motion.div
+                key="add-event-overlay"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[115] flex items-center justify-center bg-midnight/45 p-4 backdrop-blur"
+                onClick={() => setEventFormDayId(null)}
+              >
+                <motion.div
+                  initial={
+                    prefersReducedMotion
+                      ? { opacity: 0 }
+                      : { opacity: 0, scale: 0.95, y: 12 }
+                  }
+                  animate={
+                    prefersReducedMotion
+                      ? { opacity: 1 }
+                      : { opacity: 1, scale: 1, y: 0 }
+                  }
+                  exit={
+                    prefersReducedMotion
+                      ? { opacity: 0 }
+                      : { opacity: 0, scale: 0.97, y: 8 }
+                  }
+                  transition={{ type: "spring", stiffness: 240, damping: 26 }}
+                  onClick={(event) => event.stopPropagation()}
+                  className="max-h-[92vh] w-full max-w-lg overflow-y-auto border border-charcoal/12 bg-ivory shadow-[0_40px_120px_rgba(17,24,39,0.35)]"
+                >
+                  <div className="flex items-center justify-between gap-3 border-b border-charcoal/10 px-5 py-4">
+                    <div className="min-w-0">
+                      <p className={dashLabel}>Add function</p>
+                      <p className="mt-0.5 truncate font-display text-lg text-charcoal">
+                        {eventFormDay.name}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEventFormDayId(null)}
+                      aria-label="Close"
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center border border-charcoal/15 text-lg leading-none text-slate transition-colors hover:border-gold-primary hover:text-gold-dark"
+                    >
+                      <span aria-hidden>×</span>
+                    </button>
+                  </div>
+                  <form onSubmit={createEvent} className="px-5 py-5">
+                    <p className="text-sm leading-relaxed text-slate">
+                      Create a new morning, afternoon, or evening block. It will
+                      automatically get starter requirements, menu, logistics, and
+                      run-of-show tasks.
+                    </p>
+                    <div className="mt-4 grid gap-3">
+                      <input
+                        type="text"
+                        value={eventDraft.name}
+                        onChange={(event) =>
+                          setEventDraft((current) => ({
+                            ...current,
+                            name: event.target.value,
+                            eventType: event.target.value || current.eventType,
+                          }))
+                        }
+                        placeholder="Function name / type"
+                        className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                      />
+                      <select
+                        value={eventDraft.timeBlock}
+                        onChange={(event) => {
+                          const timeBlock = event.target.value as EventTimeBlockKey;
+                          const defaults = timeBlockDefaults(timeBlock);
+                          setEventDraft((current) => ({
+                            ...current,
+                            timeBlock,
+                            startTime: defaults.defaultStartTime,
+                            endTime: defaults.defaultEndTime,
+                          }));
+                        }}
+                        className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                      >
+                        {EVENT_TIME_BLOCKS.map((option) => (
+                          <option key={option.key} value={option.key}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="date"
+                        value={eventDraft.date}
+                        onChange={(event) =>
+                          setEventDraft((current) => ({
+                            ...current,
+                            date: event.target.value,
+                          }))
+                        }
+                        className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                      />
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <input
+                          type="time"
+                          value={eventDraft.startTime}
+                          onChange={(event) =>
+                            setEventDraft((current) => ({
+                              ...current,
+                              startTime: event.target.value,
+                            }))
+                          }
+                          className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                        />
+                        <input
+                          type="time"
+                          value={eventDraft.endTime}
+                          onChange={(event) =>
+                            setEventDraft((current) => ({
+                              ...current,
+                              endTime: event.target.value,
+                            }))
+                          }
+                          className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                        />
+                      </div>
+                      <div>
+                        <p className={dashLabel}>Venue or area</p>
+                        <VenuePicker
+                          venues={venueOptions}
+                          loading={venueOptionsLoading}
+                          value={eventDraft.venue}
+                          compact
+                          onChange={(venue) =>
+                            setEventDraft((current) => ({ ...current, venue }))
+                          }
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-5 flex flex-wrap gap-3">
+                      <button type="submit" className={dashBtn} disabled={savingEvent}>
+                        {savingEvent ? "Saving..." : "Create event"}
+                      </button>
+                      <button
+                        type="button"
+                        className="border border-charcoal/15 px-4 py-3 font-accent text-[11px] uppercase tracking-[0.2em] text-charcoal"
+                        onClick={() => setEventFormDayId(null)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                </motion.div>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
         </div>
 
         <AnimatePresence>
@@ -4116,13 +3914,36 @@ export default function ClientWeddingPage() {
                 <div className="flex-1 overflow-y-auto px-5 py-5 md:px-6">
                   <div className="space-y-5">
                 <div>
-                  <h4 className="font-display text-2xl text-charcoal">
-                    {selectedEvent.name}
-                  </h4>
-                  <p className="mt-2 text-sm text-slate">
-                    Refine the flow for this function from food and decor to
-                    vendor selections and spend.
+                  <button
+                    type="button"
+                    onClick={closeEditor}
+                    className="inline-flex items-center gap-1.5 font-accent text-[10px] uppercase tracking-[0.18em] text-slate transition-colors hover:text-gold-dark"
+                  >
+                    <span aria-hidden>←</span> Back to steps
+                  </button>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <h4 className="font-display text-2xl text-charcoal">
+                      {activeEditorSection.label}
+                    </h4>
+                    <span className="border border-gold-primary/35 bg-gold-primary/10 px-2 py-1 font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark">
+                      {selectedEvent.name}
+                    </span>
+                  </div>
+                  <p className="mt-2 max-w-prose text-sm leading-relaxed text-slate">
+                    {activeEditorSection.helper}
                   </p>
+                  {eventSummaryChips(selectedEvent).length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {eventSummaryChips(selectedEvent).map((chip) => (
+                        <span
+                          key={`${selectedEvent.id}-${chip}`}
+                          className="border border-charcoal/10 px-2 py-1 font-heading text-[11px] text-slate"
+                        >
+                          {chip}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                   <div className="mt-4 flex flex-wrap gap-2">
                     <button
                       type="button"
@@ -4142,54 +3963,6 @@ export default function ClientWeddingPage() {
                   </div>
                 </div>
 
-                <div className="border border-charcoal/10 bg-cream/30 p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
-                      Step{" "}
-                      {visibleEditorSections.findIndex(
-                        (entry) => entry.key === editorSection
-                      ) + 1}{" "}
-                      of {visibleEditorSections.length}
-                    </p>
-                    <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-gold-dark">
-                      {activeEditorSection.label}
-                    </p>
-                  </div>
-                  <div className="mt-3 -mx-1 flex gap-1.5 overflow-x-auto pb-1">
-                    {visibleEditorSections.map((section, index) => {
-                      const active = editorSection === section.key;
-                      return (
-                        <button
-                          key={section.key}
-                          type="button"
-                          onClick={() => setEditorSection(section.key)}
-                          className={cn(
-                            "group inline-flex shrink-0 items-center gap-2 border px-3 py-2 font-accent text-[10px] uppercase tracking-[0.16em] transition-colors",
-                            active
-                              ? "border-gold-primary bg-gold-primary/10 text-charcoal"
-                              : "border-charcoal/10 bg-ivory/70 text-slate hover:border-gold-primary/50 hover:text-charcoal"
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "flex h-5 w-5 items-center justify-center border text-[10px]",
-                              active
-                                ? "border-gold-primary bg-gold-primary text-midnight"
-                                : "border-charcoal/15 text-slate"
-                            )}
-                          >
-                            {index + 1}
-                          </span>
-                          {section.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="mt-3 text-xs leading-relaxed text-slate">
-                    {activeEditorSection.helper}
-                  </p>
-                </div>
-
                 <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
                   <div className="border border-charcoal/8 bg-cream/35 p-3">
                     <p className={dashLabel}>Menus</p>
@@ -4203,9 +3976,18 @@ export default function ClientWeddingPage() {
                       {Object.values(detailDraft.vendorSelections).flat().length}
                     </p>
                   </div>
-                  <div className="border border-charcoal/8 bg-cream/35 p-3">
+                  <div
+                    className={cn(
+                      "border p-3 transition-colors",
+                      readinessTone(
+                        selectedEvent
+                          ? eventReadinessPercent(selectedEvent, venueOptions)
+                          : 0
+                      )
+                    )}
+                  >
                     <p className={dashLabel}>Ready</p>
-                    <p className="mt-1 font-display text-lg text-charcoal">
+                    <p className="mt-1 font-display text-lg">
                       {selectedEvent
                         ? eventReadinessPercent(selectedEvent, venueOptions)
                         : 0}

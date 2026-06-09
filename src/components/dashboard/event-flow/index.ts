@@ -26,6 +26,13 @@ export { StepOrbit, type StepOrbitProps, type FlowStep, type FlowStepShape } fro
 
 export { FlowEmptyState, type FlowEmptyStateProps } from "./flow-empty-state";
 
+export {
+  CelebrationCanvas,
+  type CanvasDay,
+  type CanvasEvent,
+  type CanvasStep,
+} from "./celebration-canvas";
+
 export { MindMapLegend } from "./mind-map-legend";
 
 export { MindMapGuide, type MindMapGuideProps } from "./mind-map-guide";
