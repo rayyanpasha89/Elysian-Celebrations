@@ -1,13 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
-import { dashLabel } from "@/lib/dashboard-styles";
+import { motion } from "framer-motion";
+import {
+  AlertTriangle,
+  ArrowUpRight,
+  CalendarClock,
+  CheckCircle2,
+  Clock,
+  IndianRupee,
+  ListChecks,
+  MapPin,
+  Sparkles,
+  Users,
+  Wallet,
+} from "lucide-react";
+import { fadeUp, staggerContainer } from "@/animations/variants";
 import { cn } from "@/lib/utils";
 
-type ClientDashboardPayload = {
+// ─── API payloads ───────────────────────────────────────────────────────────
+
+type DashboardPayload = {
   wedding: {
     id: string;
     name: string;
@@ -27,70 +43,93 @@ type ClientDashboardPayload = {
   needsProfile?: boolean;
   subtitle?: string;
 };
+type GuestRow = {
+  rsvp_status: "PENDING" | "CONFIRMED" | "DECLINED" | "MAYBE";
+  plus_one: boolean;
+};
+type BudgetPayload = {
+  budget: { totalBudget: number; categories: { items: { estimatedCost: number; quantity: number }[] }[] } | null;
+  eventPlanSpend: { totalEstimated: number; eventCount: number } | null;
+};
+type SchedulePayload = {
+  schedule: {
+    id: string;
+    name: string;
+    date: string | null;
+    events: { id: string; name: string; startTime: string | null }[];
+  }[];
+};
 
-const quickActions = [
-  { label: "Event plan", href: "/client/wedding" },
-  { label: "Vendors", href: "/client/vendors" },
-  { label: "Guests", href: "/client/guests" },
-  { label: "Timeline", href: "/client/timeline" },
-  { label: "Bookings", href: "/client/bookings" },
-  { label: "Messages", href: "/client/messages" },
-  { label: "Mood board", href: "/client/mood-board" },
-];
-
-function DashboardSkeleton() {
-  return (
-    <div className="space-y-6 animate-pulse">
-      <div className="border border-charcoal/8 bg-cream/40 p-6">
-        <div className="h-3 w-24 bg-charcoal/10" />
-        <div className="mt-4 h-10 max-w-xs bg-charcoal/10" />
-        <div className="mt-3 h-4 max-w-lg bg-charcoal/10" />
-        <div className="mt-6 flex flex-wrap gap-2">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-9 w-24 border border-charcoal/8 bg-ivory/50" />
-          ))}
-        </div>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-28 border border-charcoal/8 bg-ivory/80" />
-        ))}
-      </div>
-      <div className="grid gap-6 lg:grid-cols-5">
-        <div className="lg:col-span-3 h-72 border border-charcoal/8 bg-ivory/50" />
-        <div className="lg:col-span-2 h-72 border border-charcoal/8 bg-ivory/50" />
-      </div>
-    </div>
-  );
+function formatCurrency(n: number) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(Math.round(n));
+}
+function formatLakh(n: number) {
+  if (n >= 10000000) return `₹${(n / 10000000).toFixed(2)}Cr`;
+  return `₹${(n / 100000).toFixed(1)}L`;
+}
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
+function daysTo(date: string | null): number | null {
+  if (!date) return null;
+  const t = new Date(date).getTime();
+  if (Number.isNaN(t)) return null;
+  return Math.ceil((t - Date.now()) / 86400000);
 }
 
-const actionLinkClass =
-  "font-accent inline-flex items-center justify-center border border-charcoal/15 px-4 py-2.5 text-[10px] uppercase tracking-[0.2em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark";
+const dashLabel = "font-accent text-[10px] uppercase tracking-[0.2em] text-slate";
 
-const sectionEyebrowClass =
-  "font-accent text-[10px] uppercase tracking-[0.2em] text-slate";
+const QUICK_ACTIONS = [
+  { label: "Event plan", href: "/client/wedding" },
+  { label: "Budget", href: "/client/budget" },
+  { label: "Guests", href: "/client/guests" },
+  { label: "Run of show", href: "/client/timeline" },
+  { label: "Vendors", href: "/client/vendors" },
+  { label: "Messages", href: "/client/messages" },
+];
 
-export default function ClientDashboard() {
+// ─── Page ───────────────────────────────────────────────────────────────────
+
+export default function ClientCommandCenter() {
   const { user } = useUser();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<ClientDashboardPayload | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [dash, setDash] = useState<DashboardPayload | null>(null);
+  const [guests, setGuests] = useState<GuestRow[]>([]);
+  const [budget, setBudget] = useState<BudgetPayload | null>(null);
+  const [schedule, setSchedule] = useState<SchedulePayload["schedule"]>([]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const res = await fetch("/api/dashboard/client");
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error ?? "Failed to load dashboard");
-        if (!cancelled) setData(json);
-      } catch (e) {
-        if (!cancelled)
-          setError(e instanceof Error ? e.message : "Something went wrong");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+      const safeJson = async (url: string) => {
+        try {
+          const r = await fetch(url);
+          if (!r.ok) return null;
+          return await r.json();
+        } catch {
+          return null;
+        }
+      };
+      const [d, g, b, t] = await Promise.all([
+        safeJson("/api/dashboard/client"),
+        safeJson("/api/guests"),
+        safeJson("/api/budget"),
+        safeJson("/api/timeline"),
+      ]);
+      if (cancelled) return;
+      setDash(d);
+      setGuests((g?.guests ?? []) as GuestRow[]);
+      setBudget(b ? { budget: b.budget ?? null, eventPlanSpend: b.eventPlanSpend ?? null } : null);
+      setSchedule((t?.schedule ?? []) as SchedulePayload["schedule"]);
+      setLoading(false);
     })();
     return () => {
       cancelled = true;
@@ -98,461 +137,465 @@ export default function ClientDashboard() {
   }, []);
 
   useEffect(() => {
-    if (loading || !data) return;
-    if (data.needsOnboarding || data.needsProfile)
-      router.replace("/client/onboarding");
-  }, [loading, data, router]);
+    if (loading || !dash) return;
+    if (dash.needsOnboarding || dash.needsProfile) router.replace("/client/onboarding");
+  }, [loading, dash, router]);
 
-  if (loading) return <DashboardSkeleton />;
-  if (error)
+  const agg = useMemo(() => {
+    const total = guests.length;
+    const confirmed = guests.filter((g) => g.rsvp_status === "CONFIRMED");
+    const pending = guests.filter((g) => g.rsvp_status === "PENDING").length;
+    const heads = (rows: GuestRow[]) => rows.reduce((s, g) => s + 1 + (g.plus_one ? 1 : 0), 0);
+
+    const cap = budget?.budget?.totalBudget ?? 0;
+    const quoted =
+      budget?.budget?.categories?.reduce(
+        (s, c) => s + c.items.reduce((cs, i) => cs + i.estimatedCost * i.quantity, 0),
+        0
+      ) ?? 0;
+
+    const events = schedule.flatMap((day) =>
+      day.events.map((e) => ({ ...e, dayName: day.name, date: day.date }))
+    );
+    const upcoming = events
+      .filter((e) => e.date && (daysTo(e.date) ?? -1) >= 0)
+      .sort((a, b) => (a.date! < b.date! ? -1 : 1));
+    const nextFn = upcoming[0] ?? events[0] ?? null;
+
+    return {
+      guests: {
+        total,
+        confirmed: confirmed.length,
+        pending,
+        declined: guests.filter((g) => g.rsvp_status === "DECLINED").length,
+        confirmedHeads: heads(confirmed),
+        invitedHeads: heads(guests),
+        respondedPct:
+          total > 0
+            ? Math.round((guests.filter((g) => g.rsvp_status !== "PENDING").length / total) * 100)
+            : 0,
+      },
+      budget: {
+        cap,
+        quoted,
+        over: quoted - cap,
+        pct: cap > 0 ? Math.min(999, Math.round((quoted / cap) * 100)) : 0,
+      },
+      plan: {
+        days: schedule.length,
+        events: events.length,
+      },
+      nextFn,
+    };
+  }, [guests, budget, schedule]);
+
+  const attention = useMemo(() => {
+    const a: {
+      id: string;
+      severity: "high" | "medium" | "info";
+      title: string;
+      detail: string;
+      href: string;
+      cta: string;
+    }[] = [];
+    if (!dash) return a;
+    if (agg.plan.events === 0) {
+      a.push({
+        id: "no-events",
+        severity: "high",
+        title: "No functions planned yet",
+        detail: "Add your celebration days and functions to unlock the rest of the suite.",
+        href: "/client/wedding",
+        cta: "Open planner",
+      });
+    }
+    if (agg.budget.cap > 0 && agg.budget.over > 0) {
+      a.push({
+        id: "over-budget",
+        severity: "high",
+        title: `${formatLakh(agg.budget.over)} over your cap`,
+        detail: `Quoted ${formatCurrency(agg.budget.quoted)} against a ${formatCurrency(agg.budget.cap)} ceiling.`,
+        href: "/client/budget",
+        cta: "Rebalance budget",
+      });
+    }
+    if (agg.guests.pending > 0) {
+      a.push({
+        id: "rsvp",
+        severity: "medium",
+        title: `${agg.guests.pending} ${agg.guests.pending === 1 ? "guest hasn't" : "guests haven't"} replied`,
+        detail: `${agg.guests.respondedPct}% of your list has responded so far.`,
+        href: "/client/guests",
+        cta: "Chase RSVPs",
+      });
+    }
+    if (dash.stats.vendorsBooked === 0 && agg.plan.events > 0) {
+      a.push({
+        id: "vendors",
+        severity: "medium",
+        title: "No vendors booked yet",
+        detail: "Shortlist caterers, decor and photography and add them to your functions.",
+        href: "/client/vendors",
+        cta: "Browse vendors",
+      });
+    }
+    if (agg.budget.cap > 0 && agg.budget.quoted === 0 && agg.plan.events > 0) {
+      a.push({
+        id: "budget-empty",
+        severity: "info",
+        title: "Your budget is still empty",
+        detail: "Import your vendor picks or drag line items in to start tracking spend.",
+        href: "/client/budget",
+        cta: "Open budget",
+      });
+    }
+    const nextDays = agg.nextFn?.date ? daysTo(agg.nextFn.date) : null;
+    if (nextDays != null && nextDays >= 0 && nextDays <= 21) {
+      a.push({
+        id: "next-fn",
+        severity: "info",
+        title: `${agg.nextFn!.name} in ${nextDays} ${nextDays === 1 ? "day" : "days"}`,
+        detail: "Lock the run of show and confirm vendor call-times.",
+        href: "/client/timeline",
+        cta: "Open run of show",
+      });
+    }
+    const order = { high: 0, medium: 1, info: 2 };
+    return a.sort((x, y) => order[x.severity] - order[y.severity]);
+  }, [dash, agg]);
+
+  if (loading) {
     return (
-      <div className="border border-charcoal/8 bg-ivory p-8">
-        <p className={sectionEyebrowClass}>Dashboard</p>
-        <h1 className="mt-2 font-display text-2xl text-charcoal">
-          Something went wrong
-        </h1>
-        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate">
-          {error}
-        </p>
+      <div className="flex h-64 items-center justify-center">
+        <p className={dashLabel}>Loading your command center...</p>
       </div>
     );
-  if (!data || data.needsOnboarding || data.needsProfile)
-    return <DashboardSkeleton />;
+  }
+  if (!dash || dash.needsOnboarding || dash.needsProfile) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <p className={dashLabel}>Redirecting to setup...</p>
+      </div>
+    );
+  }
 
   const firstName = user?.firstName ?? "there";
-  const { stats, tasks, recentNotifications, wedding } = data;
-  const doneTasks = tasks.filter((t) => t.done).length;
-  const taskProgress =
-    tasks.length > 0 ? Math.round((doneTasks / tasks.length) * 100) : 0;
-  const weddingDate = wedding?.date ? new Date(wedding.date) : null;
+  const wedding = dash.wedding;
+  const dday = wedding?.date ? daysTo(wedding.date) : dash.stats.daysUntil;
 
   return (
-    <div className="space-y-6">
-      {/* Strategy header — aligned with /client/budget top strip */}
-      <div className="border border-charcoal/8 bg-cream/40 p-6">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-          <div className="min-w-0 max-w-3xl">
-            <p className={sectionEyebrowClass}>Planning hub</p>
-            <h1 className="mt-2 font-display text-3xl text-charcoal md:text-4xl">
-              {firstName}
+    <motion.div
+      variants={staggerContainer}
+      initial="hidden"
+      animate="visible"
+      className="space-y-5"
+    >
+      {/* Hero */}
+      <motion.section
+        variants={fadeUp}
+        className="relative overflow-hidden border border-charcoal/10 bg-midnight text-ivory"
+      >
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(201,169,110,0.28),transparent_55%)]"
+        />
+        <div className="relative flex flex-col gap-6 p-6 md:flex-row md:items-end md:justify-between md:p-8">
+          <div>
+            <p className="font-accent text-[10px] uppercase tracking-[0.24em] text-gold-primary">
+              {greeting()}, {firstName}
+            </p>
+            <h1 className="mt-2 font-display text-3xl text-ivory md:text-4xl">
+              {wedding?.name ?? "Your celebration"}
             </h1>
-            {wedding ? (
-              <p className="font-heading mt-2 text-sm text-slate">
-                <span className="text-charcoal">{wedding.name}</span>
-                {wedding.destinationName ? (
-                  <span className="text-gold-dark">
-                    {" "}
-                    · {wedding.destinationName}
-                  </span>
-                ) : null}
-              </p>
-            ) : (
-              <p className="font-heading mt-2 text-sm text-slate">
-                Complete onboarding to unlock your full workspace.
-              </p>
-            )}
-            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate">
-              This is your command center—jump into the budget planner, day-by-day
-              event plan, vendors, and guest flow from one place. Shortcuts below
-              mirror how the budget screen keeps tools one click away.
+            <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ivory/70">
+              {wedding?.destinationName ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5 text-gold-primary" />
+                  {wedding.destinationName}
+                </span>
+              ) : null}
+              <span className="inline-flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5 text-gold-primary" />
+                {agg.plan.events} functions · {agg.plan.days} days
+              </span>
             </p>
           </div>
-
-          <div className="grid shrink-0 gap-3 sm:grid-cols-2 xl:w-[min(100%,380px)]">
-            {stats.daysUntil > 0 ? (
-              <div className="border border-charcoal/8 bg-ivory/80 p-4 sm:col-span-2">
-                <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
-                  Days to go
-                </p>
-                <p className="mt-2 font-display text-4xl text-charcoal xl:text-5xl">
-                  {stats.daysUntil}
-                </p>
-                {weddingDate ? (
-                  <p className="mt-2 font-heading text-xs text-slate">
-                    {weddingDate.toLocaleDateString("en-IN", {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    })}
-                  </p>
-                ) : null}
-              </div>
-            ) : (
-              <div className="border border-charcoal/8 bg-ivory/80 p-4 sm:col-span-2">
-                <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
-                  Countdown
-                </p>
-                <p className="mt-2 font-display text-xl text-charcoal">
-                  Set your date in onboarding or the event plan.
-                </p>
-              </div>
-            )}
+          <div className="flex items-end gap-4">
+            <div className="text-right">
+              <p className="font-display text-6xl leading-none text-gold-primary">
+                {dday != null ? Math.max(0, dday) : "—"}
+              </p>
+              <p className="mt-1 font-accent text-[10px] uppercase tracking-[0.18em] text-ivory/60">
+                days to go
+              </p>
+            </div>
           </div>
         </div>
-
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-          <Link
-            href="/client/budget"
-            className="font-accent inline-flex items-center justify-center border border-gold-primary px-5 py-2.5 text-[10px] uppercase tracking-[0.2em] text-gold-primary transition-all duration-500 hover:bg-gold-primary hover:text-midnight"
-          >
-            Open budget planner
-          </Link>
-          <Link href="/client/wedding" className={actionLinkClass}>
-            Edit event plan
-          </Link>
-        </div>
-
-        <div className="mt-5 flex flex-wrap gap-2 border-t border-charcoal/8 pt-5">
-          {quickActions.map((a) => (
-            <Link key={a.href} href={a.href} className={actionLinkClass}>
-              {a.label}
+        <div className="relative flex flex-wrap gap-2 border-t border-ivory/10 p-3 md:px-8">
+          {QUICK_ACTIONS.map((action) => (
+            <Link
+              key={action.href}
+              href={action.href}
+              className="font-accent border border-ivory/15 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-ivory/80 transition-colors hover:border-gold-primary hover:text-gold-primary"
+            >
+              {action.label}
             </Link>
           ))}
         </div>
-      </div>
+      </motion.section>
 
-      {/* Quick stats — same card language as budget QuickStat */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <DashboardQuickStat
-          label="Budget allocated"
-          value={`${stats.budgetPercent}%`}
-          hint="Of your total budget cap"
-          tone={stats.budgetPercent > 80 ? "warning" : "neutral"}
-          progress={Math.min(stats.budgetPercent, 100)}
-          progressClassName={
-            stats.budgetPercent > 80 ? "bg-gold-primary" : "bg-gold-primary/60"
+      {/* Attention now */}
+      <motion.section variants={fadeUp}>
+        <div className="mb-3 flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-gold-dark" />
+          <h2 className={dashLabel}>Attention now</h2>
+        </div>
+        {attention.length === 0 ? (
+          <div className="flex items-center gap-3 border border-sage/30 bg-sage/8 p-5">
+            <CheckCircle2 className="h-6 w-6 text-sage" />
+            <div>
+              <p className="font-display text-lg text-charcoal">You&apos;re in great shape</p>
+              <p className="text-sm text-slate">
+                Nothing needs your attention right now — enjoy the calm.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {attention.map((item) => (
+              <AttentionCard key={item.id} {...item} />
+            ))}
+          </div>
+        )}
+      </motion.section>
+
+      {/* Module health */}
+      <motion.section variants={fadeUp} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <ModuleCard
+          href="/client/wedding"
+          icon={ListChecks}
+          label="Event plan"
+          value={`${agg.plan.events}`}
+          unit="functions"
+          footer={`Across ${agg.plan.days} ${agg.plan.days === 1 ? "day" : "days"}`}
+        />
+        <ModuleCard
+          href="/client/budget"
+          icon={Wallet}
+          label="Budget"
+          value={formatLakh(agg.budget.quoted)}
+          unit={`of ${formatLakh(agg.budget.cap)}`}
+          footer={
+            agg.budget.over > 0
+              ? `${formatLakh(agg.budget.over)} over cap`
+              : `${formatLakh(Math.max(0, -agg.budget.over))} headroom`
           }
+          tone={agg.budget.over > 0 ? "warn" : "good"}
+          bar={{ pct: agg.budget.pct }}
         />
-        <DashboardQuickStat
-          label="Vendors booked"
-          value={stats.vendorsBooked}
-          hint="Confirmed on your plan"
+        <ModuleCard
+          href="/client/guests"
+          icon={Users}
+          label="Guests"
+          value={`${agg.guests.confirmedHeads}`}
+          unit={`of ${agg.guests.invitedHeads} heads`}
+          footer={`${agg.guests.confirmed} confirmed · ${agg.guests.pending} pending`}
+          tone={agg.guests.pending > 0 ? "warn" : "good"}
+          bar={{ pct: agg.guests.respondedPct }}
         />
-        <DashboardQuickStat
-          label="Guests confirmed"
-          value={stats.guestsConfirmed}
-          hint="On your primary list"
+        <ModuleCard
+          href="/client/timeline"
+          icon={CalendarClock}
+          label="Next up"
+          value={agg.nextFn?.name ?? "—"}
+          unit={agg.nextFn?.dayName ?? "Run of show"}
+          footer={(() => {
+            const d = daysTo(agg.nextFn?.date ?? null);
+            if (d == null) return "Open run of show";
+            if (d <= 0) return "Happening now";
+            return `In ${d} ${d === 1 ? "day" : "days"}`;
+          })()}
+          valueSmall
         />
-        <DashboardQuickStat
-          label="Tasks progress"
-          value={`${doneTasks} / ${tasks.length}`}
-          hint={`${taskProgress}% complete`}
-          tone={taskProgress === 100 ? "healthy" : "neutral"}
-          progress={tasks.length > 0 ? taskProgress : undefined}
-          progressClassName="bg-sage/60"
-        />
-      </div>
+      </motion.section>
 
-      <div className="grid gap-6 lg:grid-cols-5">
-        <div className="lg:col-span-3 space-y-6">
-          <div className="border border-charcoal/8 bg-ivory p-6">
-            <div className="mb-6 flex items-start justify-between gap-4">
-              <div>
-                <p className={sectionEyebrowClass}>Timeline</p>
-                <h2 className="mt-2 font-display text-xl text-charcoal">
-                  Upcoming tasks
-                </h2>
-                <p className="font-heading mt-1 text-xs text-slate">
-                  {tasks.filter((t) => !t.done).length} remaining · {doneTasks}{" "}
-                  completed
-                </p>
-              </div>
-              <Link
-                href="/client/timeline"
-                className={cn(dashLabel, "shrink-0 hover:text-gold-dark")}
-              >
-                View all
-              </Link>
+      {/* This week + activity */}
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+        <motion.section variants={fadeUp} className="border border-charcoal/10 bg-ivory">
+          <div className="flex items-center justify-between border-b border-charcoal/8 p-4">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-gold-dark" />
+              <h2 className={dashLabel}>What needs doing</h2>
             </div>
-
-            {tasks.length === 0 ? (
-              <div className="border border-dashed border-gold-primary/30 bg-gold-primary/8 px-5 py-6">
-                <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-gold-dark">
-                  What to do next
-                </p>
-                <p className="mt-2 text-sm leading-relaxed text-charcoal">
-                  Add your first event day and time block, then this timeline starts
-                  showing the tasks that actually move the weekend forward.
-                </p>
-                <Link
-                  href="/client/wedding"
-                  className="mt-4 inline-flex font-accent text-[10px] uppercase tracking-[0.18em] text-gold-primary hover:text-gold-dark"
-                >
-                  Start the event plan →
-                </Link>
-              </div>
-            ) : (
-              <ul className="divide-y divide-charcoal/5">
-                {tasks.slice(0, 6).map((task) => (
-                  <li
-                    key={task.id}
-                    className="flex items-center justify-between py-3.5"
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div
-                        className={cn(
-                          "flex h-4 w-4 shrink-0 items-center justify-center border transition-colors",
-                          task.done
-                            ? "border-gold-primary/60 bg-gold-primary/10"
-                            : "border-charcoal/20"
-                        )}
-                      >
-                        {task.done && (
-                          <div className="h-2 w-2 bg-gold-primary" />
-                        )}
-                      </div>
-                      <span
-                        className={cn(
-                          "truncate font-heading text-sm",
-                          task.done
-                            ? "text-slate line-through"
-                            : "text-charcoal"
-                        )}
-                      >
-                        {task.title}
-                      </span>
-                    </div>
-                    <span className="ml-4 shrink-0 font-accent text-[10px] uppercase tracking-[0.15em] text-slate">
-                      {task.due}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <Link
+              href="/client/timeline"
+              className="font-accent text-[10px] uppercase tracking-[0.14em] text-slate transition-colors hover:text-gold-dark"
+            >
+              View all
+            </Link>
           </div>
-
-          {wedding ? (
-            <div className="border border-charcoal/8 bg-ivory p-6">
-              <div className="mb-5 flex items-start justify-between gap-4">
-                <div>
-                  <p className={sectionEyebrowClass}>Event operating plan</p>
-                  <h2 className="mt-2 font-display text-xl text-charcoal">
-                    Overview
-                  </h2>
-                </div>
-                <Link
-                  href="/client/wedding"
-                  className={cn(dashLabel, "shrink-0 hover:text-gold-dark")}
-                >
-                  Manage
-                </Link>
-              </div>
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-                {[
-                  { label: "Event name", value: wedding.name },
-                  {
-                    label: "Destination",
-                    value: wedding.destinationName ?? "TBD",
-                  },
-                  { label: "Status", value: wedding.status },
-                  {
-                    label: "Event date",
-                    value:
-                      weddingDate?.toLocaleDateString("en-IN", {
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                      }) ?? "TBD",
-                  },
-                  {
-                    label: "Days away",
-                    value:
-                      stats.daysUntil > 0
-                        ? `${stats.daysUntil} days`
-                        : "Today or TBD",
-                  },
-                ].map((item) => (
-                  <div
-                    key={item.label}
-                    className="border border-charcoal/8 bg-cream/30 px-4 py-3"
+          {dash.tasks.length === 0 ? (
+            <p className="p-6 text-sm text-slate">
+              No open tasks. Add run-of-show moments and they&apos;ll show up here.
+            </p>
+          ) : (
+            <ul className="divide-y divide-charcoal/8">
+              {dash.tasks.map((task) => (
+                <li key={task.id} className="flex items-center gap-3 p-4">
+                  <span
+                    className={cn(
+                      "h-2 w-2 shrink-0 rounded-full",
+                      task.done ? "bg-sage" : "bg-gold-primary"
+                    )}
+                  />
+                  <span
+                    className={cn(
+                      "min-w-0 flex-1 truncate font-heading text-sm",
+                      task.done ? "text-slate line-through" : "text-charcoal"
+                    )}
                   >
-                    <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
-                      {item.label}
-                    </p>
-                    <p className="font-heading mt-2 text-sm text-charcoal">
-                      {item.value}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </div>
+                    {task.title}
+                  </span>
+                  <span className="shrink-0 font-accent text-[10px] uppercase tracking-[0.12em] text-slate">
+                    {task.due}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </motion.section>
 
-        <div className="lg:col-span-2 space-y-6">
-          <div className="border border-charcoal/8 bg-ivory p-6">
-            <div className="mb-5 flex items-start justify-between gap-4">
-              <div>
-                <p className={sectionEyebrowClass}>Investment plan</p>
-                <h2 className="mt-2 font-display text-xl text-charcoal">
-                  Budget at a glance
-                </h2>
-              </div>
-              <Link
-                href="/client/budget"
-                className={cn(dashLabel, "shrink-0 hover:text-gold-dark")}
-              >
-                Details
-              </Link>
-            </div>
-            <div className="flex items-center gap-6">
-              <div className="relative flex h-24 w-24 shrink-0 items-center justify-center">
-                <svg
-                  className="absolute inset-0 -rotate-90"
-                  viewBox="0 0 100 100"
-                >
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="8"
-                    className="text-charcoal/8"
-                  />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="8"
-                    strokeDasharray={`${2 * Math.PI * 40}`}
-                    strokeDashoffset={`${2 * Math.PI * 40 * (1 - stats.budgetPercent / 100)}`}
-                    strokeLinecap="square"
-                    className="text-gold-primary transition-all duration-700"
-                  />
-                </svg>
-                <span className="font-display text-lg font-semibold text-charcoal">
-                  {stats.budgetPercent}%
-                </span>
-              </div>
-              <div>
-                <p className="font-heading text-sm text-charcoal">
-                  Of budget allocated to categories
-                </p>
-                <p className="font-heading mt-1 text-xs text-slate">
-                  {100 - stats.budgetPercent}% headroom in the planner
-                </p>
-                <Link
-                  href="/client/budget"
-                  className="mt-4 inline-flex font-accent text-[10px] uppercase tracking-[0.2em] text-gold-primary"
-                >
-                  Manage budget →
-                </Link>
-              </div>
-            </div>
+        <motion.section variants={fadeUp} className="border border-charcoal/10 bg-ivory">
+          <div className="flex items-center gap-2 border-b border-charcoal/8 p-4">
+            <IndianRupee className="h-4 w-4 text-gold-dark" />
+            <h2 className={dashLabel}>Recent activity</h2>
           </div>
-
-          <div className="border border-charcoal/8 bg-ivory p-6">
-            <p className={sectionEyebrowClass}>Activity</p>
-            <h2 className="mt-2 font-display text-xl text-charcoal">
-              Recent updates
-            </h2>
-            <div className="mt-5">
-              {recentNotifications.length === 0 ? (
-                <div className="border border-dashed border-charcoal/12 bg-cream/30 px-4 py-6 text-center">
-                  <p className="font-heading text-sm text-slate">
-                    No activity yet.
+          {dash.recentNotifications.length === 0 ? (
+            <p className="p-6 text-sm text-slate">No recent activity yet.</p>
+          ) : (
+            <ul className="divide-y divide-charcoal/8">
+              {dash.recentNotifications.map((n) => (
+                <li key={n.id} className="p-4">
+                  <p className="text-sm leading-snug text-charcoal">{n.text}</p>
+                  <p className="mt-1 font-accent text-[10px] uppercase tracking-[0.12em] text-slate">
+                    {n.time}
                   </p>
-                </div>
-              ) : (
-                <ul className="space-y-4">
-                  {recentNotifications.map((item) => (
-                    <li
-                      key={item.id}
-                      className="border-l-2 border-gold-primary/25 pl-4"
-                    >
-                      <p className="font-heading text-sm leading-snug text-charcoal">
-                        {item.text}
-                      </p>
-                      <p className="mt-1 font-accent text-[10px] uppercase tracking-[0.15em] text-slate">
-                        {item.time}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-
-          <div className="border border-charcoal/8 bg-ivory p-6">
-            <div className="mb-4 flex items-start justify-between gap-4">
-              <div>
-                <p className={sectionEyebrowClass}>Suppliers</p>
-                <h2 className="mt-2 font-display text-xl text-charcoal">
-                  Vendors
-                </h2>
-              </div>
-              <Link
-                href="/client/vendors"
-                className={cn(dashLabel, "shrink-0 hover:text-gold-dark")}
-              >
-                Browse
-              </Link>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="border border-charcoal/8 bg-cream/40 p-4 text-center">
-                <p className="font-display text-2xl text-charcoal">
-                  {stats.vendorsBooked}
-                </p>
-                <p className={cn(dashLabel, "mt-1")}>Booked</p>
-              </div>
-              <Link
-                href="/client/vendors"
-                className="border border-charcoal/8 bg-cream/40 p-4 text-center transition-colors hover:border-gold-primary/40"
-              >
-                <p className="font-display text-2xl text-gold-dark">+</p>
-                <p className={cn(dashLabel, "mt-1")}>Add vendor</p>
-              </Link>
-            </div>
-          </div>
-        </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </motion.section>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
-function DashboardQuickStat({
+// ─── Pieces ─────────────────────────────────────────────────────────────────
+
+function AttentionCard({
+  severity,
+  title,
+  detail,
+  href,
+  cta,
+}: {
+  severity: "high" | "medium" | "info";
+  title: string;
+  detail: string;
+  href: string;
+  cta: string;
+}) {
+  const tone =
+    severity === "high"
+      ? "border-rose/40 bg-rose/[0.06]"
+      : severity === "medium"
+        ? "border-gold-primary/45 bg-gold-primary/[0.06]"
+        : "border-charcoal/12 bg-cream/30";
+  const dot =
+    severity === "high" ? "bg-rose" : severity === "medium" ? "bg-gold-primary" : "bg-slate/50";
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "group flex flex-col justify-between border p-4 transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_36px_rgba(26,26,46,0.08)]",
+        tone
+      )}
+    >
+      <div>
+        <div className="flex items-center gap-2">
+          <span className={cn("h-2 w-2 rounded-full", dot)} />
+          <p className="font-display text-base leading-tight text-charcoal">{title}</p>
+        </div>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate">{detail}</p>
+      </div>
+      <span className="mt-3 inline-flex items-center gap-1 font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark">
+        {cta}
+        <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+      </span>
+    </Link>
+  );
+}
+
+function ModuleCard({
+  href,
+  icon: Icon,
   label,
   value,
-  hint,
+  unit,
+  footer,
   tone = "neutral",
-  progress,
-  progressClassName = "bg-gold-primary/60",
+  bar,
+  valueSmall,
 }: {
+  href: string;
+  icon: typeof Wallet;
   label: string;
-  value: string | number;
-  hint: string;
-  tone?: "neutral" | "warning" | "healthy";
-  progress?: number;
-  progressClassName?: string;
+  value: string;
+  unit: string;
+  footer: string;
+  tone?: "neutral" | "good" | "warn";
+  bar?: { pct: number };
+  valueSmall?: boolean;
 }) {
-  const display = typeof value === "number" ? String(value) : value;
   return (
-    <div className="border border-charcoal/8 bg-ivory/80 p-4">
-      <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
-        {label}
-      </p>
-      <p
-        className={cn(
-          "mt-2 font-display text-xl",
-          tone === "warning" && "text-gold-dark",
-          tone === "healthy" && "text-sage",
-          tone === "neutral" && "text-charcoal"
-        )}
-      >
-        {display}
-      </p>
-      <p className="mt-1 text-xs text-slate">{hint}</p>
-      {progress !== undefined ? (
-        <div className="mt-3 h-1 border border-charcoal/10 bg-cream">
+    <Link
+      href={href}
+      className="group flex flex-col border border-charcoal/10 bg-ivory p-4 transition-all hover:-translate-y-0.5 hover:border-gold-primary/40 hover:shadow-[0_14px_36px_rgba(26,26,46,0.07)]"
+    >
+      <div className="flex items-center justify-between">
+        <p className={dashLabel}>{label}</p>
+        <Icon className="h-4 w-4 text-gold-dark" />
+      </div>
+      <div className="mt-3 flex items-baseline gap-1.5">
+        <span
+          className={cn(
+            "font-display text-charcoal",
+            valueSmall ? "truncate text-lg" : "text-3xl"
+          )}
+        >
+          {value}
+        </span>
+        <span className="truncate font-heading text-xs text-slate">{unit}</span>
+      </div>
+      {bar ? (
+        <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-charcoal/8">
           <div
-            className={cn("h-full transition-all duration-700", progressClassName)}
-            style={{ width: `${Math.min(Math.max(progress, 0), 100)}%` }}
+            className={cn(
+              "h-full rounded-full transition-all",
+              tone === "warn" ? "bg-rose" : tone === "good" ? "bg-sage" : "bg-gold-primary"
+            )}
+            style={{ width: `${Math.min(100, bar.pct)}%` }}
           />
         </div>
       ) : null}
-    </div>
+      <p
+        className={cn(
+          "mt-2 font-accent text-[10px] uppercase tracking-[0.12em]",
+          tone === "warn" ? "text-rose" : tone === "good" ? "text-sage" : "text-slate"
+        )}
+      >
+        {footer}
+      </p>
+    </Link>
   );
 }
