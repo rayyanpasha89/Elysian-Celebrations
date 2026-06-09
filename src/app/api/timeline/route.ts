@@ -66,7 +66,9 @@ export async function GET() {
         .order("sort_order", { ascending: true }),
       supabase
         .from("wedding_events")
-        .select("id, name, date, wedding_day:wedding_days(name)")
+        .select(
+          "id, name, date, start_time, end_time, venue, time_block, sort_order, wedding_day_id, wedding_day:wedding_days(id, name, date, sort_order)"
+        )
         .eq("wedding_id", wedding.id),
     ]);
 
@@ -161,9 +163,103 @@ export async function GET() {
       return (left.sort_order ?? 0) - (right.sort_order ?? 0);
     });
 
+    // ── Run-of-show schedule backbone: days → events (+ logistics call-times)
+    const firstRel = <T,>(v: T | T[] | null | undefined): T | null =>
+      Array.isArray(v) ? v[0] ?? null : v ?? null;
+
+    let logisticsByEvent = new Map<
+      string,
+      {
+        guest_arrival_time: string | null;
+        vendor_load_in_time: string | null;
+        family_call_time: string | null;
+      }
+    >();
+    if (eventIds.length > 0) {
+      const { data: logisticsRows } = await supabase
+        .from("wedding_event_logistics")
+        .select(
+          "wedding_event_id, guest_arrival_time, vendor_load_in_time, family_call_time"
+        )
+        .in("wedding_event_id", eventIds);
+      logisticsByEvent = new Map(
+        (logisticsRows ?? []).map((row) => [
+          row.wedding_event_id as string,
+          {
+            guest_arrival_time: row.guest_arrival_time ?? null,
+            vendor_load_in_time: row.vendor_load_in_time ?? null,
+            family_call_time: row.family_call_time ?? null,
+          },
+        ])
+      );
+    }
+
+    const dayMap = new Map<
+      string,
+      {
+        id: string;
+        name: string;
+        date: string | null;
+        sortOrder: number;
+        events: {
+          id: string;
+          name: string;
+          startTime: string | null;
+          endTime: string | null;
+          venue: string | null;
+          timeBlock: string | null;
+          sortOrder: number;
+          logistics: {
+            guest_arrival_time: string | null;
+            vendor_load_in_time: string | null;
+            family_call_time: string | null;
+          } | null;
+        }[];
+      }
+    >();
+
+    for (const event of eventRows) {
+      const day = firstRel(event.wedding_day) as
+        | { id: string; name: string; date: string | null; sort_order: number | null }
+        | null;
+      const dayId = day?.id ?? event.wedding_day_id ?? "__unscheduled__";
+      if (!dayMap.has(dayId)) {
+        dayMap.set(dayId, {
+          id: dayId,
+          name: day?.name ?? "Unscheduled",
+          date: day?.date ?? null,
+          sortOrder: day?.sort_order ?? 9999,
+          events: [],
+        });
+      }
+      dayMap.get(dayId)!.events.push({
+        id: event.id,
+        name: event.name,
+        startTime: event.start_time ?? null,
+        endTime: event.end_time ?? null,
+        venue: event.venue ?? null,
+        timeBlock: event.time_block ?? null,
+        sortOrder: event.sort_order ?? 0,
+        logistics: logisticsByEvent.get(event.id) ?? null,
+      });
+    }
+
+    const schedule = [...dayMap.values()]
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((day) => ({
+        ...day,
+        events: day.events.sort((a, b) => {
+          const at = a.startTime ?? "99:99";
+          const bt = b.startTime ?? "99:99";
+          if (at !== bt) return at < bt ? -1 : 1;
+          return a.sortOrder - b.sortOrder;
+        }),
+      }));
+
     return apiSuccess({
       wedding: { id: wedding.id, name: wedding.name },
       items: combinedItems,
+      schedule,
     });
   } catch (e) {
     console.error("GET /api/timeline", e);
