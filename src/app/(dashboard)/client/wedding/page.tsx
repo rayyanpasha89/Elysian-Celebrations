@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { CalendarClock, Clock, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer } from "@/animations/variants";
 import { FinalizationBoard } from "@/components/dashboard/finalization-board";
@@ -21,17 +22,13 @@ import {
   CEREMONY_FLOW_OPTIONS,
   ChipMultiSelect,
   ChipSingleSelect,
-  CUISINE_OPTIONS,
   DECOR_PALETTES,
   DECOR_STYLE_OPTIONS as PLANNER_DECOR_STYLE_OPTIONS,
-  DIETARY_TAG_OPTIONS,
   DRESS_CODE_OPTIONS,
-  FOOD_SERVICE_STYLES,
   GUEST_PRESETS,
   OwnerSelect,
   PresetTagInput,
   ROOMING_OPTIONS,
-  SIGNATURE_COUNTER_OPTIONS,
   Stepper,
   SwatchPalette,
   TASK_OWNER_OPTIONS,
@@ -42,8 +39,6 @@ import {
 import { dashBtn, dashCard, dashLabel } from "@/lib/dashboard-styles";
 import {
   EVENT_TASK_STATUS_OPTIONS,
-  MEAL_PERIOD_OPTIONS,
-  MENU_COURSE_OPTIONS,
   PLANNER_VENDOR_CATEGORIES,
   type PlannerVendorCategoryKey,
 } from "@/lib/wedding-plan";
@@ -368,6 +363,7 @@ type EventDetailDraft = {
   decorNotes: string;
   attireNotes: string;
   notes: string;
+  stepNotes: Record<string, string>;
   menus: MenuDraft[];
   logistics: LogisticsDraft;
   tasks: EventTaskDraft[];
@@ -427,61 +423,11 @@ const EDITOR_SECTIONS: {
     helper: "Capture custom needs that do not fit the standard sections.",
   },
   {
-    key: "tasks",
-    label: "Tasks",
-    helper: "Event-specific action items and owners.",
-  },
-  {
     key: "notes",
     label: "Notes",
-    helper: "Run-of-show notes and final planning reminders.",
+    helper: "Run-of-show notes and everything captured across the other steps.",
   },
 ];
-
-const MENU_BLUEPRINTS = [
-  {
-    label: "Cocktail flow",
-    foodStyle: "Canapes and cocktails",
-    mealPeriod: "Cocktail",
-    serviceStyle: "Passed canapes, bar, and one live station",
-    notes: "Built for mingling, short speeches, and high-energy guest movement.",
-    preferences: ["Vegetarian", "Non-vegetarian"],
-    items: [
-      ["Welcome drink", "Welcome drink", "Signature mocktail and cocktail"],
-      ["Passed canapes", "Starter", "Vegetarian and non-vegetarian rotation"],
-      ["Live counter", "Live counter", "One hero station with chef interaction"],
-      ["Dessert bites", "Dessert", "Small-format sweets for easy circulation"],
-    ],
-  },
-  {
-    label: "Main meal",
-    foodStyle: "Buffet spread",
-    mealPeriod: "Dinner",
-    serviceStyle: "Buffet with live counters and table beverage service",
-    notes: "A full meal structure with enough variety for mixed guest groups.",
-    preferences: ["Vegetarian", "Non-vegetarian", "Jain"],
-    items: [
-      ["Pre-meal station", "Starter", "Chaat, kebab, or regional welcome station"],
-      ["Main course", "Main", "Indian, global, and regional mains"],
-      ["Beverage station", "Beverage", "Soft drinks, mocktails, and bar handoff"],
-      ["Dessert room", "Dessert", "Indian sweets, plated desserts, and coffee"],
-    ],
-  },
-  {
-    label: "Day brunch",
-    foodStyle: "Brunch service",
-    mealPeriod: "Brunch",
-    serviceStyle: "Relaxed brunch with counters and beverage stations",
-    notes: "Best for recovery mornings, poolside lunches, and farewell hosting.",
-    preferences: ["Vegetarian", "Kids menu", "Regional specialties"],
-    items: [
-      ["Fresh beverage bar", "Welcome drink", "Juices, coffee, tea, and hydration"],
-      ["Breakfast counter", "Live counter", "Eggs, dosa, paratha, or waffle station"],
-      ["Light mains", "Main", "Regional and continental brunch options"],
-      ["Dessert and fruit", "Dessert", "Fruit, pastries, and small sweets"],
-    ],
-  },
-] as const;
 
 const LOGISTICS_BLUEPRINTS = [
   {
@@ -546,17 +492,6 @@ const MEDIA_COVERAGE_OPTIONS = [
   { value: "Same-day edit", label: "Same-day edit" },
   { value: "Couple portraits", label: "Couple portraits" },
   { value: "Aftermovie story arc", label: "Aftermovie story arc" },
-] as const;
-
-const FOOD_QUOTE_ONLY_OPTIONS = [
-  "Imported ingredient station",
-  "Celebrity chef counter",
-  "Custom dessert room",
-  "Premium bar upgrade",
-  "Late-night after-party menu",
-  "Regional live counter",
-  "Kids / elder special meals",
-  "Allergy-safe service line",
 ] as const;
 
 const ENTERTAINMENT_DIRECTION_OPTIONS = [
@@ -745,6 +680,19 @@ function emptyVendorOptions(): Record<
   ) as Record<PlannerVendorCategoryKey, VendorPlannerOption[]>;
 }
 
+/** Per-step notes live in requirement_payload.stepNotes (no schema change). */
+function readStepNotes(
+  payload: Record<string, unknown> | null | undefined
+): Record<string, string> {
+  const raw = (payload as { stepNotes?: unknown } | null | undefined)?.stepNotes;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof value === "string" && value.trim()) out[key] = value;
+  }
+  return out;
+}
+
 function buildDetailDraft(event: WeddingEvent): EventDetailDraft {
   const vendorSelections = emptyVendorSelections();
 
@@ -783,6 +731,7 @@ function buildDetailDraft(event: WeddingEvent): EventDetailDraft {
     decorNotes: event.decor_notes ?? "",
     attireNotes: event.attire_notes ?? "",
     notes: event.notes ?? "",
+    stepNotes: readStepNotes(event.requirement_payload),
     menus:
       event.menus.length > 0
         ? event.menus.map((menu) => ({
@@ -922,14 +871,6 @@ function formatEventWindow(event: WeddingEvent) {
   return bits.length > 0 ? bits.join(" - ") : "Timing to be decided";
 }
 
-function eventSummaryChips(event: WeddingEvent) {
-  return [
-    event.event_type,
-    event.food_style,
-    event.decor_style,
-    event.guest_count ? `${event.guest_count} guests` : null,
-  ].filter(Boolean) as string[];
-}
 
 function readinessTone(percent: number) {
   if (percent >= 100) return "border-sage/35 bg-sage/10 text-sage";
@@ -1627,15 +1568,6 @@ function nextBestPlannerAction(
     };
   }
 
-  if (event.tasks.length === 0) {
-    return {
-      label: "Next best action",
-      value: "Add task templates",
-      detail: "Drop in vendor handoff and run-of-show task packs.",
-      section: "tasks",
-    };
-  }
-
   return {
     label: "Next best action",
     value: "Review finalization",
@@ -1722,28 +1654,6 @@ function mergePlannerTagsWithBlocks(
     .map((block) => block.trim())
     .filter((block) => block && block.includes("\n"));
   return [...preservedBlocks, joinPlannerTags(tags)].filter(Boolean).join("\n\n");
-}
-
-function planningBlocksFromText(value: string | null | undefined) {
-  return (value ?? "")
-    .split(/\n{2,}/)
-    .map((block) => block.trim())
-    .filter((block) => block && block.includes("\n"))
-    .map((block) => {
-      const [title = "Planning note", ...lines] = block.split("\n");
-      return {
-        title,
-        lines: lines.map((line) => line.replace(/^-\s*/, "")).filter(Boolean),
-      };
-    });
-}
-
-function removePlanningBlock(current: string, title: string) {
-  return current
-    .split(/\n{2,}/)
-    .map((block) => block.trim())
-    .filter((block) => block && block.split("\n")[0] !== title)
-    .join("\n\n");
 }
 
 function appendPlanningBlock(current: string, title: string, lines: string[]) {
@@ -2245,11 +2155,6 @@ export default function ClientWeddingPage() {
     () => editorSectionsForEvent(selectedEvent),
     [selectedEvent]
   );
-  const menuPlanningBlocks = useMemo(
-    () => planningBlocksFromText(detailDraft?.menuNotes),
-    [detailDraft?.menuNotes]
-  );
-
   const activeEditorSection =
     visibleEditorSections.find((section) => section.key === editorSection) ??
     visibleEditorSections[0];
@@ -2272,7 +2177,7 @@ export default function ClientWeddingPage() {
         vendors: firstVendorGapSection(targetEvent),
         budget: "basics",
         "guests-hotels": "logistics",
-        "run-of-show": "tasks",
+        "run-of-show": "notes",
       };
 
       setLayer("requirements");
@@ -2585,6 +2490,10 @@ export default function ClientWeddingPage() {
           decorNotes: detailDraft.decorNotes || null,
           attireNotes: detailDraft.attireNotes || null,
           notes: detailDraft.notes || null,
+          requirementPayload: {
+            ...(selectedEvent.requirement_payload ?? {}),
+            stepNotes: detailDraft.stepNotes,
+          },
         }),
       });
       const json = await response.json();
@@ -2779,86 +2688,6 @@ export default function ClientWeddingPage() {
       );
       return { ...current, requirements: nextRequirements };
     });
-  };
-
-  const addMenu = () => {
-    setDetailDraft((current) =>
-      current
-        ? {
-            ...current,
-            menus: [...current.menus, createMenuDraft(current.foodStyle)],
-          }
-        : current
-    );
-  };
-
-  const applyMenuBlueprint = (blueprint: (typeof MENU_BLUEPRINTS)[number]) => {
-    setDetailDraft((current) => {
-      if (!current) return current;
-
-      const blueprintMenu: MenuDraft = {
-        clientId: draftId("menu"),
-        id: null,
-        name: blueprint.label,
-        mealPeriod: blueprint.mealPeriod,
-        serviceStyle: blueprint.serviceStyle,
-        notes: blueprint.notes,
-        items: blueprint.items.map(([name, course, notes]) => ({
-          clientId: draftId("menu_item"),
-          id: null,
-          name,
-          course,
-          dietaryTags: [],
-          notes,
-        })),
-      };
-      const hasPlannedMenu = current.menus.some(
-        (menu) =>
-          menu.name.trim() ||
-          menu.notes.trim() ||
-          menu.items.some((item) => item.name.trim())
-      );
-
-      return {
-        ...current,
-        foodStyle: blueprint.foodStyle,
-        foodPreferences: uniqueList([
-          ...current.foodPreferences,
-          ...blueprint.preferences,
-        ]),
-        menuNotes: appendPlanningBlock(current.menuNotes, blueprint.label, [
-          blueprint.notes,
-          blueprint.serviceStyle,
-        ]),
-        menus: hasPlannedMenu ? [...current.menus, blueprintMenu] : [blueprintMenu],
-      };
-    });
-    toast.success(`${blueprint.label} starter added`);
-  };
-
-  const addFoodQuoteOnlyItem = (item: string) => {
-    setDetailDraft((current) =>
-      current
-        ? {
-            ...current,
-            menuNotes: appendPlanningBlock(current.menuNotes, `Quote-only: ${item}`, [
-              "Exclude this from estimate until vendor quote is received.",
-            ]),
-          }
-        : current
-    );
-    toast.success(`${item} marked as quote-only`);
-  };
-
-  const removeMenuPlanningBlock = (title: string) => {
-    setDetailDraft((current) =>
-      current
-        ? {
-            ...current,
-            menuNotes: removePlanningBlock(current.menuNotes, title),
-          }
-        : current
-    );
   };
 
   const applyVendorServiceToPlan = ({
@@ -3118,98 +2947,6 @@ export default function ClientWeddingPage() {
                 selectionKey
               ),
             },
-          }
-        : current
-    );
-  };
-
-  const updateMenuDraft = (
-    menuClientId: string,
-    updates: Partial<Omit<MenuDraft, "items" | "clientId">>
-  ) => {
-    setDetailDraft((current) =>
-      current
-        ? {
-            ...current,
-            menus: current.menus.map((menu) =>
-              menu.clientId === menuClientId ? { ...menu, ...updates } : menu
-            ),
-          }
-        : current
-    );
-  };
-
-  const removeMenu = (menuClientId: string) => {
-    setDetailDraft((current) =>
-      current
-        ? {
-            ...current,
-            menus:
-              current.menus.length > 1
-                ? current.menus.filter((menu) => menu.clientId !== menuClientId)
-                : current.menus,
-          }
-        : current
-    );
-  };
-
-  const addMenuItem = (menuClientId: string) => {
-    setDetailDraft((current) =>
-      current
-        ? {
-            ...current,
-            menus: current.menus.map((menu) =>
-              menu.clientId === menuClientId
-                ? { ...menu, items: [...menu.items, createMenuItemDraft()] }
-                : menu
-            ),
-          }
-        : current
-    );
-  };
-
-  const updateMenuItem = (
-    menuClientId: string,
-    itemClientId: string,
-    updates: Partial<Omit<MenuItemDraft, "clientId">>
-  ) => {
-    setDetailDraft((current) =>
-      current
-        ? {
-            ...current,
-            menus: current.menus.map((menu) =>
-              menu.clientId === menuClientId
-                ? {
-                    ...menu,
-                    items: menu.items.map((item) =>
-                      item.clientId === itemClientId
-                        ? { ...item, ...updates }
-                        : item
-                    ),
-                  }
-                : menu
-            ),
-          }
-        : current
-    );
-  };
-
-  const removeMenuItem = (menuClientId: string, itemClientId: string) => {
-    setDetailDraft((current) =>
-      current
-        ? {
-            ...current,
-            menus: current.menus.map((menu) =>
-              menu.clientId === menuClientId
-                ? {
-                    ...menu,
-                    items:
-                      menu.items.length > 1
-                        ? menu.items.filter((item) => item.clientId !== itemClientId)
-                        : menu.items,
-                  }
-                : menu
-            ),
           }
         : current
     );
@@ -3913,67 +3650,109 @@ export default function ClientWeddingPage() {
                 </div>
                 <div className="flex-1 overflow-y-auto px-5 py-5 md:px-6">
                   <div className="space-y-5">
-                <div>
-                  <button
-                    type="button"
-                    onClick={closeEditor}
-                    className="inline-flex items-center gap-1.5 font-accent text-[10px] uppercase tracking-[0.18em] text-slate transition-colors hover:text-gold-dark"
-                  >
-                    <span aria-hidden>←</span> Back to steps
-                  </button>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <h4 className="font-display text-2xl text-charcoal">
-                      {activeEditorSection.label}
-                    </h4>
-                    <span className="border border-gold-primary/35 bg-gold-primary/10 px-2 py-1 font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark">
-                      {selectedEvent.name}
-                    </span>
-                  </div>
-                  <p className="mt-2 max-w-prose text-sm leading-relaxed text-slate">
-                    {activeEditorSection.helper}
-                  </p>
-                  {eventSummaryChips(selectedEvent).length > 0 ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {eventSummaryChips(selectedEvent).map((chip) => (
-                        <span
-                          key={`${selectedEvent.id}-${chip}`}
-                          className="border border-charcoal/10 px-2 py-1 font-heading text-[11px] text-slate"
-                        >
-                          {chip}
-                        </span>
-                      ))}
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                  <div className="min-w-0">
+                    <button
+                      type="button"
+                      onClick={closeEditor}
+                      className="inline-flex items-center gap-1.5 font-accent text-[10px] uppercase tracking-[0.18em] text-slate transition-colors hover:text-gold-dark"
+                    >
+                      <span aria-hidden>←</span> Back to steps
+                    </button>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <h4 className="font-display text-2xl text-charcoal">
+                        {activeEditorSection.label}
+                      </h4>
+                      <span className="border border-gold-primary/35 bg-gold-primary/10 px-2 py-1 font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark">
+                        {selectedEvent.name}
+                      </span>
                     </div>
-                  ) : null}
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      className="border border-gold-primary bg-gold-primary/10 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-gold-dark transition-colors hover:bg-gold-primary hover:text-midnight"
-                      onClick={() => openEventFormForDay(selectedDay ?? days[0])}
-                    >
-                      Create another event
-                    </button>
-                    <button
-                      type="button"
-                      className="border border-rose/35 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-rose transition-colors hover:bg-rose hover:text-ivory"
-                      disabled={savingDetail}
-                      onClick={() => void deleteEvent(selectedEvent.id)}
-                    >
-                      Delete this event
-                    </button>
+                    <p className="mt-2 max-w-prose text-sm leading-relaxed text-slate">
+                      {activeEditorSection.helper}
+                    </p>
+                    <div className="mt-4">
+                      <button
+                        type="button"
+                        className="border border-rose/35 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-rose transition-colors hover:bg-rose hover:text-ivory"
+                        disabled={savingDetail}
+                        onClick={() => void deleteEvent(selectedEvent.id)}
+                      >
+                        Delete this event
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* When & where — pinned top-right, shown on every step */}
+                  <div className="shrink-0 border border-charcoal/10 bg-cream/30 p-3 md:w-60">
+                    <p className={dashLabel}>When &amp; where</p>
+                    <dl className="mt-2 space-y-2">
+                      <div className="flex items-start gap-2">
+                        <CalendarClock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold-dark" />
+                        <div className="min-w-0">
+                          <dt className="font-accent text-[9px] uppercase tracking-[0.14em] text-slate/70">
+                            Date
+                          </dt>
+                          <dd className="font-heading text-xs text-charcoal">
+                            {detailDraft.date
+                              ? new Date(detailDraft.date).toLocaleDateString("en-IN", {
+                                  weekday: "short",
+                                  day: "numeric",
+                                  month: "short",
+                                })
+                              : "To be decided"}
+                          </dd>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold-dark" />
+                        <div className="min-w-0">
+                          <dt className="font-accent text-[9px] uppercase tracking-[0.14em] text-slate/70">
+                            Time
+                          </dt>
+                          <dd className="font-heading text-xs text-charcoal">
+                            {detailDraft.startTime
+                              ? `${detailDraft.startTime}${detailDraft.endTime ? ` – ${detailDraft.endTime}` : ""}`
+                              : "To be decided"}
+                          </dd>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold-dark" />
+                        <div className="min-w-0">
+                          <dt className="font-accent text-[9px] uppercase tracking-[0.14em] text-slate/70">
+                            Venue
+                          </dt>
+                          <dd className="truncate font-heading text-xs text-charcoal">
+                            {detailDraft.venue || "To be decided"}
+                          </dd>
+                        </div>
+                      </div>
+                    </dl>
+                    {activeEditorSection.key !== "basics" ? (
+                      <button
+                        type="button"
+                        onClick={() => setEditorSection("basics")}
+                        className="mt-3 w-full border border-charcoal/15 py-1.5 font-accent text-[9px] uppercase tracking-[0.14em] text-slate transition-colors hover:border-gold-primary hover:text-gold-dark"
+                      >
+                        Edit in Basics
+                      </button>
+                    ) : null}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
-                  <div className="border border-charcoal/8 bg-cream/35 p-3">
-                    <p className={dashLabel}>Menus</p>
-                    <p className="mt-1 font-display text-lg text-charcoal">
-                      {detailDraft.menus.length}
-                    </p>
-                  </div>
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
                   <div className="border border-charcoal/8 bg-cream/35 p-3">
                     <p className={dashLabel}>Partners</p>
                     <p className="mt-1 font-display text-lg text-charcoal">
                       {Object.values(detailDraft.vendorSelections).flat().length}
+                    </p>
+                  </div>
+                  <div className="border border-charcoal/8 bg-cream/35 p-3">
+                    <p className={dashLabel}>Notes</p>
+                    <p className="mt-1 font-display text-lg text-charcoal">
+                      {Object.values(detailDraft.stepNotes).filter((n) =>
+                        n?.trim()
+                      ).length + (detailDraft.notes.trim() ? 1 : 0)}
                     </p>
                   </div>
                   <div
@@ -3995,7 +3774,7 @@ export default function ClientWeddingPage() {
                     </p>
                   </div>
                   <div className="border border-charcoal/8 bg-cream/35 p-3">
-                    <p className={dashLabel}>Spend</p>
+                    <p className={dashLabel}>Est. cost</p>
                     <p className="mt-1 font-display text-base leading-tight text-charcoal">
                       {detailSpendEstimate
                         ? gatedSpendEstimateLabel(
@@ -4005,12 +3784,6 @@ export default function ClientWeddingPage() {
                               : 0
                           )
                         : "Pending"}
-                    </p>
-                  </div>
-                  <div className="border border-charcoal/8 bg-cream/35 p-3">
-                    <p className={dashLabel}>Tasks</p>
-                    <p className="mt-1 font-display text-lg text-charcoal">
-                      {detailDraft.tasks.length}
                     </p>
                   </div>
                 </div>
@@ -4178,10 +3951,10 @@ export default function ClientWeddingPage() {
                 {editorSection === "food" ? (
                 <div className="space-y-4 border-t border-charcoal/8 pt-5">
                   <div>
-                    <p className={dashLabel}>Food and menu</p>
+                    <p className={dashLabel}>Food and catering</p>
                     <p className="mt-1 text-sm text-slate">
-                      Start with the caterer&apos;s real catalogue, then
-                        customize menus and dietary details below.
+                      Pick your catering partner and the service or package
+                      they&apos;ll run for this function, then add any notes below.
                     </p>
                   </div>
 
@@ -4192,7 +3965,7 @@ export default function ClientWeddingPage() {
                     options={vendorOptions.catering ?? []}
                     savedSlugs={savedVendorSlugs}
                     loading={vendorOptionsLoading}
-                    intro="Pick a catering partner or package before editing dishes. Imported catalogue rows become menu items, dietary tags, and menu notes."
+                    intro="Choose a catering partner and their service or package. Their listed price feeds your cost estimate."
                     onSelectVendor={(vendor) =>
                       selectPlannerVendor("catering", vendor)
                     }
@@ -4212,325 +3985,6 @@ export default function ClientWeddingPage() {
                       })
                     }
                   />
-
-                  <div className="border border-gold-primary/20 bg-gold-primary/5 p-3">
-                    <p className={dashLabel}>Quick menu starters</p>
-                    <p className="mt-1 text-xs leading-relaxed text-slate">
-                      If no caterer package is ready yet, use a skeleton and
-                      fine-tune instead of typing every station from zero.
-                    </p>
-                    <div className="mt-3 grid gap-2 md:grid-cols-3">
-                      {MENU_BLUEPRINTS.map((blueprint) => (
-                        <button
-                          key={blueprint.label}
-                          type="button"
-                          onClick={() => applyMenuBlueprint(blueprint)}
-                          className="border border-charcoal/10 bg-ivory/75 p-3 text-left transition-colors hover:border-gold-primary/45"
-                        >
-                          <span className="font-heading text-sm text-charcoal">
-                            {blueprint.label}
-                          </span>
-                          <span className="mt-1 block text-[11px] leading-relaxed text-slate">
-                            {blueprint.mealPeriod} · {blueprint.items.length} rows
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="border border-dashed border-charcoal/15 bg-cream/30 p-3">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className={dashLabel}>Special food add-ons</p>
-                        <p className="mt-1 text-xs leading-relaxed text-slate">
-                          Add custom requests that need vendor quote approval.
-                          These stay out of the estimate until priced.
-                        </p>
-                      </div>
-                      <span className="border border-gold-primary/25 bg-gold-primary/8 px-2 py-1 font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark">
-                        Quote only
-                      </span>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {FOOD_QUOTE_ONLY_OPTIONS.map((item) => (
-                        <button
-                          key={item}
-                          type="button"
-                          onClick={() => addFoodQuoteOnlyItem(item)}
-                          className="border border-charcoal/10 bg-ivory/75 px-3 py-2 font-heading text-xs text-charcoal transition-colors hover:border-gold-primary/45"
-                        >
-                          + {item}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-	                  <Field label="Service format">
-                    <ChipSingleSelect
-                      options={labelValueOptions(FOOD_SERVICE_STYLES)}
-                      value={detailDraft.foodStyle}
-                      onChange={(foodStyle) =>
-                        setDetailDraft((current) =>
-                          current
-                            ? { ...current, foodStyle: foodStyle ?? "" }
-                            : current
-                        )
-                      }
-                    />
-                  </Field>
-
-                  <div>
-                    <p className={dashLabel}>Food preferences</p>
-                    <p className="mt-1 text-xs leading-relaxed text-slate">
-                      Pick dietary needs, cuisines, and counters first. Custom
-                      entries are still available when the event needs them.
-                    </p>
-                    <PresetTagInput
-                      className="mt-3"
-                      suggestions={[...DIETARY_TAG_OPTIONS, ...CUISINE_OPTIONS]}
-                      value={detailDraft.foodPreferences}
-                      onChange={(foodPreferences) =>
-                        setDetailDraft((current) =>
-                          current ? { ...current, foodPreferences } : current
-                        )
-                      }
-                      placeholder="Add cuisine or dietary need"
-                    />
-                  </div>
-
-                  <Field label="Menu notes">
-                    <PresetTagInput
-                      suggestions={[...CUISINE_OPTIONS, ...SIGNATURE_COUNTER_OPTIONS]}
-                      value={splitPlannerTags(detailDraft.menuNotes)}
-                      onChange={(tags) =>
-                        setDetailDraft((current) =>
-                          current
-                            ? {
-                                ...current,
-                                menuNotes: mergePlannerTagsWithBlocks(
-                                  current.menuNotes,
-                                  tags
-                                ),
-                              }
-                            : current
-                        )
-                      }
-                      placeholder="Add menu note"
-                    />
-                    {menuPlanningBlocks.length > 0 ? (
-                      <div className="mt-3 space-y-2">
-                        {menuPlanningBlocks.map((block) => (
-                          <div
-                            key={block.title}
-                            className="border border-dashed border-charcoal/15 bg-cream/35 p-3"
-                          >
-                            <div className="flex flex-wrap items-start justify-between gap-3">
-                              <div>
-                                <p className="font-heading text-sm text-charcoal">
-                                  {block.title}
-                                </p>
-                                {block.lines.length > 0 ? (
-                                  <ul className="mt-1 space-y-1 text-xs leading-relaxed text-slate">
-                                    {block.lines.map((line) => (
-                                      <li key={line}>{line}</li>
-                                    ))}
-                                  </ul>
-                                ) : null}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {block.title
-                                  .toLowerCase()
-                                  .includes("quote-only") ? (
-                                  <span className="border border-gold-primary/25 bg-gold-primary/8 px-2 py-1 font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark">
-                                    Quote only
-                                  </span>
-                                ) : null}
-                                <button
-                                  type="button"
-                                  onClick={() => removeMenuPlanningBlock(block.title)}
-                                  className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate transition-colors hover:text-charcoal"
-                                >
-                                  Remove
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
-                  </Field>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className={dashLabel}>Menus</p>
-                      <button
-                        type="button"
-                        className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal"
-                        onClick={addMenu}
-                      >
-                        Add menu
-                      </button>
-                    </div>
-
-                    {detailDraft.menus.map((menu, menuIndex) => (
-                      <div
-                        key={menu.clientId}
-                        className="space-y-3 border border-charcoal/10 bg-cream/30 p-4"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="font-display text-lg text-charcoal">
-                            Menu {menuIndex + 1}
-                          </p>
-                          <button
-                            type="button"
-                            className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal"
-                            onClick={() => removeMenu(menu.clientId)}
-                            disabled={detailDraft.menus.length === 1}
-                          >
-                            Remove
-                          </button>
-                        </div>
-
-                        <div className="grid gap-3 md:grid-cols-2">
-                          <Field label="Menu name">
-                            <input
-                              type="text"
-                              value={menu.name}
-                              onChange={(event) =>
-                                updateMenuDraft(menu.clientId, {
-                                  name: event.target.value,
-                                })
-                              }
-                              className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                            />
-                          </Field>
-                          <Field label="Meal">
-                            <select
-                              value={menu.mealPeriod}
-                              onChange={(event) =>
-                                updateMenuDraft(menu.clientId, {
-                                  mealPeriod: event.target.value,
-                                })
-                              }
-                              className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                            >
-                              <option value="">Choose meal</option>
-                              {MEAL_PERIOD_OPTIONS.map((option) => (
-                                <option key={option} value={option}>
-                                  {option}
-                                </option>
-                              ))}
-                            </select>
-                          </Field>
-                          <Field label="Service style" className="md:col-span-2">
-                            <ChipSingleSelect
-                              options={labelValueOptions(FOOD_SERVICE_STYLES)}
-                              value={menu.serviceStyle}
-                              onChange={(serviceStyle) =>
-                                updateMenuDraft(menu.clientId, {
-                                  serviceStyle: serviceStyle ?? "",
-                                })
-                              }
-                            />
-                          </Field>
-                        </div>
-
-                        <Field label="Menu brief">
-                          <PresetTagInput
-                            suggestions={[...CUISINE_OPTIONS, ...SIGNATURE_COUNTER_OPTIONS]}
-                            value={splitPlannerTags(menu.notes)}
-                            onChange={(tags) =>
-                              updateMenuDraft(menu.clientId, {
-                                notes: mergePlannerTagsWithBlocks(menu.notes, tags),
-                              })
-                            }
-                            placeholder="Add menu brief"
-                          />
-                        </Field>
-
-                        <div className="space-y-3 border-t border-charcoal/8 pt-3">
-                          <div className="flex items-center justify-between gap-3">
-                            <p className={dashLabel}>Dishes and counters</p>
-                            <button
-                              type="button"
-                              className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal"
-                              onClick={() => addMenuItem(menu.clientId)}
-                            >
-                              Add item
-                            </button>
-                          </div>
-
-                          {menu.items.map((item) => (
-                            <div
-                              key={item.clientId}
-                              className="space-y-3 border border-charcoal/10 bg-ivory/70 p-3"
-                            >
-                              <div className="grid gap-3 md:grid-cols-2">
-                                <PresetTagInput
-                                  suggestions={SIGNATURE_COUNTER_OPTIONS}
-                                  value={item.name ? [item.name] : []}
-                                  onChange={(tags) =>
-                                    updateMenuItem(menu.clientId, item.clientId, {
-                                      name: tags.at(-1) ?? "",
-                                    })
-                                  }
-                                  placeholder="Add dish or station"
-                                />
-                                <select
-                                  value={item.course}
-                                  onChange={(event) =>
-                                    updateMenuItem(menu.clientId, item.clientId, {
-                                      course: event.target.value,
-                                    })
-                                  }
-                                  className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                                >
-                                  <option value="">Course</option>
-                                  {MENU_COURSE_OPTIONS.map((option) => (
-                                    <option key={option} value={option}>
-                                      {option}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-
-                              <ChipMultiSelect
-                                options={labelValueOptions(DIETARY_TAG_OPTIONS)}
-                                value={item.dietaryTags}
-                                onChange={(dietaryTags) =>
-                                  updateMenuItem(menu.clientId, item.clientId, {
-                                    dietaryTags,
-                                  })
-                                }
-                              />
-
-                              <textarea
-                                value={item.notes}
-                                onChange={(event) =>
-                                  updateMenuItem(menu.clientId, item.clientId, {
-                                    notes: event.target.value,
-                                  })
-                                }
-                                className="min-h-[64px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                                placeholder="Spice level, serving notes, substitutions, allergies..."
-                              />
-
-                              <button
-                                type="button"
-                                className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal"
-                                onClick={() =>
-                                  removeMenuItem(menu.clientId, item.clientId)
-                                }
-                                disabled={menu.items.length === 1}
-                              >
-                                Remove item
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
                 </div>
 
                 ) : null}
@@ -5345,8 +4799,79 @@ export default function ClientWeddingPage() {
                               : current
                           )
                         }
-                        className="min-h-[180px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                        className="min-h-[140px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
                         placeholder="Run-of-show reminders, family logistics, weather backups..."
+                      />
+                    </Field>
+
+                    {/* Everything typed inside each step, gathered here */}
+                    {(() => {
+                      const entries = EDITOR_SECTIONS.filter(
+                        (entry) => entry.key !== "notes"
+                      )
+                        .map((entry) => ({
+                          key: entry.key,
+                          label: entry.label,
+                          text: (detailDraft.stepNotes[entry.key] ?? "").trim(),
+                        }))
+                        .filter((entry) => entry.text);
+                      return entries.length > 0 ? (
+                        <div className="border border-charcoal/10 bg-cream/30 p-4">
+                          <p className={dashLabel}>From every step</p>
+                          <p className="mt-1 text-xs leading-relaxed text-slate">
+                            Notes you typed inside each step, collected in one place.
+                          </p>
+                          <ul className="mt-3 space-y-3">
+                            {entries.map((entry) => (
+                              <li
+                                key={entry.key}
+                                className="border-l-2 border-gold-primary/40 pl-3"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => setEditorSection(entry.key)}
+                                  className="font-accent text-[10px] uppercase tracking-[0.14em] text-gold-dark transition-colors hover:text-charcoal"
+                                >
+                                  {entry.label} ↗
+                                </button>
+                                <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-charcoal">
+                                  {entry.text}
+                                </p>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : (
+                        <p className="border border-dashed border-charcoal/15 bg-cream/20 px-4 py-3 text-xs leading-relaxed text-slate">
+                          Notes you add inside Basics, Food, Design and the other
+                          steps gather here automatically.
+                        </p>
+                      );
+                    })()}
+                  </div>
+                ) : null}
+
+                {/* Adaptive per-step notes — shows on every step except Notes */}
+                {activeEditorSection.key !== "notes" ? (
+                  <div className="border-t border-charcoal/8 pt-5">
+                    <Field label={`Notes for ${activeEditorSection.label}`}>
+                      <textarea
+                        value={detailDraft.stepNotes[activeEditorSection.key] ?? ""}
+                        onChange={(event) =>
+                          setDetailDraft((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  stepNotes: {
+                                    ...current.stepNotes,
+                                    [activeEditorSection.key]: event.target.value,
+                                  },
+                                }
+                              : current
+                          )
+                        }
+                        className="min-h-[100px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                        placeholder={`Anything specific for ${activeEditorSection.label.toLowerCase()} — this collects in the Notes step.`}
                       />
                     </Field>
                   </div>
