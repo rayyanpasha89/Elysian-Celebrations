@@ -14,6 +14,7 @@ import {
   IndianRupee,
   ListChecks,
   MapPin,
+  ReceiptText,
   Sparkles,
   Users,
   Wallet,
@@ -47,9 +48,11 @@ type GuestRow = {
   rsvp_status: "PENDING" | "CONFIRMED" | "DECLINED" | "MAYBE";
   plus_one: boolean;
 };
+type BookingStage = "selected" | "booked" | "confirmed";
 type BudgetPayload = {
   budget: { totalBudget: number; categories: { items: { estimatedCost: number; quantity: number }[] }[] } | null;
   eventPlanSpend: { totalEstimated: number; eventCount: number } | null;
+  planLineItems: { stage: BookingStage; estimatedCost: number }[];
 };
 type SchedulePayload = {
   schedule: {
@@ -60,13 +63,6 @@ type SchedulePayload = {
   }[];
 };
 
-function formatCurrency(n: number) {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(Math.round(n));
-}
 function formatLakh(n: number) {
   if (n >= 10000000) return `₹${(n / 10000000).toFixed(2)}Cr`;
   return `₹${(n / 100000).toFixed(1)}L`;
@@ -88,7 +84,7 @@ const dashLabel = "font-accent text-[10px] uppercase tracking-[0.2em] text-slate
 
 const QUICK_ACTIONS = [
   { label: "Event plan", href: "/client/wedding" },
-  { label: "Budget", href: "/client/budget" },
+  { label: "Cost estimate", href: "/client/budget" },
   { label: "Guests", href: "/client/guests" },
   { label: "Run of show", href: "/client/timeline" },
   { label: "Vendors", href: "/client/vendors" },
@@ -127,7 +123,15 @@ export default function ClientCommandCenter() {
       if (cancelled) return;
       setDash(d);
       setGuests((g?.guests ?? []) as GuestRow[]);
-      setBudget(b ? { budget: b.budget ?? null, eventPlanSpend: b.eventPlanSpend ?? null } : null);
+      setBudget(
+        b
+          ? {
+              budget: b.budget ?? null,
+              eventPlanSpend: b.eventPlanSpend ?? null,
+              planLineItems: b.planLineItems ?? [],
+            }
+          : null
+      );
       setSchedule((t?.schedule ?? []) as SchedulePayload["schedule"]);
       setLoading(false);
     })();
@@ -147,12 +151,20 @@ export default function ClientCommandCenter() {
     const pending = guests.filter((g) => g.rsvp_status === "PENDING").length;
     const heads = (rows: GuestRow[]) => rows.reduce((s, g) => s + 1 + (g.plus_one ? 1 : 0), 0);
 
-    const cap = budget?.budget?.totalBudget ?? 0;
-    const quoted =
+    const estimated =
       budget?.budget?.categories?.reduce(
         (s, c) => s + c.items.reduce((cs, i) => cs + i.estimatedCost * i.quantity, 0),
         0
       ) ?? 0;
+
+    const picks = budget?.planLineItems ?? [];
+    const bookings = {
+      total: picks.length,
+      selected: picks.filter((p) => p.stage === "selected").length,
+      booked: picks.filter((p) => p.stage === "booked").length,
+      confirmed: picks.filter((p) => p.stage === "confirmed").length,
+      value: picks.reduce((s, p) => s + p.estimatedCost, 0),
+    };
 
     const events = schedule.flatMap((day) =>
       day.events.map((e) => ({ ...e, dayName: day.name, date: day.date }))
@@ -175,12 +187,8 @@ export default function ClientCommandCenter() {
             ? Math.round((guests.filter((g) => g.rsvp_status !== "PENDING").length / total) * 100)
             : 0,
       },
-      budget: {
-        cap,
-        quoted,
-        over: quoted - cap,
-        pct: cap > 0 ? Math.min(999, Math.round((quoted / cap) * 100)) : 0,
-      },
+      budget: { estimated },
+      bookings,
       plan: {
         days: schedule.length,
         events: events.length,
@@ -209,16 +217,6 @@ export default function ClientCommandCenter() {
         cta: "Open planner",
       });
     }
-    if (agg.budget.cap > 0 && agg.budget.over > 0) {
-      a.push({
-        id: "over-budget",
-        severity: "high",
-        title: `${formatLakh(agg.budget.over)} over your cap`,
-        detail: `Quoted ${formatCurrency(agg.budget.quoted)} against a ${formatCurrency(agg.budget.cap)} ceiling.`,
-        href: "/client/budget",
-        cta: "Rebalance budget",
-      });
-    }
     if (agg.guests.pending > 0) {
       a.push({
         id: "rsvp",
@@ -229,24 +227,30 @@ export default function ClientCommandCenter() {
         cta: "Chase RSVPs",
       });
     }
-    if (dash.stats.vendorsBooked === 0 && agg.plan.events > 0) {
+    if (agg.bookings.confirmed === 0 && agg.plan.events > 0) {
       a.push({
         id: "vendors",
         severity: "medium",
-        title: "No vendors booked yet",
-        detail: "Shortlist caterers, decor and photography and add them to your functions.",
+        title:
+          agg.bookings.total === 0
+            ? "No vendors selected yet"
+            : `${agg.bookings.total} vendor ${agg.bookings.total === 1 ? "pick" : "picks"}, none confirmed`,
+        detail:
+          agg.bookings.total === 0
+            ? "Shortlist caterers, decor and photography and add them to your functions."
+            : "Confirm your selected vendors to lock in their pricing.",
         href: "/client/vendors",
-        cta: "Browse vendors",
+        cta: "Open vendors",
       });
     }
-    if (agg.budget.cap > 0 && agg.budget.quoted === 0 && agg.plan.events > 0) {
+    if (agg.budget.estimated === 0 && agg.plan.events > 0) {
       a.push({
-        id: "budget-empty",
+        id: "estimate-empty",
         severity: "info",
-        title: "Your budget is still empty",
-        detail: "Import your vendor picks or drag line items in to start tracking spend.",
+        title: "Costs not estimated yet",
+        detail: "Import your vendor picks or add line items to build your cost estimate.",
         href: "/client/budget",
-        cta: "Open budget",
+        cta: "Open cost estimate",
       });
     }
     const nextDays = agg.nextFn?.date ? daysTo(agg.nextFn.date) : null;
@@ -382,16 +386,14 @@ export default function ClientCommandCenter() {
         <ModuleCard
           href="/client/budget"
           icon={Wallet}
-          label="Budget"
-          value={formatLakh(agg.budget.quoted)}
-          unit={`of ${formatLakh(agg.budget.cap)}`}
+          label="Cost estimate"
+          value={formatLakh(agg.budget.estimated)}
+          unit="estimated"
           footer={
-            agg.budget.over > 0
-              ? `${formatLakh(agg.budget.over)} over cap`
-              : `${formatLakh(Math.max(0, -agg.budget.over))} headroom`
+            agg.bookings.total > 0
+              ? `${agg.bookings.total} vendor ${agg.bookings.total === 1 ? "pick" : "picks"}`
+              : "Add picks to estimate"
           }
-          tone={agg.budget.over > 0 ? "warn" : "good"}
-          bar={{ pct: agg.budget.pct }}
         />
         <ModuleCard
           href="/client/guests"
@@ -417,6 +419,45 @@ export default function ClientCommandCenter() {
           })()}
           valueSmall
         />
+      </motion.section>
+
+      {/* Vendor bookings status */}
+      <motion.section variants={fadeUp} className="border border-charcoal/10 bg-ivory">
+        <div className="flex items-center justify-between border-b border-charcoal/8 p-4">
+          <div className="flex items-center gap-2">
+            <ReceiptText className="h-4 w-4 text-gold-dark" />
+            <h2 className={dashLabel}>Vendor bookings</h2>
+          </div>
+          <Link
+            href="/client/budget"
+            className="font-accent text-[10px] uppercase tracking-[0.14em] text-slate transition-colors hover:text-gold-dark"
+          >
+            View costs
+          </Link>
+        </div>
+        <div className="grid grid-cols-3 divide-x divide-charcoal/8">
+          {(
+            [
+              { key: "confirmed", label: "Confirmed", n: agg.bookings.confirmed, dot: "bg-sage" },
+              { key: "booked", label: "Booked", n: agg.bookings.booked, dot: "bg-gold-primary" },
+              { key: "selected", label: "Selected", n: agg.bookings.selected, dot: "bg-slate/50" },
+            ] as const
+          ).map((stage) => (
+            <div key={stage.key} className="p-4 text-center">
+              <p className="font-display text-3xl text-charcoal">{stage.n}</p>
+              <p className="mt-1 inline-flex items-center gap-1.5 font-accent text-[10px] uppercase tracking-[0.14em] text-slate">
+                <span className={cn("h-1.5 w-1.5 rounded-full", stage.dot)} />
+                {stage.label}
+              </p>
+            </div>
+          ))}
+        </div>
+        {agg.bookings.total === 0 ? (
+          <p className="border-t border-charcoal/8 px-4 py-3 text-xs text-slate">
+            Pick vendors on your functions and they appear here as selected →
+            booked → confirmed.
+          </p>
+        ) : null}
       </motion.section>
 
       {/* This week + activity */}
