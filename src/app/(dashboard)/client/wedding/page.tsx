@@ -3715,16 +3715,6 @@ export default function ClientWeddingPage() {
                     <p className="mt-2 max-w-prose text-sm leading-relaxed text-slate">
                       {activeEditorSection.helper}
                     </p>
-                    <div className="mt-4">
-                      <button
-                        type="button"
-                        className="border border-rose/35 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-rose transition-colors hover:bg-rose hover:text-ivory"
-                        disabled={savingDetail}
-                        onClick={() => void deleteEvent(selectedEvent.id)}
-                      >
-                        Delete this event
-                      </button>
-                    </div>
                   </div>
 
                   {/* When & where — pinned top-right, shown on every step */}
@@ -4960,7 +4950,11 @@ export default function ClientWeddingPage() {
                   </div>
                 ) : null}
 
-                <div className="flex items-center justify-between gap-2 border-t border-charcoal/8 pt-4">
+              </div>
+
+              {/* One sticky action bar: step nav on the left, save/delete on the right */}
+              <div className="sticky bottom-0 z-10 -mx-5 -mb-5 flex flex-col gap-3 border-t border-charcoal/10 bg-ivory/95 px-5 py-3.5 backdrop-blur md:-mx-6 md:px-6 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => {
@@ -4975,16 +4969,17 @@ export default function ClientWeddingPage() {
                         (entry) => entry.key === editorSection
                       ) === 0
                     }
-                    className="font-accent inline-flex items-center justify-center border border-charcoal/15 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-charcoal/15 disabled:hover:text-charcoal"
+                    className="font-accent inline-flex h-9 w-9 items-center justify-center border border-charcoal/15 text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-charcoal/15"
+                    aria-label="Previous step"
                   >
-                    ← Prev
+                    ←
                   </button>
-                  <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
+                  <span className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
                     {visibleEditorSections.findIndex(
                       (entry) => entry.key === editorSection
                     ) + 1}{" "}
                     / {visibleEditorSections.length}
-                  </p>
+                  </span>
                   <button
                     type="button"
                     onClick={() => {
@@ -5003,28 +4998,29 @@ export default function ClientWeddingPage() {
                       ) ===
                       visibleEditorSections.length - 1
                     }
-                    className="font-accent inline-flex items-center justify-center border border-charcoal/15 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-charcoal/15 disabled:hover:text-charcoal"
+                    className="font-accent inline-flex h-9 w-9 items-center justify-center border border-charcoal/15 text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-charcoal/15"
+                    aria-label="Next step"
                   >
-                    Next →
+                    →
                   </button>
                 </div>
 
-                <div className="flex flex-wrap gap-3 border-t border-charcoal/8 pt-4">
+                <div className="flex items-center justify-end gap-2">
                   <button
                     type="button"
-                    className={dashBtn}
                     disabled={savingDetail}
-                    onClick={() => void saveEventDetails()}
+                    onClick={() => void deleteEvent(selectedEvent.id)}
+                    className="font-accent px-3 py-2.5 text-[10px] uppercase tracking-[0.18em] text-rose transition-colors hover:text-rose/70 disabled:opacity-40"
                   >
-                    {savingDetail ? "Saving..." : "Save event plan"}
+                    Delete event
                   </button>
                   <button
                     type="button"
-                    className="border border-charcoal/15 px-4 py-3 font-accent text-[11px] uppercase tracking-[0.2em] text-charcoal"
                     disabled={savingDetail}
-                    onClick={() => void deleteEvent(selectedEvent.id)}
+                    onClick={() => void saveEventDetails()}
+                    className="font-accent inline-flex items-center justify-center border border-gold-primary bg-gold-primary px-6 py-3 text-[11px] uppercase tracking-[0.2em] text-midnight shadow-[0_14px_36px_rgba(201,169,110,0.18)] transition-all hover:bg-gold-dark hover:border-gold-dark disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Delete event
+                    {savingDetail ? "Saving..." : "Save event plan"}
                   </button>
                 </div>
               </div>
