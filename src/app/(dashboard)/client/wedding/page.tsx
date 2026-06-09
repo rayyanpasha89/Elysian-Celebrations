@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { CalendarClock, Clock, MapPin } from "lucide-react";
+import { CalendarClock, Check, Clock, MapPin, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer } from "@/animations/variants";
 import { FinalizationBoard } from "@/components/dashboard/finalization-board";
@@ -1301,11 +1301,18 @@ function requirementCategoriesForVendorPlanning(event: WeddingEvent) {
   ] satisfies EventRequirementCategoryKey[];
 }
 
-function editorSectionsForEvent(event: WeddingEvent | null) {
-  const categories = new Set<EventRequirementCategoryKey>(
-    (event?.requirements ?? []).map((requirement) => requirement.category)
-  );
+/** Optional steps users can add/remove in Basics, mapped to a requirement category. */
+const OPTIONAL_STEP_CATEGORY: Record<string, EventRequirementCategoryKey> = {
+  food: "food",
+  design: "decor",
+  media: "photo-video",
+  entertainment: "entertainment",
+  logistics: "logistics",
+};
 
+function editorSectionsForCategories(
+  categories: Set<EventRequirementCategoryKey>
+) {
   if (categories.size === 0) return EDITOR_SECTIONS;
 
   return EDITOR_SECTIONS.filter((section) => {
@@ -1320,6 +1327,14 @@ function editorSectionsForEvent(event: WeddingEvent | null) {
     }
     return true;
   });
+}
+
+function editorSectionsForEvent(event: WeddingEvent | null) {
+  return editorSectionsForCategories(
+    new Set<EventRequirementCategoryKey>(
+      (event?.requirements ?? []).map((requirement) => requirement.category)
+    )
+  );
 }
 
 function vendorSelectionForCategory(
@@ -2151,13 +2166,43 @@ export default function ClientWeddingPage() {
   // sections (basics, special, tasks, notes) always show. If the event carries no
   // requirement rows at all — legacy plans, or a block created with zero needs —
   // we show everything so nothing is silently unreachable.
+  // Derive visible steps from the live draft so adding/removing a step in
+  // Basics updates the available steps immediately (falls back to the event).
   const visibleEditorSections = useMemo(
-    () => editorSectionsForEvent(selectedEvent),
-    [selectedEvent]
+    () =>
+      detailDraft
+        ? editorSectionsForCategories(
+            new Set<EventRequirementCategoryKey>(
+              detailDraft.requirements.map(
+                (requirement) => requirement.category as EventRequirementCategoryKey
+              )
+            )
+          )
+        : editorSectionsForEvent(selectedEvent),
+    [detailDraft, selectedEvent]
   );
   const activeEditorSection =
     visibleEditorSections.find((section) => section.key === editorSection) ??
     visibleEditorSections[0];
+
+  const toggleEventStep = useCallback((sectionKey: string) => {
+    const category = OPTIONAL_STEP_CATEGORY[sectionKey];
+    if (!category) return;
+    setDetailDraft((current) => {
+      if (!current) return current;
+      const has = current.requirements.some(
+        (requirement) => requirement.category === category
+      );
+      return {
+        ...current,
+        requirements: has
+          ? current.requirements.filter(
+              (requirement) => requirement.category !== category
+            )
+          : [...current.requirements, createRequirementDraft(category)],
+      };
+    });
+  }, []);
 
   const resolveFinalizationCheck = useCallback(
     (checkKey: string) => {
@@ -3944,6 +3989,44 @@ export default function ClientWeddingPage() {
                       ) : null}
                     </div>
                   </Field>
+
+                  <div className="border-t border-charcoal/8 pt-4 md:col-span-2">
+                    <p className={dashLabel}>Steps in this function</p>
+                    <p className="mt-1 text-xs leading-relaxed text-slate">
+                      Turn on only the steps this function needs — add food,
+                      design, photo and more here, and they appear in the orbit.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {EDITOR_SECTIONS.filter(
+                        (section) => section.key in OPTIONAL_STEP_CATEGORY
+                      ).map((section) => {
+                        const category = OPTIONAL_STEP_CATEGORY[section.key];
+                        const on = detailDraft.requirements.some(
+                          (requirement) => requirement.category === category
+                        );
+                        return (
+                          <button
+                            key={section.key}
+                            type="button"
+                            onClick={() => toggleEventStep(section.key)}
+                            className={cn(
+                              "inline-flex items-center gap-1.5 border px-3 py-2 font-accent text-[10px] uppercase tracking-[0.14em] transition-colors",
+                              on
+                                ? "border-gold-primary bg-gold-primary/10 text-gold-dark"
+                                : "border-charcoal/15 text-slate hover:border-gold-primary/50"
+                            )}
+                          >
+                            {on ? (
+                              <Check className="h-3 w-3" />
+                            ) : (
+                              <Plus className="h-3 w-3" />
+                            )}
+                            {section.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
 
                 ) : null}
