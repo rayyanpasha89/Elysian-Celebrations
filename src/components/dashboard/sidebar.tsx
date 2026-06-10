@@ -68,6 +68,7 @@ const ICON_BY_HREF: Record<string, LucideIcon> = {
   "/vendor/settings": Settings,
   // Admin
   "/admin": LayoutDashboard,
+  "/admin/pricing": Wallet,
   "/admin/vendors": Store,
   "/admin/destinations": MapPin,
   "/admin/users": Users,

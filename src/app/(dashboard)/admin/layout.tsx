@@ -15,6 +15,10 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    title: "Revenue",
+    items: [{ label: "Pricing & Margin", href: "/admin/pricing" }],
+  },
+  {
     title: "Management",
     items: [
       { label: "Vendors", href: "/admin/vendors" },
