@@ -69,6 +69,8 @@ const ICON_BY_HREF: Record<string, LucideIcon> = {
   // Admin
   "/admin": LayoutDashboard,
   "/admin/pricing": Wallet,
+  "/admin/progress": BarChart3,
+  "/admin/revenue": BarChart3,
   "/admin/vendors": Store,
   "/admin/destinations": MapPin,
   "/admin/users": Users,
