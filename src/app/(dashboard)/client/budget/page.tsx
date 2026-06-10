@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ArrowUpRight, CheckCircle2, ReceiptText, Sparkles } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, Lock, ReceiptText, Sparkles } from "lucide-react";
 import { BudgetCanvas } from "@/components/dashboard/budget/budget-canvas";
 import {
   BudgetByEventView,
@@ -61,6 +61,14 @@ type PlanLineItem = {
   estimatedCost: number;
   status: string;
   stage: BookingStage;
+};
+
+type ConfirmedEvent = {
+  eventId: string;
+  eventName: string;
+  dayName: string | null;
+  finalTotal: number;
+  locked: boolean;
 };
 
 const STAGE_META: Record<
@@ -127,6 +135,7 @@ export default function CostEstimationPage() {
     null
   );
   const [planLineItems, setPlanLineItems] = useState<PlanLineItem[]>([]);
+  const [confirmedEvents, setConfirmedEvents] = useState<ConfirmedEvent[]>([]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -150,6 +159,7 @@ export default function CostEstimationPage() {
         }
         setEventPlanSpend((json.eventPlanSpend as EventPlanSpendSummary | null) ?? null);
         setPlanLineItems((json.planLineItems as PlanLineItem[] | null) ?? []);
+        setConfirmedEvents((json.confirmedEvents as ConfirmedEvent[] | null) ?? []);
       } catch (error) {
         if (!cancelled)
           toast.error(error instanceof Error ? error.message : "Failed to load estimate");
@@ -447,6 +457,11 @@ export default function CostEstimationPage() {
         </div>
       </section>
 
+      {/* Confirmed by Elysian — locked final prices once the event is 100% */}
+      {confirmedEvents.length > 0 ? (
+        <ConfirmedPricingBand events={confirmedEvents} />
+      ) : null}
+
       {/* Bookings funnel */}
       {bookings.count > 0 || (eventPlanSpend && eventPlanSpend.eventCount > 0) ? (
         <BookingsPanel
@@ -590,6 +605,59 @@ export default function CostEstimationPage() {
         ) : null}
       </div>
     </div>
+  );
+}
+
+function ConfirmedPricingBand({ events }: { events: ConfirmedEvent[] }) {
+  const locked = events.filter((e) => e.locked);
+  const lockedTotal = locked.reduce((s, e) => s + e.finalTotal, 0);
+  return (
+    <section className="border border-gold-primary/35 bg-gold-primary/[0.05]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gold-primary/20 p-4">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="h-5 w-5 text-gold-dark" />
+          <div>
+            <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-gold-dark">
+              Confirmed by Elysian
+            </p>
+            <p className="mt-0.5 text-xs text-slate">
+              Final prices we&apos;ve negotiated and locked for you.
+            </p>
+          </div>
+        </div>
+        {lockedTotal > 0 ? (
+          <div className="text-right">
+            <p className="font-display text-2xl text-gold-dark">
+              {formatCurrency(lockedTotal)}
+            </p>
+            <p className="font-accent text-[9px] uppercase tracking-[0.14em] text-slate">
+              {locked.length} {locked.length === 1 ? "function" : "functions"} locked
+            </p>
+          </div>
+        ) : null}
+      </div>
+      <ul className="divide-y divide-gold-primary/15">
+        {events.map((e) => (
+          <li key={e.eventId} className="flex items-center justify-between gap-3 p-4">
+            <div className="min-w-0">
+              <p className="truncate font-heading text-sm text-charcoal">{e.eventName}</p>
+              {e.dayName ? (
+                <p className="truncate text-xs text-slate">{e.dayName}</p>
+              ) : null}
+            </div>
+            {e.locked ? (
+              <span className="shrink-0 font-display text-lg text-gold-dark">
+                {formatCurrency(e.finalTotal)}
+              </span>
+            ) : (
+              <span className="inline-flex shrink-0 items-center gap-1.5 font-accent text-[10px] uppercase tracking-[0.14em] text-slate">
+                <Lock className="h-3 w-3" /> Finish this function to reveal
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

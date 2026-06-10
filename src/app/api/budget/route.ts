@@ -587,6 +587,75 @@ async function loadBudgetPayload(profileId: string): Promise<BudgetPayload> {
   };
 }
 
+export type ConfirmedEvent = {
+  eventId: string;
+  eventName: string;
+  dayName: string | null;
+  finalTotal: number;
+  locked: boolean;
+};
+
+/**
+ * Elysian's published final prices the client is allowed to see. The locked
+ * flag is true once the client's own event is "complete enough" (venue, guests,
+ * and times set) — only then do we reveal the confirmed amount.
+ */
+async function getConfirmedEventPricing(profileId: string): Promise<ConfirmedEvent[]> {
+  const supabase = createAdminSupabaseClient();
+  const { data: wedding } = await supabase
+    .from("weddings")
+    .select("id")
+    .eq("client_profile_id", profileId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!wedding) return [];
+
+  const [{ data: dayRows }, { data: eventRows }] = await Promise.all([
+    supabase.from("wedding_days").select("id, name").eq("wedding_id", wedding.id),
+    supabase
+      .from("wedding_events")
+      .select("id, name, wedding_day_id, venue, guest_count, start_time, end_time")
+      .eq("wedding_id", wedding.id),
+  ]);
+
+  const dayNameById = new Map((dayRows ?? []).map((d) => [d.id as string, d.name as string]));
+  const events = eventRows ?? [];
+  const eventIds = events.map((e) => e.id as string);
+  if (eventIds.length === 0) return [];
+
+  const { data: bookings } = await supabase
+    .from("bookings")
+    .select("wedding_event_id, final_price, price_published")
+    .in("wedding_event_id", eventIds);
+
+  const finalByEvent = new Map<string, number>();
+  for (const b of bookings ?? []) {
+    if (!b.price_published || b.final_price == null) continue;
+    const id = b.wedding_event_id as string;
+    finalByEvent.set(id, (finalByEvent.get(id) ?? 0) + (b.final_price as number));
+  }
+
+  const out: ConfirmedEvent[] = [];
+  for (const e of events) {
+    const finalTotal = finalByEvent.get(e.id as string) ?? 0;
+    if (finalTotal <= 0) continue;
+    const ready =
+      Boolean((e.venue as string | null)?.trim()) &&
+      Boolean(e.guest_count) &&
+      Boolean(e.start_time) &&
+      Boolean(e.end_time);
+    out.push({
+      eventId: e.id as string,
+      eventName: (e.name as string) ?? "Function",
+      dayName: e.wedding_day_id ? dayNameById.get(e.wedding_day_id as string) ?? null : null,
+      finalTotal,
+      locked: ready,
+    });
+  }
+  return out;
+}
+
 export async function GET() {
   const session = await getAuthSession();
   if (session instanceof NextResponse) return session;
@@ -599,16 +668,18 @@ export async function GET() {
       return apiSuccess({ needsOnboarding: true, budget: null });
     }
 
-    const [budget, eventPlanSpend, planLineItems] = await Promise.all([
+    const [budget, eventPlanSpend, planLineItems, confirmedEvents] = await Promise.all([
       loadBudgetPayload(profileId),
       getEventPlanSpendSummary(profileId),
       getPlanVendorLineItems(profileId),
+      getConfirmedEventPricing(profileId),
     ]);
     return apiSuccess({
       needsOnboarding: false,
       budget,
       eventPlanSpend,
       planLineItems,
+      confirmedEvents,
     });
   } catch (error) {
     console.error("GET /api/budget", error);
