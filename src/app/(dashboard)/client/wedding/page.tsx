@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { CalendarClock, Check, Clock, MapPin, Plus } from "lucide-react";
+import { CalendarClock, Check, ChevronDown, Clock, MapPin, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer } from "@/animations/variants";
 import { FinalizationBoard } from "@/components/dashboard/finalization-board";
@@ -1886,10 +1886,14 @@ export default function ClientWeddingPage() {
               .sort((left, right) => left.sort_order - right.sort_order)
               .map((event) => {
                 const readiness = eventReadinessPercent(event, venueOptions);
+                const resolvedVenue = findVenueByValue(venueOptions, event.venue);
+                const venueLabel = resolvedVenue?.name ?? event.venue?.trim() ?? "";
                 return {
                   id: event.id,
                   title: event.name,
                   timeLabel: formatEventWindow(event),
+                  dateLabel: formatDayDate(event.date ?? day.date),
+                  venueLabel: venueLabel || undefined,
                   meta: `${event.guest_count ?? 0} guests`,
                   status: flowStatusFromReadiness(readiness),
                   readiness,
@@ -3712,9 +3716,6 @@ export default function ClientWeddingPage() {
                         {selectedEvent.name}
                       </span>
                     </div>
-                    <p className="mt-2 max-w-prose text-sm leading-relaxed text-slate">
-                      {activeEditorSection.helper}
-                    </p>
                   </div>
 
                   {/* When & where — pinned top-right, shown on every step */}
@@ -3775,21 +3776,7 @@ export default function ClientWeddingPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-                  <div className="border border-charcoal/8 bg-cream/35 p-3">
-                    <p className={dashLabel}>Partners</p>
-                    <p className="mt-1 font-display text-lg text-charcoal">
-                      {Object.values(detailDraft.vendorSelections).flat().length}
-                    </p>
-                  </div>
-                  <div className="border border-charcoal/8 bg-cream/35 p-3">
-                    <p className={dashLabel}>Notes</p>
-                    <p className="mt-1 font-display text-lg text-charcoal">
-                      {Object.values(detailDraft.stepNotes).filter((n) =>
-                        n?.trim()
-                      ).length + (detailDraft.notes.trim() ? 1 : 0)}
-                    </p>
-                  </div>
+                <div className="grid grid-cols-2 gap-2">
                   <div
                     className={cn(
                       "border p-3 transition-colors",
@@ -3847,6 +3834,45 @@ export default function ClientWeddingPage() {
                       the flow map, budget sync, and vendor briefs.
                     </p>
                   </Field>
+
+                  <div className="md:col-span-2">
+                    <p className={dashLabel}>Steps in this function</p>
+                    <p className="mt-1 text-xs leading-relaxed text-slate">
+                      Turn on only the steps this function needs — add food,
+                      design, photo and more here, and they appear in the orbit.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {EDITOR_SECTIONS.filter(
+                        (section) => section.key in OPTIONAL_STEP_CATEGORY
+                      ).map((section) => {
+                        const category = OPTIONAL_STEP_CATEGORY[section.key];
+                        const on = detailDraft.requirements.some(
+                          (requirement) => requirement.category === category
+                        );
+                        return (
+                          <button
+                            key={section.key}
+                            type="button"
+                            onClick={() => toggleEventStep(section.key)}
+                            className={cn(
+                              "inline-flex items-center gap-1.5 border px-3 py-2 font-accent text-[10px] uppercase tracking-[0.14em] transition-colors",
+                              on
+                                ? "border-gold-primary bg-gold-primary/10 text-gold-dark"
+                                : "border-charcoal/15 text-slate hover:border-gold-primary/50"
+                            )}
+                          >
+                            {on ? (
+                              <Check className="h-3 w-3" />
+                            ) : (
+                              <Plus className="h-3 w-3" />
+                            )}
+                            {section.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   <Field label="Celebration day">
                     <select
                       value={detailDraft.weddingDayId}
@@ -3913,6 +3939,7 @@ export default function ClientWeddingPage() {
                       venues={venueOptions}
                       loading={venueOptionsLoading}
                       value={detailDraft.venue}
+                      dropdown
                       onChange={(venue) =>
                         setDetailDraft((current) =>
                           current ? { ...current, venue } : current
@@ -3979,44 +4006,6 @@ export default function ClientWeddingPage() {
                       ) : null}
                     </div>
                   </Field>
-
-                  <div className="border-t border-charcoal/8 pt-4 md:col-span-2">
-                    <p className={dashLabel}>Steps in this function</p>
-                    <p className="mt-1 text-xs leading-relaxed text-slate">
-                      Turn on only the steps this function needs — add food,
-                      design, photo and more here, and they appear in the orbit.
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {EDITOR_SECTIONS.filter(
-                        (section) => section.key in OPTIONAL_STEP_CATEGORY
-                      ).map((section) => {
-                        const category = OPTIONAL_STEP_CATEGORY[section.key];
-                        const on = detailDraft.requirements.some(
-                          (requirement) => requirement.category === category
-                        );
-                        return (
-                          <button
-                            key={section.key}
-                            type="button"
-                            onClick={() => toggleEventStep(section.key)}
-                            className={cn(
-                              "inline-flex items-center gap-1.5 border px-3 py-2 font-accent text-[10px] uppercase tracking-[0.14em] transition-colors",
-                              on
-                                ? "border-gold-primary bg-gold-primary/10 text-gold-dark"
-                                : "border-charcoal/15 text-slate hover:border-gold-primary/50"
-                            )}
-                          >
-                            {on ? (
-                              <Check className="h-3 w-3" />
-                            ) : (
-                              <Plus className="h-3 w-3" />
-                            )}
-                            {section.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
                 </div>
 
                 ) : null}
@@ -4924,8 +4913,9 @@ export default function ClientWeddingPage() {
                   </div>
                 ) : null}
 
-                {/* Adaptive per-step notes — shows on every step except Notes */}
-                {activeEditorSection.key !== "notes" ? (
+                {/* Adaptive per-step notes — shows on every step except Notes and Basics */}
+                {activeEditorSection.key !== "notes" &&
+                activeEditorSection.key !== "basics" ? (
                   <div className="border-t border-charcoal/8 pt-5">
                     <Field label={`Notes for ${activeEditorSection.label}`}>
                       <textarea
@@ -5129,18 +5119,82 @@ function VenuePicker({
   value,
   onChange,
   compact = false,
+  dropdown = false,
 }: {
   venues: VenueOption[];
   loading: boolean;
   value: string;
   onChange: (value: string) => void;
   compact?: boolean;
+  dropdown?: boolean;
 }) {
   const selectedVenue = venues.find((venue) => venueMatchesValue(venue, value));
   const [showCustom, setShowCustom] = useState(false);
   const visibleVenues = compact ? venues.slice(0, 4) : venues.slice(0, 6);
   const customValueActive = Boolean(value && !selectedVenue);
   const customOpen = showCustom || customValueActive;
+
+  // Compact pull-down — used in the Basics editor so it doesn't eat the page.
+  if (dropdown) {
+    const selectValue = selectedVenue ? selectedVenue.name : customValueActive ? "__custom__" : "";
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <select
+              value={selectValue}
+              disabled={loading}
+              onChange={(event) => {
+                const next = event.target.value;
+                if (next === "__custom__") {
+                  setShowCustom(true);
+                  onChange("");
+                } else {
+                  setShowCustom(false);
+                  onChange(next);
+                }
+              }}
+              className="w-full appearance-none border border-charcoal/15 bg-transparent px-3 py-2.5 pr-9 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+            >
+              <option value="">{loading ? "Loading venues…" : "Select a venue…"}</option>
+              {venues.map((venue) => {
+                const dest = venueDestinationLabel(venue);
+                return (
+                  <option key={venue.id} value={venue.name}>
+                    {venue.name}
+                    {dest ? ` — ${dest}` : ""}
+                  </option>
+                );
+              })}
+              <option value="__custom__">Custom area…</option>
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate" />
+          </div>
+          {value ? (
+            <button
+              type="button"
+              onClick={() => {
+                onChange("");
+                setShowCustom(false);
+              }}
+              className="shrink-0 font-accent text-[10px] uppercase tracking-[0.14em] text-slate transition-colors hover:text-rose"
+            >
+              Clear
+            </button>
+          ) : null}
+        </div>
+        {customOpen ? (
+          <input
+            type="text"
+            value={selectedVenue ? "" : value}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder="Custom venue, lawn, ballroom, beach…"
+            className="w-full border border-charcoal/15 bg-transparent px-3 py-2.5 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+          />
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">

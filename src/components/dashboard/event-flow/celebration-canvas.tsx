@@ -18,12 +18,15 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ArrowLeft,
   BedDouble,
+  CalendarDays,
   Camera,
+  Clock,
   FileText,
   Flower2,
   Gem,
   Gift,
   ListChecks,
+  MapPin,
   Music,
   Palette,
   Plus,
@@ -69,6 +72,8 @@ export type CanvasEvent = {
   id: string;
   title: string;
   timeLabel?: string;
+  dateLabel?: string;
+  venueLabel?: string;
   meta?: string;
   status: FlowStatus;
   readiness: number;
@@ -267,6 +272,33 @@ export function CelebrationCanvas({
           </div>
         ) : null}
       </div>
+
+      {/* Function-level detail strip: date · time · venue near the breadcrumb */}
+      {safeLevel.kind === "function" && activeEvent ? (
+        <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 border border-charcoal/10 bg-ivory/70 px-3.5 py-2.5">
+          <span className="font-display text-sm leading-tight text-charcoal">
+            {activeEvent.title}
+          </span>
+          {activeEvent.dateLabel ? (
+            <span className="inline-flex items-center gap-1.5 font-accent text-[10px] uppercase tracking-[0.12em] text-slate">
+              <CalendarDays className="h-3.5 w-3.5 text-gold-dark" />
+              {activeEvent.dateLabel}
+            </span>
+          ) : null}
+          {activeEvent.timeLabel ? (
+            <span className="inline-flex items-center gap-1.5 font-accent text-[10px] uppercase tracking-[0.12em] text-slate">
+              <Clock className="h-3.5 w-3.5 text-gold-dark" />
+              {activeEvent.timeLabel}
+            </span>
+          ) : null}
+          {activeEvent.venueLabel ? (
+            <span className="inline-flex items-center gap-1.5 font-accent text-[10px] uppercase tracking-[0.12em] text-slate">
+              <MapPin className="h-3.5 w-3.5 text-gold-dark" />
+              {activeEvent.venueLabel}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
 
       {/* Canvas stage */}
       <div className="relative aspect-square max-h-[560px] min-h-[420px] w-full overflow-hidden border border-charcoal/10 bg-[radial-gradient(circle_at_center,rgba(201,169,110,0.12),transparent_45%),linear-gradient(140deg,rgba(255,255,255,0.7),rgba(245,240,231,0.55))]">
