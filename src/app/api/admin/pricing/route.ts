@@ -6,6 +6,7 @@ import {
   apiError,
   apiSuccess,
 } from "@/lib/api-utils";
+import { recordAudit } from "@/lib/admin-audit";
 
 function firstRel<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null;
@@ -53,6 +54,7 @@ export async function GET() {
   if (session instanceof NextResponse) return session;
   const roleCheck = requireRole(session, "admin", "manager");
   if (roleCheck) return roleCheck;
+  const isAdmin = session.role === "admin";
 
   try {
     const supabase = createAdminSupabaseClient();
@@ -236,7 +238,22 @@ export async function GET() {
       };
     });
 
-    return apiSuccess({ clients });
+    // Managers never see cost / margin / final price — only progress + prices
+    // are theirs; the money is admin-only.
+    if (!isAdmin) {
+      for (const c of clients) {
+        c.totals = { revenue: 0, cost: 0, margin: 0, bookingCount: c.totals.bookingCount, pricedCount: c.totals.pricedCount };
+        for (const d of c.days)
+          for (const e of d.events)
+            for (const b of e.bookings) {
+              b.vendorCost = null;
+              b.listedPrice = null;
+              b.margin = null;
+            }
+      }
+    }
+
+    return apiSuccess({ clients, isAdmin });
   } catch (e) {
     console.error("GET /api/admin/pricing", e);
     return apiError("Failed to load pricing data", 500);
@@ -246,7 +263,8 @@ export async function GET() {
 export async function PATCH(request: NextRequest) {
   const session = await getAuthSession();
   if (session instanceof NextResponse) return session;
-  const roleCheck = requireRole(session, "admin", "manager");
+  // Setting cost / final price is admin-only (managers can't see or change money).
+  const roleCheck = requireRole(session, "admin");
   if (roleCheck) return roleCheck;
 
   try {
@@ -296,6 +314,21 @@ export async function PATCH(request: NextRequest) {
       console.error("PATCH /api/admin/pricing update:", error);
       return apiError("Failed to update pricing", 500);
     }
+
+    await recordAudit({
+      actorUserId: session.userId,
+      action: body.pricePublished !== undefined ? "PRICE_PUBLISH" : "PRICE_SET",
+      entityType: "booking",
+      entityId: bookingId,
+      summary: `cost ₹${data.vendor_cost ?? "—"} · final ₹${data.final_price ?? "—"}${
+        data.price_published ? " · published" : ""
+      }`,
+      meta: {
+        vendorCost: data.vendor_cost ?? null,
+        finalPrice: data.final_price ?? null,
+        published: Boolean(data.price_published),
+      },
+    });
 
     return apiSuccess({
       booking: {

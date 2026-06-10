@@ -50,11 +50,13 @@ type AdminClient = {
 
 const dashLabel = "font-accent text-[10px] uppercase tracking-[0.2em] text-slate";
 
-function flowStatus(readiness: number, hasContent = true): FlowStatus {
-  if (!hasContent) return "planned";
-  if (readiness >= 100) return "ready";
-  if (readiness >= 50) return "active";
-  return "gap";
+/** Colour a node by margin health: green = all priced (no loss), amber = some
+ *  still to price, red = a loss somewhere, grey = no picks. */
+function marginHealth(picks: number, priced: number, loss: boolean): FlowStatus {
+  if (picks === 0) return "planned";
+  if (loss) return "gap";
+  if (priced < picks) return "active";
+  return "ready";
 }
 function bookingStatus(b: Booking): FlowStatus {
   if (b.pricePublished) return "ready";
@@ -104,31 +106,49 @@ export default function AdminPricingPage() {
   const canvasDays: CanvasDay[] = useMemo(() => {
     if (!selectedClient) return [];
     return selectedClient.days.map((day) => {
-      const events = day.events.map((ev) => ({
-        id: ev.id,
-        title: ev.name,
-        timeLabel: ev.startTime ?? undefined,
-        meta: `${ev.bookings.length} picks`,
-        status: flowStatus(ev.readiness, ev.bookings.length > 0),
-        readiness: ev.readiness,
-        steps: ev.bookings.map((b) => ({
-          id: b.id,
-          label: b.vendorName,
-          status: bookingStatus(b),
-        })),
-      }));
-      const avg =
-        events.length > 0
-          ? Math.round(events.reduce((s, e) => s + e.readiness, 0) / events.length)
-          : 0;
+      let dayMargin = 0;
+      let dayPicks = 0;
+      let dayPriced = 0;
+      let dayLoss = false;
+      const events = day.events.map((ev) => {
+        const margin = ev.bookings.reduce((s, b) => s + (b.margin ?? 0), 0);
+        const priced = ev.bookings.filter((b) => b.finalPrice != null).length;
+        const loss = ev.bookings.some((b) => b.margin != null && b.margin < 0);
+        dayMargin += margin;
+        dayPicks += ev.bookings.length;
+        dayPriced += priced;
+        if (loss) dayLoss = true;
+        return {
+          id: ev.id,
+          title: ev.name,
+          // money shown right on the node
+          timeLabel:
+            ev.bookings.length === 0
+              ? undefined
+              : priced < ev.bookings.length
+                ? `${ev.bookings.length - priced} to price`
+                : `${lakh(margin)} margin`,
+          meta: `${ev.bookings.length} picks`,
+          status: marginHealth(ev.bookings.length, priced, loss),
+          readiness:
+            ev.bookings.length > 0 ? Math.round((priced / ev.bookings.length) * 100) : 0,
+          steps: ev.bookings.map((b) => ({
+            id: b.id,
+            label: b.vendorName,
+            status: bookingStatus(b),
+          })),
+        };
+      });
       return {
         id: day.id,
         title: day.name,
         dateLabel: day.date
           ? new Date(day.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
-          : undefined,
-        status: flowStatus(avg, events.length > 0),
-        readiness: avg,
+          : dayPicks > 0
+            ? `${lakh(dayMargin)} margin`
+            : undefined,
+        status: marginHealth(dayPicks, dayPriced, dayLoss),
+        readiness: dayPicks > 0 ? Math.round((dayPriced / dayPicks) * 100) : 0,
         events,
       };
     });
@@ -373,6 +393,7 @@ export default function AdminPricingPage() {
             data={editing}
             onClose={() => setEditing(null)}
             onSave={savePricing}
+            onRefresh={refetch}
           />
         ) : null}
       </AnimatePresence>
@@ -427,10 +448,26 @@ function MiniStat({
 
 // ─── Pricing editor ─────────────────────────────────────────────────────────
 
+type NegEntry = {
+  id: string;
+  stage: string;
+  amount: number | null;
+  note: string | null;
+  created_at: string;
+};
+const GST_RATE = 0.18;
+const TARGET_MARGIN = 0.3;
+const NEG_META: Record<string, { label: string; dot: string }> = {
+  QUOTED: { label: "Quoted", dot: "bg-slate/50" },
+  COUNTERED: { label: "Countered", dot: "bg-gold-primary" },
+  AGREED: { label: "Agreed", dot: "bg-sage" },
+};
+
 function PricingEditor({
   data,
   onClose,
   onSave,
+  onRefresh,
 }: {
   data: { booking: Booking; eventName: string; clientName: string };
   onClose: () => void;
@@ -438,16 +475,38 @@ function PricingEditor({
     bookingId: string,
     patch: { vendorCost?: number | null; finalPrice?: number | null; pricePublished?: boolean }
   ) => Promise<void>;
+  onRefresh: () => void;
 }) {
   const { booking, eventName, clientName } = data;
   const [cost, setCost] = useState(booking.vendorCost != null ? String(booking.vendorCost) : "");
   const [price, setPrice] = useState(booking.finalPrice != null ? String(booking.finalPrice) : "");
   const [busy, setBusy] = useState(false);
 
+  const [entries, setEntries] = useState<NegEntry[]>([]);
+  const [negStage, setNegStage] = useState<"QUOTED" | "COUNTERED" | "AGREED">("COUNTERED");
+  const [negAmount, setNegAmount] = useState("");
+  const [negNote, setNegNote] = useState("");
+  const [negBusy, setNegBusy] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`/api/admin/negotiation?bookingId=${booking.id}`);
+        const json = await res.json();
+        if (res.ok) setEntries((json.entries ?? []) as NegEntry[]);
+      } catch {
+        /* non-fatal */
+      }
+    })();
+  }, [booking.id]);
+
   const costN = cost.trim() ? Number(cost) : null;
   const priceN = price.trim() ? Number(price) : null;
   const margin = priceN != null && costN != null ? priceN - costN : null;
   const marginPct = margin != null && costN ? Math.round((margin / costN) * 100) : null;
+  const gst = priceN != null ? Math.round(priceN * GST_RATE) : null;
+  const suggested =
+    costN != null && costN > 0 ? Math.round((costN * (1 + TARGET_MARGIN)) / 1000) * 1000 : null;
 
   const save = async (publish?: boolean) => {
     setBusy(true);
@@ -458,6 +517,32 @@ function PricingEditor({
     });
     setBusy(false);
     if (publish !== undefined) onClose();
+  };
+
+  const addEntry = async () => {
+    const amt = negAmount.trim() ? Number(negAmount) : null;
+    setNegBusy(true);
+    try {
+      const res = await fetch("/api/admin/negotiation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId: booking.id, stage: negStage, amount: amt, note: negNote || null }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Failed to add entry");
+      setEntries((e) => [...e, json.entry as NegEntry]);
+      setNegAmount("");
+      setNegNote("");
+      if (negStage === "AGREED" && amt != null) {
+        setCost(String(amt)); // agreeing locks the cost
+        onRefresh();
+        toast.success("Agreed — cost locked");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not add entry");
+    } finally {
+      setNegBusy(false);
+    }
   };
 
   return (
@@ -525,8 +610,19 @@ function PricingEditor({
               </div>
             </label>
             <label className="block">
-              <span className="font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark">
-                Final client price
+              <span className="flex items-center justify-between gap-2">
+                <span className="font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark">
+                  Final client price
+                </span>
+                {suggested != null ? (
+                  <button
+                    type="button"
+                    onClick={() => setPrice(String(suggested))}
+                    className="font-accent text-[9px] uppercase tracking-[0.1em] text-gold-dark underline-offset-2 hover:underline"
+                  >
+                    +30% → {formatCurrency(suggested)}
+                  </button>
+                ) : null}
               </span>
               <div className="mt-1.5 flex items-center border border-gold-primary/50 px-3 focus-within:border-gold-primary">
                 <IndianRupee className="h-3.5 w-3.5 text-gold-dark" />
@@ -558,18 +654,78 @@ function PricingEditor({
             </div>
           </div>
 
-          <div className="mt-3 flex items-center gap-2 border border-charcoal/10 px-4 py-2.5">
-            <span
-              className={cn(
-                "h-2 w-2 rounded-full",
-                booking.pricePublished ? "bg-sage" : "bg-slate/40"
-              )}
-            />
-            <span className="flex-1 text-xs text-slate">
-              {booking.pricePublished
-                ? "Published — client sees this once their event is 100% ready."
-                : "Not published — hidden from the client until you publish."}
-            </span>
+          {gst != null ? (
+            <div className="mt-2 flex items-center justify-between px-1 text-xs text-slate">
+              <span>+ GST (18%)</span>
+              <span>
+                {formatCurrency(gst)} · client pays{" "}
+                <span className="text-charcoal">{formatCurrency((priceN ?? 0) + gst)}</span>
+              </span>
+            </div>
+          ) : null}
+
+          {/* Negotiation log */}
+          <div className="mt-5 border-t border-charcoal/8 pt-4">
+            <p className={dashLabel}>Negotiation</p>
+            {entries.length > 0 ? (
+              <ul className="mt-2 space-y-1.5">
+                {entries.map((e) => (
+                  <li key={e.id} className="flex items-center gap-2 text-xs">
+                    <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", NEG_META[e.stage]?.dot ?? "bg-slate/50")} />
+                    <span className="font-accent uppercase tracking-[0.12em] text-slate">
+                      {NEG_META[e.stage]?.label ?? e.stage}
+                    </span>
+                    {e.amount != null ? (
+                      <span className="font-heading text-charcoal">{formatCurrency(e.amount)}</span>
+                    ) : null}
+                    {e.note ? <span className="truncate text-slate">· {e.note}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-1 text-xs text-slate">No negotiation logged yet.</p>
+            )}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <div className="inline-flex border border-charcoal/12 p-0.5">
+                {(["QUOTED", "COUNTERED", "AGREED"] as const).map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => setNegStage(st)}
+                    className={cn(
+                      "px-2.5 py-1.5 font-accent text-[9px] uppercase tracking-[0.1em] transition-colors",
+                      negStage === st ? "bg-charcoal text-ivory" : "text-slate hover:text-charcoal"
+                    )}
+                  >
+                    {NEG_META[st].label}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="number"
+                value={negAmount}
+                onChange={(e) => setNegAmount(e.target.value)}
+                placeholder="Amount"
+                className="w-24 border border-charcoal/15 bg-transparent px-2 py-1.5 font-heading text-xs text-charcoal outline-none focus:border-gold-primary"
+              />
+              <input
+                value={negNote}
+                onChange={(e) => setNegNote(e.target.value)}
+                placeholder="Note"
+                className="min-w-0 flex-1 border border-charcoal/15 bg-transparent px-2 py-1.5 font-heading text-xs text-charcoal outline-none focus:border-gold-primary"
+              />
+              <button
+                type="button"
+                onClick={() => void addEntry()}
+                disabled={negBusy}
+                className="font-accent border border-charcoal/15 px-3 py-1.5 text-[9px] uppercase tracking-[0.12em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark disabled:opacity-40"
+              >
+                Log
+              </button>
+            </div>
+            <p className="mt-1.5 text-[10px] text-slate/70">
+              Marking &ldquo;Agreed&rdquo; locks that amount as the vendor cost.
+            </p>
           </div>
 
           <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
