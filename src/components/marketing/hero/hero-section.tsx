@@ -176,7 +176,7 @@ export function HeroSection() {
                 ? { duration: 0.8, delay: 1.45, ease: [0.16, 1, 0.3, 1] }
                 : { duration: 0 }
             }
-            className="mt-7 grid max-w-2xl grid-cols-3 gap-3"
+            className="mt-7 grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3"
           >
             <LayerProofCard
               index="01"
@@ -209,12 +209,25 @@ export function HeroSection() {
               Map our destinations
             </MagneticButton>
             <a
-              href="#how-it-works"
+              href="#event-system"
               className="group inline-flex items-center gap-3 font-accent text-[11px] uppercase tracking-[0.24em] text-ivory/68 transition-colors hover:text-gold-primary"
             >
-              Walk the five acts
+              Enter the spatial plan
               <span className="h-px w-10 bg-current transition-all duration-500 group-hover:w-16" />
             </a>
+          </motion.div>
+
+          <motion.div
+            initial={shouldAnimate ? { opacity: 0, y: 20 } : false}
+            animate={{ opacity: 1, y: 0 }}
+            transition={
+              shouldAnimate
+                ? { duration: 0.8, delay: 1.85, ease: [0.16, 1, 0.3, 1] }
+                : { duration: 0 }
+            }
+            className="mt-8 lg:hidden"
+          >
+            <MobileHeroStage />
           </motion.div>
 
         </motion.div>
@@ -473,6 +486,57 @@ function LayerProofCard({
   );
 }
 
+function MobileHeroStage() {
+  return (
+    <div className="relative min-h-[22rem] overflow-hidden border border-white/10 bg-white/[0.04] p-4 shadow-[0_28px_90px_rgba(0,0,0,0.22)] backdrop-blur-xl [perspective:1100px]">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(201,169,110,0.18),transparent_58%)]" />
+      <div className="absolute left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2 rounded-full border border-gold-primary/18" />
+      <div className="absolute left-1/2 top-1/2 h-36 w-36 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10" />
+
+      {[
+        ["Day", "left-5 top-6"],
+        ["Function", "right-5 top-20"],
+        ["Vendor", "left-7 bottom-16"],
+        ["Ready", "right-7 bottom-7"],
+      ].map(([label, position]) => (
+        <span
+          key={label}
+          className={cn(
+            "absolute rounded-full border border-gold-primary/24 bg-midnight/70 px-3 py-2 font-accent text-[9px] uppercase tracking-[0.18em] text-gold-light backdrop-blur-md",
+            position
+          )}
+        >
+          {label}
+        </span>
+      ))}
+
+      <div
+        className="absolute left-1/2 top-1/2 w-[14rem] overflow-hidden border border-gold-primary/28 bg-ivory text-charcoal shadow-[0_24px_80px_rgba(0,0,0,0.3)]"
+        style={{ transform: "translate3d(-50%, -50%, 44px) rotateX(7deg) rotateY(-6deg)" }}
+      >
+        <div
+          className="h-24 bg-cover bg-center"
+          style={{
+            backgroundImage: `linear-gradient(180deg,rgba(12,14,24,0.1),rgba(12,14,24,0.72)),url(${MARKETING_IMAGES.hero.tablescape})`,
+          }}
+        />
+        <div className="p-4">
+          <p className="font-accent text-[9px] uppercase tracking-[0.2em] text-gold-dark">
+            Live spatial plan
+          </p>
+          <h3 className="mt-2 font-display text-2xl leading-none">
+            Pick a branch. Edit one step.
+          </h3>
+          <p className="mt-3 text-xs leading-relaxed text-slate">
+            The mobile story still shows the product: one event world, not a
+            pile of forms.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FloatingTag({
   children,
   className,
@@ -631,7 +695,7 @@ function MainStageCard() {
       </div>
       <div className="relative border-b border-charcoal/8 px-5 py-3">
         <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-slate">
-          Elysian operating stack
+          Elysian spatial atelier
         </p>
         <h3 className="mt-1.5 font-display text-xl">From vision to locked plan</h3>
       </div>

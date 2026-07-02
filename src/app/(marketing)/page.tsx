@@ -77,7 +77,7 @@ export default function HomePage() {
               <SectionHeader
                 chapter="08"
                 eyebrow="Concierge brief"
-                title="Start with the event you want to model."
+                title="Start with the event you want to shape."
                 intro="Bring the event type, destination, guest frame, and the moments you already know. We’ll turn it into a first structure: days, functions, vendor direction, budget logic, and what needs a quote."
                 align="start"
                 titleMaxWidth="max-w-xl"
@@ -106,7 +106,7 @@ export default function HomePage() {
               <div className="mb-8">
                 <p className="max-w-lg text-sm leading-relaxed text-slate">
                   Tell us what matters most and we’ll return with a clearer first
-                  route into the event model: structure, requirements, vendor
+                  route into the event plan: structure, requirements, vendor
                   direction, and open questions.
                 </p>
               </div>
@@ -244,7 +244,7 @@ function AssuranceStrip() {
   const signals = [
     {
       eyebrow: "Spatial planning",
-      copy: "Days, functions, vendors, budgets, and readiness stay connected in one model.",
+      copy: "Days, functions, vendors, budgets, and readiness stay connected in one spatial plan.",
     },
     {
       eyebrow: "Tap, don’t type",

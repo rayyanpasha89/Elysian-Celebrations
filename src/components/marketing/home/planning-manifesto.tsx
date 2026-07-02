@@ -41,7 +41,7 @@ export function PlanningManifesto() {
             chapter="01"
             eyebrow="Planning manifesto"
             title="The plan should feel alive before it feels expensive."
-            intro="Elysian turns an event into a living model: first the structure, then each function, then the vendors, menus, logistics, budget, and final readiness. Less blank typing, more guided decisions."
+            intro="Elysian turns an event into a living spatial plan: first the structure, then each function, then the vendors, menus, logistics, budget, and final readiness. Less blank typing, more guided decisions."
             align="start"
             titleMaxWidth="max-w-2xl"
           />
