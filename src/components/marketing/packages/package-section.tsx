@@ -29,7 +29,7 @@ const tiers: {
     startingPrice: 1500000,
     featured: false,
     image:
-      "https://images.unsplash.com/photo-1506014299253-3725319c7749?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1519225421980-715cb0215aed?auto=format&fit=crop&w=1200&q=80",
   },
   {
     name: "Grand",

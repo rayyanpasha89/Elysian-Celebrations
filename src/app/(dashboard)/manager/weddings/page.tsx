@@ -150,10 +150,10 @@ export default async function ManagerWeddingsPage() {
         <div className="max-w-2xl">
           <p className={dashLabel}>Operations</p>
           <h2 className="font-display mt-2 text-3xl font-semibold text-charcoal">
-            Weddings
+            Events
           </h2>
           <p className="mt-3 text-sm leading-relaxed text-slate">
-            A read-only operating list of every wedding, with day/event depth,
+            A read-only operating list of every client event, with day/function depth,
             destination, status, and budget shape visible before you enter the
             bookings command center.
           </p>
@@ -168,7 +168,7 @@ export default async function ManagerWeddingsPage() {
       ) : null}
 
       {result.kind === "error" ? (
-        <StateCard title="Could not load weddings" body={result.message} />
+        <StateCard title="Could not load events" body={result.message} />
       ) : null}
 
       {result.kind === "ok" ? <WeddingsList weddings={result.weddings} /> : null}
@@ -189,10 +189,10 @@ function WeddingsList({ weddings }: { weddings: WeddingSummary[] }) {
   if (weddings.length === 0) {
     return (
       <div className={cn(dashCard, "border-dashed border-gold-primary/40 bg-gold-primary/8")}>
-        <p className={cn(dashLabel, "text-gold-dark")}>No weddings yet</p>
+        <p className={cn(dashLabel, "text-gold-dark")}>No events yet</p>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-charcoal">
           New client onboarding records will appear here once a couple creates
-          their wedding. Until then, review incoming inquiries and convert the
+          their event. Until then, review incoming inquiries and convert the
           right ones into client accounts.
         </p>
         <Link href="/manager/inquiries" className={cn(dashBtn, "mt-4")}>
@@ -214,7 +214,7 @@ function WeddingsList({ weddings }: { weddings: WeddingSummary[] }) {
   return (
     <div className="space-y-8">
       <div className="grid gap-3 sm:grid-cols-3">
-        <MetricCard label="Active weddings" value={String(activeCount)} />
+        <MetricCard label="Active events" value={String(activeCount)} />
         <MetricCard label="Planned events" value={String(eventCount)} />
         <MetricCard label="Event budget" value={formatCurrency(plannedBudget)} />
       </div>
@@ -257,7 +257,7 @@ function WeddingCard({ wedding }: { wedding: WeddingSummary }) {
       </div>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Tile label="Wedding date" value={formatDate(wedding.date)} />
+        <Tile label="Event date" value={formatDate(wedding.date)} />
         <Tile label="Days" value={String(wedding.dayCount)} />
         <Tile label="Events" value={String(wedding.eventCount)} />
         <Tile label="Event budget" value={formatCurrency(wedding.plannedBudget)} />

@@ -68,7 +68,8 @@ export function BlogPostGrid({ posts }: { posts: BlogPost[] }) {
                 <div
                   className="relative aspect-[16/10] w-full overflow-hidden"
                   style={{
-                    background: `linear-gradient(135deg, hsl(220, 24%, 18%) 0%, hsl(35, 28%, 22%) 100%)`,
+                    background:
+                      "linear-gradient(135deg, var(--charcoal-brown) 0%, var(--dark-walnut) 100%)",
                   }}
                 >
                   <div className="absolute inset-0 bg-gradient-to-t from-midnight/70 to-transparent opacity-80 transition group-hover:opacity-90" />

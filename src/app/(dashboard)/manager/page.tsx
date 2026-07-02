@@ -62,7 +62,7 @@ function inquiryStatusStyle(status: string) {
 
 const quickLinks = [
   { label: "Inquiries", href: "/manager/inquiries" },
-  { label: "Weddings", href: "/manager/weddings" },
+  { label: "Events", href: "/manager/weddings" },
   { label: "Vendors", href: "/manager/vendors" },
   { label: "Configurator", href: "/manager/configurator" },
   { label: "Messages", href: "/manager/messages" },
@@ -170,7 +170,7 @@ export default function ManagerDashboard() {
       {/* Stat row */}
       <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: "Active Weddings", value: stats.activeWeddings, sub: "in planning", href: "/manager/weddings" },
+          { label: "Active Events", value: stats.activeWeddings, sub: "in planning", href: "/manager/weddings" },
           { label: "Pending Inquiries", value: stats.pendingInquiries, sub: "awaiting response", href: "/manager/inquiries", highlight: stats.pendingInquiries > 0 },
           { label: "Confirmed Bookings", value: stats.confirmedBookings, sub: "in pipeline", href: null },
           { label: "Verified Vendors", value: stats.vendorsAvailable, sub: "available", href: "/manager/vendors" },
@@ -256,16 +256,16 @@ export default function ManagerDashboard() {
         {/* Right column */}
         <motion.div variants={fadeUp} initial="hidden" animate="visible" transition={{ delay: 0.1 }} className="lg:col-span-2 space-y-6">
 
-          {/* Upcoming weddings */}
+          {/* Upcoming events */}
           <div className="border border-charcoal/8 bg-ivory p-6">
             <div className="mb-5 flex items-center justify-between">
-              <h3 className="font-display text-xl text-charcoal">Upcoming Weddings</h3>
+              <h3 className="font-display text-xl text-charcoal">Upcoming Events</h3>
               <Link href="/manager/weddings" className={cn(dashLabel, "hover:text-gold-dark transition-colors")}>All</Link>
             </div>
 
             {upcomingWeddings.length === 0 ? (
               <div className="border border-dashed border-charcoal/12 bg-cream/30 px-4 py-6 text-center">
-                <p className="font-heading text-sm text-slate">No upcoming weddings.</p>
+                <p className="font-heading text-sm text-slate">No upcoming events.</p>
               </div>
             ) : (
               <div className="space-y-0 divide-y divide-charcoal/5">
@@ -316,7 +316,7 @@ export default function ManagerDashboard() {
             <p className={cn(dashLabel, "mb-4")}>Operations at a glance</p>
             <div className="space-y-3">
               {[
-                { label: "Weddings in planning", value: stats.activeWeddings },
+                { label: "Events in planning", value: stats.activeWeddings },
                 { label: "Bookings confirmed", value: stats.confirmedBookings },
                 { label: "Vendor network", value: stats.vendorsAvailable },
               ].map((m) => (

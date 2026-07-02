@@ -78,7 +78,7 @@ export default function AdminClientsPage() {
 
       <motion.div variants={fadeUp} className="mt-10 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Total clients" value={clients.length} />
-        <StatCard label="With wedding date" value={withWedding} />
+        <StatCard label="With event date" value={withWedding} />
         <StatCard label="With destination" value={withDestination} />
         <StatCard label="No date yet" value={clients.length - withWedding} />
       </motion.div>
@@ -107,7 +107,7 @@ export default function AdminClientsPage() {
               <tr className="border-b border-charcoal/15">
                 <th className={cn(dashLabel, "pb-3 pr-4 font-normal")}>Name</th>
                 <th className={cn(dashLabel, "pb-3 pr-4 font-normal")}>Email</th>
-                <th className={cn(dashLabel, "pb-3 pr-4 font-normal")}>Wedding</th>
+                <th className={cn(dashLabel, "pb-3 pr-4 font-normal")}>Event</th>
                 <th className={cn(dashLabel, "pb-3 pr-4 font-normal")}>Date</th>
                 <th className={cn(dashLabel, "pb-3 pr-4 font-normal")}>Destination</th>
                 <th className={cn(dashLabel, "pb-3 font-normal")}>Guests</th>

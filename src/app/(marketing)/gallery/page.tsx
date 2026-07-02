@@ -39,7 +39,7 @@ const galleryImages: GalleryImage[] = [
     category: "Galas & Social",
   },
   {
-    src: "https://images.unsplash.com/photo-1503177119275-0aa32b3a9366?auto=format&fit=crop&w=1400&q=80",
+    src: "https://images.unsplash.com/photo-1524492412937-b28074a5d7da?auto=format&fit=crop&w=1400&q=80",
     alt: "Lakeside venue with ceremony scale",
     category: "Destinations",
   },
@@ -64,7 +64,7 @@ const galleryImages: GalleryImage[] = [
     category: "Corporate",
   },
   {
-    src: "https://images.unsplash.com/photo-1506014299253-3725319c7749?auto=format&fit=crop&w=1400&q=80",
+    src: "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&w=1400&q=80",
     alt: "Intimate ceremony with soft editorial composition",
     category: "Weddings",
   },

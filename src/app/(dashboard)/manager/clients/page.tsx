@@ -72,7 +72,7 @@ export default function ManagerClientsPage() {
 
       <motion.div variants={fadeUp} className="mt-10 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Total clients" value={clients.length} />
-        <StatCard label="With wedding" value={withWedding} />
+        <StatCard label="With event" value={withWedding} />
         <StatCard label="Pending setup" value={clients.length - withWedding} />
       </motion.div>
 
@@ -83,7 +83,7 @@ export default function ManagerClientsPage() {
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Name, email, wedding, destination"
+          placeholder="Name, email, event, destination"
           className="mt-3 w-full max-w-md border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm text-charcoal outline-none transition-colors focus:border-gold-primary"
         />
       </motion.div>
@@ -97,7 +97,7 @@ export default function ManagerClientsPage() {
               <tr className="border-b border-charcoal/15">
                 <th className={cn(dashLabel, "pb-3 pr-4 font-normal")}>Name</th>
                 <th className={cn(dashLabel, "pb-3 pr-4 font-normal")}>Email</th>
-                <th className={cn(dashLabel, "pb-3 pr-4 font-normal")}>Wedding</th>
+                <th className={cn(dashLabel, "pb-3 pr-4 font-normal")}>Event</th>
                 <th className={cn(dashLabel, "pb-3 pr-4 font-normal")}>Date</th>
                 <th className={cn(dashLabel, "pb-3 pr-4 font-normal")}>Destination</th>
                 <th className={cn(dashLabel, "pb-3 font-normal")}>Guests</th>

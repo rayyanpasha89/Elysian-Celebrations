@@ -37,7 +37,7 @@ const testimonials = [
     quote:
       "Deeksha and Nithin treated the wedding like a creative production, not a checklist. The result was royal without feeling formal, and personal without losing polish.",
     image:
-      "https://images.unsplash.com/photo-1529634806980-85c3dd4b45b2?auto=format&fit=crop&w=1400&q=80",
+      "https://images.unsplash.com/photo-1529634806980-85c3dd6d34ac?auto=format&fit=crop&w=1400&q=80",
     highlight: "Editorial direction that still felt deeply personal",
   },
   {
@@ -47,7 +47,7 @@ const testimonials = [
     quote:
       "What stood out most was how seamlessly everything connected. Venue, vendor team, and guest movement all felt like one story, which made the whole weekend feel effortless.",
     image:
-      "https://images.unsplash.com/photo-1519302959554-a75be0afc82f?auto=format&fit=crop&w=1400&q=80",
+      "https://images.unsplash.com/photo-1529636798458-92182e662485?auto=format&fit=crop&w=1400&q=80",
     highlight: "Backwater ceremony with seamless guest movement",
   },
   {

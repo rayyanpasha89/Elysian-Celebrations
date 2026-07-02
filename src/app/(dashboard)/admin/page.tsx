@@ -143,7 +143,7 @@ export default function AdminDashboard() {
       {/* Stat row */}
       <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: "Total Weddings", value: data.weddingsCount, sub: "on platform", href: "/admin/clients" },
+          { label: "Total Events", value: data.weddingsCount, sub: "on platform", href: "/admin/clients" },
           { label: "Active Vendors", value: data.usersByRole.vendor, sub: "registered", href: "/admin/vendors" },
           { label: "Active Bookings", value: activeBookings, sub: "in pipeline", href: null },
           { label: "New Inquiries", value: data.newContactInquiries, sub: "uncontacted", href: "/admin/inquiries", highlight: data.newContactInquiries > 0 },
@@ -246,7 +246,7 @@ export default function AdminDashboard() {
                 { label: "Clients", value: data.usersByRole.client, href: "/admin/clients" },
                 { label: "Vendors", value: data.usersByRole.vendor, href: "/admin/vendors" },
                 { label: "Pending approvals", value: data.pendingVendorCount, href: "/admin/vendors", highlight: data.pendingVendorCount > 0 },
-                { label: "Weddings active", value: data.weddingsCount, href: null },
+                { label: "Events active", value: data.weddingsCount, href: null },
               ].map((m) => (
                 <div key={m.label} className="flex items-center justify-between border-b border-charcoal/5 pb-3 last:border-0">
                   <p className={dashLabel}>{m.label}</p>

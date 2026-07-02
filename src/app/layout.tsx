@@ -7,9 +7,9 @@ import { TestAuthSwitcher } from "@/components/testing/test-auth-switcher";
 import { isTestAuthEnabled } from "@/lib/test-auth";
 import "./globals.css";
 
-const siteTitle = "Elysian Celebrations — Luxury Destination Weddings";
+const siteTitle = "Elysian Celebrations — Luxury Event Planning";
 const siteDescription =
-  "Discover, plan, and celebrate your dream destination wedding. Curated destinations, trusted vendors, and transparent budgeting—from first vision to last dance.";
+  "Discover, design, and operate destination events with curated venues, trusted vendors, and a planning board that connects every day, function, and service.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(
@@ -21,12 +21,12 @@ export const metadata: Metadata = {
   },
   description: siteDescription,
   keywords: [
-    "destination wedding",
-    "luxury wedding planner",
-    "wedding planning",
-    "Udaipur wedding",
-    "Goa wedding",
-    "destination wedding India",
+    "destination event",
+    "luxury event planner",
+    "event planning",
+    "Udaipur event",
+    "Goa event",
+    "destination event India",
   ],
   openGraph: {
     title: siteTitle,

@@ -15,7 +15,7 @@ const destinations = [
     country: "India",
     tagline: "Lakeside palaces, mirrored light, and ceremony as theatre.",
     heroImage:
-      "https://images.unsplash.com/photo-1503177119275-0aa32b3a9366?auto=format&fit=crop&w=1400&q=80",
+      "https://images.unsplash.com/photo-1524492412937-b28074a5d7da?auto=format&fit=crop&w=1400&q=80",
     startingPrice: 2500000,
     venueCount: 24,
     vibe: "Royal lakefront",
