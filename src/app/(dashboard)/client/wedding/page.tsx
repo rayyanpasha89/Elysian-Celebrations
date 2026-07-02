@@ -3094,6 +3094,115 @@ export default function ClientWeddingPage() {
     );
   }
 
+  const renderPlanOverviewPanel = (className = "") => (
+    <motion.section
+      variants={fadeUp}
+      className={cn("border border-charcoal/8 bg-ivory p-5 md:p-6", className)}
+    >
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className={dashLabel}>Plan details</p>
+          <h2 className="mt-2 font-display text-3xl font-semibold text-charcoal md:text-4xl">
+            {wedding.name}
+          </h2>
+          <p className="font-heading mt-2 max-w-2xl text-sm text-slate">
+            Use this panel after the map when you need totals, readiness, layer
+            switching, or destructive actions. The flowchart stays first.
+          </p>
+        </div>
+        <div className="flex flex-col gap-3 lg:items-end">
+          <div className="border border-charcoal/10 bg-cream/40 px-3 py-2 font-heading text-sm text-slate">
+            {wedding.date
+              ? new Date(wedding.date).toLocaleDateString("en-IN", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })
+              : "Date TBD"}
+          </div>
+          <button
+            type="button"
+            className="border border-rose/35 px-4 py-2.5 font-accent text-[10px] uppercase tracking-[0.18em] text-rose transition-colors hover:bg-rose hover:text-ivory disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={deletingPlan}
+            onClick={() => void deleteEventPlan()}
+          >
+            {deletingPlan ? "Deleting..." : "Delete event plan"}
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="border border-charcoal/8 bg-cream/35 px-3 py-2.5">
+          <p className={dashLabel}>Days</p>
+          <p className="mt-1 font-display text-2xl text-charcoal">{days.length}</p>
+        </div>
+        <div className="border border-charcoal/8 bg-cream/35 px-3 py-2.5">
+          <p className={dashLabel}>Functions</p>
+          <p className="mt-1 font-display text-2xl text-charcoal">{totalEvents}</p>
+        </div>
+        <div className="border border-charcoal/8 bg-cream/35 px-3 py-2.5">
+          <p className={dashLabel}>Readiness</p>
+          <div className="mt-1 flex items-center gap-3">
+            <p className="font-display text-2xl text-charcoal">{overallReadiness}%</p>
+            <ProgressRing
+              percent={overallReadiness}
+              size={38}
+              stroke={3}
+              label="ready"
+              showValue={false}
+            />
+          </div>
+        </div>
+        <div className="border border-gold-primary/25 bg-gold-primary/8 px-3 py-2.5">
+          <p className={cn(dashLabel, "text-gold-dark")}>Estimate</p>
+          <p className="mt-1 truncate font-display text-2xl text-charcoal">
+            {gatedSpendEstimateLabel(estimatedSpend, overallReadiness)}
+          </p>
+          <p className="mt-1 truncate text-[11px] text-slate">
+            {totalSelections} vendor selection{totalSelections === 1 ? "" : "s"}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 flex flex-col gap-3 border-t border-charcoal/8 pt-4 lg:flex-row lg:items-center lg:justify-between">
+        <p className="text-xs leading-relaxed text-slate">
+          {layer === "definition"
+            ? "Confirm the structure that feeds this map."
+            : layer === "requirements"
+              ? "The flowchart is the main workspace. Tap nodes to reveal details."
+              : "Use finalization only to chase missing gaps."}
+        </p>
+        <div className="grid w-full grid-cols-3 self-start border border-charcoal/12 bg-cream/30 p-1 sm:inline-flex sm:w-auto lg:self-auto">
+          {(
+            [
+              { key: "definition", label: "1 · Definition" },
+              { key: "requirements", label: "2 · Requirements" },
+              { key: "finalization", label: "3 · Finalization" },
+            ] as const
+          ).map((tab) => {
+            const active = layer === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setLayer(tab.key)}
+                className={cn(
+                  "font-accent inline-flex items-center justify-center px-2 py-2 text-center text-[10px] uppercase tracking-[0.16em] transition-colors sm:px-3",
+                  active
+                    ? "bg-charcoal text-ivory"
+                    : "text-slate hover:text-charcoal"
+                )}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </motion.section>
+  );
+
   return (
     <motion.div
       variants={staggerContainer}
@@ -3101,110 +3210,7 @@ export default function ClientWeddingPage() {
       animate="visible"
       className="text-[15px] md:text-base [&_.text-sm]:text-[15px] [&_.text-xs]:text-sm [&_input]:text-base [&_select]:text-base [&_textarea]:text-base"
     >
-      <motion.header variants={fadeUp} className="border border-charcoal/8 bg-ivory p-5 md:p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className={dashLabel}>Event flowchart</p>
-            <h2 className="mt-2 font-display text-3xl font-semibold text-charcoal md:text-4xl">
-              {wedding.name}
-            </h2>
-            <p className="font-heading mt-2 max-w-2xl text-sm text-slate">
-              Work from the map first: choose a day, open a function, then tap
-              the exact step you want to edit. Details stay hidden until you ask
-              for them.
-            </p>
-          </div>
-          <div className="flex flex-col gap-3 lg:items-end">
-            <div className="border border-charcoal/10 bg-cream/40 px-3 py-2 font-heading text-sm text-slate">
-              {wedding.date
-                ? new Date(wedding.date).toLocaleDateString("en-IN", {
-                    weekday: "long",
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                  })
-                : "Date TBD"}
-            </div>
-            <button
-              type="button"
-              className="border border-rose/35 px-4 py-2.5 font-accent text-[10px] uppercase tracking-[0.18em] text-rose transition-colors hover:bg-rose hover:text-ivory disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={deletingPlan}
-              onClick={() => void deleteEventPlan()}
-            >
-              {deletingPlan ? "Deleting..." : "Delete event plan"}
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="border border-charcoal/8 bg-cream/35 px-3 py-2.5">
-            <p className={dashLabel}>Days</p>
-            <p className="mt-1 font-display text-2xl text-charcoal">{days.length}</p>
-          </div>
-          <div className="border border-charcoal/8 bg-cream/35 px-3 py-2.5">
-            <p className={dashLabel}>Functions</p>
-            <p className="mt-1 font-display text-2xl text-charcoal">{totalEvents}</p>
-          </div>
-          <div className="border border-charcoal/8 bg-cream/35 px-3 py-2.5">
-            <p className={dashLabel}>Readiness</p>
-            <div className="mt-1 flex items-center gap-3">
-              <p className="font-display text-2xl text-charcoal">{overallReadiness}%</p>
-              <ProgressRing
-                percent={overallReadiness}
-                size={38}
-                stroke={3}
-                label="ready"
-                showValue={false}
-              />
-            </div>
-          </div>
-          <div className="border border-gold-primary/25 bg-gold-primary/8 px-3 py-2.5">
-            <p className={cn(dashLabel, "text-gold-dark")}>Estimate</p>
-            <p className="mt-1 truncate font-display text-2xl text-charcoal">
-              {gatedSpendEstimateLabel(estimatedSpend, overallReadiness)}
-            </p>
-            <p className="mt-1 truncate text-[11px] text-slate">
-              {totalSelections} vendor selection{totalSelections === 1 ? "" : "s"}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-5 flex flex-col gap-3 border-t border-charcoal/8 pt-4 lg:flex-row lg:items-center lg:justify-between">
-          <p className="text-xs leading-relaxed text-slate">
-            {layer === "definition"
-              ? "Confirm the structure that feeds this map."
-              : layer === "requirements"
-                ? "The flowchart is the main workspace. Tap nodes to reveal details."
-                : "Use finalization only to chase missing gaps."}
-          </p>
-          <div className="inline-flex self-start border border-charcoal/12 bg-cream/30 p-1 lg:self-auto">
-            {(
-              [
-                { key: "definition", label: "1 · Definition" },
-                { key: "requirements", label: "2 · Requirements" },
-                { key: "finalization", label: "3 · Finalization" },
-              ] as const
-            ).map((tab) => {
-              const active = layer === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setLayer(tab.key)}
-                  className={cn(
-                    "font-accent inline-flex items-center justify-center px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition-colors",
-                    active
-                      ? "bg-charcoal text-ivory"
-                      : "text-slate hover:text-charcoal"
-                  )}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </motion.header>
+      {layer === "requirements" ? null : renderPlanOverviewPanel()}
 
       {layer === "definition" ? (
         <DefinitionLayer
@@ -3225,7 +3231,7 @@ export default function ClientWeddingPage() {
 
       {layer === "requirements" ? (
       <>
-      <div className="relative mt-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
+      <div className="relative grid gap-4">
         <div className="relative min-w-0">
           <motion.div
             variants={fadeUp}
@@ -3234,7 +3240,7 @@ export default function ClientWeddingPage() {
             <div>
               <p className={dashLabel}>Layer 2 · Flowchart workspace</p>
               <h3 className="mt-2 font-display text-2xl text-charcoal md:text-3xl">
-                Start on the map
+                {wedding.name}
               </h3>
               <p className="mt-2 max-w-2xl text-xs leading-relaxed text-slate">
                 Day nodes lead to function branches, then the shaped step tokens
@@ -3636,19 +3642,6 @@ export default function ClientWeddingPage() {
             ) : null}
           </AnimatePresence>
         </div>
-
-        <LayerTwoGuidance
-          selectedEvent={selectedEvent}
-          selectedDay={selectedDay}
-          venueOptionsCount={venueOptions.length}
-          savedVendorCount={savedVendorSlugs.length}
-          nextAction={nextPlannerAction}
-          onOpenSection={(section) => {
-            setEditorSection(section);
-            setEditorOrigin(null);
-            setEditorOpen(true);
-          }}
-        />
 
         <AnimatePresence>
           {editorOpen && selectedEvent && detailDraft ? (
@@ -5011,6 +5004,20 @@ export default function ClientWeddingPage() {
           ) : null}
         </AnimatePresence>
       </div>
+      <LayerTwoGuidance
+        className="mt-4"
+        selectedEvent={selectedEvent}
+        selectedDay={selectedDay}
+        venueOptionsCount={venueOptions.length}
+        savedVendorCount={savedVendorSlugs.length}
+        nextAction={nextPlannerAction}
+        onOpenSection={(section) => {
+          setEditorSection(section);
+          setEditorOrigin(null);
+          setEditorOpen(true);
+        }}
+      />
+      {renderPlanOverviewPanel("mt-4")}
       </>
       ) : null}
     </motion.div>
@@ -5024,6 +5031,7 @@ function LayerTwoGuidance({
   savedVendorCount,
   nextAction,
   onOpenSection,
+  className,
 }: {
   selectedEvent: WeddingEvent | null;
   selectedDay: WeddingDay | null;
@@ -5031,11 +5039,12 @@ function LayerTwoGuidance({
   savedVendorCount: number;
   nextAction: ReturnType<typeof nextBestPlannerAction>;
   onOpenSection: (section: EditorSectionKey) => void;
+  className?: string;
 }) {
   return (
-    <motion.aside
+    <motion.section
       variants={fadeUp}
-      className="space-y-3 xl:sticky xl:top-24 xl:self-start"
+      className={cn("grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,1fr)]", className)}
     >
       <article className="border border-gold-primary/35 bg-gold-primary/10 p-4">
         <p className={cn(dashLabel, "text-gold-dark")}>Next move</p>
@@ -5058,7 +5067,7 @@ function LayerTwoGuidance({
         ) : null}
       </article>
 
-      <MindMapLegend compact />
+      <MindMapLegend compact className="h-full" />
 
       <article className="border border-charcoal/10 bg-ivory p-4">
         <p className={dashLabel}>Current focus</p>
@@ -5089,7 +5098,7 @@ function LayerTwoGuidance({
           </div>
         </div>
       </article>
-    </motion.aside>
+    </motion.section>
   );
 }
 
