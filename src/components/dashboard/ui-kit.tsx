@@ -23,12 +23,14 @@ export function ProgressRing({
   size = 96,
   stroke = 5,
   label = "Ready",
+  showValue = true,
   className,
 }: {
   percent: number;
   size?: number;
   stroke?: number;
   label?: string;
+  showValue?: boolean;
   className?: string;
 }) {
   const clamped = Math.max(0, Math.min(100, Math.round(percent)));
@@ -39,6 +41,7 @@ export function ProgressRing({
     <div
       className={cn("relative shrink-0", className)}
       style={{ width: size, height: size }}
+      aria-label={!showValue ? `${clamped}% ${label || "ready"}` : undefined}
     >
       <svg viewBox={`0 0 ${size} ${size}`} className="h-full w-full -rotate-90">
         <circle
@@ -63,16 +66,18 @@ export function ProgressRing({
           className="text-gold-primary transition-[stroke-dashoffset] duration-700 ease-out"
         />
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-display text-2xl leading-none text-charcoal">
-          {clamped}%
-        </span>
-        {label ? (
-          <span className="font-accent text-[8px] uppercase tracking-[0.18em] text-slate">
-            {label}
+      {showValue ? (
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="font-display text-2xl leading-none text-charcoal">
+            {clamped}%
           </span>
-        ) : null}
-      </div>
+          {label ? (
+            <span className="font-accent text-[8px] uppercase tracking-[0.18em] text-slate">
+              {label}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

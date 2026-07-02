@@ -3149,7 +3149,13 @@ export default function ClientWeddingPage() {
             <p className={dashLabel}>Readiness</p>
             <div className="mt-1 flex items-center gap-3">
               <p className="font-display text-2xl text-charcoal">{overallReadiness}%</p>
-              <ProgressRing percent={overallReadiness} size={38} stroke={3} label="" />
+              <ProgressRing
+                percent={overallReadiness}
+                size={38}
+                stroke={3}
+                label="ready"
+                showValue={false}
+              />
             </div>
           </div>
           <div className="border border-gold-primary/25 bg-gold-primary/8 px-3 py-2.5">
