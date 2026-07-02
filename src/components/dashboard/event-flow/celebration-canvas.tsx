@@ -321,8 +321,19 @@ export function CelebrationCanvas({
                 emptyHint={days.length === 0 ? "Add a day to begin the map." : undefined}
                 nodes={days.map((day) => ({
                   id: day.id,
-                  title: day.title,
-                  subtitle: `${day.events.length} ${day.events.length === 1 ? "function" : "functions"} · ${day.readiness}%`,
+                  title:
+                    day.dateLabel && day.dateLabel !== "Date TBD"
+                      ? day.dateLabel
+                      : day.title,
+                  subtitle:
+                    day.dateLabel && day.dateLabel !== "Date TBD"
+                      ? `${day.title} · ${day.events.length} ${
+                          day.events.length === 1 ? "function" : "functions"
+                        }`
+                      : `${day.events.length} ${
+                          day.events.length === 1 ? "function" : "functions"
+                        }`,
+                  details: [`${day.readiness}% ready`],
                   status: day.status,
                   onClick: () => setLevel({ kind: "day", dayId: day.id }),
                 }))}
@@ -332,8 +343,14 @@ export function CelebrationCanvas({
             {safeLevel.kind === "day" && activeDay ? (
               <RadialLevel
                 hub={{
-                  title: activeDay.title,
-                  subtitle: activeDay.dateLabel ?? `${activeDay.readiness}% ready`,
+                  title:
+                    activeDay.dateLabel && activeDay.dateLabel !== "Date TBD"
+                      ? activeDay.dateLabel
+                      : activeDay.title,
+                  subtitle:
+                    activeDay.dateLabel && activeDay.dateLabel !== "Date TBD"
+                      ? `${activeDay.title} · ${activeDay.readiness}% ready`
+                      : `${activeDay.readiness}% ready`,
                   status: activeDay.status,
                   onClick: () => setLevel({ kind: "event" }),
                 }}
@@ -343,7 +360,13 @@ export function CelebrationCanvas({
                 nodes={activeDay.events.map((event) => ({
                   id: event.id,
                   title: event.title,
-                  subtitle: `${event.timeLabel ?? ""}${event.timeLabel ? " · " : ""}${event.readiness}%`,
+                  eyebrow: event.dateLabel,
+                  subtitle: event.timeLabel ?? "Time TBD",
+                  details: [
+                    event.venueLabel ?? "Venue TBD",
+                    event.meta ?? "Guests TBD",
+                    `${event.readiness}% ready`,
+                  ],
                   status: event.status,
                   onClick: () =>
                     setLevel({ kind: "function", dayId: activeDay.id, eventId: event.id }),
@@ -375,7 +398,9 @@ export function CelebrationCanvas({
 type RadialNode = {
   id: string;
   title: string;
+  eyebrow?: string;
   subtitle?: string;
+  details?: string[];
   status: FlowStatus;
   onClick: () => void;
 };
@@ -443,7 +468,7 @@ function RadialLevel({
         return (
           <div
             key={node.id}
-            className="absolute z-10 w-[34%] max-w-[10.5rem] -translate-x-1/2 -translate-y-1/2"
+            className="absolute z-10 w-[32%] max-w-[11.75rem] -translate-x-1/2 -translate-y-1/2"
             style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
           >
             <motion.button
@@ -453,20 +478,37 @@ function RadialLevel({
               whileTap={{ scale: 0.96 }}
               aria-label={`Open ${node.title}`}
               className={cn(
-                "flex w-full flex-col items-center gap-1 border bg-ivory px-3 py-2.5 text-center shadow-[0_10px_28px_rgba(51,61,41,0.08)] transition-colors",
+                "flex w-full flex-col items-center gap-1.5 border bg-ivory px-3 py-3 text-center shadow-[0_10px_28px_rgba(51,61,41,0.08)] transition-colors",
                 "border-charcoal/12 hover:border-gold-primary/50",
                 FOCUS_RING
               )}
             >
+              {node.eyebrow ? (
+                <span className="max-w-full truncate font-accent text-[8px] uppercase tracking-[0.12em] text-gold-dark">
+                  {node.eyebrow}
+                </span>
+              ) : null}
               <span className="flex items-center gap-1.5">
                 <span className={cn("h-2 w-2 rounded-full", tone.dot)} />
-                <span className="truncate font-heading text-xs font-medium text-charcoal">
+                <span className="line-clamp-2 font-heading text-xs font-medium leading-tight text-charcoal">
                   {node.title}
                 </span>
               </span>
               {node.subtitle ? (
                 <span className="truncate font-accent text-[8px] uppercase tracking-[0.12em] text-slate">
                   {node.subtitle}
+                </span>
+              ) : null}
+              {node.details?.length ? (
+                <span className="mt-0.5 flex max-w-full flex-wrap justify-center gap-1">
+                  {node.details.slice(0, 3).map((detail) => (
+                    <span
+                      key={detail}
+                      className="max-w-full truncate border border-charcoal/10 bg-cream/45 px-1.5 py-0.5 font-heading text-[9px] leading-tight text-slate"
+                    >
+                      {detail}
+                    </span>
+                  ))}
                 </span>
               ) : null}
             </motion.button>

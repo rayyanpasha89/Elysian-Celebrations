@@ -1894,7 +1894,10 @@ export default function ClientWeddingPage() {
                   timeLabel: formatEventWindow(event),
                   dateLabel: formatDayDate(event.date ?? day.date),
                   venueLabel: venueLabel || undefined,
-                  meta: `${event.guest_count ?? 0} guests`,
+                  meta:
+                    event.guest_count != null
+                      ? `${event.guest_count.toLocaleString("en-IN")} guests`
+                      : "Guests TBD",
                   status: flowStatusFromReadiness(readiness),
                   readiness,
                   steps: eventFlowSteps(event).map((step) => ({
