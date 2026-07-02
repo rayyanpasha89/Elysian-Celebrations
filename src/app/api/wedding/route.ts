@@ -747,6 +747,7 @@ export async function POST(request: NextRequest) {
       eventName: name,
       eventType: body.eventType ?? eventDefinitionObject.eventType,
       customEventType: body.customEventType ?? eventDefinitionObject.customEventType,
+      primaryVenue: body.primaryVenue ?? eventDefinitionObject.primaryVenue,
       eventDate: dateIso,
       dayCount: totalDays,
       days: extractEventDefinitionDays(body as Record<string, unknown>),
@@ -881,6 +882,7 @@ export async function POST(request: NextRequest) {
             ...event,
             endTime: null,
             timeBlock: null,
+            venue: null,
             notes: null,
           })),
         }));
@@ -939,6 +941,7 @@ export async function POST(request: NextRequest) {
         date: day.date,
         start_time: event.startTime,
         end_time: event.endTime,
+        venue: event.venue ?? null,
         // Per-block guest count from the layered definition; falls back to the
         // event-level guest estimate when a block didn't set its own.
         guest_count:

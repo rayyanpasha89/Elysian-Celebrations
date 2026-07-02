@@ -3,12 +3,13 @@
 /**
  * Layer 1 — Definition.
  *
- * A 5-step guided flow that captures the new event-platform model:
+ * A 6-step guided flow that captures the new event-platform model:
  *   Step 1 — profile name
  *   Step 2 — event type (14 presets + Custom)
  *   Step 3 — number of days
  *   Step 4 — optional per-day dates
- *   Step 5 — per-day morning / afternoon / evening time blocks (needs + timing + guests)
+ *   Step 5 — primary venue / event area
+ *   Step 6 — per-day morning / afternoon / evening time blocks (needs + timing + guests)
  *
  * Submits to the existing /api/wedding POST. The request includes the richer
  * `definitionPayload` (event type, custom name, full day/block plan); when
@@ -52,9 +53,16 @@ const DEFAULT_NEEDS: EventRequirementCategoryKey[] = [
   "photo-video",
 ];
 
-type Step = 0 | 1 | 2 | 3 | 4;
+type Step = 0 | 1 | 2 | 3 | 4 | 5;
 
-const STEP_LABELS = ["Name", "Type", "Days", "Dates", "Time blocks"] as const;
+const STEP_LABELS = [
+  "Name",
+  "Type",
+  "Days",
+  "Dates",
+  "Venue",
+  "Time blocks",
+] as const;
 
 type LocalDay = {
   name: string;
@@ -71,6 +79,30 @@ type LocalDay = {
       needs: EventRequirementCategoryKey[];
     }
   >;
+};
+
+type VenueOption = {
+  id: string;
+  name: string;
+  slug?: string | null;
+  description?: string | null;
+  address?: string | null;
+  capacity?: number | null;
+  price_range?: string | null;
+  hero_image?: string | null;
+  amenities?: string[] | null;
+  destination?:
+    | {
+        name?: string | null;
+        slug?: string | null;
+        country?: string | null;
+      }
+    | {
+        name?: string | null;
+        slug?: string | null;
+        country?: string | null;
+      }[]
+    | null;
 };
 
 const DEFAULT_GUESTS = 120;
@@ -162,6 +194,9 @@ export default function ClientOnboardingPage() {
   // Step 3 — scale
   const [dayCount, setDayCount] = useState(3);
   // Step 4
+  const [primaryVenue, setPrimaryVenue] = useState("");
+  const [venueOptions, setVenueOptions] = useState<VenueOption[]>([]);
+  const [venueOptionsLoading, setVenueOptionsLoading] = useState(false);
   const eventTypeLabel = useMemo(() => {
     const match = EVENT_PLATFORM_TYPES.find((t) => t.value === eventType);
     if (!match) return "Event";
@@ -182,17 +217,42 @@ export default function ClientOnboardingPage() {
     );
   }, [dayCount, eventTypeLabel]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      setVenueOptionsLoading(true);
+      try {
+        const res = await fetch("/api/venues?limit=8");
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "Could not load venues");
+        if (!cancelled) {
+          setVenueOptions((json.venues ?? []) as VenueOption[]);
+        }
+      } catch {
+        if (!cancelled) setVenueOptions([]);
+      } finally {
+        if (!cancelled) setVenueOptionsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const definition = useMemo<EventDefinitionPayload>(
     () =>
       buildEventDefinitionPayload({
         eventName: profileName,
         eventType,
         customEventType: eventType === CUSTOM_EVENT_TYPE_VALUE ? customEventType : null,
+        primaryVenue,
         eventDate: null,
         dayCount,
         days: days.map(toEventDefinitionDay),
       }),
-    [profileName, eventType, customEventType, dayCount, days]
+    [profileName, eventType, customEventType, primaryVenue, dayCount, days]
   );
 
   const canAdvance = (): boolean => {
@@ -203,6 +263,7 @@ export default function ClientOnboardingPage() {
     }
     if (step === 2) return dayCount >= 1 && dayCount <= 14;
     if (step === 3) return days.length > 0;
+    if (step === 4) return true;
     return true;
   };
 
@@ -211,7 +272,7 @@ export default function ClientOnboardingPage() {
       toast.error("Please complete this step before continuing.");
       return;
     }
-    setStep((s) => (s < 4 ? ((s + 1) as Step) : s));
+    setStep((s) => (s < 5 ? ((s + 1) as Step) : s));
   };
 
   const back = () => setStep((s) => (s > 0 ? ((s - 1) as Step) : s));
@@ -223,12 +284,12 @@ export default function ClientOnboardingPage() {
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (saving) return;
-    if (step < 4) next();
+    if (step < 5) next();
   };
 
   const createEvent = async () => {
     if (saving) return;
-    if (step < 4) {
+    if (step < 5) {
       next();
       return;
     }
@@ -254,6 +315,7 @@ export default function ClientOnboardingPage() {
           eventType,
           customEventType:
             eventType === CUSTOM_EVENT_TYPE_VALUE ? customEventType.trim() : null,
+          primaryVenue: primaryVenue.trim() || null,
           definitionPayload: definition,
         }),
       });
@@ -353,10 +415,20 @@ export default function ClientOnboardingPage() {
           ) : null}
 
           {step === 4 ? (
+            <VenueStep
+              venues={venueOptions}
+              loading={venueOptionsLoading}
+              value={primaryVenue}
+              onChange={setPrimaryVenue}
+            />
+          ) : null}
+
+          {step === 5 ? (
             <>
               <ReviewSummary
                 eventName={profileName}
                 eventTypeLabel={eventTypeLabel}
+                primaryVenue={primaryVenue}
                 days={days}
               />
               <BlocksStep
@@ -393,7 +465,7 @@ export default function ClientOnboardingPage() {
           >
             ← Back
           </button>
-          {step < 4 ? (
+          {step < 5 ? (
             <button type="button" onClick={next} className={dashBtn}>
               Continue →
             </button>
@@ -635,14 +707,194 @@ function DatesStep({
   );
 }
 
+function venueDestinationLabel(venue: VenueOption) {
+  const destination = Array.isArray(venue.destination)
+    ? venue.destination[0]
+    : venue.destination;
+  return [destination?.name, destination?.country].filter(Boolean).join(", ");
+}
+
+function venueMatchesValue(venue: VenueOption, value: string) {
+  const needle = value.trim().toLowerCase();
+  if (!needle) return false;
+  return (
+    venue.name.trim().toLowerCase() === needle ||
+    venue.slug?.trim().toLowerCase() === needle
+  );
+}
+
+function VenueStep({
+  venues,
+  loading,
+  value,
+  onChange,
+}: {
+  venues: VenueOption[];
+  loading: boolean;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const selectedVenue = venues.find((venue) => venueMatchesValue(venue, value));
+  const customValueActive = Boolean(value.trim() && !selectedVenue);
+  const [showCustom, setShowCustom] = useState(customValueActive);
+  const customOpen = showCustom || customValueActive;
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <p className={dashLabel}>Choose the primary venue or area</p>
+        <p className="mt-2 text-xs leading-relaxed text-slate">
+          Pick the main property, ballroom, lawn, or beach now. Every time block
+          starts with this venue, and you can override individual functions later
+          from the map.
+        </p>
+      </div>
+
+      {loading ? (
+        <div className="border border-charcoal/10 bg-cream/30 p-4 text-sm text-slate">
+          Loading venue catalogue...
+        </div>
+      ) : null}
+
+      {!loading && venues.length === 0 ? (
+        <div className="border border-dashed border-charcoal/15 bg-cream/30 p-4">
+          <p className={dashLabel}>Venue catalogue not seeded yet</p>
+          <p className="mt-2 text-xs leading-relaxed text-slate">
+            Use a custom area for now, or skip this step and anchor venues per
+            function in the planner.
+          </p>
+        </div>
+      ) : null}
+
+      {venues.length > 0 ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {venues.map((venue) => {
+            const active = venueMatchesValue(venue, value);
+            const destinationLabel = venueDestinationLabel(venue);
+            return (
+              <button
+                key={venue.id}
+                type="button"
+                onClick={() => {
+                  onChange(venue.name);
+                  setShowCustom(false);
+                }}
+                className={cn(
+                  "group overflow-hidden border bg-ivory text-left transition-all hover:-translate-y-0.5 hover:border-gold-primary/45 hover:shadow-[0_18px_40px_rgba(51,61,41,0.08)]",
+                  active
+                    ? "border-gold-primary shadow-[0_18px_40px_rgba(201,169,110,0.14)]"
+                    : "border-charcoal/10"
+                )}
+              >
+                {venue.hero_image ? (
+                  <span className="block aspect-[5/2] overflow-hidden bg-cream">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={venue.hero_image}
+                      alt=""
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                  </span>
+                ) : null}
+                <span className="block p-3">
+                  <span className="font-heading text-sm text-charcoal">
+                    {venue.name}
+                  </span>
+                  <span className="mt-1 block text-[11px] leading-relaxed text-slate">
+                    {destinationLabel || venue.address || "Destination venue"}
+                  </span>
+                  <span className="mt-2 flex flex-wrap gap-1.5">
+                    {venue.capacity ? (
+                      <span className="border border-charcoal/10 px-2 py-1 font-heading text-[10px] text-slate">
+                        Up to {venue.capacity}
+                      </span>
+                    ) : null}
+                    {venue.price_range ? (
+                      <span className="border border-gold-primary/25 bg-gold-primary/8 px-2 py-1 font-heading text-[10px] text-gold-dark">
+                        {venue.price_range}
+                      </span>
+                    ) : null}
+                  </span>
+                  {venue.amenities?.length ? (
+                    <span className="mt-2 block text-[11px] leading-relaxed text-slate">
+                      {venue.amenities.slice(0, 3).join(" · ")}
+                    </span>
+                  ) : null}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      <div className="flex flex-wrap items-center gap-2 border-t border-charcoal/8 pt-4">
+        <button
+          type="button"
+          onClick={() => {
+            onChange("");
+            setShowCustom(false);
+          }}
+          className={cn(
+            "border px-3 py-2 font-accent text-[10px] uppercase tracking-[0.16em] transition-colors",
+            value
+              ? "border-charcoal/15 text-slate hover:border-gold-primary hover:text-gold-dark"
+              : "border-gold-primary/40 bg-gold-primary/10 text-gold-dark"
+          )}
+        >
+          Decide later
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            if (customValueActive) {
+              onChange("");
+              setShowCustom(false);
+              return;
+            }
+            setShowCustom((current) => !current);
+          }}
+          className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.16em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark"
+        >
+          {customValueActive
+            ? "Clear custom venue"
+            : customOpen
+              ? "Hide custom area"
+              : "Use custom area"}
+        </button>
+      </div>
+
+      {customOpen ? (
+        <input
+          type="text"
+          value={selectedVenue ? "" : value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder="Custom venue, lawn, ballroom, beach, terrace..."
+          className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+        />
+      ) : selectedVenue ? (
+        <p className="border border-gold-primary/20 bg-gold-primary/8 px-3 py-2 text-xs leading-relaxed text-gold-dark">
+          Selected from venue catalogue: {selectedVenue.name}
+        </p>
+      ) : (
+        <p className="text-xs leading-relaxed text-slate">
+          No venue selected yet. The planner will still work; each function can
+          receive its own venue later.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // Compact "what you're about to create" recap shown on the final step.
 function ReviewSummary({
   eventName,
   eventTypeLabel,
+  primaryVenue,
   days,
 }: {
   eventName: string;
   eventTypeLabel: string;
+  primaryVenue: string;
   days: LocalDay[];
 }) {
   const enabledBlocks = days.reduce(
@@ -666,6 +918,7 @@ function ReviewSummary({
   const items: Array<{ label: string; value: string }> = [
     { label: "Event", value: eventName.trim() || "Untitled event" },
     { label: "Type", value: eventTypeLabel },
+    { label: "Venue", value: primaryVenue.trim() || "Decide later" },
     { label: "Days", value: `${days.length}` },
     { label: "Time blocks", value: `${enabledBlocks}` },
     { label: "Peak guests", value: peakGuests.toLocaleString("en-IN") },

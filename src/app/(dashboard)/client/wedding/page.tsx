@@ -3098,20 +3098,21 @@ export default function ClientWeddingPage() {
       animate="visible"
       className="text-[15px] md:text-base [&_.text-sm]:text-[15px] [&_.text-xs]:text-sm [&_input]:text-base [&_select]:text-base [&_textarea]:text-base"
     >
-      <motion.header variants={fadeUp} className="border-b border-charcoal/8 pb-8">
-        <p className={dashLabel}>Event operating plan</p>
-        <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <motion.header variants={fadeUp} className="border border-charcoal/8 bg-ivory p-5 md:p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h2 className="font-display text-3xl font-semibold text-charcoal md:text-4xl">
+            <p className={dashLabel}>Event flowchart</p>
+            <h2 className="mt-2 font-display text-3xl font-semibold text-charcoal md:text-4xl">
               {wedding.name}
             </h2>
             <p className="font-heading mt-2 max-w-2xl text-sm text-slate">
-              Build the celebration day by day. Each event can carry its own
-              timing, guest flow, menu logic, decor brief, and vendor picks.
+              Work from the map first: choose a day, open a function, then tap
+              the exact step you want to edit. Details stay hidden until you ask
+              for them.
             </p>
           </div>
           <div className="flex flex-col gap-3 lg:items-end">
-            <div className="font-heading text-sm text-slate">
+            <div className="border border-charcoal/10 bg-cream/40 px-3 py-2 font-heading text-sm text-slate">
               {wedding.date
                 ? new Date(wedding.date).toLocaleDateString("en-IN", {
                     weekday: "long",
@@ -3131,59 +3132,43 @@ export default function ClientWeddingPage() {
             </button>
           </div>
         </div>
-      </motion.header>
 
-      <motion.div variants={fadeUp} className="mt-8 grid gap-4 md:grid-cols-3">
-        <div className={dashCard}>
-          <p className={dashLabel}>Celebration days</p>
-          <p className="mt-3 font-display text-3xl text-charcoal">{days.length}</p>
-          <p className="mt-2 text-sm text-slate">
-            Rename them, reorder them, and keep each event anchored to a real day.
-          </p>
-        </div>
-        <div className={dashCard}>
-          <p className={dashLabel}>Events planned</p>
-          <div className="mt-3 flex items-center justify-between gap-4">
-            <p className="font-display text-3xl text-charcoal">{totalEvents}</p>
-            <ProgressRing
-              percent={overallReadiness}
-              size={62}
-              stroke={4}
-              label=""
-            />
+        <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="border border-charcoal/8 bg-cream/35 px-3 py-2.5">
+            <p className={dashLabel}>Days</p>
+            <p className="mt-1 font-display text-2xl text-charcoal">{days.length}</p>
           </div>
-          <p className="mt-2 text-sm text-slate">
-            {overallReadiness}% planner readiness across all active event blocks.
-          </p>
-        </div>
-        <div className={dashCard}>
-          <p className={dashLabel}>Derived event spend</p>
-          <p className="mt-3 font-display text-3xl text-charcoal">
-            {gatedSpendEstimateLabel(estimatedSpend, overallReadiness)}
-          </p>
-          <p className="mt-2 text-sm text-slate">
-            {totalSelections} vendor selections ·{" "}
-            {gatedSpendEstimateCaption(estimatedSpend, overallReadiness)}
-          </p>
-        </div>
-      </motion.div>
-
-      <motion.div
-        variants={fadeUp}
-        className="mt-10 border-b border-charcoal/10"
-      >
-        <div className="flex flex-wrap items-end justify-between gap-3 pb-3">
-          <div>
-            <p className={dashLabel}>Layered planner</p>
-            <p className="mt-1 text-xs leading-relaxed text-slate">
-              {layer === "definition"
-                ? "Step 1 · Confirm the shape — name, days, time blocks."
-                : layer === "requirements"
-                  ? "Step 2 · Choose partners, import packages, then customize details."
-                  : "Step 3 · Close the gaps before go-live."}
+          <div className="border border-charcoal/8 bg-cream/35 px-3 py-2.5">
+            <p className={dashLabel}>Functions</p>
+            <p className="mt-1 font-display text-2xl text-charcoal">{totalEvents}</p>
+          </div>
+          <div className="border border-charcoal/8 bg-cream/35 px-3 py-2.5">
+            <p className={dashLabel}>Readiness</p>
+            <div className="mt-1 flex items-center gap-3">
+              <p className="font-display text-2xl text-charcoal">{overallReadiness}%</p>
+              <ProgressRing percent={overallReadiness} size={38} stroke={3} label="" />
+            </div>
+          </div>
+          <div className="border border-gold-primary/25 bg-gold-primary/8 px-3 py-2.5">
+            <p className={cn(dashLabel, "text-gold-dark")}>Estimate</p>
+            <p className="mt-1 truncate font-display text-2xl text-charcoal">
+              {gatedSpendEstimateLabel(estimatedSpend, overallReadiness)}
+            </p>
+            <p className="mt-1 truncate text-[11px] text-slate">
+              {totalSelections} vendor selection{totalSelections === 1 ? "" : "s"}
             </p>
           </div>
-          <div className="inline-flex border border-charcoal/12 bg-cream/30 p-1">
+        </div>
+
+        <div className="mt-5 flex flex-col gap-3 border-t border-charcoal/8 pt-4 lg:flex-row lg:items-center lg:justify-between">
+          <p className="text-xs leading-relaxed text-slate">
+            {layer === "definition"
+              ? "Confirm the structure that feeds this map."
+              : layer === "requirements"
+                ? "The flowchart is the main workspace. Tap nodes to reveal details."
+                : "Use finalization only to chase missing gaps."}
+          </p>
+          <div className="inline-flex self-start border border-charcoal/12 bg-cream/30 p-1 lg:self-auto">
             {(
               [
                 { key: "definition", label: "1 · Definition" },
@@ -3210,7 +3195,7 @@ export default function ClientWeddingPage() {
             })}
           </div>
         </div>
-      </motion.div>
+      </motion.header>
 
       {layer === "definition" ? (
         <DefinitionLayer
@@ -3231,32 +3216,20 @@ export default function ClientWeddingPage() {
 
       {layer === "requirements" ? (
       <>
-      <LayerTwoGuidance
-        selectedEvent={selectedEvent}
-        selectedDay={selectedDay}
-        venueOptionsCount={venueOptions.length}
-        savedVendorCount={savedVendorSlugs.length}
-        nextAction={nextPlannerAction}
-        onOpenSection={(section) => {
-          setEditorSection(section);
-          setEditorOrigin(null);
-          setEditorOpen(true);
-        }}
-      />
-      <div className="relative mt-8">
-        <div className="relative">
+      <div className="relative mt-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="relative min-w-0">
           <motion.div
             variants={fadeUp}
-            className="flex flex-col gap-4 border-b border-charcoal/10 pb-5"
+            className="flex flex-col gap-4 border border-charcoal/10 bg-ivory p-4 md:flex-row md:items-center md:justify-between"
           >
             <div>
-              <p className={dashLabel}>Celebration flow map</p>
-              <h3 className="mt-2 font-display text-2xl text-charcoal">
-                Pick a day, function, or step
+              <p className={dashLabel}>Layer 2 · Flowchart workspace</p>
+              <h3 className="mt-2 font-display text-2xl text-charcoal md:text-3xl">
+                Start on the map
               </h3>
-              <p className="mt-2 text-xs leading-relaxed text-slate">
-                The editor opens only after you choose a function. Use the small
-                step nodes to jump straight into Basics, Food, Design, and more.
+              <p className="mt-2 max-w-2xl text-xs leading-relaxed text-slate">
+                Day nodes lead to function branches, then the shaped step tokens
+                open only the editor you chose. No long form until you tap a step.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -3337,12 +3310,8 @@ export default function ClientWeddingPage() {
             </motion.form>
           ) : null}
 
-          {days.length > 0 ? (
-            <MindMapLegend className="mt-6 bg-ivory/80" />
-          ) : null}
-
           {days.length === 0 ? (
-            <div className="mt-8">
+            <div className="mt-4">
               <FlowEmptyState
                 title="Map your event structure"
                 description="Start with one day, then branch into morning, afternoon, and evening functions before opening the editor."
@@ -3351,7 +3320,7 @@ export default function ClientWeddingPage() {
               />
             </div>
           ) : (
-            <div className="mt-6">
+            <div className="mt-4">
               <CelebrationCanvas
                 eventTitle={wedding?.name ?? "Your event"}
                 days={canvasDays}
@@ -3658,6 +3627,19 @@ export default function ClientWeddingPage() {
             ) : null}
           </AnimatePresence>
         </div>
+
+        <LayerTwoGuidance
+          selectedEvent={selectedEvent}
+          selectedDay={selectedDay}
+          venueOptionsCount={venueOptions.length}
+          savedVendorCount={savedVendorSlugs.length}
+          nextAction={nextPlannerAction}
+          onOpenSection={(section) => {
+            setEditorSection(section);
+            setEditorOrigin(null);
+            setEditorOpen(true);
+          }}
+        />
 
         <AnimatePresence>
           {editorOpen && selectedEvent && detailDraft ? (
@@ -5041,64 +5023,22 @@ function LayerTwoGuidance({
   nextAction: ReturnType<typeof nextBestPlannerAction>;
   onOpenSection: (section: EditorSectionKey) => void;
 }) {
-  const guidance = [
-    {
-      label: "Pick one block",
-      value: selectedEvent
-        ? selectedEvent.name
-        : "Open a morning / afternoon / evening block",
-      detail: selectedDay
-        ? `${selectedDay.name} · ${formatDayDate(selectedDay.date)}`
-        : "The editor works event by event so the screen stays lighter.",
-    },
-    {
-      label: "Anchor the venue",
-      value: `${venueOptionsCount} catalogue option${
-        venueOptionsCount === 1 ? "" : "s"
-      } loaded`,
-      detail:
-        "Choose a venue card first; only use custom text for unpublished spaces.",
-    },
-    {
-      label: "Choose partners in-section",
-      value:
-        savedVendorCount > 0
-          ? `${savedVendorCount} shortlisted vendor${
-              savedVendorCount === 1 ? "" : "s"
-            } prioritized`
-          : "Curated vendors ready",
-      detail:
-        "Food, design, photo/film, entertainment, and logistics each start with partner cards.",
-    },
-    {
-      label: nextAction.label,
-      value: nextAction.value,
-      detail: nextAction.detail,
-      action: true,
-    },
-  ];
-
   return (
-    <motion.section
+    <motion.aside
       variants={fadeUp}
-      className="mt-8 grid gap-3 md:grid-cols-4"
+      className="space-y-3 xl:sticky xl:top-24 xl:self-start"
     >
-      {guidance.map((item, index) => (
-        <article
-          key={item.label}
-          className={cn(
-            "border p-4",
-            item.action
-              ? "border-gold-primary bg-gold-primary/10"
-              : "border-gold-primary/20 bg-gold-primary/5"
-          )}
-        >
-          <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-gold-dark">
-            {String(index + 1).padStart(2, "0")} · {item.label}
-          </p>
-          <p className="mt-2 font-display text-lg text-charcoal">{item.value}</p>
-          <p className="mt-2 text-xs leading-relaxed text-slate">{item.detail}</p>
-          {item.action ? (
+      <article className="border border-gold-primary/35 bg-gold-primary/10 p-4">
+        <p className={cn(dashLabel, "text-gold-dark")}>Next move</p>
+        <p className="mt-2 font-display text-lg text-charcoal">
+          {selectedEvent ? nextAction.value : "Pick any function branch"}
+        </p>
+        <p className="mt-2 text-xs leading-relaxed text-slate">
+          {selectedEvent
+            ? nextAction.detail
+            : "Start from a day, then open a morning / afternoon / evening function before editing details."}
+        </p>
+        {selectedEvent ? (
             <button
               type="button"
               onClick={() => onOpenSection(nextAction.section)}
@@ -5106,10 +5046,41 @@ function LayerTwoGuidance({
             >
               Open section
             </button>
-          ) : null}
-        </article>
-      ))}
-    </motion.section>
+        ) : null}
+      </article>
+
+      <MindMapLegend compact />
+
+      <article className="border border-charcoal/10 bg-ivory p-4">
+        <p className={dashLabel}>Current focus</p>
+        <p className="mt-2 font-display text-lg text-charcoal">
+          {selectedEvent ? selectedEvent.name : "No function selected"}
+        </p>
+        <p className="mt-2 text-xs leading-relaxed text-slate">
+          {selectedDay
+            ? `${selectedDay.name} · ${formatDayDate(selectedDay.date)}`
+            : "The editor stays closed until a step token is chosen."}
+        </p>
+        <div className="mt-4 grid grid-cols-2 gap-2 border-t border-charcoal/8 pt-4">
+          <div>
+            <p className="font-accent text-[9px] uppercase tracking-[0.14em] text-slate">
+              Venues
+            </p>
+            <p className="mt-1 font-display text-lg text-charcoal">
+              {venueOptionsCount}
+            </p>
+          </div>
+          <div>
+            <p className="font-accent text-[9px] uppercase tracking-[0.14em] text-slate">
+              Shortlist
+            </p>
+            <p className="mt-1 font-display text-lg text-charcoal">
+              {savedVendorCount}
+            </p>
+          </div>
+        </div>
+      </article>
+    </motion.aside>
   );
 }
 

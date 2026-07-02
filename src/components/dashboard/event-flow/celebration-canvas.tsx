@@ -301,7 +301,7 @@ export function CelebrationCanvas({
       ) : null}
 
       {/* Canvas stage */}
-      <div className="relative aspect-square max-h-[560px] min-h-[420px] w-full overflow-hidden border border-charcoal/10 bg-[radial-gradient(circle_at_center,rgba(201,169,110,0.12),transparent_45%),linear-gradient(140deg,rgba(255,255,255,0.7),rgba(245,240,231,0.55))]">
+      <div className="relative min-h-[460px] w-full overflow-hidden border border-charcoal/10 bg-[radial-gradient(circle_at_center,rgba(201,169,110,0.12),transparent_45%),linear-gradient(140deg,rgba(255,255,255,0.7),rgba(245,240,231,0.55))] sm:min-h-[540px] xl:min-h-[640px]">
         <AnimatePresence mode="wait">
           <motion.div
             key={levelKey}

@@ -235,6 +235,7 @@ export type EventDefinitionPayload = {
   eventType: EventPlatformType;
   eventTypeLabel: string;
   customEventType: string | null;
+  primaryVenue: string | null;
   dayCount: number;
   layers: {
     definition: string;
@@ -256,6 +257,7 @@ export type EventDefinitionPlanDay = {
     startTime: string | null;
     endTime: string | null;
     timeBlock: EventTimeBlockKey | null;
+    venue: string | null;
     guestCount: number | null;
     requirementCategories: EventRequirementCategoryKey[];
     notes: string | null;
@@ -277,6 +279,7 @@ type BuildEventDefinitionPayloadInput = {
   eventName: string;
   eventType: unknown;
   customEventType: unknown;
+  primaryVenue?: unknown;
   eventDate: string | null;
   dayCount: unknown;
   days: unknown;
@@ -712,6 +715,7 @@ export function buildEventDefinitionPayload(
     eventType: eventType.eventType,
     eventTypeLabel: eventType.eventTypeLabel,
     customEventType: eventType.customEventType,
+    primaryVenue: toOptionalString(input.primaryVenue, 180),
     dayCount,
     layers: {
       definition:
@@ -766,6 +770,7 @@ export function buildCelebrationPlanFromEventDefinition(
         startTime: block.startTime,
         endTime: block.endTime,
         timeBlock: block.slot,
+        venue: definition.primaryVenue,
         guestCount: block.guestCount,
         requirementCategories: block.requirementCategories,
         notes: block.notes,

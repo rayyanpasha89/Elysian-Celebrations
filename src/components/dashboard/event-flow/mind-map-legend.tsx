@@ -35,7 +35,52 @@ const NODE_LEGEND = [
 // Ready first, Planned last — most-resolved to least-resolved.
 const STATUS_ORDER: FlowStatus[] = ["ready", "active", "gap", "planned"];
 
-export function MindMapLegend({ className }: { className?: string }) {
+export function MindMapLegend({
+  className,
+  compact = false,
+}: {
+  className?: string;
+  compact?: boolean;
+}) {
+  if (compact) {
+    return (
+      <div className={cn("border border-charcoal/10 bg-ivory p-4", className)}>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className={dashLabel}>Map key</p>
+            <h3 className="mt-1 font-display text-base text-charcoal">
+              Day → function → step
+            </h3>
+          </div>
+          <NodeGlyph kind="orbit" />
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-2 border-t border-charcoal/8 pt-4">
+          {NODE_LEGEND.map((item) => (
+            <div key={item.key} className="min-w-0">
+              <NodeGlyph kind={item.key} />
+              <p className="mt-1 font-accent text-[9px] uppercase tracking-[0.14em] text-gold-dark">
+                {item.maps}
+              </p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {STATUS_ORDER.map((status) => {
+            const tone = FLOW_STATUS_META[status];
+            return (
+              <span key={status} className="inline-flex items-center gap-1.5">
+                <span className={cn("h-2 w-2 shrink-0 rounded-full", tone.dot)} aria-hidden />
+                <span className="font-accent text-[9px] uppercase tracking-[0.12em] text-slate">
+                  {tone.label}
+                </span>
+              </span>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={cn(dashCard, "space-y-5", className)}>
       <div>
