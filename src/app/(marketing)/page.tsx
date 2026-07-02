@@ -7,6 +7,7 @@ import { BudgetTeaser } from "@/components/marketing/budget/budget-teaser";
 import { TestimonialCarousel } from "@/components/marketing/testimonials/testimonial-carousel";
 import { FoundersSection } from "@/components/marketing/about/founders-section";
 import { PlanningManifesto } from "@/components/marketing/home/planning-manifesto";
+import { EventSystemShowcase } from "@/components/marketing/home/event-system-showcase";
 import { ContactForm } from "@/components/marketing/contact/contact-form";
 import {
   OrnamentRule,
@@ -25,6 +26,7 @@ export default function HomePage() {
     <>
       <HeroSection />
       <AssuranceStrip />
+      <EventSystemShowcase />
       <PlanningManifesto />
 
       <div className="relative z-10">
@@ -75,17 +77,17 @@ export default function HomePage() {
               <SectionHeader
                 chapter="08"
                 eyebrow="Concierge brief"
-                title="Start with a concierge brief, not a generic inquiry form."
-                intro="Bring the destination, guest count, timing, and social rhythm you want the weekend to hold. We’ll respond with direction that already feels shaped around your celebration."
+                title="Start with the event you want to model."
+                intro="Bring the event type, destination, guest frame, and the moments you already know. We’ll turn it into a first structure: days, functions, vendor direction, budget logic, and what needs a quote."
                 align="start"
                 titleMaxWidth="max-w-xl"
               />
 
               <div className="mt-8 grid gap-4">
                 {[
-                  "A first response shaped around destination fit",
-                  "Budget direction before the scope can drift",
-                  "Vendor curation that already reflects your taste",
+                  "A first structure shaped around your event type",
+                  "Vendor and venue direction before scope drifts",
+                  "Budget logic that follows the actual plan",
                 ].map((point) => (
                   <div
                     key={point}
@@ -103,8 +105,9 @@ export default function HomePage() {
             <div className="border border-charcoal/8 bg-ivory/75 p-6 shadow-[0_22px_70px_rgba(26,26,46,0.07)] backdrop-blur-sm md:p-8">
               <div className="mb-8">
                 <p className="max-w-lg text-sm leading-relaxed text-slate">
-                  Tell us what matters most and we’ll return with destination fit,
-                  planning scope, and a clearer first route into the weekend.
+                  Tell us what matters most and we’ll return with a clearer first
+                  route into the event model: structure, requirements, vendor
+                  direction, and open questions.
                 </p>
               </div>
               <ContactForm />
@@ -120,23 +123,23 @@ function AtmosphereGallery() {
   const moments = [
     {
       image: MARKETING_IMAGES.editorial.ceremony,
-      label: "Ceremony",
-      title: "Light, procession, architecture.",
-      copy: "A ceremony should feel built — every sightline composed before a guest crosses the threshold.",
+      label: "Arrival layer",
+      title: "The first minute sets the physics.",
+      copy: "Sightlines, welcome drinks, lighting, and movement get composed before the guest enters the room.",
       height: "h-[480px] lg:h-[460px]",
     },
     {
       image: MARKETING_IMAGES.hero.tablescape,
-      label: "Hospitality",
-      title: "Tables that carry the night.",
-      copy: "Service, palette, lighting, pacing — the table is the second venue. We design it that way.",
+      label: "Hospitality layer",
+      title: "Food becomes part of the storyline.",
+      copy: "Menus, stations, service pacing, and dietary cues connect back to the function they belong to.",
       height: "h-[420px] lg:h-[360px]",
     },
     {
       image: MARKETING_IMAGES.editorial.portrait,
-      label: "Portrait",
-      title: "Editorial, but personal.",
-      copy: "Direction earns its keep when it still leaves room for family, weather, and the unrepeatable.",
+      label: "Memory layer",
+      title: "Every frame knows why it exists.",
+      copy: "Photo, film, decor, and family rhythm stay linked to the same plan instead of drifting apart.",
       height: "h-[520px] lg:h-[560px]",
     },
   ];
@@ -148,8 +151,8 @@ function AtmosphereGallery() {
         <div className="mb-10 grid gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,0.75fr)] lg:items-end">
           <SectionHeader
             eyebrow="Signature moments"
-            title="Three frames the rest of the planning has to live up to."
-            intro="One ceremony, one table, one portrait — each a brief in itself. The rest of the event gets designed against these three references."
+            title="The beautiful parts now connect to the operating parts."
+            intro="A premium event cannot be only visual. The atmosphere, vendors, food, movement, and budget need to speak to each other from the first brief."
             align="start"
             titleMaxWidth="max-w-3xl"
           />
@@ -160,9 +163,9 @@ function AtmosphereGallery() {
             </p>
             <div className="mt-4 grid gap-3">
               {[
-                "Venue light must support the procession.",
-                "Hospitality pacing should feel invisible.",
-                "Portrait direction leaves space for family.",
+                "Each function gets its own vendor and service logic.",
+                "Menus start from shortlisted offerings, not blank typing.",
+                "Custom requests stay visible for quote follow-up.",
               ].map((note, index) => (
                 <div
                   key={note}
@@ -183,14 +186,14 @@ function AtmosphereGallery() {
             <div
               key={moment.title}
               className={cn(
-                "group",
+                "group [perspective:1400px]",
                 index === 0 && "hidden sm:block",
                 index === 1 && "hidden lg:block",
                 index === 2 && "sm:col-span-2 lg:col-span-1"
               )}
             >
               <div
-                className={`relative overflow-hidden border border-charcoal/10 ${moment.height} transition-shadow duration-700 group-hover:shadow-[0_30px_90px_rgba(26,26,46,0.18)]`}
+                className={`relative overflow-hidden border border-charcoal/10 ${moment.height} transition-all duration-700 motion-safe:group-hover:-translate-y-2 motion-safe:group-hover:rotate-x-[2deg] motion-safe:group-hover:rotate-y-[-3deg] group-hover:shadow-[0_30px_90px_rgba(26,26,46,0.18)]`}
               >
                 <div
                   className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-[1.04]"
@@ -240,16 +243,16 @@ function SectionDivider({ variant }: { variant: "soft" | "gold" }) {
 function AssuranceStrip() {
   const signals = [
     {
-      eyebrow: "Concierge-only",
-      copy: "Every weekend ships with a senior planner inside the loop.",
+      eyebrow: "Spatial planning",
+      copy: "Days, functions, vendors, budgets, and readiness stay connected in one model.",
     },
     {
-      eyebrow: "Curated vendor depth",
-      copy: "Catering, decor, photo, and entertainment partners vetted for chemistry.",
+      eyebrow: "Tap, don’t type",
+      copy: "Couples select real vendor offerings first, then customize what needs a quote.",
     },
     {
-      eyebrow: "Operations on the day",
-      copy: "A weekend-of team that keeps run-of-show steady while families stay present.",
+      eyebrow: "Readiness engine",
+      copy: "The platform shows what is complete, partial, or missing before execution.",
     },
   ];
 
@@ -261,7 +264,7 @@ function AssuranceStrip() {
       <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-gold-primary/40 to-transparent" />
       <div className="relative z-10 mx-auto max-w-7xl px-[var(--section-padding-x)] py-12 md:py-16">
         <SectionEyebrow
-          label="What our weekends carry"
+          label="What the platform now carries"
           tone="light"
           size="sm"
           className="mb-8"
@@ -271,10 +274,11 @@ function AssuranceStrip() {
             <div
               key={signal.eyebrow}
               className={cn(
-                "group relative border border-white/8 bg-white/[0.03] p-6 backdrop-blur-md transition-all duration-500 hover:border-gold-primary/35",
+                "group relative overflow-hidden border border-white/8 bg-white/[0.03] p-6 backdrop-blur-md transition-all duration-500 hover:border-gold-primary/35 hover:bg-white/[0.055]",
                 index === 1 && "motion-safe:lg:-translate-y-3"
               )}
             >
+              <div className="absolute -right-12 -top-16 h-32 w-32 rounded-full bg-gold-primary/10 blur-2xl transition-transform duration-700 group-hover:scale-125" />
               <span className="font-accent absolute bottom-4 right-4 text-[10px] uppercase tracking-[0.22em] text-ivory/24">
                 {String(index + 1).padStart(2, "0")}
               </span>

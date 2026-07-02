@@ -19,33 +19,33 @@ import {
 
 const steps = [
   {
-    title: "Frame the atmosphere",
+    title: "Define the event shape",
     body:
-      "We begin with the emotional brief: how the arrival should feel, what kind of energy the ceremony needs, and how the weekend should live in memory and in photographs.",
+      "Start with the event type, day count, dates, and morning, afternoon, or evening functions so the platform understands the real structure before details begin.",
     icon: Sparkles,
   },
   {
-    title: "Reduce the world",
+    title: "Open the function map",
     body:
-      "Then we narrow destinations, venues, and timing until only the places that truly fit your guest flow, budget, and visual language remain.",
+      "Each function becomes a branch. Select the branch, then edit only the exact step you need: basics, food, design, media, logistics, tasks, or notes.",
     icon: MapPin,
   },
   {
-    title: "Assemble the cast",
+    title: "Choose vendors before typing",
     body:
-      "Photographers, florists, hospitality teams, and production partners are chosen for chemistry, not just availability, so the event feels coherent instead of crowded.",
+      "Menus, decor setups, performances, coverage, and service scopes begin from real vendor catalogues, then get customized for the function.",
     icon: UsersRound,
   },
   {
-    title: "Model the investment",
+    title: "Let estimates follow the plan",
     body:
-      "Before scope expands, we make the investment legible through target categories, scenario planning, and trade-offs that protect what matters most.",
+      "Food uses guest counts, vendors use service cues, and special requests stay outside estimates until they are quoted, so budget decisions stay honest.",
     icon: Wallet,
   },
   {
-    title: "Conduct the weekend",
+    title: "Close the readiness gaps",
     body:
-      "On site, every cue, arrival, contingency, and late-night shift is conducted in sequence so you can stay present while the experience holds together around you.",
+      "The final layer shows what is complete, partial, or missing across vendors, budget, guests, logistics, and run-of-show before the event moves forward.",
     icon: PartyPopper,
   },
 ] as const;
@@ -96,8 +96,8 @@ export function JourneySteps() {
           <SectionHeader
             chapter="03"
             eyebrow="How it works"
-            title="The planning unfolds in five deliberate acts."
-            intro="Each act reduces noise, strengthens taste, and keeps the event readable from the first brief through the final moment."
+            title="The planning unfolds like a map, not a questionnaire."
+            intro="Each act reduces typing, sharpens decisions, and keeps every day, function, vendor, budget line, and readiness gap connected."
             align="center"
           />
         </motion.div>
@@ -176,9 +176,9 @@ export function JourneySteps() {
         <div className="mt-20 flex flex-col items-center gap-6 text-center md:mt-28">
           <OrnamentRule align="center" width={96} />
           <p className="max-w-xl font-heading text-base leading-relaxed text-slate">
-            Once these five acts hold together, the planning surface itself starts
-            doing the heavy lifting — vendors, budget, and the weekend programme
-            move as one.
+            Once these five acts hold together, the planning surface starts doing
+            the heavy lifting — vendors, budget, menus, logistics, and the event
+            programme move as one.
           </p>
           <Link
             href="/contact"

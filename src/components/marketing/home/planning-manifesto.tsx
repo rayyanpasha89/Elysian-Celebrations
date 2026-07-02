@@ -6,23 +6,23 @@ import { SectionHeader } from "@/components/marketing/shared/marketing-primitive
 const pillars = [
   {
     icon: WalletCards,
-    title: "Budget Intelligence",
+    title: "Estimate Intelligence",
     description:
-      "Move from vague totals to a layered investment plan with targets, quotes, actuals, and payment visibility.",
+      "Let the plan create the budget story: per-person food, vendor services, custom quotes, and paid visibility.",
     href: "/#packages",
   },
   {
     icon: Sparkles,
-    title: "Vendor Curation",
+    title: "Vendor-First Composition",
     description:
-      "Evaluate creative fit, service mix, and pricing without losing the aesthetic thread of the event.",
+      "Start from real catalogues and shortlisted offerings, then customize the exact menu, setup, or deliverable.",
     href: "/#vendors",
   },
   {
     icon: Layers3,
-    title: "Weekend Architecture",
+    title: "Event Architecture",
     description:
-      "Design the guest journey as a sequence of moments, not a collection of disconnected tasks.",
+      "Move from event type to days, functions, needs, vendors, budget, and readiness without losing the thread.",
     href: "/#how-it-works",
   },
 ];
@@ -40,8 +40,8 @@ export function PlanningManifesto() {
           <SectionHeader
             chapter="01"
             eyebrow="Planning manifesto"
-            title="The event should feel composed before it feels expensive."
-            intro="We’re building a planning surface for couples who care about atmosphere, precision, and control. That means transparent financial structure, curated vendors, and a weekend narrative that is designed, not improvised."
+            title="The plan should feel alive before it feels expensive."
+            intro="Elysian turns an event into a living model: first the structure, then each function, then the vendors, menus, logistics, budget, and final readiness. Less blank typing, more guided decisions."
             align="start"
             titleMaxWidth="max-w-2xl"
           />
@@ -51,7 +51,7 @@ export function PlanningManifesto() {
               href="/#how-it-works"
               className="font-accent inline-flex items-center justify-center border border-charcoal/15 px-6 py-3 text-[11px] uppercase tracking-[0.22em] text-charcoal transition-all duration-300 hover:border-gold-primary hover:text-gold-dark"
             >
-              See the flow
+              Enter the system
             </Link>
             <Link
               href="/contact"
