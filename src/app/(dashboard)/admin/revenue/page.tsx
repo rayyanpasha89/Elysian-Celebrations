@@ -24,7 +24,7 @@ type AdminClient = {
 };
 
 const dashLabel = "font-accent text-[10px] uppercase tracking-[0.2em] text-slate";
-const CAT_COLORS = ["#C9A96E", "#D4A0A0", "#7BA7C9", "#9CAF88", "#8B7EC8", "#D4A843", "#C4956A", "#6B7280"];
+const CAT_COLORS = ["#C9A96E", "#D4A0A0", "#A4AC86", "#9CAF88", "#656D4A", "#D4A843", "#C4956A", "#656D4A"];
 
 function lakh(n: number) {
   if (Math.abs(n) >= 10000000) return `₹${(n / 10000000).toFixed(2)}Cr`;

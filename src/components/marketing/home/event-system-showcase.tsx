@@ -177,9 +177,9 @@ export function EventSystemShowcase() {
     <section
       id="event-system"
       ref={sectionRef}
-      className="noise relative overflow-hidden bg-[linear-gradient(180deg,#10101b_0%,#17192a_48%,#f5f0e8_100%)] text-ivory"
+      className="noise relative overflow-hidden bg-[linear-gradient(180deg,#333d29_0%,#414833_48%,#f5f0e8_100%)] text-ivory"
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(201,169,110,0.2),transparent_30%),radial-gradient(circle_at_82%_24%,rgba(123,167,201,0.16),transparent_28%),radial-gradient(circle_at_50%_78%,rgba(212,160,160,0.12),transparent_34%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(201,169,110,0.2),transparent_30%),radial-gradient(circle_at_82%_24%,rgba(164,172,134,0.16),transparent_28%),radial-gradient(circle_at_50%_78%,rgba(212,160,160,0.12),transparent_34%)]" />
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:88px_88px] opacity-[0.08]" />
 
       <motion.div
@@ -253,7 +253,7 @@ export function EventSystemShowcase() {
 
         <div className="lg:sticky lg:top-28">
           <div className="relative min-h-[680px] overflow-hidden border border-white/10 bg-midnight/55 p-4 shadow-[0_50px_160px_rgba(0,0,0,0.35)] backdrop-blur-xl md:p-8 lg:min-h-[740px]">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,rgba(201,169,110,0.14),transparent_40%),radial-gradient(circle_at_58%_62%,rgba(123,167,201,0.1),transparent_34%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,rgba(201,169,110,0.14),transparent_40%),radial-gradient(circle_at_58%_62%,rgba(164,172,134,0.1),transparent_34%)]" />
             <div className="absolute left-6 top-6 z-20 border border-white/10 bg-white/[0.04] px-4 py-3 backdrop-blur-xl">
               <p className="font-accent text-[9px] uppercase tracking-[0.24em] text-gold-light">
                 {activeChapter.metric} · {activeChapter.label}
@@ -406,7 +406,7 @@ function CoreModelCard({ chapter }: { chapter: ScrollChapter }) {
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage: `linear-gradient(180deg,rgba(12,14,24,0.04),rgba(12,14,24,0.66)),url(${MARKETING_IMAGES.hero.spatialAtelier})`,
+            backgroundImage: `linear-gradient(180deg,rgba(51,61,41,0.04),rgba(51,61,41,0.66)),url(${MARKETING_IMAGES.hero.spatialAtelier})`,
           }}
         />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(201,169,110,0.22),transparent_42%)]" />
@@ -519,7 +519,7 @@ function MobileSystemPreview() {
         <div
           className="h-24 bg-cover bg-center"
           style={{
-            backgroundImage: `linear-gradient(180deg,rgba(12,14,24,0.04),rgba(12,14,24,0.66)),url(${MARKETING_IMAGES.hero.spatialAtelier})`,
+            backgroundImage: `linear-gradient(180deg,rgba(51,61,41,0.04),rgba(51,61,41,0.66)),url(${MARKETING_IMAGES.hero.spatialAtelier})`,
           }}
         />
         <div className="p-4">

@@ -29,7 +29,7 @@ const faqs = [
 export default function FAQPage() {
   return (
     <section className="relative overflow-hidden bg-ivory py-32">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,169,110,0.12),transparent_28%),radial-gradient(circle_at_80%_20%,rgba(123,167,201,0.08),transparent_24%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,169,110,0.12),transparent_28%),radial-gradient(circle_at_80%_20%,rgba(164,172,134,0.08),transparent_24%)]" />
 
       <div className="relative z-10 mx-auto max-w-5xl px-[var(--section-padding-x)]">
         <p className="font-accent text-[11px] uppercase tracking-[0.3em] text-gold-primary">
@@ -46,7 +46,7 @@ export default function FAQPage() {
           {faqs.map((faq) => (
             <article
               key={faq.question}
-              className="border border-charcoal/8 bg-ivory/90 p-6 shadow-[0_18px_70px_rgba(17,24,39,0.05)]"
+              className="border border-charcoal/8 bg-ivory/90 p-6 shadow-[0_18px_70px_rgba(51,61,41,0.05)]"
             >
               <h2 className="font-display text-2xl text-charcoal">
                 {faq.question}

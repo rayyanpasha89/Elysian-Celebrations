@@ -134,7 +134,7 @@ export function FlowNode({
               FOCUS_RING,
               selected
                 ? "border-l-gold-primary border-y border-r border-y-gold-primary/40 border-r-gold-primary/40 shadow-[0_16px_44px_rgba(201,169,110,0.16)]"
-                : "border-l-gold-primary/50 border-y border-r border-y-charcoal/8 border-r-charcoal/8 hover:border-l-gold-primary hover:shadow-[0_12px_36px_rgba(26,26,46,0.07)]"
+                : "border-l-gold-primary/50 border-y border-r border-y-charcoal/8 border-r-charcoal/8 hover:border-l-gold-primary hover:shadow-[0_12px_36px_rgba(51,61,41,0.07)]"
             )}
           >
             {body}
@@ -201,7 +201,7 @@ export function FlowNode({
             FOCUS_RING,
             selected
               ? "border-gold-primary shadow-[0_18px_50px_rgba(201,169,110,0.18)]"
-              : "border-charcoal/12 hover:border-gold-primary/45 hover:shadow-[0_14px_40px_rgba(26,26,46,0.08)]"
+              : "border-charcoal/12 hover:border-gold-primary/45 hover:shadow-[0_14px_40px_rgba(51,61,41,0.08)]"
           )}
         >
           {eventBody}

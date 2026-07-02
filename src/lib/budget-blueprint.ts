@@ -54,7 +54,7 @@ export const BUDGET_CATEGORY_BLUEPRINTS: BudgetBlueprintCategory[] = [
   },
   {
     name: "Photography & Video",
-    color: "#7BA7C9",
+    color: "#A4AC86",
     recommendedShare: 0.12,
     items: [
       { name: "Wedding Photography", estimatedCost: 200000 },
@@ -89,7 +89,7 @@ export const BUDGET_CATEGORY_BLUEPRINTS: BudgetBlueprintCategory[] = [
   },
   {
     name: "Travel & Logistics",
-    color: "#8B7EC8",
+    color: "#656D4A",
     recommendedShare: 0.06,
     items: [
       { name: "Guest Transport", estimatedCost: 100000 },
@@ -100,7 +100,7 @@ export const BUDGET_CATEGORY_BLUEPRINTS: BudgetBlueprintCategory[] = [
   },
   {
     name: "Miscellaneous",
-    color: "#6B7280",
+    color: "#656D4A",
     recommendedShare: 0.04,
     items: [
       { name: "Wedding Invitations", estimatedCost: 40000 },
@@ -116,7 +116,7 @@ export function budgetColorForCategory(name: string) {
   return (
     BUDGET_CATEGORY_BLUEPRINTS.find(
       (category) => category.name.toLowerCase() === name.toLowerCase()
-    )?.color ?? "#6B7280"
+    )?.color ?? "#656D4A"
   );
 }
 

@@ -49,12 +49,12 @@ const quickActions = [
 export function Footer() {
   return (
     <footer className="noise-dark relative overflow-hidden bg-midnight text-ivory/80">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,169,110,0.14),transparent_30%),radial-gradient(circle_at_80%_20%,rgba(123,167,201,0.12),transparent_22%),linear-gradient(180deg,rgba(26,26,46,0.15),rgba(26,26,46,0.82))]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,169,110,0.14),transparent_30%),radial-gradient(circle_at_80%_20%,rgba(164,172,134,0.12),transparent_22%),linear-gradient(180deg,rgba(51,61,41,0.15),rgba(51,61,41,0.82))]" />
 
       <div className="relative z-10 mx-auto max-w-7xl px-[var(--section-padding-x)] py-18 lg:py-24">
         <div className="mb-12 grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
           <div className="relative overflow-hidden border border-white/10 bg-white/[0.04] p-8 shadow-[0_24px_90px_rgba(0,0,0,0.18)] backdrop-blur-2xl">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(201,169,110,0.1),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(123,167,201,0.08),transparent_24%)]" />
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(201,169,110,0.1),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(164,172,134,0.08),transparent_24%)]" />
             <div className="relative">
             <p className="font-accent text-[11px] uppercase tracking-[0.3em] text-gold-primary">
               Elysian Celebrations

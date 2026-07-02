@@ -33,7 +33,7 @@ export function PlanningManifesto() {
       id="manifesto"
       className="relative overflow-hidden bg-ivory py-[calc(var(--section-padding-y)*0.9)]"
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_25%,rgba(201,169,110,0.08),transparent_32%),radial-gradient(circle_at_85%_20%,rgba(123,167,201,0.1),transparent_28%),linear-gradient(180deg,rgba(250,247,242,1)_0%,rgba(245,240,232,0.86)_100%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_25%,rgba(201,169,110,0.08),transparent_32%),radial-gradient(circle_at_85%_20%,rgba(164,172,134,0.1),transparent_28%),linear-gradient(180deg,rgba(250,247,242,1)_0%,rgba(245,240,232,0.86)_100%)]" />
 
       <div className="relative z-10 mx-auto grid max-w-7xl gap-10 px-[var(--section-padding-x)] lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-start">
         <div>
@@ -71,7 +71,7 @@ export function PlanningManifesto() {
               <Link
                 key={pillar.title}
                 href={pillar.href}
-                className="group relative border border-charcoal/10 bg-white/75 p-6 shadow-[0_22px_60px_rgba(26,26,46,0.06)] backdrop-blur-sm transition-all duration-500 hover:-translate-y-1 hover:border-gold-primary/30 hover:shadow-[0_30px_80px_rgba(26,26,46,0.1)]"
+                className="group relative border border-charcoal/10 bg-white/75 p-6 shadow-[0_22px_60px_rgba(51,61,41,0.06)] backdrop-blur-sm transition-all duration-500 hover:-translate-y-1 hover:border-gold-primary/30 hover:shadow-[0_30px_80px_rgba(51,61,41,0.1)]"
               >
                 <span className="font-accent absolute right-5 top-5 text-[10px] uppercase tracking-[0.22em] text-charcoal/24">
                   {String(index + 1).padStart(2, "0")}

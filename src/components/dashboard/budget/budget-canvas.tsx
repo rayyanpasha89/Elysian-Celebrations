@@ -435,7 +435,7 @@ function SortableBudgetItem({
     <div
       ref={setNodeRef}
       style={style}
-      className="border border-charcoal/8 bg-ivory p-4 shadow-[0_12px_36px_rgba(26,26,46,0.04)]"
+      className="border border-charcoal/8 bg-ivory p-4 shadow-[0_12px_36px_rgba(51,61,41,0.04)]"
     >
       <div className="flex flex-wrap items-center gap-3">
         <button

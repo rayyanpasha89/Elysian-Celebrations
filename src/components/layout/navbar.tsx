@@ -72,13 +72,13 @@ export function Navbar() {
               prefersReducedMotion ? "transition-none" : "transition-all duration-500",
               isMobileCondensed && "h-14 px-3 py-1 md:h-auto md:px-6 md:py-3",
               isScrolled
-                ? "border-charcoal/6 bg-ivory/88 shadow-[0_22px_80px_rgba(17,24,39,0.12)] backdrop-blur-2xl"
+                ? "border-charcoal/6 bg-ivory/88 shadow-[0_22px_80px_rgba(51,61,41,0.12)] backdrop-blur-2xl"
                 : "border-white/12 bg-white/[0.04] shadow-[0_22px_90px_rgba(0,0,0,0.18)] backdrop-blur-2xl"
             )}
           >
             <div
               className={cn(
-                "pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,169,110,0.14),transparent_28%),radial-gradient(circle_at_85%_0%,rgba(123,167,201,0.12),transparent_24%),linear-gradient(90deg,rgba(255,255,255,0.08),transparent_30%,transparent_70%,rgba(255,255,255,0.05))] transition-opacity duration-500",
+                "pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,169,110,0.14),transparent_28%),radial-gradient(circle_at_85%_0%,rgba(164,172,134,0.12),transparent_24%),linear-gradient(90deg,rgba(255,255,255,0.08),transparent_30%,transparent_70%,rgba(255,255,255,0.05))] transition-opacity duration-500",
                 isScrolled ? "opacity-55" : "opacity-100"
               )}
             />

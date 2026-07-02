@@ -149,7 +149,7 @@ export default function AdminVendorsPage() {
             key={v.id}
             type="button"
             onClick={() => setEditingId(v.id)}
-            className="group flex flex-col border border-charcoal/10 bg-ivory p-4 text-left transition-all hover:-translate-y-0.5 hover:border-gold-primary/40 hover:shadow-[0_14px_36px_rgba(26,26,46,0.08)]"
+            className="group flex flex-col border border-charcoal/10 bg-ivory p-4 text-left transition-all hover:-translate-y-0.5 hover:border-gold-primary/40 hover:shadow-[0_14px_36px_rgba(51,61,41,0.08)]"
           >
             <div className="flex items-start justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2.5">
@@ -644,7 +644,7 @@ function Overlay({ children, onClose, wide }: { children: React.ReactNode; onClo
         transition={{ type: "spring", stiffness: 240, damping: 26 }}
         onClick={(e) => e.stopPropagation()}
         className={cn(
-          "w-full border border-charcoal/12 bg-ivory shadow-[0_40px_120px_rgba(17,24,39,0.35)]",
+          "w-full border border-charcoal/12 bg-ivory shadow-[0_40px_120px_rgba(51,61,41,0.35)]",
           wide ? "max-w-2xl" : "max-w-lg"
         )}
       >

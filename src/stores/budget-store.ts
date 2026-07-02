@@ -154,7 +154,7 @@ export const useBudgetStore = create<BudgetState>()(
         })),
 
       // Category level
-      addCategory: (name, color = "#6B7280") =>
+      addCategory: (name, color = "#656D4A") =>
         set((state) => ({
           categories: [
             ...state.categories,

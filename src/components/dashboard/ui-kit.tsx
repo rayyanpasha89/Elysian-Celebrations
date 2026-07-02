@@ -444,7 +444,7 @@ export function Drawer({
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
             style={{ width: `min(${width}px, 100%)` }}
             onClick={(event) => event.stopPropagation()}
-            className="flex h-full flex-col border-l border-charcoal/10 bg-ivory shadow-[0_0_120px_rgba(17,24,39,0.25)]"
+            className="flex h-full flex-col border-l border-charcoal/10 bg-ivory shadow-[0_0_120px_rgba(51,61,41,0.25)]"
           >
             <div className="flex items-start justify-between gap-4 border-b border-charcoal/10 p-6">
               <div>

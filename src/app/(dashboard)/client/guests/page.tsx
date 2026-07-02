@@ -45,7 +45,7 @@ type Guest = {
 
 const SIDES: { key: GuestSide; label: string; short: string; color: string }[] = [
   { key: "BRIDE", label: "Bride's side", short: "Bride", color: "#D4A0A0" },
-  { key: "GROOM", label: "Groom's side", short: "Groom", color: "#7BA7C9" },
+  { key: "GROOM", label: "Groom's side", short: "Groom", color: "#A4AC86" },
   { key: "COUPLE", label: "Both / shared", short: "Both", color: "#C9A96E" },
 ];
 const SIDE_MAP = Object.fromEntries(SIDES.map((s) => [s.key, s])) as Record<

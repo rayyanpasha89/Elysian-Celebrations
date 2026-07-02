@@ -418,7 +418,7 @@ function RadialLevel({
           disabled={!hub.onClick}
           aria-label={hub.onClick ? "Zoom out" : hub.title}
           className={cn(
-            "flex h-28 w-28 flex-col items-center justify-center rounded-full border-2 bg-ivory p-2 text-center shadow-[0_18px_50px_rgba(26,26,46,0.12)] transition-transform sm:h-32 sm:w-32",
+            "flex h-28 w-28 flex-col items-center justify-center rounded-full border-2 bg-ivory p-2 text-center shadow-[0_18px_50px_rgba(51,61,41,0.12)] transition-transform sm:h-32 sm:w-32",
             hub.onClick ? "hover:scale-[1.03]" : "",
             "border-gold-primary/60",
             FOCUS_RING
@@ -453,7 +453,7 @@ function RadialLevel({
               whileTap={{ scale: 0.96 }}
               aria-label={`Open ${node.title}`}
               className={cn(
-                "flex w-full flex-col items-center gap-1 border bg-ivory px-3 py-2.5 text-center shadow-[0_10px_28px_rgba(26,26,46,0.08)] transition-colors",
+                "flex w-full flex-col items-center gap-1 border bg-ivory px-3 py-2.5 text-center shadow-[0_10px_28px_rgba(51,61,41,0.08)] transition-colors",
                 "border-charcoal/12 hover:border-gold-primary/50",
                 FOCUS_RING
               )}
@@ -510,7 +510,7 @@ function StepLevel({
         ))}
       </svg>
 
-      <div className="absolute left-1/2 top-1/2 z-20 flex h-28 w-28 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border-2 border-gold-primary/60 bg-ivory p-2 text-center shadow-[0_18px_50px_rgba(26,26,46,0.12)] sm:h-32 sm:w-32">
+      <div className="absolute left-1/2 top-1/2 z-20 flex h-28 w-28 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border-2 border-gold-primary/60 bg-ivory p-2 text-center shadow-[0_18px_50px_rgba(51,61,41,0.12)] sm:h-32 sm:w-32">
         <span className={cn("h-1.5 w-1.5 rounded-full", hubTone.dot)} />
         <span className="mt-1 line-clamp-2 font-display text-sm leading-tight text-charcoal">
           {event.title}

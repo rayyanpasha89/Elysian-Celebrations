@@ -97,7 +97,7 @@ export function TestimonialCarousel() {
         className="absolute inset-0 pointer-events-none"
         style={{
           backgroundImage:
-            "radial-gradient(ellipse at 20% 50%, rgba(201,169,110,0.08) 0%, transparent 48%), radial-gradient(ellipse at 80% 20%, rgba(123,167,201,0.08) 0%, transparent 38%), linear-gradient(180deg, rgba(16,16,27,1) 0%, rgba(14,15,25,0.96) 100%)",
+            "radial-gradient(ellipse at 20% 50%, rgba(201,169,110,0.08) 0%, transparent 48%), radial-gradient(ellipse at 80% 20%, rgba(164,172,134,0.08) 0%, transparent 38%), linear-gradient(180deg, rgba(51,61,41,1) 0%, rgba(65,72,51,0.96) 100%)",
         }}
       />
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold-primary/30 to-transparent" />
@@ -168,7 +168,7 @@ export function TestimonialCarousel() {
                   backgroundImage: `url(${currentTestimonial.image})`,
                 }}
               />
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(16,16,27,0.32),rgba(16,16,27,0.32))] md:bg-[linear-gradient(180deg,rgba(16,16,27,0.16),rgba(16,16,27,0.84))]" />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(51,61,41,0.32),rgba(51,61,41,0.32))] md:bg-[linear-gradient(180deg,rgba(51,61,41,0.16),rgba(51,61,41,0.84))]" />
             </div>
 
             <div className="relative grid min-h-[38rem] gap-6 p-6 md:p-8 lg:grid-cols-[minmax(0,1.12fr)_minmax(280px,0.88fr)]">
@@ -211,7 +211,7 @@ export function TestimonialCarousel() {
                   <div
                     className="min-h-[14rem] bg-cover bg-center md:min-h-[17rem]"
                     style={{
-                      backgroundImage: `linear-gradient(180deg, rgba(16,16,27,0.08), rgba(16,16,27,0.68)), url(${currentTestimonial.image})`,
+                      backgroundImage: `linear-gradient(180deg, rgba(51,61,41,0.08), rgba(51,61,41,0.68)), url(${currentTestimonial.image})`,
                     }}
                   />
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(201,169,110,0.2),transparent_42%)]" />

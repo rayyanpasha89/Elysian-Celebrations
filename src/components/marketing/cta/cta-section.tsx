@@ -38,7 +38,7 @@ export function CTASection() {
   return (
     <section className="noise-dark relative overflow-hidden bg-midnight py-[var(--section-padding-y)]">
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_22%,rgba(201,169,110,0.18),transparent_28%),radial-gradient(circle_at_82%_50%,rgba(123,167,201,0.12),transparent_26%),linear-gradient(180deg,#10101b_0%,#151728_100%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_22%,rgba(201,169,110,0.18),transparent_28%),radial-gradient(circle_at_82%_50%,rgba(164,172,134,0.12),transparent_26%),linear-gradient(180deg,#333d29_0%,#414833_100%)]" />
         <div className="absolute left-[8%] right-[8%] top-0 h-px bg-gradient-to-r from-transparent via-gold-primary/20 to-transparent" />
         <div className="absolute left-[8%] right-[8%] bottom-0 h-px bg-gradient-to-r from-transparent via-gold-primary/20 to-transparent" />
       </div>
@@ -51,7 +51,7 @@ export function CTASection() {
           className="grid gap-8 border border-white/10 bg-white/[0.045] p-5 shadow-[0_28px_100px_rgba(0,0,0,0.24)] backdrop-blur-2xl lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] lg:p-8"
         >
           <div className="relative overflow-hidden border border-white/10 bg-white/[0.03] p-6 lg:p-8">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,169,110,0.14),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(123,167,201,0.12),transparent_24%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,169,110,0.14),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(164,172,134,0.12),transparent_24%)]" />
             <div className="relative">
               <p className="font-accent text-[11px] uppercase tracking-[0.3em] text-gold-primary">
                 Final Step
@@ -97,7 +97,7 @@ export function CTASection() {
             <div
               className="relative min-h-[240px] overflow-hidden border border-white/10 bg-cover bg-center shadow-[0_24px_70px_rgba(0,0,0,0.2)]"
               style={{
-                backgroundImage: `linear-gradient(180deg, rgba(17,24,39,0.1), rgba(17,24,39,0.72)), url(${closingImage})`,
+                backgroundImage: `linear-gradient(180deg, rgba(51,61,41,0.1), rgba(51,61,41,0.72)), url(${closingImage})`,
               }}
             >
               <div className="absolute left-4 top-4 border border-ivory/14 bg-midnight/45 px-3 py-2 text-ivory backdrop-blur-md">

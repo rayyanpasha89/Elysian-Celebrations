@@ -555,7 +555,7 @@ export const DECOR_PALETTES: Swatch[] = [
   { value: "blush-gold", label: "Blush & gold", colors: ["#f3d9d2", "#e8d5b0", "#c9a96e"] },
   { value: "ivory-sage", label: "Ivory & sage", colors: ["#f6f1e7", "#cdd7c2", "#9bae8f"] },
   { value: "jewel-tones", label: "Jewel tones", colors: ["#7b2d4e", "#1f5f5b", "#c9a227"] },
-  { value: "midnight-gold", label: "Midnight & gold", colors: ["#16182a", "#3b3f63", "#c9a96e"] },
+  { value: "midnight-gold", label: "Midnight & gold", colors: ["#414833", "#3b3f63", "#c9a96e"] },
   { value: "coral-sunset", label: "Coral sunset", colors: ["#f4a261", "#e76f51", "#9d4e4e"] },
   { value: "pastel-spring", label: "Pastel spring", colors: ["#fbe5e1", "#dfeae0", "#cfe0ef"] },
   { value: "terracotta", label: "Terracotta earth", colors: ["#c97b5a", "#d9b08c", "#7c5b43"] },

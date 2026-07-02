@@ -19,7 +19,7 @@ export function LegalPageShell({
   return (
     <div className="min-h-screen bg-cream">
       <section className="relative overflow-hidden bg-midnight px-[var(--section-padding-x)] pb-20 pt-36 text-ivory">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(201,169,110,0.18),transparent_28%),radial-gradient(circle_at_80%_25%,rgba(123,167,201,0.12),transparent_24%),linear-gradient(180deg,#10101a_0%,#16182a_100%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(201,169,110,0.18),transparent_28%),radial-gradient(circle_at_80%_25%,rgba(164,172,134,0.12),transparent_24%),linear-gradient(180deg,#333d29_0%,#414833_100%)]" />
         <div className="relative z-10 mx-auto max-w-5xl">
           <p className="font-accent text-[11px] uppercase tracking-[0.3em] text-gold-light">
             {eyebrow}
@@ -52,7 +52,7 @@ export function LegalPageShell({
           {sections.map((section) => (
             <article
               key={section.title}
-              className="border border-charcoal/8 bg-ivory p-8 shadow-[0_18px_60px_rgba(26,26,46,0.05)]"
+              className="border border-charcoal/8 bg-ivory p-8 shadow-[0_18px_60px_rgba(51,61,41,0.05)]"
             >
               <h2 className="font-display text-3xl text-charcoal">
                 {section.title}

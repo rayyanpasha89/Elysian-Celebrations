@@ -145,7 +145,7 @@ export function DestinationCarousel() {
 
   return (
     <section id="destinations" className="relative overflow-hidden bg-midnight">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(201,169,110,0.14),transparent_28%),radial-gradient(circle_at_80%_20%,rgba(123,167,201,0.12),transparent_24%),linear-gradient(180deg,rgba(17,17,27,1)_0%,rgba(11,15,24,1)_100%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(201,169,110,0.14),transparent_28%),radial-gradient(circle_at_80%_20%,rgba(164,172,134,0.12),transparent_24%),linear-gradient(180deg,rgba(17,17,27,1)_0%,rgba(11,15,24,1)_100%)]" />
       <div className="absolute inset-0 noise-dark" />
 
       <div
@@ -185,7 +185,7 @@ export function DestinationCarousel() {
             <StatCard
               label="Venue possibilities"
               value={`${venueCount}+`}
-              accent="blue"
+              accent="sage"
             />
             <StatCard
               label="Vibes available"
@@ -252,12 +252,12 @@ function StatCard({
 }: {
   label: string;
   value: string | number;
-  accent: "gold" | "blue" | "rose";
+  accent: "gold" | "sage" | "rose";
 }) {
   const accentClass =
     accent === "gold"
       ? "from-gold-primary/25 via-gold-primary/8 to-transparent"
-      : accent === "blue"
+      : accent === "sage"
         ? "from-info/25 via-info/8 to-transparent"
         : "from-rose/25 via-rose/8 to-transparent";
 

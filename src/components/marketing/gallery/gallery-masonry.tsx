@@ -34,7 +34,7 @@ function MasonryItem({
     <div ref={ref} className="mb-4 break-inside-avoid">
       <div
         className={cn(
-          "relative w-full overflow-hidden border border-charcoal/8 bg-cream shadow-[0_18px_55px_rgba(26,26,46,0.08)]",
+          "relative w-full overflow-hidden border border-charcoal/8 bg-cream shadow-[0_18px_55px_rgba(51,61,41,0.08)]",
           aspectClass
         )}
       >
@@ -51,7 +51,7 @@ function MasonryItem({
             className="object-cover transition duration-700 ease-out group-hover:scale-[1.06]"
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
           />
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(17,24,39,0.02),rgba(17,24,39,0.05)_42%,rgba(17,24,39,0.78)_100%)] opacity-70 transition-opacity duration-500 group-hover:opacity-100" />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(51,61,41,0.02),rgba(51,61,41,0.05)_42%,rgba(51,61,41,0.78)_100%)] opacity-70 transition-opacity duration-500 group-hover:opacity-100" />
           <div className="absolute left-4 top-4 inline-flex items-center gap-2 border border-ivory/14 bg-midnight/42 px-3 py-2 text-[9px] uppercase tracking-[0.18em] text-ivory/78 backdrop-blur-md">
             <Camera className="h-3.5 w-3.5 text-gold-light" />
             {item.category}

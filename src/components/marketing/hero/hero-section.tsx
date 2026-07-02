@@ -109,7 +109,7 @@ export function HeroSection() {
         style={shouldAnimate ? { y: backgroundY } : undefined}
         className="absolute inset-0 z-0"
       >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(232,213,176,0.18),transparent_35%),radial-gradient(circle_at_75%_20%,rgba(123,167,201,0.18),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(212,160,160,0.12),transparent_32%),linear-gradient(135deg,#10101b_0%,#161829_40%,#10131e_100%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(232,213,176,0.18),transparent_35%),radial-gradient(circle_at_75%_20%,rgba(164,172,134,0.18),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(212,160,160,0.12),transparent_32%),linear-gradient(135deg,#333d29_0%,#414833_40%,#333d29_100%)]" />
         <motion.div
           style={shouldAnimate ? { scale: haloScale } : undefined}
           className="absolute right-[12%] top-[18%] h-[32rem] w-[32rem] rounded-full bg-[radial-gradient(circle,rgba(201,169,110,0.18),rgba(201,169,110,0.02)_60%,transparent_75%)] blur-3xl"
@@ -120,11 +120,11 @@ export function HeroSection() {
         />
         <motion.div
           style={shouldAnimate ? { y: foregroundMistY } : undefined}
-          className="absolute -bottom-32 right-[2%] h-[30rem] w-[52rem] rotate-[-8deg] rounded-full bg-[radial-gradient(ellipse,rgba(123,167,201,0.15),rgba(201,169,110,0.06)_42%,transparent_72%)] blur-3xl"
+          className="absolute -bottom-32 right-[2%] h-[30rem] w-[52rem] rotate-[-8deg] rounded-full bg-[radial-gradient(ellipse,rgba(164,172,134,0.15),rgba(201,169,110,0.06)_42%,transparent_72%)] blur-3xl"
         />
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:120px_120px] opacity-[0.12]" />
         <div className="absolute inset-x-0 top-0 h-48 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.1),transparent_60%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(26,26,46,0.04)_0%,rgba(26,26,46,0.2)_55%,rgba(26,26,46,0.85)_100%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(51,61,41,0.04)_0%,rgba(51,61,41,0.2)_55%,rgba(51,61,41,0.85)_100%)]" />
         <div className="absolute inset-0 noise-dark" />
       </motion.div>
 
@@ -257,7 +257,7 @@ export function HeroSection() {
                   : undefined
               }
               transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
-              className="pointer-events-none absolute -right-2 top-2 h-44 w-44 rounded-full border border-gold-primary/18 bg-[conic-gradient(from_140deg,transparent,rgba(201,169,110,0.18),transparent_45%,rgba(123,167,201,0.14),transparent_78%)] opacity-80 blur-[0.2px]"
+              className="pointer-events-none absolute -right-2 top-2 h-44 w-44 rounded-full border border-gold-primary/18 bg-[conic-gradient(from_140deg,transparent,rgba(201,169,110,0.18),transparent_45%,rgba(164,172,134,0.14),transparent_78%)] opacity-80 blur-[0.2px]"
             />
             <div
               className="relative"
@@ -513,7 +513,7 @@ function MobileHeroStage() {
         <div
           className="h-24 bg-cover bg-center"
           style={{
-            backgroundImage: `linear-gradient(180deg,rgba(12,14,24,0.04),rgba(12,14,24,0.64)),url(${MARKETING_IMAGES.hero.spatialAtelier})`,
+            backgroundImage: `linear-gradient(180deg,rgba(51,61,41,0.04),rgba(51,61,41,0.64)),url(${MARKETING_IMAGES.hero.spatialAtelier})`,
           }}
         />
         <div className="p-4">
@@ -619,7 +619,7 @@ function PhotoPlane({
       <div
         className="absolute inset-0 bg-cover bg-center"
         style={{
-          backgroundImage: `linear-gradient(180deg, rgba(10,12,20,0.1), rgba(10,12,20,0.72)), url(${image})`,
+          backgroundImage: `linear-gradient(180deg, rgba(51,61,41,0.1), rgba(51,61,41,0.72)), url(${image})`,
         }}
       />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(201,169,110,0.18),transparent_35%)]" />
@@ -665,12 +665,12 @@ const MAIN_STAGE_VENDOR_PICKS = [
 function MainStageCard() {
   return (
     <div className="relative overflow-hidden border border-white/15 bg-[linear-gradient(145deg,rgba(250,247,242,0.97),rgba(245,240,232,0.9))] text-charcoal shadow-[0_42px_140px_rgba(0,0,0,0.34)]">
-      <div className="pointer-events-none absolute inset-0 z-10 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),inset_0_-28px_70px_rgba(26,26,46,0.07)]" />
+      <div className="pointer-events-none absolute inset-0 z-10 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),inset_0_-28px_70px_rgba(51,61,41,0.07)]" />
       <div className="relative h-28 border-b border-charcoal/8">
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage: `linear-gradient(180deg, rgba(17,24,39,0.04), rgba(17,24,39,0.42)), url(${MARKETING_IMAGES.hero.spatialAtelier})`,
+            backgroundImage: `linear-gradient(180deg, rgba(51,61,41,0.04), rgba(51,61,41,0.42)), url(${MARKETING_IMAGES.hero.spatialAtelier})`,
           }}
         />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_18%,rgba(232,213,176,0.28),transparent_34%)]" />
@@ -701,7 +701,7 @@ function MainStageCard() {
           {MAIN_STAGE_LAYER_ROWS.map((row, index) => (
             <div
               key={row.label}
-              className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 border border-charcoal/8 bg-white/76 p-2.5 shadow-[0_10px_30px_rgba(26,26,46,0.045)]"
+              className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 border border-charcoal/8 bg-white/76 p-2.5 shadow-[0_10px_30px_rgba(51,61,41,0.045)]"
             >
               <div
                 className={cn(

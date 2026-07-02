@@ -291,7 +291,7 @@ export default function ClientMoodBoardPage() {
                   className="relative w-full overflow-hidden border-b border-charcoal/8 bg-cover bg-center"
                   style={{
                     height: heights[(idx + item.id.charCodeAt(0)) % heights.length],
-                    backgroundImage: `linear-gradient(180deg, rgba(17,24,39,0.08), rgba(17,24,39,0.24)), url(${item.imageUrl})`,
+                    backgroundImage: `linear-gradient(180deg, rgba(51,61,41,0.08), rgba(51,61,41,0.24)), url(${item.imageUrl})`,
                   }}
                 >
                   <span className="font-accent absolute left-3 top-3 border border-ivory/30 bg-ivory/90 px-2 py-1 text-[9px] uppercase tracking-[0.15em] text-charcoal">

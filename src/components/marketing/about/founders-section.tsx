@@ -55,7 +55,7 @@ export function FoundersSection() {
         className="absolute inset-0 pointer-events-none"
         style={{
           backgroundImage:
-            "radial-gradient(ellipse at 18% 22%, rgba(201,169,110,0.08) 0%, transparent 34%), radial-gradient(ellipse at 82% 20%, rgba(123,167,201,0.06) 0%, transparent 28%), radial-gradient(ellipse at 50% 100%, rgba(212,160,160,0.05) 0%, transparent 30%)",
+            "radial-gradient(ellipse at 18% 22%, rgba(201,169,110,0.08) 0%, transparent 34%), radial-gradient(ellipse at 82% 20%, rgba(164,172,134,0.06) 0%, transparent 28%), radial-gradient(ellipse at 50% 100%, rgba(212,160,160,0.05) 0%, transparent 30%)",
         }}
       />
 
@@ -68,14 +68,14 @@ export function FoundersSection() {
             className="relative"
           >
               <div className="relative grid gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-              <div className="relative aspect-[4/5] min-h-[30rem] overflow-hidden border border-charcoal/8 bg-midnight shadow-[0_28px_90px_rgba(26,26,46,0.12)]">
+              <div className="relative aspect-[4/5] min-h-[30rem] overflow-hidden border border-charcoal/8 bg-midnight shadow-[0_28px_90px_rgba(51,61,41,0.12)]">
                 <div
                   className="absolute inset-0 bg-cover bg-center"
                   style={{
-                    backgroundImage: `linear-gradient(180deg, rgba(17,24,39,0.05), rgba(17,24,39,0.22)), url(${portraitImage})`,
+                    backgroundImage: `linear-gradient(180deg, rgba(51,61,41,0.05), rgba(51,61,41,0.22)), url(${portraitImage})`,
                   }}
                 />
-                <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_0%,rgba(17,24,39,0.16)_50%,rgba(17,24,39,0.76)_100%)]" />
+                <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_0%,rgba(51,61,41,0.16)_50%,rgba(51,61,41,0.76)_100%)]" />
                 <div className="absolute left-5 top-5 border border-ivory/15 bg-midnight/45 px-3 py-2 text-ivory backdrop-blur-md">
                   <p className="font-accent text-[9px] uppercase tracking-[0.28em] text-gold-light">
                     Founders
@@ -92,15 +92,15 @@ export function FoundersSection() {
 
               <div className="grid gap-4">
                 <div
-                  className="aspect-[4/3] min-h-[220px] overflow-hidden border border-charcoal/8 bg-cover bg-center shadow-[0_20px_60px_rgba(26,26,46,0.08)]"
+                  className="aspect-[4/3] min-h-[220px] overflow-hidden border border-charcoal/8 bg-cover bg-center shadow-[0_20px_60px_rgba(51,61,41,0.08)]"
                   style={{
-                    backgroundImage: `linear-gradient(180deg, rgba(17,24,39,0.06), rgba(17,24,39,0.22)), url(${detailImageOne})`,
+                    backgroundImage: `linear-gradient(180deg, rgba(51,61,41,0.06), rgba(51,61,41,0.22)), url(${detailImageOne})`,
                   }}
                 />
                 <div
-                  className="aspect-[4/3] min-h-[180px] overflow-hidden border border-charcoal/8 bg-cover bg-center shadow-[0_20px_60px_rgba(26,26,46,0.08)]"
+                  className="aspect-[4/3] min-h-[180px] overflow-hidden border border-charcoal/8 bg-cover bg-center shadow-[0_20px_60px_rgba(51,61,41,0.08)]"
                   style={{
-                    backgroundImage: `linear-gradient(180deg, rgba(17,24,39,0.04), rgba(17,24,39,0.22)), url(${detailImageTwo})`,
+                    backgroundImage: `linear-gradient(180deg, rgba(51,61,41,0.04), rgba(51,61,41,0.22)), url(${detailImageTwo})`,
                   }}
                 >
                   <div className="flex h-full items-end p-4">
@@ -158,7 +158,7 @@ export function FoundersSection() {
                   <motion.div
                     key={item.title}
                     variants={staggerItem}
-                    className="border border-charcoal/8 bg-white/75 p-4 shadow-[0_18px_50px_rgba(26,26,46,0.05)]"
+                    className="border border-charcoal/8 bg-white/75 p-4 shadow-[0_18px_50px_rgba(51,61,41,0.05)]"
                   >
                     <div className="flex h-10 w-10 items-center justify-center border border-gold-primary/18 bg-gold-primary/10 text-gold-dark">
                       <Icon className="h-4 w-4" />
@@ -171,7 +171,7 @@ export function FoundersSection() {
             </motion.div>
 
             <div className="mt-8 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]">
-              <div className="border border-gold-primary/15 bg-cream/70 p-5 shadow-[0_20px_60px_rgba(26,26,46,0.05)]">
+              <div className="border border-gold-primary/15 bg-cream/70 p-5 shadow-[0_20px_60px_rgba(51,61,41,0.05)]">
                 <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-gold-primary">
                   Why clients come to us
                 </p>
@@ -181,7 +181,7 @@ export function FoundersSection() {
                 </p>
               </div>
 
-              <div className="border border-charcoal/8 bg-white/80 p-5 shadow-[0_20px_60px_rgba(26,26,46,0.05)]">
+              <div className="border border-charcoal/8 bg-white/80 p-5 shadow-[0_20px_60px_rgba(51,61,41,0.05)]">
                 <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-slate">
                   Sign-off
                 </p>

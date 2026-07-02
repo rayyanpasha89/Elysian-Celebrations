@@ -3412,7 +3412,7 @@ export default function ClientWeddingPage() {
                   }
                   transition={{ type: "spring", stiffness: 240, damping: 26 }}
                   onClick={(event) => event.stopPropagation()}
-                  className="w-full max-w-lg border border-charcoal/12 bg-ivory p-5 shadow-[0_40px_120px_rgba(17,24,39,0.35)]"
+                  className="w-full max-w-lg border border-charcoal/12 bg-ivory p-5 shadow-[0_40px_120px_rgba(51,61,41,0.35)]"
                 >
                   <div className="flex items-center justify-between gap-3 border-b border-charcoal/10 pb-3">
                     <p className={dashLabel}>Edit day</p>
@@ -3534,7 +3534,7 @@ export default function ClientWeddingPage() {
                   }
                   transition={{ type: "spring", stiffness: 240, damping: 26 }}
                   onClick={(event) => event.stopPropagation()}
-                  className="max-h-[92vh] w-full max-w-lg overflow-y-auto border border-charcoal/12 bg-ivory shadow-[0_40px_120px_rgba(17,24,39,0.35)]"
+                  className="max-h-[92vh] w-full max-w-lg overflow-y-auto border border-charcoal/12 bg-ivory shadow-[0_40px_120px_rgba(51,61,41,0.35)]"
                 >
                   <div className="flex items-center justify-between gap-3 border-b border-charcoal/10 px-5 py-4">
                     <div className="min-w-0">
@@ -3679,7 +3679,7 @@ export default function ClientWeddingPage() {
                 animate={editorMotion.animate}
                 exit={editorMotion.exit}
                 transition={editorMotion.transition}
-                className="relative flex max-h-[100dvh] w-full max-w-3xl flex-col overflow-hidden border border-charcoal/12 bg-ivory shadow-[0_40px_120px_rgba(17,24,39,0.35)] sm:max-h-[92vh]"
+                className="relative flex max-h-[100dvh] w-full max-w-3xl flex-col overflow-hidden border border-charcoal/12 bg-ivory shadow-[0_40px_120px_rgba(51,61,41,0.35)] sm:max-h-[92vh]"
               >
                 <div className="flex items-center justify-between gap-3 border-b border-charcoal/10 bg-ivory/95 px-5 py-4 backdrop-blur">
                   <div className="min-w-0">
@@ -5228,7 +5228,7 @@ function VenuePicker({
                   setShowCustom(false);
                 }}
                 className={cn(
-                  "group overflow-hidden border bg-ivory text-left transition-all hover:-translate-y-0.5 hover:border-gold-primary/45 hover:shadow-[0_18px_40px_rgba(26,26,46,0.08)]",
+                  "group overflow-hidden border bg-ivory text-left transition-all hover:-translate-y-0.5 hover:border-gold-primary/45 hover:shadow-[0_18px_40px_rgba(51,61,41,0.08)]",
                   active
                     ? "border-gold-primary shadow-[0_18px_40px_rgba(201,169,110,0.14)]"
                     : "border-charcoal/10"
@@ -5612,7 +5612,7 @@ function VendorOptionCards({
               type="button"
               onClick={() => onSelect(option)}
               className={cn(
-                "border bg-ivory p-3 text-left transition-all hover:-translate-y-0.5 hover:border-gold-primary/45 hover:shadow-[0_18px_40px_rgba(26,26,46,0.08)]",
+                "border bg-ivory p-3 text-left transition-all hover:-translate-y-0.5 hover:border-gold-primary/45 hover:shadow-[0_18px_40px_rgba(51,61,41,0.08)]",
                 active
                   ? "border-gold-primary bg-gold-primary/8 shadow-[0_18px_40px_rgba(201,169,110,0.14)]"
                   : "border-charcoal/10"

@@ -28,7 +28,7 @@ const collageMoments = [
 export function ExperienceCollage() {
   return (
     <section className="noise relative overflow-hidden bg-midnight py-[calc(var(--section-padding-y)*0.95)] text-ivory">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_18%,rgba(201,169,110,0.16),transparent_28%),radial-gradient(circle_at_82%_55%,rgba(123,167,201,0.12),transparent_26%),linear-gradient(180deg,#10111c_0%,#121723_100%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_18%,rgba(201,169,110,0.16),transparent_28%),radial-gradient(circle_at_82%_55%,rgba(164,172,134,0.12),transparent_26%),linear-gradient(180deg,#333d29_0%,#414833_100%)]" />
 
       <div className="relative z-10 mx-auto max-w-7xl px-[var(--section-padding-x)]">
         <div className="grid gap-10 lg:grid-cols-[minmax(0,0.88fr)_minmax(0,1.12fr)] lg:items-end">
@@ -61,7 +61,7 @@ export function ExperienceCollage() {
                 <div
                   className="aspect-[4/5] bg-cover bg-center"
                   style={{
-                    backgroundImage: `linear-gradient(180deg, rgba(10,12,20,0.08), rgba(10,12,20,0.34)), url(${moment.image})`,
+                    backgroundImage: `linear-gradient(180deg, rgba(51,61,41,0.08), rgba(51,61,41,0.34)), url(${moment.image})`,
                   }}
                 />
                 <div className="space-y-3 p-5">

@@ -40,7 +40,7 @@ export default function HomePage() {
       <JourneySteps />
 
       <section className="noise relative overflow-hidden bg-ivory">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(201,169,110,0.08),transparent_30%),radial-gradient(circle_at_80%_40%,rgba(123,167,201,0.05),transparent_28%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(201,169,110,0.08),transparent_30%),radial-gradient(circle_at_80%_40%,rgba(164,172,134,0.05),transparent_28%)]" />
         <div className="relative z-10">
           <PackageSection />
         </div>
@@ -70,7 +70,7 @@ export default function HomePage() {
         id="contact"
         className="noise relative overflow-hidden bg-cream py-[var(--section-padding-y)]"
       >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(201,169,110,0.08),transparent_28%),radial-gradient(circle_at_86%_18%,rgba(123,167,201,0.08),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.12),transparent_30%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(201,169,110,0.08),transparent_28%),radial-gradient(circle_at_86%_18%,rgba(164,172,134,0.08),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.12),transparent_30%)]" />
         <div className="relative z-10 mx-auto max-w-7xl px-[var(--section-padding-x)]">
           <div className="grid gap-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-start">
             <div className="lg:sticky lg:top-32">
@@ -102,7 +102,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="border border-charcoal/8 bg-ivory/75 p-6 shadow-[0_22px_70px_rgba(26,26,46,0.07)] backdrop-blur-sm md:p-8">
+            <div className="border border-charcoal/8 bg-ivory/75 p-6 shadow-[0_22px_70px_rgba(51,61,41,0.07)] backdrop-blur-sm md:p-8">
               <div className="mb-8">
                 <p className="max-w-lg text-sm leading-relaxed text-slate">
                   Tell us what matters most and we’ll return with a clearer first
@@ -146,7 +146,7 @@ function AtmosphereGallery() {
 
   return (
     <section className="relative overflow-hidden bg-ivory px-[var(--section-padding-x)] py-12 md:py-[calc(var(--section-padding-y)*0.95)]">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(201,169,110,0.08),transparent_24%),radial-gradient(circle_at_82%_26%,rgba(123,167,201,0.07),transparent_26%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(201,169,110,0.08),transparent_24%),radial-gradient(circle_at_82%_26%,rgba(164,172,134,0.07),transparent_26%)]" />
       <div className="relative z-10 mx-auto max-w-7xl">
         <div className="mb-10 grid gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,0.75fr)] lg:items-end">
           <SectionHeader
@@ -193,13 +193,13 @@ function AtmosphereGallery() {
               )}
             >
               <div
-                className={`relative overflow-hidden border border-charcoal/10 ${moment.height} transition-all duration-700 motion-safe:group-hover:-translate-y-2 motion-safe:group-hover:rotate-x-[2deg] motion-safe:group-hover:rotate-y-[-3deg] group-hover:shadow-[0_30px_90px_rgba(26,26,46,0.18)]`}
+                className={`relative overflow-hidden border border-charcoal/10 ${moment.height} transition-all duration-700 motion-safe:group-hover:-translate-y-2 motion-safe:group-hover:rotate-x-[2deg] motion-safe:group-hover:rotate-y-[-3deg] group-hover:shadow-[0_30px_90px_rgba(51,61,41,0.18)]`}
               >
                 <div
                   className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-[1.04]"
                   style={{ backgroundImage: `url(${moment.image})` }}
                 />
-                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(17,24,39,0.02)_0%,rgba(17,24,39,0.18)_38%,rgba(17,24,39,0.82)_100%)]" />
+                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(51,61,41,0.02)_0%,rgba(51,61,41,0.18)_38%,rgba(51,61,41,0.82)_100%)]" />
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(201,169,110,0.18),transparent_42%)] opacity-0 transition-opacity duration-700 group-hover:opacity-100" />
                 <span className="font-accent absolute right-5 top-5 text-[10px] uppercase tracking-[0.24em] text-ivory/40">
                   {String(index + 1).padStart(2, "0")} / {String(moments.length).padStart(2, "0")}
@@ -258,7 +258,7 @@ function AssuranceStrip() {
 
   return (
     <section className="relative overflow-hidden bg-midnight text-ivory">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_30%,rgba(201,169,110,0.14),transparent_28%),radial-gradient(circle_at_82%_30%,rgba(123,167,201,0.1),transparent_24%),linear-gradient(180deg,#10101b,#15172a)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_30%,rgba(201,169,110,0.14),transparent_28%),radial-gradient(circle_at_82%_30%,rgba(164,172,134,0.1),transparent_24%),linear-gradient(180deg,#333d29,#414833)]" />
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:120px_120px] opacity-[0.10]" />
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold-primary/40 to-transparent" />
       <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-gold-primary/40 to-transparent" />

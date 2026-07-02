@@ -216,7 +216,7 @@ export function PackageSection({
       id="packages"
       className="relative overflow-hidden bg-cream py-[var(--section-padding-y)]"
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(201,169,110,0.08),transparent_28%),radial-gradient(circle_at_85%_10%,rgba(123,167,201,0.07),transparent_24%),linear-gradient(180deg,rgba(250,247,242,1)_0%,rgba(245,240,232,0.92)_100%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(201,169,110,0.08),transparent_28%),radial-gradient(circle_at_85%_10%,rgba(164,172,134,0.07),transparent_24%),linear-gradient(180deg,rgba(250,247,242,1)_0%,rgba(245,240,232,0.92)_100%)]" />
       <div ref={ref} className="mx-auto max-w-7xl px-[var(--section-padding-x)]">
         {showHeader && (
           <motion.div
@@ -332,8 +332,8 @@ function PackageCard({
       className={cn(
         "group relative overflow-hidden p-0 transition-all duration-500",
         pkg.featured
-          ? "bg-ivory shadow-[0_36px_100px_rgba(26,26,46,0.14)] ring-1 ring-gold-primary/30 hover:shadow-[0_44px_120px_rgba(26,26,46,0.18)] md:-mt-4 md:mb-4"
-          : "border border-charcoal/5 bg-cream/80 shadow-[0_18px_60px_rgba(26,26,46,0.06)] hover:-translate-y-1 hover:shadow-[0_30px_80px_rgba(26,26,46,0.1)]"
+          ? "bg-ivory shadow-[0_36px_100px_rgba(51,61,41,0.14)] ring-1 ring-gold-primary/30 hover:shadow-[0_44px_120px_rgba(51,61,41,0.18)] md:-mt-4 md:mb-4"
+          : "border border-charcoal/5 bg-cream/80 shadow-[0_18px_60px_rgba(51,61,41,0.06)] hover:-translate-y-1 hover:shadow-[0_30px_80px_rgba(51,61,41,0.1)]"
       )}
     >
       <article aria-labelledby={headingId}>
@@ -341,7 +341,7 @@ function PackageCard({
           <div
             className="min-h-[200px] bg-cover bg-center"
             style={{
-              backgroundImage: `linear-gradient(180deg, rgba(17,24,39,0.12), rgba(17,24,39,0.72)), url(${pkg.image})`,
+              backgroundImage: `linear-gradient(180deg, rgba(51,61,41,0.12), rgba(51,61,41,0.72)), url(${pkg.image})`,
             }}
           >
             <div className="flex h-full min-h-[200px] flex-col justify-between p-5 text-ivory">

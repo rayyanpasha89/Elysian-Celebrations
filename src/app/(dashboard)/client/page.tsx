@@ -558,7 +558,7 @@ function AttentionCard({
     <Link
       href={href}
       className={cn(
-        "group flex flex-col justify-between border p-4 transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_36px_rgba(26,26,46,0.08)]",
+        "group flex flex-col justify-between border p-4 transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_36px_rgba(51,61,41,0.08)]",
         tone
       )}
     >
@@ -601,7 +601,7 @@ function ModuleCard({
   return (
     <Link
       href={href}
-      className="group flex flex-col border border-charcoal/10 bg-ivory p-4 transition-all hover:-translate-y-0.5 hover:border-gold-primary/40 hover:shadow-[0_14px_36px_rgba(26,26,46,0.07)]"
+      className="group flex flex-col border border-charcoal/10 bg-ivory p-4 transition-all hover:-translate-y-0.5 hover:border-gold-primary/40 hover:shadow-[0_14px_36px_rgba(51,61,41,0.07)]"
     >
       <div className="flex items-center justify-between">
         <p className={dashLabel}>{label}</p>

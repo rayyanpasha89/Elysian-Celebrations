@@ -118,7 +118,7 @@ export const destinations: Destination[] = [
     name: "Santorini",
     slug: "santorini",
     country: "Greece",
-    tagline: "Caldera blues, whitewashed curves, and sunsets that steal every breath.",
+    tagline: "Caldera whites, mineral cliffs, and sunsets that steal every breath.",
     description:
       "Santorini is the postcard made real—terraces stepping toward the Aegean, domes catching the last blush of day, and tables set for small, exquisite parties. Say ‘I do’ as the caldera glows gold, then dance under strings of light while the sea turns ink below. For couples who want European elegance with the drama of an island suspended between sky and water.",
     heroImage: MARKETING_IMAGES.destinations.santorini,

@@ -15,7 +15,7 @@ export function TestAuthSwitcher() {
   const currentRoot = pathname?.split("/").filter(Boolean)[0] ?? "";
 
   return (
-    <aside className="fixed bottom-4 left-4 z-[80] hidden max-w-[calc(100vw-2rem)] border border-gold-primary/35 bg-midnight/92 p-3 text-ivory shadow-[0_24px_80px_rgba(16,16,27,0.24)] backdrop-blur-xl md:block">
+    <aside className="fixed bottom-4 left-4 z-[80] hidden max-w-[calc(100vw-2rem)] border border-gold-primary/35 bg-midnight/92 p-3 text-ivory shadow-[0_24px_80px_rgba(51,61,41,0.24)] backdrop-blur-xl md:block">
       <p className="font-accent text-[9px] uppercase tracking-[0.22em] text-gold-light">
         Clerk paused for testing
       </p>

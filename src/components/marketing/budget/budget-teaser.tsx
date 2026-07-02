@@ -14,9 +14,9 @@ const budgetBreakdown = [
   { label: "Venue & Hospitality", percent: 35, color: "#C9A96E" },
   { label: "Decor & Design", percent: 20, color: "#D4A0A0" },
   { label: "Catering", percent: 15, color: "#9CAF88" },
-  { label: "Photography & Video", percent: 12, color: "#7BA7C9" },
+  { label: "Photography & Video", percent: 12, color: "#A4AC86" },
   { label: "Entertainment", percent: 8, color: "#D4A843" },
-  { label: "Others", percent: 10, color: "#6B7280" },
+  { label: "Others", percent: 10, color: "#656D4A" },
 ];
 
 const budgetNotes = [
@@ -52,7 +52,7 @@ export function BudgetTeaser() {
         className="absolute inset-0 pointer-events-none"
         style={{
           backgroundImage:
-            "radial-gradient(ellipse at 72% 18%, rgba(201,169,110,0.08) 0%, transparent 46%), radial-gradient(ellipse at 18% 78%, rgba(123,167,201,0.06) 0%, transparent 42%), linear-gradient(180deg,rgba(250,247,242,1)_0%,rgba(245,240,232,0.9)_100%)",
+            "radial-gradient(ellipse at 72% 18%, rgba(201,169,110,0.08) 0%, transparent 46%), radial-gradient(ellipse at 18% 78%, rgba(164,172,134,0.06) 0%, transparent 42%), linear-gradient(180deg,rgba(250,247,242,1)_0%,rgba(245,240,232,0.9)_100%)",
         }}
       />
       <div className="absolute inset-0 dot-pattern opacity-20 pointer-events-none" />
@@ -87,7 +87,7 @@ export function BudgetTeaser() {
               {budgetNotes.map(({ icon: Icon, title, body }) => (
                 <div
                   key={title}
-                  className="border border-charcoal/8 bg-white/70 p-4 shadow-[0_18px_50px_rgba(26,26,46,0.05)] backdrop-blur-sm"
+                  className="border border-charcoal/8 bg-white/70 p-4 shadow-[0_18px_50px_rgba(51,61,41,0.05)] backdrop-blur-sm"
                 >
                   <div className="flex h-10 w-10 items-center justify-center border border-gold-primary/18 bg-gold-primary/10 text-gold-dark">
                     <Icon className="h-4 w-4" />
@@ -98,7 +98,7 @@ export function BudgetTeaser() {
               ))}
             </div>
 
-            <div className="mt-8 border border-gold-primary/12 bg-ivory/70 p-5 shadow-[0_18px_60px_rgba(26,26,46,0.05)]">
+            <div className="mt-8 border border-gold-primary/12 bg-ivory/70 p-5 shadow-[0_18px_60px_rgba(51,61,41,0.05)]">
               <div className="flex items-end justify-between gap-4">
                 <div>
                   <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-gold-primary/55">
@@ -147,11 +147,11 @@ export function BudgetTeaser() {
             animate={isInView ? "visible" : "hidden"}
             className="grid gap-5"
           >
-            <div className="overflow-hidden border border-gold-primary/15 bg-cream shadow-[0_28px_100px_rgba(26,26,46,0.12)]">
+            <div className="overflow-hidden border border-gold-primary/15 bg-cream shadow-[0_28px_100px_rgba(51,61,41,0.12)]">
               <div
                 className="relative min-h-[230px] bg-cover bg-center"
                 style={{
-                  backgroundImage: `linear-gradient(180deg, rgba(17,24,39,0.14), rgba(17,24,39,0.68)), url(${budgetHeroImage})`,
+                  backgroundImage: `linear-gradient(180deg, rgba(51,61,41,0.14), rgba(51,61,41,0.68)), url(${budgetHeroImage})`,
                 }}
               >
                 <div className="absolute left-5 top-5 max-w-[14rem] border border-white/12 bg-midnight/35 px-4 py-3 text-ivory backdrop-blur-md">
@@ -182,7 +182,7 @@ export function BudgetTeaser() {
               </div>
             </div>
 
-            <div className="border border-gold-primary/15 bg-cream p-7 shadow-[0_28px_100px_rgba(26,26,46,0.1)] md:p-8">
+            <div className="border border-gold-primary/15 bg-cream p-7 shadow-[0_28px_100px_rgba(51,61,41,0.1)] md:p-8">
               <div className="mb-8">
                 <div className="mb-3 flex items-center justify-between">
                   <label className="font-accent text-xs uppercase tracking-[0.15em] text-slate">
@@ -207,7 +207,7 @@ export function BudgetTeaser() {
                 </div>
               </div>
 
-              <div className="mb-6 border border-gold-primary/12 bg-ivory p-6 text-center shadow-[0_18px_50px_rgba(26,26,46,0.05)]">
+              <div className="mb-6 border border-gold-primary/12 bg-ivory p-6 text-center shadow-[0_18px_50px_rgba(51,61,41,0.05)]">
                 <p className="mb-2 font-accent text-xs uppercase tracking-[0.2em] text-slate">
                   Estimated starting from
                 </p>

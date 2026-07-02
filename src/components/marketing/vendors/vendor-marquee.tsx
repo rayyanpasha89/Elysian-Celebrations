@@ -69,7 +69,7 @@ export function VendorMarquee() {
         className="absolute inset-0 pointer-events-none"
         style={{
           backgroundImage:
-            "radial-gradient(ellipse at 18% 12%, rgba(201,169,110,0.08) 0%, transparent 36%), radial-gradient(ellipse at 82% 12%, rgba(123,167,201,0.08) 0%, transparent 30%)",
+            "radial-gradient(ellipse at 18% 12%, rgba(201,169,110,0.08) 0%, transparent 36%), radial-gradient(ellipse at 82% 12%, rgba(164,172,134,0.08) 0%, transparent 30%)",
         }}
       />
 
@@ -94,7 +94,7 @@ export function VendorMarquee() {
               {standards.map((standard) => (
                 <div
                   key={standard}
-                  className="flex items-center gap-3 border border-charcoal/8 bg-white/72 px-4 py-4 shadow-[0_18px_50px_rgba(26,26,46,0.05)]"
+                  className="flex items-center gap-3 border border-charcoal/8 bg-white/72 px-4 py-4 shadow-[0_18px_50px_rgba(51,61,41,0.05)]"
                 >
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center border border-gold-primary/18 bg-gold-primary/10 text-gold-dark">
                     <ShieldCheck className="h-4 w-4" />
@@ -119,12 +119,12 @@ export function VendorMarquee() {
             {vendorProofCards.map(({ title, detail, image, icon: Icon }) => (
               <article
                 key={title}
-                className="overflow-hidden border border-charcoal/8 bg-white/75 shadow-[0_24px_70px_rgba(26,26,46,0.08)]"
+                className="overflow-hidden border border-charcoal/8 bg-white/75 shadow-[0_24px_70px_rgba(51,61,41,0.08)]"
               >
                 <div
                   className="relative min-h-[19rem] bg-cover bg-center"
                   style={{
-                    backgroundImage: `linear-gradient(180deg, rgba(17,24,39,0.08), rgba(17,24,39,0.72)), url(${image})`,
+                    backgroundImage: `linear-gradient(180deg, rgba(51,61,41,0.08), rgba(51,61,41,0.72)), url(${image})`,
                   }}
                 >
                   <div className="absolute left-4 top-4 flex h-10 w-10 items-center justify-center border border-ivory/14 bg-midnight/45 text-gold-light backdrop-blur-md">

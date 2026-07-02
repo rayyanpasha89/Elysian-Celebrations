@@ -321,7 +321,7 @@ export default function AdminPricingPage() {
                 key={c.id}
                 type="button"
                 onClick={() => setSelectedClientId(c.id)}
-                className="group flex flex-col border border-charcoal/10 bg-ivory p-4 text-left transition-all hover:-translate-y-0.5 hover:border-gold-primary/40 hover:shadow-[0_14px_36px_rgba(26,26,46,0.08)]"
+                className="group flex flex-col border border-charcoal/10 bg-ivory p-4 text-left transition-all hover:-translate-y-0.5 hover:border-gold-primary/40 hover:shadow-[0_14px_36px_rgba(51,61,41,0.08)]"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -559,7 +559,7 @@ function PricingEditor({
         exit={{ opacity: 0, scale: 0.97, y: 8 }}
         transition={{ type: "spring", stiffness: 240, damping: 26 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg border border-charcoal/12 bg-ivory shadow-[0_40px_120px_rgba(17,24,39,0.35)]"
+        className="w-full max-w-lg border border-charcoal/12 bg-ivory shadow-[0_40px_120px_rgba(51,61,41,0.35)]"
       >
         <div className="flex items-start justify-between gap-3 border-b border-charcoal/10 px-5 py-4">
           <div className="min-w-0">
