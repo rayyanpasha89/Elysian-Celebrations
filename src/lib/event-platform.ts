@@ -210,6 +210,8 @@ export type EventDefinitionTimeBlock = {
   eventType: string;
   startTime: string | null;
   endTime: string | null;
+  /** Venue, ballroom, lawn, beach, or custom area for this specific block. */
+  venue: string | null;
   /** Expected guests for this specific block. Null = inherit from event scale. */
   guestCount: number | null;
   requirementCategories: EventRequirementCategoryKey[];
@@ -595,6 +597,7 @@ export function buildDefaultRequirementsForEvent({
     eventType: eventName,
     startTime,
     endTime: null,
+    venue: null,
     guestCount: null,
     requirementCategories: categories ?? [],
     notes: null,
@@ -653,6 +656,7 @@ function normalizeDefinitionTimeBlock(
     eventType,
     startTime: toOptionalString(block.startTime, 20) ?? slot.defaultStartTime,
     endTime: toOptionalString(block.endTime, 20) ?? slot.defaultEndTime,
+    venue: toOptionalString(block.venue ?? block.venueName ?? block.location, 180),
     guestCount: normalizeGuestCount(block.guestCount ?? block.guests),
     requirementCategories: normalizeRequirementCategories(
       block.requirementCategories ?? block.requirements
@@ -770,7 +774,7 @@ export function buildCelebrationPlanFromEventDefinition(
         startTime: block.startTime,
         endTime: block.endTime,
         timeBlock: block.slot,
-        venue: definition.primaryVenue,
+        venue: block.venue ?? definition.primaryVenue,
         guestCount: block.guestCount,
         requirementCategories: block.requirementCategories,
         notes: block.notes,

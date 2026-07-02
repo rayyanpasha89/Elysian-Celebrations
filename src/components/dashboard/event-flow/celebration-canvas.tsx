@@ -325,15 +325,22 @@ export function CelebrationCanvas({
                     day.dateLabel && day.dateLabel !== "Date TBD"
                       ? day.dateLabel
                       : day.title,
-                  subtitle:
+                  eyebrow:
                     day.dateLabel && day.dateLabel !== "Date TBD"
                       ? `${day.title} · ${day.events.length} ${
                           day.events.length === 1 ? "function" : "functions"
                         }`
+                      : undefined,
+                  subtitle:
+                    day.dateLabel && day.dateLabel !== "Date TBD"
+                      ? `${day.readiness}% ready`
                       : `${day.events.length} ${
                           day.events.length === 1 ? "function" : "functions"
                         }`,
-                  details: [`${day.readiness}% ready`],
+                  details:
+                    day.dateLabel && day.dateLabel !== "Date TBD"
+                      ? []
+                      : [`${day.readiness}% ready`],
                   status: day.status,
                   onClick: () => setLevel({ kind: "day", dayId: day.id }),
                 }))}
@@ -360,10 +367,9 @@ export function CelebrationCanvas({
                 nodes={activeDay.events.map((event) => ({
                   id: event.id,
                   title: event.title,
-                  eyebrow: event.dateLabel,
-                  subtitle: event.timeLabel ?? "Time TBD",
+                  eyebrow: [event.dateLabel, event.timeLabel].filter(Boolean).join(" · "),
+                  subtitle: event.venueLabel ?? "Venue TBD",
                   details: [
-                    event.venueLabel ?? "Venue TBD",
                     event.meta ?? "Guests TBD",
                     `${event.readiness}% ready`,
                   ],

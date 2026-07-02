@@ -3,13 +3,13 @@
 /**
  * Layer 1 — Definition.
  *
- * A 6-step guided flow that captures the new event-platform model:
+ * A 5-step guided flow that captures the new event-platform model:
  *   Step 1 — profile name
  *   Step 2 — event type (14 presets + Custom)
  *   Step 3 — number of days
  *   Step 4 — optional per-day dates
- *   Step 5 — primary venue / event area
- *   Step 6 — per-day morning / afternoon / evening time blocks (needs + timing + guests)
+ *   Step 5 — per-day morning / afternoon / evening time blocks
+ *            (venue + needs + timing + guests)
  *
  * Submits to the existing /api/wedding POST. The request includes the richer
  * `definitionPayload` (event type, custom name, full day/block plan); when
@@ -53,14 +53,13 @@ const DEFAULT_NEEDS: EventRequirementCategoryKey[] = [
   "photo-video",
 ];
 
-type Step = 0 | 1 | 2 | 3 | 4 | 5;
+type Step = 0 | 1 | 2 | 3 | 4;
 
 const STEP_LABELS = [
   "Name",
   "Type",
   "Days",
   "Dates",
-  "Venue",
   "Time blocks",
 ] as const;
 
@@ -75,6 +74,7 @@ type LocalDay = {
       title: string;
       startTime: string;
       endTime: string;
+      venue: string;
       guestCount: number;
       needs: EventRequirementCategoryKey[];
     }
@@ -129,6 +129,7 @@ function createEmptyDay(
               : `${block.label} ${dayName}`,
           startTime: block.defaultStartTime,
           endTime: block.defaultEndTime,
+          venue: "",
           guestCount: DEFAULT_GUESTS,
           needs: [...DEFAULT_NEEDS],
         };
@@ -172,6 +173,7 @@ function toEventDefinitionDay(day: LocalDay): EventDefinitionDay {
           eventType: local.title,
           startTime: local.startTime || null,
           endTime: local.endTime || null,
+          venue: local.venue || null,
           guestCount: local.guestCount || null,
           requirementCategories: local.needs,
           notes: null,
@@ -193,8 +195,6 @@ export default function ClientOnboardingPage() {
   const [customEventType, setCustomEventType] = useState("");
   // Step 3 — scale
   const [dayCount, setDayCount] = useState(3);
-  // Step 4
-  const [primaryVenue, setPrimaryVenue] = useState("");
   const [venueOptions, setVenueOptions] = useState<VenueOption[]>([]);
   const [venueOptionsLoading, setVenueOptionsLoading] = useState(false);
   const eventTypeLabel = useMemo(() => {
@@ -247,12 +247,11 @@ export default function ClientOnboardingPage() {
         eventName: profileName,
         eventType,
         customEventType: eventType === CUSTOM_EVENT_TYPE_VALUE ? customEventType : null,
-        primaryVenue,
         eventDate: null,
         dayCount,
         days: days.map(toEventDefinitionDay),
       }),
-    [profileName, eventType, customEventType, primaryVenue, dayCount, days]
+    [profileName, eventType, customEventType, dayCount, days]
   );
 
   const canAdvance = (): boolean => {
@@ -263,7 +262,6 @@ export default function ClientOnboardingPage() {
     }
     if (step === 2) return dayCount >= 1 && dayCount <= 14;
     if (step === 3) return days.length > 0;
-    if (step === 4) return true;
     return true;
   };
 
@@ -272,7 +270,7 @@ export default function ClientOnboardingPage() {
       toast.error("Please complete this step before continuing.");
       return;
     }
-    setStep((s) => (s < 5 ? ((s + 1) as Step) : s));
+    setStep((s) => (s < 4 ? ((s + 1) as Step) : s));
   };
 
   const back = () => setStep((s) => (s > 0 ? ((s - 1) as Step) : s));
@@ -284,12 +282,12 @@ export default function ClientOnboardingPage() {
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (saving) return;
-    if (step < 5) next();
+    if (step < 4) next();
   };
 
   const createEvent = async () => {
     if (saving) return;
-    if (step < 5) {
+    if (step < 4) {
       next();
       return;
     }
@@ -315,7 +313,6 @@ export default function ClientOnboardingPage() {
           eventType,
           customEventType:
             eventType === CUSTOM_EVENT_TYPE_VALUE ? customEventType.trim() : null,
-          primaryVenue: primaryVenue.trim() || null,
           definitionPayload: definition,
         }),
       });
@@ -415,24 +412,16 @@ export default function ClientOnboardingPage() {
           ) : null}
 
           {step === 4 ? (
-            <VenueStep
-              venues={venueOptions}
-              loading={venueOptionsLoading}
-              value={primaryVenue}
-              onChange={setPrimaryVenue}
-            />
-          ) : null}
-
-          {step === 5 ? (
             <>
               <ReviewSummary
                 eventName={profileName}
                 eventTypeLabel={eventTypeLabel}
-                primaryVenue={primaryVenue}
                 days={days}
               />
               <BlocksStep
                 days={days}
+                venues={venueOptions}
+                venuesLoading={venueOptionsLoading}
                 onBlockPatch={(dayIndex, blockKey, patch) => {
                   setDays((current) =>
                     current.map((day, i) =>
@@ -465,7 +454,7 @@ export default function ClientOnboardingPage() {
           >
             ← Back
           </button>
-          {step < 5 ? (
+          {step < 4 ? (
             <button type="button" onClick={next} className={dashBtn}>
               Continue →
             </button>
@@ -723,12 +712,14 @@ function venueMatchesValue(venue: VenueOption, value: string) {
   );
 }
 
-function VenueStep({
+function BlockVenuePicker({
+  id,
   venues,
   loading,
   value,
   onChange,
 }: {
+  id: string;
   venues: VenueOption[];
   loading: boolean;
   value: string;
@@ -738,130 +729,42 @@ function VenueStep({
   const customValueActive = Boolean(value.trim() && !selectedVenue);
   const [showCustom, setShowCustom] = useState(customValueActive);
   const customOpen = showCustom || customValueActive;
+  const destinationLabel = selectedVenue ? venueDestinationLabel(selectedVenue) : "";
 
   return (
-    <div className="space-y-5">
-      <div>
-        <p className={dashLabel}>Choose the primary venue or area</p>
-        <p className="mt-2 text-xs leading-relaxed text-slate">
-          Pick the main property, ballroom, lawn, or beach now. Every time block
-          starts with this venue, and you can override individual functions later
-          from the map.
-        </p>
-      </div>
+    <div className="mt-3 space-y-2">
+      <label htmlFor={id} className="block text-[11px] text-slate">
+        Venue / area for this block
+      </label>
+      <select
+        id={id}
+        value={selectedVenue ? selectedVenue.name : customOpen ? "__custom__" : ""}
+        onChange={(event) => {
+          const nextValue = event.target.value;
+          if (nextValue === "__custom__") {
+            setShowCustom(true);
+            if (selectedVenue) onChange("");
+            return;
+          }
+          setShowCustom(false);
+          onChange(nextValue);
+        }}
+        className="w-full border border-charcoal/12 bg-ivory px-2.5 py-2 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+      >
+        <option value="">Decide later</option>
+        {venues.map((venue) => (
+          <option key={venue.id} value={venue.name}>
+            {venue.name}
+          </option>
+        ))}
+        <option value="__custom__">Custom venue / area</option>
+      </select>
 
       {loading ? (
-        <div className="border border-charcoal/10 bg-cream/30 p-4 text-sm text-slate">
+        <p className="text-[10px] leading-relaxed text-slate/70">
           Loading venue catalogue...
-        </div>
+        </p>
       ) : null}
-
-      {!loading && venues.length === 0 ? (
-        <div className="border border-dashed border-charcoal/15 bg-cream/30 p-4">
-          <p className={dashLabel}>Venue catalogue not seeded yet</p>
-          <p className="mt-2 text-xs leading-relaxed text-slate">
-            Use a custom area for now, or skip this step and anchor venues per
-            function in the planner.
-          </p>
-        </div>
-      ) : null}
-
-      {venues.length > 0 ? (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {venues.map((venue) => {
-            const active = venueMatchesValue(venue, value);
-            const destinationLabel = venueDestinationLabel(venue);
-            return (
-              <button
-                key={venue.id}
-                type="button"
-                onClick={() => {
-                  onChange(venue.name);
-                  setShowCustom(false);
-                }}
-                className={cn(
-                  "group overflow-hidden border bg-ivory text-left transition-all hover:-translate-y-0.5 hover:border-gold-primary/45 hover:shadow-[0_18px_40px_rgba(51,61,41,0.08)]",
-                  active
-                    ? "border-gold-primary shadow-[0_18px_40px_rgba(201,169,110,0.14)]"
-                    : "border-charcoal/10"
-                )}
-              >
-                {venue.hero_image ? (
-                  <span className="block aspect-[5/2] overflow-hidden bg-cream">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={venue.hero_image}
-                      alt=""
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                  </span>
-                ) : null}
-                <span className="block p-3">
-                  <span className="font-heading text-sm text-charcoal">
-                    {venue.name}
-                  </span>
-                  <span className="mt-1 block text-[11px] leading-relaxed text-slate">
-                    {destinationLabel || venue.address || "Destination venue"}
-                  </span>
-                  <span className="mt-2 flex flex-wrap gap-1.5">
-                    {venue.capacity ? (
-                      <span className="border border-charcoal/10 px-2 py-1 font-heading text-[10px] text-slate">
-                        Up to {venue.capacity}
-                      </span>
-                    ) : null}
-                    {venue.price_range ? (
-                      <span className="border border-gold-primary/25 bg-gold-primary/8 px-2 py-1 font-heading text-[10px] text-gold-dark">
-                        {venue.price_range}
-                      </span>
-                    ) : null}
-                  </span>
-                  {venue.amenities?.length ? (
-                    <span className="mt-2 block text-[11px] leading-relaxed text-slate">
-                      {venue.amenities.slice(0, 3).join(" · ")}
-                    </span>
-                  ) : null}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
-
-      <div className="flex flex-wrap items-center gap-2 border-t border-charcoal/8 pt-4">
-        <button
-          type="button"
-          onClick={() => {
-            onChange("");
-            setShowCustom(false);
-          }}
-          className={cn(
-            "border px-3 py-2 font-accent text-[10px] uppercase tracking-[0.16em] transition-colors",
-            value
-              ? "border-charcoal/15 text-slate hover:border-gold-primary hover:text-gold-dark"
-              : "border-gold-primary/40 bg-gold-primary/10 text-gold-dark"
-          )}
-        >
-          Decide later
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            if (customValueActive) {
-              onChange("");
-              setShowCustom(false);
-              return;
-            }
-            setShowCustom((current) => !current);
-          }}
-          className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.16em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark"
-        >
-          {customValueActive
-            ? "Clear custom venue"
-            : customOpen
-              ? "Hide custom area"
-              : "Use custom area"}
-        </button>
-      </div>
 
       {customOpen ? (
         <input
@@ -869,18 +772,19 @@ function VenueStep({
           value={selectedVenue ? "" : value}
           onChange={(event) => onChange(event.target.value)}
           placeholder="Custom venue, lawn, ballroom, beach, terrace..."
-          className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+          className="w-full border border-charcoal/15 bg-transparent px-3 py-2 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
         />
       ) : selectedVenue ? (
-        <p className="border border-gold-primary/20 bg-gold-primary/8 px-3 py-2 text-xs leading-relaxed text-gold-dark">
-          Selected from venue catalogue: {selectedVenue.name}
+        <p className="border border-gold-primary/20 bg-gold-primary/8 px-2.5 py-2 text-[10px] leading-relaxed text-gold-dark">
+          {destinationLabel || selectedVenue.address || "Venue catalogue"}
+          {selectedVenue.capacity ? ` · up to ${selectedVenue.capacity}` : ""}
+          {selectedVenue.price_range ? ` · ${selectedVenue.price_range}` : ""}
         </p>
-      ) : (
-        <p className="text-xs leading-relaxed text-slate">
-          No venue selected yet. The planner will still work; each function can
-          receive its own venue later.
+      ) : !loading && venues.length === 0 ? (
+        <p className="text-[10px] leading-relaxed text-slate/70">
+          Catalogue not seeded yet. Use custom venue if you know the area.
         </p>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -889,12 +793,10 @@ function VenueStep({
 function ReviewSummary({
   eventName,
   eventTypeLabel,
-  primaryVenue,
   days,
 }: {
   eventName: string;
   eventTypeLabel: string;
-  primaryVenue: string;
   days: LocalDay[];
 }) {
   const enabledBlocks = days.reduce(
@@ -908,6 +810,13 @@ function ReviewSummary({
     return Math.max(max, dayGuests);
   }, 0);
   const dated = days.filter((d) => d.date).map((d) => d.date as string).sort();
+  const venueCount = new Set(
+    days.flatMap((day) =>
+      Object.values(day.blocks)
+        .filter((block) => block.enabled && block.venue.trim())
+        .map((block) => block.venue.trim().toLowerCase())
+    )
+  ).size;
   const range =
     dated.length > 0
       ? dated.length === 1
@@ -918,7 +827,7 @@ function ReviewSummary({
   const items: Array<{ label: string; value: string }> = [
     { label: "Event", value: eventName.trim() || "Untitled event" },
     { label: "Type", value: eventTypeLabel },
-    { label: "Venue", value: primaryVenue.trim() || "Decide later" },
+    { label: "Venues", value: venueCount ? `${venueCount} anchored` : "Per block" },
     { label: "Days", value: `${days.length}` },
     { label: "Time blocks", value: `${enabledBlocks}` },
     { label: "Peak guests", value: peakGuests.toLocaleString("en-IN") },
@@ -956,9 +865,13 @@ function ReviewSummary({
 
 function BlocksStep({
   days,
+  venues,
+  venuesLoading,
   onBlockPatch,
 }: {
   days: LocalDay[];
+  venues: VenueOption[];
+  venuesLoading: boolean;
   onBlockPatch: (
     dayIndex: number,
     blockKey: EventTimeBlockKey,
@@ -968,11 +881,11 @@ function BlocksStep({
   return (
     <div className="space-y-5">
       <div>
-        <p className={dashLabel}>Choose time blocks for each day</p>
+        <p className={dashLabel}>Choose time blocks, venues, and needs</p>
         <p className="mt-2 text-xs leading-relaxed text-slate">
           Morning, afternoon, and evening are on by default. Turn off any block
-          you do not need, then rename the rest — &quot;Morning&quot; can become
-          &quot;Haldi brunch&quot;, &quot;Evening&quot; can become &quot;Reception&quot;.
+          you do not need, then rename the rest and anchor each function to its
+          own venue or area. This is where multi-day, multi-venue events stay clear.
         </p>
       </div>
 
@@ -986,7 +899,7 @@ function BlocksStep({
               </span>
             </div>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="mt-4 grid gap-3 lg:grid-cols-3">
               {DEFAULT_BLOCK_KEYS.map((blockKey) => {
                 const preset = EVENT_TIME_BLOCKS.find((b) => b.key === blockKey)!;
                 const block = day.blocks[blockKey];
@@ -1068,6 +981,15 @@ function BlocksStep({
                             className="mt-1 w-full border border-charcoal/12 bg-ivory px-2 py-1 font-heading text-sm outline-none focus:border-gold-primary"
                           />
                         </label>
+                        <BlockVenuePicker
+                          id={`venue-${dayIndex}-${blockKey}`}
+                          venues={venues}
+                          loading={venuesLoading}
+                          value={block.venue}
+                          onChange={(value) =>
+                            onBlockPatch(dayIndex, blockKey, { venue: value })
+                          }
+                        />
                         <div className="mt-3">
                           <span className="block text-[11px] text-slate">
                             What this block needs
