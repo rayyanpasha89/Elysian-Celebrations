@@ -406,7 +406,7 @@ function CoreModelCard({ chapter }: { chapter: ScrollChapter }) {
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage: `linear-gradient(180deg,rgba(12,14,24,0.1),rgba(12,14,24,0.72)),url(${MARKETING_IMAGES.hero.tablescape})`,
+            backgroundImage: `linear-gradient(180deg,rgba(12,14,24,0.04),rgba(12,14,24,0.66)),url(${MARKETING_IMAGES.hero.spatialAtelier})`,
           }}
         />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(201,169,110,0.22),transparent_42%)]" />
@@ -519,7 +519,7 @@ function MobileSystemPreview() {
         <div
           className="h-24 bg-cover bg-center"
           style={{
-            backgroundImage: `linear-gradient(180deg,rgba(12,14,24,0.1),rgba(12,14,24,0.72)),url(${MARKETING_IMAGES.hero.tablescape})`,
+            backgroundImage: `linear-gradient(180deg,rgba(12,14,24,0.04),rgba(12,14,24,0.66)),url(${MARKETING_IMAGES.hero.spatialAtelier})`,
           }}
         />
         <div className="p-4">

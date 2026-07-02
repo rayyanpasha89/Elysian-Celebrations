@@ -441,19 +441,15 @@ function AnimatedLine({
           key={`${text}-${wordIndex}`}
           className="inline-flex overflow-hidden pb-[0.08em]"
         >
-          <motion.span
-            initial={shouldAnimate ? { opacity: 0, y: "32%" } : false}
-            animate={{ opacity: 1, y: "0%" }}
-            transition={{
-              duration: shouldAnimate ? 0.55 : 0,
-              delay: shouldAnimate ? delay + wordIndex * 0.07 : 0,
-              ease: [0.16, 1, 0.3, 1],
-            }}
+          <span
             className="inline-block"
-            style={{ transformOrigin: "bottom center" }}
+            style={{
+              transformOrigin: "bottom center",
+              transitionDelay: shouldAnimate ? `${delay + wordIndex * 0.07}s` : undefined,
+            }}
           >
             {word}
-          </motion.span>
+          </span>
         </span>
       ))}
     </span>
@@ -517,7 +513,7 @@ function MobileHeroStage() {
         <div
           className="h-24 bg-cover bg-center"
           style={{
-            backgroundImage: `linear-gradient(180deg,rgba(12,14,24,0.1),rgba(12,14,24,0.72)),url(${MARKETING_IMAGES.hero.tablescape})`,
+            backgroundImage: `linear-gradient(180deg,rgba(12,14,24,0.04),rgba(12,14,24,0.64)),url(${MARKETING_IMAGES.hero.spatialAtelier})`,
           }}
         />
         <div className="p-4">
@@ -674,7 +670,7 @@ function MainStageCard() {
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage: `linear-gradient(180deg, rgba(17,24,39,0.08), rgba(17,24,39,0.56)), url(${MARKETING_IMAGES.hero.tablescape})`,
+            backgroundImage: `linear-gradient(180deg, rgba(17,24,39,0.04), rgba(17,24,39,0.42)), url(${MARKETING_IMAGES.hero.spatialAtelier})`,
           }}
         />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_18%,rgba(232,213,176,0.28),transparent_34%)]" />

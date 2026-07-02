@@ -6,6 +6,7 @@ export const MARKETING_IMAGES = {
       "https://images.unsplash.com/photo-1529636798458-92182e662485?auto=format&fit=crop&w=1200&q=80",
     tablescape:
       "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=80",
+    spatialAtelier: "/generated/elysian-spatial-atelier.svg",
   },
   destinations: {
     udaipur:
