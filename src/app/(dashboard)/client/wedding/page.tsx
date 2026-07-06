@@ -1744,6 +1744,116 @@ function menuDraftFromVendorService({
   };
 }
 
+function applyVendorServiceToDraft({
+  draft,
+  categoryKey,
+  vendor,
+  service,
+  selectedItems,
+}: {
+  draft: EventDetailDraft;
+  categoryKey: PlannerVendorCategoryKey;
+  vendor: VendorPlannerOption;
+  service: VendorPlannerService;
+  selectedItems: VendorPlannerServiceItem[];
+}): EventDetailDraft {
+  const title = `${vendor.business_name}: ${service.name}`;
+  const lines = servicePlanningLines(service, selectedItems);
+  const taskTitle = `Confirm ${vendor.business_name} ${service.name} scope`;
+  const nextVendorSelections = {
+    ...draft.vendorSelections,
+    [categoryKey]: upsertVendorDraftSelection(draft.vendorSelections[categoryKey], {
+      vendorProfileId: vendor.id,
+      vendorSlug: vendor.slug,
+      vendorServiceId: service.id,
+    }),
+  };
+  const nextTasks = draft.tasks.some((task) => task.title === taskTitle)
+    ? draft.tasks
+    : [
+        ...draft.tasks,
+        {
+          ...createTaskDraft(),
+          title: taskTitle,
+          owner: "Planner",
+        },
+      ];
+
+  if (categoryKey === "catering") {
+    const selectedDietaryTags = selectedItems.flatMap(
+      (item) => item.dietary_tags ?? []
+    );
+
+    return {
+      ...draft,
+      vendorSelections: nextVendorSelections,
+      menus: [
+        ...draft.menus,
+        menuDraftFromVendorService({
+          vendorName: vendor.business_name,
+          service,
+          selectedItems,
+          foodStyle: draft.foodStyle,
+        }),
+      ],
+      foodPreferences: uniqueList([
+        ...draft.foodPreferences,
+        ...selectedDietaryTags,
+      ]),
+      menuNotes: appendPlanningBlock(draft.menuNotes, title, lines),
+      tasks: nextTasks,
+    };
+  }
+
+  if (categoryKey === "decor") {
+    return {
+      ...draft,
+      vendorSelections: nextVendorSelections,
+      decorNotes: appendPlanningBlock(draft.decorNotes, title, lines),
+      tasks: nextTasks,
+    };
+  }
+
+  if (categoryKey === "logistics") {
+    return {
+      ...draft,
+      vendorSelections: nextVendorSelections,
+      logistics: {
+        ...draft.logistics,
+        transportNotes: appendPlanningBlock(
+          draft.logistics.transportNotes,
+          title,
+          lines
+        ),
+      },
+      tasks: nextTasks,
+    };
+  }
+
+  if (categoryKey === "hospitality") {
+    return {
+      ...draft,
+      vendorSelections: nextVendorSelections,
+      logistics: {
+        ...draft.logistics,
+        roomingNotes: appendPlanningBlock(
+          draft.logistics.roomingNotes,
+          title,
+          lines
+        ),
+      },
+      tasks: nextTasks,
+    };
+  }
+
+  return {
+    ...draft,
+    vendorSelections: nextVendorSelections,
+    notes: appendPlanningBlock(draft.notes, title, lines),
+    tasks: nextTasks,
+  };
+}
+
 export default function ClientWeddingPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -2511,8 +2621,20 @@ export default function ClientWeddingPage() {
     }
   };
 
-  const saveEventDetails = async () => {
-    if (!selectedEvent || !detailDraft) return;
+  const saveEventDetails = async (
+    draftOverride?: EventDetailDraft,
+    options: { successMessage?: string } = {}
+  ) => {
+    const draftToSave = draftOverride ?? detailDraft;
+    if (!selectedEvent || !draftToSave) return;
+    const spendEstimateToSave = draftOverride
+      ? estimateDraftSpend({
+          draft: draftToSave,
+          event: selectedEvent,
+          venueOptions,
+          vendorOptions,
+        })
+      : detailSpendEstimate;
 
     setSavingDetail(true);
 
@@ -2521,30 +2643,30 @@ export default function ClientWeddingPage() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          weddingDayId: detailDraft.weddingDayId,
-          name: detailDraft.name,
-          eventType: detailDraft.eventType,
-          date: detailDraft.date || null,
-          startTime: detailDraft.startTime || null,
-          endTime: detailDraft.endTime || null,
-          venue: detailDraft.venue || null,
-          guestCount: detailDraft.guestCount
-            ? Number(detailDraft.guestCount)
+          weddingDayId: draftToSave.weddingDayId,
+          name: draftToSave.name,
+          eventType: draftToSave.eventType,
+          date: draftToSave.date || null,
+          startTime: draftToSave.startTime || null,
+          endTime: draftToSave.endTime || null,
+          venue: draftToSave.venue || null,
+          guestCount: draftToSave.guestCount
+            ? Number(draftToSave.guestCount)
             : null,
           estimatedBudget:
-            detailSpendEstimate && detailSpendEstimate.min > 0
-              ? detailSpendEstimate.min
+            spendEstimateToSave && spendEstimateToSave.min > 0
+              ? spendEstimateToSave.min
               : null,
-          foodStyle: detailDraft.foodStyle || null,
-          foodPreferences: detailDraft.foodPreferences,
-          menuNotes: detailDraft.menuNotes || null,
-          decorStyle: detailDraft.decorStyle || null,
-          decorNotes: detailDraft.decorNotes || null,
-          attireNotes: detailDraft.attireNotes || null,
-          notes: detailDraft.notes || null,
+          foodStyle: draftToSave.foodStyle || null,
+          foodPreferences: draftToSave.foodPreferences,
+          menuNotes: draftToSave.menuNotes || null,
+          decorStyle: draftToSave.decorStyle || null,
+          decorNotes: draftToSave.decorNotes || null,
+          attireNotes: draftToSave.attireNotes || null,
+          notes: draftToSave.notes || null,
           requirementPayload: {
             ...(selectedEvent.requirement_payload ?? {}),
-            stepNotes: detailDraft.stepNotes,
+            stepNotes: draftToSave.stepNotes,
           },
         }),
       });
@@ -2558,7 +2680,7 @@ export default function ClientWeddingPage() {
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(planningPayloadFromDraft(detailDraft)),
+          body: JSON.stringify(planningPayloadFromDraft(draftToSave)),
         }
       );
       const planningJson = await planningResponse.json();
@@ -2571,7 +2693,7 @@ export default function ClientWeddingPage() {
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(requirementsPayloadFromDraft(detailDraft)),
+          body: JSON.stringify(requirementsPayloadFromDraft(draftToSave)),
         }
       );
       const requirementsJson = await requirementsResponse.json();
@@ -2581,9 +2703,9 @@ export default function ClientWeddingPage() {
         );
       }
 
-      await syncVendorSelections(selectedEvent, detailDraft);
+      await syncVendorSelections(selectedEvent, draftToSave);
       await refreshWedding();
-      toast.success("Event plan saved");
+      toast.success(options.successMessage ?? "Event plan saved");
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to save event"
@@ -2760,115 +2882,23 @@ export default function ClientWeddingPage() {
       catalogueItems.length > 0
         ? catalogueItems.filter((item) => selectedItemIds.includes(item.id))
         : [];
-    const title = `${vendor.business_name}: ${service.name}`;
-    const lines = servicePlanningLines(service, selectedItems);
-    const taskTitle = `Confirm ${vendor.business_name} ${service.name} scope`;
+    if (!detailDraft) return;
 
-    setDetailDraft((current) => {
-      if (!current) return current;
-
-      const nextVendorSelections = {
-        ...current.vendorSelections,
-        [categoryKey]: upsertVendorDraftSelection(
-          current.vendorSelections[categoryKey],
-          {
-            vendorProfileId: vendor.id,
-            vendorSlug: vendor.slug,
-            vendorServiceId: service.id,
-          }
-        ),
-      };
-      const nextTasks = current.tasks.some((task) => task.title === taskTitle)
-        ? current.tasks
-        : [
-            ...current.tasks,
-            {
-              ...createTaskDraft(),
-              title: taskTitle,
-              owner: "Planner",
-            },
-          ];
-
-      if (categoryKey === "catering") {
-        const selectedDietaryTags = selectedItems.flatMap(
-          (item) => item.dietary_tags ?? []
-        );
-
-        return {
-          ...current,
-          vendorSelections: nextVendorSelections,
-          menus: [
-            ...current.menus,
-            menuDraftFromVendorService({
-              vendorName: vendor.business_name,
-              service,
-              selectedItems,
-              foodStyle: current.foodStyle,
-            }),
-          ],
-          foodPreferences: uniqueList([
-            ...current.foodPreferences,
-            ...selectedDietaryTags,
-          ]),
-          menuNotes: appendPlanningBlock(current.menuNotes, title, lines),
-          tasks: nextTasks,
-        };
-      }
-
-      if (categoryKey === "decor") {
-        return {
-          ...current,
-          vendorSelections: nextVendorSelections,
-          decorNotes: appendPlanningBlock(current.decorNotes, title, lines),
-          tasks: nextTasks,
-        };
-      }
-
-      if (categoryKey === "logistics") {
-        return {
-          ...current,
-          vendorSelections: nextVendorSelections,
-          logistics: {
-            ...current.logistics,
-            transportNotes: appendPlanningBlock(
-              current.logistics.transportNotes,
-              title,
-              lines
-            ),
-          },
-          tasks: nextTasks,
-        };
-      }
-
-      if (categoryKey === "hospitality") {
-        return {
-          ...current,
-          vendorSelections: nextVendorSelections,
-          logistics: {
-            ...current.logistics,
-            roomingNotes: appendPlanningBlock(
-              current.logistics.roomingNotes,
-              title,
-              lines
-            ),
-          },
-          tasks: nextTasks,
-        };
-      }
-
-      return {
-        ...current,
-        vendorSelections: nextVendorSelections,
-        notes: appendPlanningBlock(current.notes, title, lines),
-        tasks: nextTasks,
-      };
+    const nextDraft = applyVendorServiceToDraft({
+      draft: detailDraft,
+      categoryKey,
+      vendor,
+      service,
+      selectedItems,
     });
 
-    toast.success(
-      categoryKey === "catering"
-        ? "Catalogue rows added. Keep editing this menu or add another package."
-        : "Offering added. Keep editing this section or add another package."
-    );
+    setDetailDraft(nextDraft);
+    void saveEventDetails(nextDraft, {
+      successMessage:
+        categoryKey === "catering"
+          ? "Catalogue rows added and saved. Keep editing this menu or add another package."
+          : "Offering added and saved. Keep editing this section or add another package.",
+    });
   };
 
   const applyLogisticsBlueprint = (
@@ -3618,6 +3648,7 @@ export default function ClientWeddingPage() {
                           loading={venueOptionsLoading}
                           value={eventDraft.venue}
                           compact
+                          dropdown
                           onChange={(venue) =>
                             setEventDraft((current) => ({ ...current, venue }))
                           }
@@ -5008,6 +5039,8 @@ export default function ClientWeddingPage() {
         className="mt-4"
         selectedEvent={selectedEvent}
         selectedDay={selectedDay}
+        editorOpen={editorOpen}
+        editorSectionLabel={activeEditorSection?.label ?? "Selected step"}
         venueOptionsCount={venueOptions.length}
         savedVendorCount={savedVendorSlugs.length}
         nextAction={nextPlannerAction}
@@ -5027,6 +5060,8 @@ export default function ClientWeddingPage() {
 function LayerTwoGuidance({
   selectedEvent,
   selectedDay,
+  editorOpen,
+  editorSectionLabel,
   venueOptionsCount,
   savedVendorCount,
   nextAction,
@@ -5035,6 +5070,8 @@ function LayerTwoGuidance({
 }: {
   selectedEvent: WeddingEvent | null;
   selectedDay: WeddingDay | null;
+  editorOpen: boolean;
+  editorSectionLabel: string;
   venueOptionsCount: number;
   savedVendorCount: number;
   nextAction: ReturnType<typeof nextBestPlannerAction>;
@@ -5052,11 +5089,13 @@ function LayerTwoGuidance({
           {selectedEvent ? nextAction.value : "Pick any function branch"}
         </p>
         <p className="mt-2 text-xs leading-relaxed text-slate">
-          {selectedEvent
+          {selectedEvent && editorOpen
+            ? `You're editing ${editorSectionLabel}. Save here, or close the editor to pick another step from the map.`
+            : selectedEvent
             ? nextAction.detail
             : "Start from a day, then open a morning / afternoon / evening function before editing details."}
         </p>
-        {selectedEvent ? (
+        {selectedEvent && !editorOpen ? (
             <button
               type="button"
               onClick={() => onOpenSection(nextAction.section)}
@@ -5064,6 +5103,10 @@ function LayerTwoGuidance({
             >
               Open section
             </button>
+        ) : selectedEvent && editorOpen ? (
+          <p className="mt-3 border border-sage/25 bg-sage/10 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.16em] text-sage">
+            Section open
+          </p>
         ) : null}
       </article>
 
