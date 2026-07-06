@@ -26,6 +26,7 @@
 *.swp
 .claude/
 .cursor/
+.gstack/
 
 # debug
 npm-debug.log*
