@@ -54,9 +54,9 @@ export function Navbar() {
   return (
     <>
       <motion.header
-        initial={{ y: -80, opacity: 0 }}
+        initial={{ y: -48, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.45 }}
+        transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.12 }}
         className="fixed inset-x-0 top-0 z-[10020]"
       >
         <div
@@ -69,17 +69,17 @@ export function Navbar() {
           <nav
             className={cn(
               "relative flex items-center justify-between overflow-hidden border px-4 py-3 md:h-auto md:px-6 md:py-3",
-              prefersReducedMotion ? "transition-none" : "transition-all duration-500",
+              prefersReducedMotion ? "transition-none" : "transition-all duration-200",
               isMobileCondensed && "h-14 px-3 py-1 md:h-auto md:px-6 md:py-3",
               isScrolled
-                ? "border-charcoal/6 bg-ivory/88 shadow-[0_22px_80px_rgba(51,61,41,0.12)] backdrop-blur-2xl"
-                : "border-white/12 bg-white/[0.04] shadow-[0_22px_90px_rgba(0,0,0,0.18)] backdrop-blur-2xl"
+                ? "border-gold-primary/20 bg-charcoal-brown/78 shadow-[0_16px_52px_rgba(0,0,0,0.22)] backdrop-blur-xl"
+                : "border-white/12 bg-charcoal-brown/30 shadow-[0_18px_56px_rgba(0,0,0,0.18)] backdrop-blur-xl"
             )}
           >
             <div
               className={cn(
-                "pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,169,110,0.14),transparent_28%),radial-gradient(circle_at_85%_0%,rgba(164,172,134,0.12),transparent_24%),linear-gradient(90deg,rgba(255,255,255,0.08),transparent_30%,transparent_70%,rgba(255,255,255,0.05))] transition-opacity duration-500",
-                isScrolled ? "opacity-55" : "opacity-100"
+                "pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,169,110,0.18),transparent_28%),radial-gradient(circle_at_85%_0%,rgba(164,172,134,0.13),transparent_24%),linear-gradient(90deg,rgba(255,255,255,0.08),transparent_30%,transparent_70%,rgba(255,255,255,0.05))] transition-opacity duration-200",
+                isScrolled ? "opacity-75" : "opacity-100"
               )}
             />
 
@@ -98,7 +98,7 @@ export function Navbar() {
                     prefersReducedMotion ? "transition-none" : "transition-all duration-500",
                     isMobileCondensed ? "h-8 w-8" : "h-10 w-10",
                     isScrolled
-                      ? "border-gold-primary/30 bg-gold-primary/10 shadow-[0_10px_30px_rgba(201,169,110,0.12)]"
+                      ? "border-gold-primary/34 bg-gold-primary/12 shadow-[0_10px_30px_rgba(201,169,110,0.10)]"
                       : "border-white/12 bg-white/[0.06] shadow-[0_10px_30px_rgba(0,0,0,0.12)]"
                   )}
                 >
@@ -112,7 +112,7 @@ export function Navbar() {
                       "block font-display font-bold tracking-[0.02em] md:text-[1.55rem]",
                       prefersReducedMotion ? "transition-none" : "transition-all duration-500",
                       isMobileCondensed ? "text-[1.18rem]" : "text-[1.45rem]",
-                      isScrolled ? "text-charcoal" : "text-ivory"
+                      "text-ivory"
                     )}
                   >
                     Elysian
@@ -124,7 +124,7 @@ export function Navbar() {
                       isMobileCondensed
                         ? "text-[8px] tracking-[0.24em]"
                         : "text-[10px] tracking-[0.34em]",
-                      isScrolled ? "text-gold-dark" : "text-gold-light"
+                      isScrolled ? "text-gold-light" : "text-gold-light"
                     )}
                   >
                     Celebrations
@@ -133,15 +133,15 @@ export function Navbar() {
               </div>
             </Link>
 
-            <div className="relative z-10 hidden items-center gap-2 lg:flex">
+            <div className="relative z-10 hidden items-center gap-1 xl:flex">
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
                   className={cn(
-                    "group relative rounded-full px-4 py-2 font-accent text-[11px] uppercase tracking-[0.18em] transition-all duration-300",
+                    "group relative rounded-full px-3 py-2 font-accent text-[10px] uppercase tracking-[0.16em] transition-all duration-300 2xl:px-4 2xl:text-[11px] 2xl:tracking-[0.18em]",
                     isScrolled
-                      ? "text-charcoal/72 hover:bg-charcoal/[0.04] hover:text-charcoal"
+                      ? "text-ivory/76 hover:bg-white/[0.07] hover:text-gold-light"
                       : "text-ivory/72 hover:bg-white/[0.06] hover:text-ivory"
                   )}
                 >
@@ -151,19 +151,19 @@ export function Navbar() {
               ))}
             </div>
 
-            <div className="relative z-10 hidden items-center gap-4 lg:flex">
+            <div className="relative z-10 hidden items-center gap-3 lg:flex">
               <div
                 className={cn(
-                  "hidden flex-col justify-center rounded-full border px-4 py-2 text-right xl:flex",
+                  "hidden flex-col justify-center rounded-full border px-4 py-2 text-right 2xl:flex",
                   isScrolled
-                    ? "border-charcoal/8 bg-white/70"
+                    ? "border-gold-primary/20 bg-white/[0.06]"
                     : "border-white/10 bg-white/[0.05]"
                 )}
               >
                 <span
                   className={cn(
                     "font-accent text-[9px] uppercase tracking-[0.26em]",
-                    isScrolled ? "text-slate" : "text-ivory/44"
+                    isScrolled ? "text-gold-light/72" : "text-ivory/44"
                   )}
                 >
                   Premium planning stack
@@ -171,7 +171,7 @@ export function Navbar() {
                 <span
                   className={cn(
                     "mt-1 font-heading text-[12px] leading-none",
-                    isScrolled ? "text-charcoal" : "text-ivory/78"
+                    isScrolled ? "text-ivory/72" : "text-ivory/78"
                   )}
                 >
                   Budget, vendors, events
@@ -180,13 +180,13 @@ export function Navbar() {
 
               <NavSignIn
                 className={cn(
-                  "font-accent text-[11px] uppercase tracking-[0.18em] transition-colors",
+                  "font-accent text-[10px] uppercase tracking-[0.16em] transition-colors 2xl:text-[11px] 2xl:tracking-[0.18em]",
                   isScrolled
-                    ? "text-charcoal/72 hover:text-gold-dark"
+                    ? "text-ivory/74 hover:text-gold-light"
                     : "text-ivory/74 hover:text-ivory"
                 )}
               />
-              <MagneticButton href="/contact" className="px-6 py-3 text-xs shadow-[0_14px_40px_rgba(201,169,110,0.16)]">
+              <MagneticButton href="/contact" className="px-5 py-3 text-xs shadow-[0_14px_40px_rgba(201,169,110,0.16)] 2xl:px-6">
                 Inquire
               </MagneticButton>
             </div>
@@ -194,9 +194,9 @@ export function Navbar() {
             <button
               onClick={() => setIsMobileOpen((open) => !open)}
               className={cn(
-                "relative z-10 transition-colors lg:hidden",
+                "relative z-10 transition-colors xl:hidden",
                 isMobileCondensed ? "p-1.5" : "p-2",
-                isScrolled || isMobileOpen ? "text-charcoal" : "text-ivory"
+                isScrolled || isMobileOpen ? "text-ivory" : "text-ivory"
               )}
               aria-label="Toggle menu"
             >

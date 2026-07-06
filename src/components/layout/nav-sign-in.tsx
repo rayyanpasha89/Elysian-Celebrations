@@ -45,7 +45,7 @@ export function NavSignIn({ className, onNavigate }: NavSignInProps) {
         className={className}
         onClick={() => onNavigate?.()}
       >
-        Testing Dashboard
+        Dashboard
       </Link>
     );
   }

@@ -1,11 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { DestinationCard } from "./destination-card";
-import { fadeUp } from "@/animations/variants";
-import { useInViewAnimation } from "@/hooks/use-in-view-animation";
 import { SectionHeader } from "@/components/marketing/shared/marketing-primitives";
 
 const destinations = [
@@ -92,7 +89,6 @@ export function DestinationCarousel() {
   const trackRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Array<HTMLDivElement | null>>([]);
   const [activeIndex, setActiveIndex] = useState(0);
-  const { ref: titleRef, isInView } = useInViewAnimation({ threshold: 0.3 });
   const destinationCount = destinations.length;
   const venueCount = destinations.reduce((sum, destination) => sum + destination.venueCount, 0);
 
@@ -145,60 +141,54 @@ export function DestinationCarousel() {
 
   return (
     <section id="destinations" className="relative overflow-hidden bg-midnight">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(201,169,110,0.14),transparent_28%),radial-gradient(circle_at_80%_20%,rgba(164,172,134,0.12),transparent_24%),linear-gradient(180deg,rgba(17,17,27,1)_0%,rgba(11,15,24,1)_100%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(201,169,110,0.14),transparent_28%),radial-gradient(circle_at_80%_20%,rgba(164,172,134,0.13),transparent_24%),linear-gradient(180deg,rgba(51,61,41,1)_0%,rgba(65,72,51,1)_52%,rgba(51,61,41,1)_100%)]" />
       <div className="absolute inset-0 noise-dark" />
 
       <div
-        ref={titleRef}
-        className="relative z-10 mx-auto max-w-7xl px-[var(--section-padding-x)] pt-[var(--section-padding-y)] pb-12"
+        className="relative z-10 mx-auto max-w-7xl px-[var(--section-padding-x)] pb-10 pt-20 md:pt-[var(--section-padding-y)]"
       >
-        <motion.div
-          variants={fadeUp}
-          initial="hidden"
-          animate={isInView ? "visible" : "hidden"}
-          className="space-y-8"
-        >
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(320px,0.55fr)] lg:items-end">
           <SectionHeader
             chapter="02"
             eyebrow="Destinations"
             title={
               <>
-                Seven places,
+                Where the plan
                 <br />
                 <span className="text-gold-primary">
-                  seven different atmospheres
+                  finds its ground.
                 </span>
               </>
             }
-            intro="Each destination is chosen for visual weight, guest comfort, vendor depth, and the kind of narrative it creates when the celebration needs to feel expensive, considered, and deeply personal."
-            align="center"
+            intro="A destination is not just scenery. It decides venue anchors, guest movement, weather risk, vendor density, room blocks, and how every function should breathe."
+            align="start"
             tone="light"
             className="max-w-4xl"
           />
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
             <StatCard
-              label="Curated destinations"
+              label="Destination maps"
               value={destinationCount}
               accent="gold"
             />
             <StatCard
-              label="Venue possibilities"
+              label="Venue anchors"
               value={`${venueCount}+`}
               accent="sage"
             />
             <StatCard
-              label="Vibes available"
-              value="Royal to coastal"
+              label="Planning read"
+              value="Movement · climate · vendors"
               accent="rose"
             />
           </div>
-        </motion.div>
+        </div>
 
-        <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-6">
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-5">
           <p className="max-w-2xl text-sm leading-relaxed text-ivory/56">
-            Scroll through destination scenes, each with a different emotional texture
-            and planning cadence.
+            Choose a place, then the product turns it into usable structure:
+            venues, function timing, vendor availability, and budget cues.
           </p>
           <div className="hidden items-center gap-3 lg:flex">
             <ScrollButton direction="left" onClick={() => scrollTrack("left")} />

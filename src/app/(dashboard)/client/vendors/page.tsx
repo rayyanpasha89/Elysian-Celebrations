@@ -738,70 +738,38 @@ export default function ClientVendorsPage() {
 
       <motion.section
         variants={fadeUp}
-        className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3"
-        aria-label="Function based vendor filters"
-      >
-        {eventNeedFilters.map((need) => {
-          const active = activeNeedId === need.id;
-          return (
-            <button
-              key={need.id}
-              type="button"
-              aria-pressed={active}
-              onClick={() => chooseNeed(need)}
-              className={cn(
-                "group border p-4 text-left transition-all duration-300",
-                active
-                  ? "border-gold-primary bg-gold-primary/10 shadow-[0_16px_50px_rgba(201,169,110,0.12)]"
-                  : "border-charcoal/8 bg-ivory hover:border-gold-primary/50 hover:bg-cream/35"
-              )}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-slate">
-                    {need.day}
-                  </p>
-                  <h3 className="mt-2 font-display text-xl leading-tight text-charcoal">
-                    {need.label}
-                  </h3>
-                </div>
-                <span
-                  className={cn(
-                    "font-accent border px-2 py-1 text-[10px] uppercase tracking-[0.14em]",
-                    active
-                      ? "border-gold-primary/50 text-gold-dark"
-                      : "border-charcoal/10 text-slate group-hover:border-gold-primary/35"
-                  )}
-                >
-                  {need.category}
-                </span>
-              </div>
-              <p className="mt-3 text-sm leading-relaxed text-slate">
-                {need.intent}
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {need.support.map((item) => (
-                  <span
-                    key={`${need.id}-${item}`}
-                    className="border border-charcoal/10 bg-ivory px-2 py-1 font-heading text-[11px] text-charcoal/75"
-                  >
-                    {item}
-                  </span>
-                ))}
-              </div>
-            </button>
-          );
-        })}
-      </motion.section>
-
-      <motion.section
-        variants={fadeUp}
         className="mt-6 border border-charcoal/8 bg-ivory p-4 md:p-5"
       >
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,380px)] lg:items-end">
           <div>
-            <p className={dashLabel}>Refine this brief</p>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
+            <p className={dashLabel}>Choose sourcing context</p>
+            <div className="mt-3 flex snap-x gap-2 overflow-x-auto pb-1 scrollbar-elysian">
+              {eventNeedFilters.map((need) => {
+                const active = activeNeedId === need.id;
+                return (
+                  <button
+                    key={need.id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => chooseNeed(need)}
+                    className={cn(
+                      "shrink-0 border px-3.5 py-2.5 text-left transition-colors",
+                      active
+                        ? "border-gold-primary bg-gold-primary/10 text-gold-dark"
+                        : "border-charcoal/10 text-slate hover:border-gold-primary hover:text-charcoal"
+                    )}
+                  >
+                    <span className="block font-accent text-[9px] uppercase tracking-[0.16em]">
+                      {need.day}
+                    </span>
+                    <span className="mt-1 block font-heading text-sm">
+                      {need.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-charcoal/8 pt-3">
               {categories.map((c) => {
                 const active = cat === c;
                 return (

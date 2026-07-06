@@ -3178,17 +3178,17 @@ export default function ClientWeddingPage() {
                 open only the editor you chose. No long form until you tap a step.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid w-full gap-2 sm:w-auto sm:grid-cols-2 md:flex md:flex-wrap md:justify-end">
               <button
                 type="button"
-                className={dashBtn}
+                className={cn(dashBtn, "w-full md:w-auto")}
                 onClick={() => openEventFormForDay(selectedDay ?? days[0])}
               >
                 Add event
               </button>
               <button
                 type="button"
-                className="border border-charcoal/15 px-4 py-3 font-accent text-[11px] uppercase tracking-[0.2em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark"
+                className="inline-flex w-full items-center justify-center border border-charcoal/15 px-4 py-3 font-accent text-[11px] uppercase tracking-[0.18em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark md:w-auto md:tracking-[0.2em]"
                 onClick={() => setShowDayForm((current) => !current)}
               >
                 {showDayForm ? "Close day form" : "Add day"}
@@ -3241,13 +3241,17 @@ export default function ClientWeddingPage() {
                   placeholder="Dress code for guests, transport, venue block, family seating..."
                 />
               </Field>
-              <div className="mt-4 flex flex-wrap gap-3">
-                <button type="submit" className={dashBtn} disabled={savingDay}>
+              <div className="mt-4 grid gap-3 sm:flex sm:flex-wrap">
+                <button
+                  type="submit"
+                  className={cn(dashBtn, "w-full sm:w-auto")}
+                  disabled={savingDay}
+                >
                   {savingDay ? "Saving..." : "Create day"}
                 </button>
                 <button
                   type="button"
-                  className="border border-charcoal/15 px-4 py-3 font-accent text-[11px] uppercase tracking-[0.2em] text-charcoal"
+                  className="inline-flex w-full items-center justify-center border border-charcoal/15 px-4 py-3 font-accent text-[11px] uppercase tracking-[0.18em] text-charcoal sm:w-auto"
                   onClick={() => setShowDayForm(false)}
                 >
                   Cancel
@@ -3377,7 +3381,7 @@ export default function ClientWeddingPage() {
                       />
                     </Field>
                   </div>
-                  <div className="mt-5 flex items-center gap-2 border-t border-charcoal/8 pt-4">
+                  <div className="mt-5 grid gap-2 border-t border-charcoal/8 pt-4 sm:flex sm:flex-wrap sm:items-center">
                     <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
                       Order
                     </p>
@@ -3398,10 +3402,10 @@ export default function ClientWeddingPage() {
                       Later
                     </button>
                   </div>
-                  <div className="mt-4 flex flex-wrap gap-3">
+                  <div className="mt-4 grid gap-3 sm:flex sm:flex-wrap">
                     <button
                       type="button"
-                      className={dashBtn}
+                      className={cn(dashBtn, "w-full sm:w-auto")}
                       disabled={savingDay}
                       onClick={() => void saveDayEdits(editingDay.id)}
                     >
@@ -3409,7 +3413,7 @@ export default function ClientWeddingPage() {
                     </button>
                     <button
                       type="button"
-                      className="border border-charcoal/15 px-4 py-3 font-accent text-[11px] uppercase tracking-[0.2em] text-charcoal"
+                      className="inline-flex w-full items-center justify-center border border-charcoal/15 px-4 py-3 font-accent text-[11px] uppercase tracking-[0.18em] text-charcoal sm:w-auto"
                       onClick={() => setEditingDayId(null)}
                     >
                       Cancel
@@ -3556,13 +3560,17 @@ export default function ClientWeddingPage() {
                         />
                       </div>
                     </div>
-                    <div className="mt-5 flex flex-wrap gap-3">
-                      <button type="submit" className={dashBtn} disabled={savingEvent}>
+                    <div className="mt-5 grid gap-3 sm:flex sm:flex-wrap">
+                      <button
+                        type="submit"
+                        className={cn(dashBtn, "w-full sm:w-auto")}
+                        disabled={savingEvent}
+                      >
                         {savingEvent ? "Saving..." : "Create event"}
                       </button>
                       <button
                         type="button"
-                        className="border border-charcoal/15 px-4 py-3 font-accent text-[11px] uppercase tracking-[0.2em] text-charcoal"
+                        className="inline-flex w-full items-center justify-center border border-charcoal/15 px-4 py-3 font-accent text-[11px] uppercase tracking-[0.18em] text-charcoal sm:w-auto"
                         onClick={() => setEventFormDayId(null)}
                       >
                         Cancel
@@ -4859,8 +4867,8 @@ export default function ClientWeddingPage() {
               </div>
 
               {/* One sticky action bar: step nav on the left, save/delete on the right */}
-              <div className="sticky bottom-0 z-10 -mx-5 -mb-5 flex flex-col gap-3 border-t border-charcoal/10 bg-ivory/95 px-5 py-3.5 backdrop-blur md:-mx-6 md:px-6 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-2">
+              <div className="sticky bottom-0 z-10 -mx-5 -mb-5 grid gap-3 border-t border-charcoal/10 bg-ivory/95 px-5 py-3.5 backdrop-blur md:-mx-6 md:px-6 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-center">
+                <div className="flex items-center justify-center gap-2 lg:justify-start">
                   <button
                     type="button"
                     onClick={() => {
@@ -4911,12 +4919,12 @@ export default function ClientWeddingPage() {
                   </button>
                 </div>
 
-                <div className="flex items-center justify-end gap-2">
+                <div className="grid gap-2 sm:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)] lg:ml-auto lg:w-auto lg:min-w-[22rem]">
                   <button
                     type="button"
                     disabled={savingDetail}
                     onClick={() => void deleteEvent(selectedEvent.id)}
-                    className="font-accent px-3 py-2.5 text-[10px] uppercase tracking-[0.18em] text-rose transition-colors hover:text-rose/70 disabled:opacity-40"
+                    className="inline-flex w-full items-center justify-center px-3 py-2.5 font-accent text-[10px] uppercase tracking-[0.16em] text-rose transition-colors hover:text-rose/70 disabled:opacity-40"
                   >
                     Delete event
                   </button>
@@ -4924,7 +4932,7 @@ export default function ClientWeddingPage() {
                     type="button"
                     disabled={savingDetail}
                     onClick={() => void saveEventDetails()}
-                    className="font-accent inline-flex items-center justify-center border border-gold-primary bg-gold-primary px-6 py-3 text-[11px] uppercase tracking-[0.2em] text-midnight shadow-[0_14px_36px_rgba(201,169,110,0.18)] transition-all hover:bg-gold-dark hover:border-gold-dark disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex w-full items-center justify-center border border-gold-primary bg-gold-primary px-5 py-3 font-accent text-[11px] uppercase tracking-[0.16em] text-midnight shadow-[0_14px_36px_rgba(201,169,110,0.18)] transition-all hover:border-gold-dark hover:bg-gold-dark disabled:cursor-not-allowed disabled:opacity-50 sm:tracking-[0.18em]"
                   >
                     {savingDetail ? "Saving..." : "Save event plan"}
                   </button>

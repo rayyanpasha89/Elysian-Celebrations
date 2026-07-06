@@ -442,20 +442,27 @@ export default function ClientOnboardingPage() {
           ) : null}
         </motion.div>
 
-        <motion.div variants={fadeUp} className="flex flex-wrap items-center justify-between gap-4">
+        <motion.div
+          variants={fadeUp}
+          className="grid gap-3 sm:flex sm:items-center sm:justify-between"
+        >
           <button
             type="button"
             onClick={back}
             disabled={step === 0}
             className={cn(
-              "font-accent inline-flex items-center justify-center border border-charcoal/15 px-4 py-2.5 text-[11px] uppercase tracking-[0.2em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark",
+              "order-2 inline-flex w-full items-center justify-center border border-charcoal/15 px-4 py-3 font-accent text-[11px] uppercase tracking-[0.18em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark sm:order-1 sm:w-auto",
               step === 0 && "cursor-not-allowed opacity-40"
             )}
           >
             ← Back
           </button>
           {step < 4 ? (
-            <button type="button" onClick={next} className={dashBtn}>
+            <button
+              type="button"
+              onClick={next}
+              className={cn(dashBtn, "order-1 w-full sm:order-2 sm:w-auto")}
+            >
               Continue →
             </button>
           ) : (
@@ -463,7 +470,10 @@ export default function ClientOnboardingPage() {
               type="button"
               onClick={() => void createEvent()}
               disabled={saving}
-              className={dashBtn}
+              className={cn(
+                dashBtn,
+                "order-1 w-full px-4 text-center tracking-[0.14em] sm:order-2 sm:w-auto sm:px-6 sm:tracking-[0.2em]"
+              )}
             >
               {saving ? "Saving…" : "Create event & open planner"}
             </button>

@@ -172,11 +172,11 @@ export function EventSystemShowcase() {
     offset: ["start end", "end start"],
   });
 
-  const deskRotateX = useTransform(scrollYProgress, [0, 0.5, 1], [18, 7, 13]);
-  const deskRotateY = useTransform(scrollYProgress, [0, 0.5, 1], [-22, 0, 18]);
-  const deskRotateZ = useTransform(scrollYProgress, [0, 0.5, 1], [-8, 0, 7]);
-  const deskY = useTransform(scrollYProgress, [0, 1], [90, -110]);
-  const deskScale = useTransform(scrollYProgress, [0, 0.55, 1], [0.88, 1.03, 0.92]);
+  const deskRotateX = useTransform(scrollYProgress, [0, 0.5, 1], [14, 6, 10]);
+  const deskRotateY = useTransform(scrollYProgress, [0, 0.5, 1], [-16, 0, 13]);
+  const deskRotateZ = useTransform(scrollYProgress, [0, 0.5, 1], [-5, 0, 4]);
+  const deskY = useTransform(scrollYProgress, [0, 1], [58, -72]);
+  const deskScale = useTransform(scrollYProgress, [0, 0.55, 1], [0.9, 1, 0.94]);
   const routeDraw = useTransform(scrollYProgress, [0.12, 0.84], [0, 1]);
   const compassSpin = useTransform(scrollYProgress, [0, 1], [0, 62]);
   const plateLift = useTransform(scrollYProgress, [0, 0.42, 0.82, 1], [0, 34, 92, 138]);
@@ -204,7 +204,7 @@ export function EventSystemShowcase() {
       <div className="absolute inset-0 bg-[linear-gradient(rgba(245,240,226,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(245,240,226,0.04)_1px,transparent_1px)] bg-[size:92px_92px] opacity-[0.10]" />
       <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-midnight/70 to-transparent" />
 
-      <div className="relative z-10 mx-auto grid max-w-[1520px] gap-12 px-[var(--section-padding-x)] py-20 lg:min-h-[390vh] lg:grid-cols-[minmax(0,0.76fr)_minmax(680px,1.24fr)] lg:items-start lg:gap-16 lg:py-28">
+      <div className="relative z-10 mx-auto grid max-w-[1520px] gap-10 px-[var(--section-padding-x)] py-16 lg:min-h-[270vh] lg:grid-cols-[minmax(0,0.76fr)_minmax(640px,1.24fr)] lg:items-start lg:gap-14 lg:py-24">
         <div className="lg:sticky lg:top-24">
           <SectionHeader
             eyebrow="3D planning atlas"
@@ -219,7 +219,7 @@ export function EventSystemShowcase() {
             <MobileAtlasCard />
           </div>
 
-          <div className="mt-10 grid gap-3">
+          <div className="mt-8 grid gap-2.5">
             {atlasScenes.map((scene, index) => {
               const Icon = scene.icon;
               const selected = activeScene === index;
@@ -230,9 +230,9 @@ export function EventSystemShowcase() {
                   onClick={() => setActiveScene(index)}
                   aria-pressed={selected}
                   className={cn(
-                    "group grid grid-cols-[auto_minmax(0,1fr)] gap-4 border p-4 text-left backdrop-blur-xl transition-all duration-500",
+                    "group grid grid-cols-[auto_minmax(0,1fr)] gap-3 border p-3.5 text-left backdrop-blur-md transition-all duration-200",
                     selected
-                      ? "border-gold-primary/45 bg-gold-primary/[0.105] shadow-[0_24px_90px_rgba(0,0,0,0.22)]"
+                      ? "border-gold-primary/45 bg-gold-primary/[0.105] shadow-[0_16px_48px_rgba(0,0,0,0.18)]"
                       : "border-white/10 bg-white/[0.045] hover:border-gold-primary/25 hover:bg-white/[0.06]"
                   )}
                 >
@@ -259,7 +259,7 @@ export function EventSystemShowcase() {
                         {scene.metric}
                       </span>
                     </span>
-                    <span className="mt-2 block font-display text-2xl leading-tight text-ivory">
+                    <span className="mt-2 block font-display text-xl leading-tight text-ivory">
                       {scene.title}
                     </span>
                     <span className="mt-3 block text-sm leading-relaxed text-ivory/66">
@@ -273,7 +273,7 @@ export function EventSystemShowcase() {
         </div>
 
         <div className="lg:sticky lg:top-20">
-          <div className="relative min-h-[720px] overflow-hidden border border-white/10 bg-midnight/55 p-4 shadow-[0_56px_180px_rgba(0,0,0,0.38)] backdrop-blur-2xl md:p-8 lg:min-h-[820px]">
+          <div className="relative min-h-[620px] overflow-hidden border border-white/10 bg-midnight/55 p-4 shadow-[0_36px_110px_rgba(0,0,0,0.32)] backdrop-blur-lg md:p-6 lg:min-h-[700px]">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,rgba(166,138,100,0.16),transparent_42%),radial-gradient(circle_at_58%_64%,rgba(194,197,170,0.12),transparent_34%)]" />
             <div className="absolute inset-0 bg-[linear-gradient(rgba(245,240,226,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(245,240,226,0.035)_1px,transparent_1px)] bg-[size:52px_52px] opacity-30" />
 
@@ -299,11 +299,11 @@ export function EventSystemShowcase() {
               </div>
             </div>
 
-            <div className="relative z-10 flex min-h-[620px] items-center justify-center lg:min-h-[710px]">
-              <div className="relative h-[590px] w-full max-w-[760px] md:h-[660px]" style={{ perspective: "1900px" }}>
+            <div className="relative z-10 flex min-h-[520px] items-center justify-center lg:min-h-[590px]">
+              <div className="relative h-[520px] w-full max-w-[700px] md:h-[590px]" style={{ perspective: "1700px" }}>
                 <motion.div
                   aria-hidden
-                  className="absolute left-1/2 top-[61%] h-40 w-[72%] -translate-x-1/2 rounded-full bg-black blur-3xl"
+                  className="absolute left-1/2 top-[61%] h-32 w-[68%] -translate-x-1/2 rounded-full bg-black blur-2xl"
                   style={shouldAnimate ? { opacity: shadowOpacity } : { opacity: 0.45 }}
                 />
 
@@ -456,8 +456,8 @@ export function EventSystemShowcase() {
                   </div>
 
                   <div
-                    className="absolute right-[2%] top-[11%] w-[13rem] border border-white/10 bg-white/[0.055] p-4 text-ivory shadow-[0_24px_80px_rgba(0,0,0,0.24)] backdrop-blur-xl"
-                    style={{ transform: "translateZ(190px) rotateZ(5deg)" }}
+                    className="absolute right-[2%] top-[11%] w-[12rem] border border-white/10 bg-white/[0.055] p-3.5 text-ivory shadow-[0_18px_56px_rgba(0,0,0,0.22)] backdrop-blur-md"
+                    style={{ transform: "translateZ(160px) rotateZ(5deg)" }}
                   >
                     <div className="flex items-center gap-2 text-gold-light">
                       <Sparkles className="h-3.5 w-3.5" />
@@ -465,7 +465,7 @@ export function EventSystemShowcase() {
                         Fast interaction
                       </p>
                     </div>
-                    <p className="mt-2 font-display text-xl leading-tight">
+                    <p className="mt-2 font-display text-lg leading-tight">
                       Tap one node. Edit one step.
                     </p>
                   </div>

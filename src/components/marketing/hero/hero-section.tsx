@@ -32,13 +32,13 @@ export function HeroSection() {
   });
 
   const backgroundY = useTransform(scrollYProgress, [0, 1], ["0%", "16%"]);
-  const backgroundRibbonY = useTransform(scrollYProgress, [0, 1], [0, -86]);
-  const foregroundMistY = useTransform(scrollYProgress, [0, 1], [0, 74]);
+  const backgroundRibbonY = useTransform(scrollYProgress, [0, 1], [0, -56]);
+  const foregroundMistY = useTransform(scrollYProgress, [0, 1], [0, 48]);
   const contentOpacity = useTransform(scrollYProgress, [0, 0.45], [1, 0.2]);
   const contentY = useTransform(scrollYProgress, [0, 0.45], [0, -32]);
-  const stageY = useTransform(scrollYProgress, [0, 1], [0, 72]);
-  const stageScale = useTransform(scrollYProgress, [0, 1], [1, 0.94]);
-  const stageOpacity = useTransform(scrollYProgress, [0, 0.85], [1, 0.72]);
+  const stageY = useTransform(scrollYProgress, [0, 1], [0, 44]);
+  const stageScale = useTransform(scrollYProgress, [0, 1], [0.94, 0.9]);
+  const stageOpacity = useTransform(scrollYProgress, [0, 0.85], [1, 0.82]);
   // Gentle tilt only — strong rotateX/Y was distorting the card's text.
   const stageScrollRotateX = useTransform(scrollYProgress, [0, 1], [7, 2]);
   const stageScrollRotateY = useTransform(scrollYProgress, [0, 1], [-8, -3]);
@@ -60,7 +60,7 @@ export function HeroSection() {
     damping: 22,
     mass: 0.45,
   });
-  const stageGlow = useMotionTemplate`radial-gradient(440px circle at ${pointerGlowX}% ${pointerGlowY}%, rgba(232,213,176,0.28), rgba(201,169,110,0.1) 34%, transparent 68%)`;
+  const stageGlow = useMotionTemplate`radial-gradient(360px circle at ${pointerGlowX}% ${pointerGlowY}%, rgba(232,213,176,0.20), rgba(201,169,110,0.08) 34%, transparent 68%)`;
 
   const handleStagePointerMove = useCallback(
     (event: PointerEvent<HTMLDivElement>) => {
@@ -112,15 +112,15 @@ export function HeroSection() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(232,213,176,0.18),transparent_35%),radial-gradient(circle_at_75%_20%,rgba(164,172,134,0.18),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(212,160,160,0.12),transparent_32%),linear-gradient(135deg,#333d29_0%,#414833_40%,#333d29_100%)]" />
         <motion.div
           style={shouldAnimate ? { scale: haloScale } : undefined}
-          className="absolute right-[12%] top-[18%] h-[32rem] w-[32rem] rounded-full bg-[radial-gradient(circle,rgba(201,169,110,0.18),rgba(201,169,110,0.02)_60%,transparent_75%)] blur-3xl"
+          className="absolute right-[12%] top-[18%] h-[26rem] w-[26rem] rounded-full bg-[radial-gradient(circle,rgba(201,169,110,0.15),rgba(201,169,110,0.02)_60%,transparent_75%)] blur-2xl"
         />
         <motion.div
           style={shouldAnimate ? { y: backgroundRibbonY } : undefined}
-          className="absolute left-[7%] top-[14%] h-[38rem] w-[14rem] -rotate-[24deg] rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.11),rgba(201,169,110,0.025)_44%,transparent_78%)] blur-[1px]"
+          className="absolute left-[7%] top-[14%] h-[32rem] w-[12rem] -rotate-[24deg] rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(201,169,110,0.025)_44%,transparent_78%)] blur-[1px]"
         />
         <motion.div
           style={shouldAnimate ? { y: foregroundMistY } : undefined}
-          className="absolute -bottom-32 right-[2%] h-[30rem] w-[52rem] rotate-[-8deg] rounded-full bg-[radial-gradient(ellipse,rgba(164,172,134,0.15),rgba(201,169,110,0.06)_42%,transparent_72%)] blur-3xl"
+          className="absolute -bottom-32 right-[2%] h-[24rem] w-[42rem] rotate-[-8deg] rounded-full bg-[radial-gradient(ellipse,rgba(164,172,134,0.12),rgba(201,169,110,0.05)_42%,transparent_72%)] blur-2xl"
         />
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:120px_120px] opacity-[0.12]" />
         <div className="absolute inset-x-0 top-0 h-48 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.1),transparent_60%)]" />
@@ -157,7 +157,7 @@ export function HeroSection() {
             animate={{ opacity: 1, y: 0 }}
             transition={
               shouldAnimate
-                ? { duration: 0.8, delay: 1.25, ease: [0.16, 1, 0.3, 1] }
+                ? { duration: 0.55, delay: 0.62, ease: [0.16, 1, 0.3, 1] }
                 : { duration: 0 }
             }
             className="mt-6 max-w-2xl font-heading text-lg leading-relaxed text-ivory/72 md:text-[1.28rem]"
@@ -173,7 +173,7 @@ export function HeroSection() {
             animate={{ opacity: 1, y: 0 }}
             transition={
               shouldAnimate
-                ? { duration: 0.8, delay: 1.45, ease: [0.16, 1, 0.3, 1] }
+                ? { duration: 0.55, delay: 0.76, ease: [0.16, 1, 0.3, 1] }
                 : { duration: 0 }
             }
             className="mt-7 grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3"
@@ -200,7 +200,7 @@ export function HeroSection() {
             animate={{ opacity: 1, y: 0 }}
             transition={
               shouldAnimate
-                ? { duration: 0.8, delay: 1.7, ease: [0.16, 1, 0.3, 1] }
+                ? { duration: 0.55, delay: 0.9, ease: [0.16, 1, 0.3, 1] }
                 : { duration: 0 }
             }
             className="mt-8 flex flex-col gap-5 sm:flex-row sm:flex-wrap sm:items-center"
@@ -222,7 +222,7 @@ export function HeroSection() {
             animate={{ opacity: 1, y: 0 }}
             transition={
               shouldAnimate
-                ? { duration: 0.8, delay: 1.85, ease: [0.16, 1, 0.3, 1] }
+                ? { duration: 0.55, delay: 0.98, ease: [0.16, 1, 0.3, 1] }
                 : { duration: 0 }
             }
             className="mt-8 lg:hidden"
@@ -237,7 +237,7 @@ export function HeroSection() {
           animate={{ opacity: 1, y: 0 }}
           transition={
             shouldAnimate
-              ? { duration: 1.1, delay: 0.6, ease: [0.16, 1, 0.3, 1] }
+              ? { duration: 0.75, delay: 0.32, ease: [0.16, 1, 0.3, 1] }
               : { duration: 0 }
           }
           style={
@@ -247,8 +247,8 @@ export function HeroSection() {
           }
           className="relative hidden items-center justify-center lg:flex"
         >
-          <div className="relative mx-auto w-full max-w-[480px] px-6 lg:mt-4">
-            <div className="pointer-events-none absolute -inset-x-6 -inset-y-10 -z-10 rounded-[4rem] bg-[radial-gradient(circle_at_48%_28%,rgba(232,213,176,0.18),transparent_68%)] blur-2xl" />
+          <div className="relative mx-auto w-full max-w-[420px] px-6 lg:mt-4">
+            <div className="pointer-events-none absolute -inset-x-4 -inset-y-8 -z-10 rounded-[4rem] bg-[radial-gradient(circle_at_48%_28%,rgba(232,213,176,0.14),transparent_68%)] blur-xl" />
             <motion.div
               aria-hidden
               animate={
@@ -257,7 +257,7 @@ export function HeroSection() {
                   : undefined
               }
               transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
-              className="pointer-events-none absolute -right-2 top-2 h-44 w-44 rounded-full border border-gold-primary/18 bg-[conic-gradient(from_140deg,transparent,rgba(201,169,110,0.18),transparent_45%,rgba(164,172,134,0.14),transparent_78%)] opacity-80 blur-[0.2px]"
+              className="pointer-events-none absolute -right-2 top-2 h-36 w-36 rounded-full border border-gold-primary/18 bg-[conic-gradient(from_140deg,transparent,rgba(201,169,110,0.16),transparent_45%,rgba(164,172,134,0.12),transparent_78%)] opacity-70 blur-[0.2px]"
             />
             <div
               className="relative"
@@ -305,8 +305,8 @@ export function HeroSection() {
                       }}
                     >
                       <PhotoPlane
-                        eyebrow="Lakefront setting"
-                        title="A visual language, not a logistics sheet."
+                        eyebrow="Place layer"
+                        title="The venue becomes the first coordinate."
                         image={MARKETING_IMAGES.hero.venue}
                       />
                     </motion.div>
@@ -331,20 +331,20 @@ export function HeroSection() {
 
                   <div
                     className="relative"
-                    style={{ transform: "translateZ(96px)" }}
+                    style={{ transform: "translateZ(76px) scale(0.92)" }}
                   >
                     <MainStageCard />
                   </div>
 
                   <FloatingTag
-                    className="-left-4 top-[39%]"
+                    className="-left-3 top-[39%]"
                     delay={1.5}
                     shouldAnimate={shouldAnimate}
                   >
                     Venue matched
                   </FloatingTag>
                   <FloatingTag
-                    className="-right-2 bottom-12"
+                    className="-right-1 bottom-10"
                     delay={1.9}
                     shouldAnimate={shouldAnimate}
                   >
@@ -360,7 +360,7 @@ export function HeroSection() {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 2.5, duration: 1.2 }}
+        transition={{ delay: 1.2, duration: 0.6 }}
         className="absolute left-6 top-1/2 z-20 hidden -translate-y-1/2 xl:block"
       >
         <span
@@ -374,7 +374,7 @@ export function HeroSection() {
       <motion.div
         initial={shouldAnimate ? { opacity: 0 } : false}
         animate={{ opacity: 1 }}
-        transition={shouldAnimate ? { delay: 2.8, duration: 1 } : { duration: 0 }}
+        transition={shouldAnimate ? { delay: 1.35, duration: 0.55 } : { duration: 0 }}
         className="absolute bottom-10 left-1/2 z-20 hidden -translate-x-1/2 lg:block"
       >
         <motion.div
@@ -580,13 +580,13 @@ function BlueprintPlane() {
 
 function StageSignalCard() {
   return (
-    <div className="relative overflow-hidden border border-white/12 bg-midnight/78 p-4 text-ivory shadow-[0_24px_70px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+    <div className="relative overflow-hidden border border-white/12 bg-midnight/78 p-3.5 text-ivory shadow-[0_18px_52px_rgba(0,0,0,0.24)] backdrop-blur-md">
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold-primary/60 to-transparent" />
       <p className="font-accent text-[9px] uppercase tracking-[0.2em] text-gold-light">
-        Budget pulse
+        Budget gravity
       </p>
-      <p className="mt-2 font-display text-xl leading-tight">
-        Spend bands stay visible
+      <p className="mt-2 font-display text-lg leading-tight">
+        Estimates follow the branch
       </p>
       <div className="mt-4 grid gap-1.5">
         {[68, 46, 82].map((width, index) => (
@@ -615,7 +615,7 @@ function PhotoPlane({
   image: string;
 }) {
   return (
-    <div className="relative overflow-hidden border border-white/10 bg-midnight text-ivory shadow-[0_30px_90px_rgba(0,0,0,0.26)]">
+    <div className="relative overflow-hidden border border-white/10 bg-midnight text-ivory shadow-[0_20px_62px_rgba(0,0,0,0.24)]">
       <div
         className="absolute inset-0 bg-cover bg-center"
         style={{
@@ -623,11 +623,11 @@ function PhotoPlane({
         }}
       />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(201,169,110,0.18),transparent_35%)]" />
-      <div className="relative flex min-h-[16rem] flex-col justify-end p-5">
+      <div className="relative flex min-h-[13.5rem] flex-col justify-end p-4">
         <p className="font-accent text-[9px] uppercase tracking-[0.22em] text-gold-light">
           {eyebrow}
         </p>
-        <h3 className="mt-3 font-display text-2xl leading-tight text-ivory">
+        <h3 className="mt-3 font-display text-xl leading-tight text-ivory">
           {title}
         </h3>
       </div>
@@ -664,9 +664,9 @@ const MAIN_STAGE_VENDOR_PICKS = [
 
 function MainStageCard() {
   return (
-    <div className="relative overflow-hidden border border-white/15 bg-[linear-gradient(145deg,rgba(250,247,242,0.97),rgba(245,240,232,0.9))] text-charcoal shadow-[0_42px_140px_rgba(0,0,0,0.34)]">
+    <div className="relative overflow-hidden border border-white/15 bg-[linear-gradient(145deg,rgba(250,247,242,0.97),rgba(245,240,232,0.9))] text-charcoal shadow-[0_32px_96px_rgba(0,0,0,0.28)]">
       <div className="pointer-events-none absolute inset-0 z-10 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),inset_0_-28px_70px_rgba(51,61,41,0.07)]" />
-      <div className="relative h-28 border-b border-charcoal/8">
+      <div className="relative h-24 border-b border-charcoal/8">
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
@@ -674,12 +674,12 @@ function MainStageCard() {
           }}
         />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_18%,rgba(232,213,176,0.28),transparent_34%)]" />
-        <div className="absolute left-6 top-4 border border-ivory/14 bg-midnight/42 px-3 py-2 text-ivory backdrop-blur-md">
+        <div className="absolute left-5 top-4 border border-ivory/14 bg-midnight/42 px-3 py-2 text-ivory backdrop-blur-md">
           <p className="font-accent text-[9px] uppercase tracking-[0.18em] text-gold-light">
-            Live planner preview
+            Spatial plan preview
           </p>
           <p className="mt-1 text-sm text-ivory/84">
-            Venue, vendors, and run-of-show in one frame
+            Venue, vendors, and flow in one frame
           </p>
         </div>
         <div className="absolute bottom-4 right-5 flex items-center gap-2 border border-ivory/14 bg-ivory/14 px-3 py-2 text-ivory backdrop-blur-md">
@@ -691,21 +691,21 @@ function MainStageCard() {
       </div>
       <div className="relative border-b border-charcoal/8 px-5 py-3">
         <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-slate">
-          Elysian spatial atelier
+          Elysian event atlas
         </p>
-        <h3 className="mt-1.5 font-display text-xl">From vision to locked plan</h3>
+        <h3 className="mt-1.5 font-display text-xl">From vision to mapped plan</h3>
       </div>
 
-      <div className="relative grid gap-3 px-5 py-4">
+      <div className="relative grid gap-3 px-4 py-4">
         <div className="grid gap-2.5">
           {MAIN_STAGE_LAYER_ROWS.map((row, index) => (
             <div
               key={row.label}
-              className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 border border-charcoal/8 bg-white/76 p-2.5 shadow-[0_10px_30px_rgba(51,61,41,0.045)]"
+              className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 border border-charcoal/8 bg-white/76 p-2.5 shadow-[0_8px_24px_rgba(51,61,41,0.04)]"
             >
               <div
                 className={cn(
-                  "flex h-9 w-9 items-center justify-center rounded-full font-accent text-[10px] tracking-[0.14em]",
+                  "flex h-8 w-8 items-center justify-center rounded-full font-accent text-[9px] tracking-[0.14em]",
                   row.tone
                 )}
               >
@@ -718,7 +718,7 @@ function MainStageCard() {
                   </p>
                   <p className="text-xs font-medium text-charcoal">{row.value}</p>
                 </div>
-                <p className="mt-1 text-sm leading-relaxed text-slate">
+                <p className="mt-1 text-[13px] leading-relaxed text-slate">
                   {row.detail}
                 </p>
               </div>
@@ -734,7 +734,7 @@ function MainStageCard() {
                 Venue anchor
               </p>
             </div>
-            <p className="mt-2.5 font-display text-xl leading-tight">
+            <p className="mt-2.5 font-display text-lg leading-tight">
               Leela Palace Udaipur
             </p>
             <p className="mt-2 text-xs leading-relaxed text-slate">
@@ -755,7 +755,7 @@ function MainStageCard() {
                   key={vendor}
                   className="flex items-center justify-between gap-3 border border-charcoal/6 bg-cream/55 px-3 py-2"
                 >
-                  <span className="text-sm capitalize text-charcoal">
+                  <span className="text-[13px] capitalize text-charcoal">
                     {vendor}
                   </span>
                   <span className="font-accent text-[8px] uppercase tracking-[0.16em] text-slate">
