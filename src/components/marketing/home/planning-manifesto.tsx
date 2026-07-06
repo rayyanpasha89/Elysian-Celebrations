@@ -6,21 +6,21 @@ import { SectionHeader } from "@/components/marketing/shared/marketing-primitive
 const pillars = [
   {
     icon: WalletCards,
-    title: "Estimate Intelligence",
+    title: "Budget Follows Structure",
     description:
-      "Let the plan create the budget story: per-person food, vendor services, custom quotes, and paid visibility.",
+      "Per-person food, vendor packages, custom quotes, and paid visibility stay tied to the branch that created them.",
     href: "/#packages",
   },
   {
     icon: Sparkles,
-    title: "Vendor-First Composition",
+    title: "Vendors Before Blank Menus",
     description:
-      "Start from real catalogues and shortlisted offerings, then customize the exact menu, setup, or deliverable.",
+      "Start from real catalogues and shortlisted offerings, then customize the exact menu, setup, coverage, or deliverable.",
     href: "/#vendors",
   },
   {
     icon: Layers3,
-    title: "Event Architecture",
+    title: "Branch-Based Planning",
     description:
       "Move from event type to days, functions, needs, vendors, budget, and readiness without losing the thread.",
     href: "/#how-it-works",
@@ -40,8 +40,8 @@ export function PlanningManifesto() {
           <SectionHeader
             chapter="01"
             eyebrow="Planning manifesto"
-            title="The plan should feel alive before it feels expensive."
-            intro="Elysian turns an event into a living spatial plan: first the structure, then each function, then the vendors, menus, logistics, budget, and final readiness. Less blank typing, more guided decisions."
+            title="The plan should behave like the event itself."
+            intro="Elysian turns a celebration into a living spatial plan: first the structure, then each function, then the vendors, menus, logistics, budget, and final readiness. Less blank typing, more guided decisions."
             align="start"
             titleMaxWidth="max-w-2xl"
           />
@@ -63,7 +63,8 @@ export function PlanningManifesto() {
           </div>
         </div>
 
-        <div className="grid gap-4">
+        <div className="relative grid gap-4">
+          <div className="absolute left-6 top-8 bottom-8 hidden w-px bg-gradient-to-b from-gold-primary/35 via-charcoal/10 to-gold-primary/20 md:block" />
           {pillars.map((pillar, index) => {
             const Icon = pillar.icon;
 
@@ -71,7 +72,7 @@ export function PlanningManifesto() {
               <Link
                 key={pillar.title}
                 href={pillar.href}
-                className="group relative border border-charcoal/10 bg-white/75 p-6 shadow-[0_22px_60px_rgba(51,61,41,0.06)] backdrop-blur-sm transition-all duration-500 hover:-translate-y-1 hover:border-gold-primary/30 hover:shadow-[0_30px_80px_rgba(51,61,41,0.1)]"
+                className="group relative border border-charcoal/10 bg-white/75 p-6 shadow-[0_22px_60px_rgba(51,61,41,0.06)] backdrop-blur-sm transition-all duration-500 hover:-translate-y-1 hover:border-gold-primary/30 hover:shadow-[0_30px_80px_rgba(51,61,41,0.1)] md:pl-16"
               >
                 <span className="font-accent absolute right-5 top-5 text-[10px] uppercase tracking-[0.22em] text-charcoal/24">
                   {String(index + 1).padStart(2, "0")}

@@ -11,7 +11,6 @@ import { FinalizationBoard } from "@/components/dashboard/finalization-board";
 import {
   CelebrationCanvas,
   FlowEmptyState,
-  MindMapLegend,
   type CanvasDay,
   type FlowStatus,
   type FlowStep,
@@ -1498,99 +1497,6 @@ function removeVendorDraftSelection(
   );
 }
 
-function nextBestPlannerAction(
-  event: WeddingEvent | null,
-  estimate: SpendEstimate | null
-): {
-  label: string;
-  value: string;
-  detail: string;
-  section: EditorSectionKey;
-} {
-  if (!event) {
-    return {
-      label: "Next best action",
-      value: "Open an event block",
-      detail: "Pick a morning, afternoon, or evening block before editing details.",
-      section: "basics",
-    };
-  }
-
-  const needsFood = (event.requirements ?? []).some(
-    (requirement) => requirement.category === "food"
-  );
-  const needsLogistics = (event.requirements ?? []).some(
-    (requirement) => requirement.category === "logistics"
-  );
-
-  if (!event.venue?.trim()) {
-    return {
-      label: "Next best action",
-      value: "Choose the venue card",
-      detail: "Venue selection unlocks capacity context and venue-based spend range.",
-      section: "basics",
-    };
-  }
-
-  if (!event.guest_count || event.guest_count <= 0) {
-    return {
-      label: "Next best action",
-      value: "Set the guest count",
-      detail: "Guest count powers catering, seating, rooming, and per-person estimates.",
-      section: "basics",
-    };
-  }
-
-  if (needsFood && event.menus.length === 0) {
-    return {
-      label: "Next best action",
-      value: "Pick the caterer first",
-      detail:
-        "Choose a catering partner or package, then import their catalogue rows into menus.",
-      section: "food",
-    };
-  }
-
-  const missingVendorCategory = firstMissingVendorCategory(event);
-  if (missingVendorCategory) {
-    const category = PLANNER_VENDOR_CATEGORIES.find(
-      (entry) => entry.key === missingVendorCategory
-    );
-    return {
-      label: "Next best action",
-      value: `Choose ${category?.label.toLowerCase() ?? "partner"} package`,
-      detail:
-        "Each section now starts with its own partner cards, then customization happens under that choice.",
-      section: vendorCategorySection(missingVendorCategory),
-    };
-  }
-
-  if (!estimate || estimate.max <= 0 || estimate.missingCount > 0) {
-    return {
-      label: "Next best action",
-      value: "Resolve pricing gaps",
-      detail: "Choose packages with published prices inside each requirement section.",
-      section: firstVendorGapSection(event),
-    };
-  }
-
-  if (needsLogistics && !hasLogisticsDetails(event.logistics)) {
-    return {
-      label: "Next best action",
-      value: "Apply logistics preset",
-      detail: "Start with movement, rooming, weather, and load-in presets.",
-      section: "logistics",
-    };
-  }
-
-  return {
-    label: "Next best action",
-    value: "Review finalization",
-    detail: "This block is ready for the Layer 3 gap board.",
-    section: "notes",
-  };
-}
-
 function servicePriceLabel(service: VendorPlannerService) {
   const base = service.base_price ?? 0;
   const max = service.max_price ?? null;
@@ -2212,11 +2118,6 @@ export default function ClientWeddingPage() {
       vendorOptions,
     });
   }, [detailDraft, selectedEvent, venueOptions, vendorOptions]);
-
-  const nextPlannerAction = useMemo(
-    () => nextBestPlannerAction(selectedEvent, detailSpendEstimate),
-    [detailSpendEstimate, selectedEvent]
-  );
 
   const openEventSection = useCallback(
     (eventId: string, section: EditorSectionKey = "basics") => {
@@ -5035,113 +4936,10 @@ export default function ClientWeddingPage() {
           ) : null}
         </AnimatePresence>
       </div>
-      <LayerTwoGuidance
-        className="mt-4"
-        selectedEvent={selectedEvent}
-        selectedDay={selectedDay}
-        editorOpen={editorOpen}
-        editorSectionLabel={activeEditorSection?.label ?? "Selected step"}
-        venueOptionsCount={venueOptions.length}
-        savedVendorCount={savedVendorSlugs.length}
-        nextAction={nextPlannerAction}
-        onOpenSection={(section) => {
-          setEditorSection(section);
-          setEditorOrigin(null);
-          setEditorOpen(true);
-        }}
-      />
       {renderPlanOverviewPanel("mt-4")}
       </>
       ) : null}
     </motion.div>
-  );
-}
-
-function LayerTwoGuidance({
-  selectedEvent,
-  selectedDay,
-  editorOpen,
-  editorSectionLabel,
-  venueOptionsCount,
-  savedVendorCount,
-  nextAction,
-  onOpenSection,
-  className,
-}: {
-  selectedEvent: WeddingEvent | null;
-  selectedDay: WeddingDay | null;
-  editorOpen: boolean;
-  editorSectionLabel: string;
-  venueOptionsCount: number;
-  savedVendorCount: number;
-  nextAction: ReturnType<typeof nextBestPlannerAction>;
-  onOpenSection: (section: EditorSectionKey) => void;
-  className?: string;
-}) {
-  return (
-    <motion.section
-      variants={fadeUp}
-      className={cn("grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,1fr)]", className)}
-    >
-      <article className="border border-gold-primary/35 bg-gold-primary/10 p-4">
-        <p className={cn(dashLabel, "text-gold-dark")}>Next move</p>
-        <p className="mt-2 font-display text-lg text-charcoal">
-          {selectedEvent ? nextAction.value : "Pick any function branch"}
-        </p>
-        <p className="mt-2 text-xs leading-relaxed text-slate">
-          {selectedEvent && editorOpen
-            ? `You're editing ${editorSectionLabel}. Save here, or close the editor to pick another step from the map.`
-            : selectedEvent
-            ? nextAction.detail
-            : "Start from a day, then open a morning / afternoon / evening function before editing details."}
-        </p>
-        {selectedEvent && !editorOpen ? (
-            <button
-              type="button"
-              onClick={() => onOpenSection(nextAction.section)}
-              className="mt-3 border border-gold-primary bg-gold-primary px-3 py-2 font-accent text-[10px] uppercase tracking-[0.16em] text-midnight transition-colors hover:bg-gold-dark"
-            >
-              Open section
-            </button>
-        ) : selectedEvent && editorOpen ? (
-          <p className="mt-3 border border-sage/25 bg-sage/10 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.16em] text-sage">
-            Section open
-          </p>
-        ) : null}
-      </article>
-
-      <MindMapLegend compact className="h-full" />
-
-      <article className="border border-charcoal/10 bg-ivory p-4">
-        <p className={dashLabel}>Current focus</p>
-        <p className="mt-2 font-display text-lg text-charcoal">
-          {selectedEvent ? selectedEvent.name : "No function selected"}
-        </p>
-        <p className="mt-2 text-xs leading-relaxed text-slate">
-          {selectedDay
-            ? `${selectedDay.name} · ${formatDayDate(selectedDay.date)}`
-            : "The editor stays closed until a step token is chosen."}
-        </p>
-        <div className="mt-4 grid grid-cols-2 gap-2 border-t border-charcoal/8 pt-4">
-          <div>
-            <p className="font-accent text-[9px] uppercase tracking-[0.14em] text-slate">
-              Venues
-            </p>
-            <p className="mt-1 font-display text-lg text-charcoal">
-              {venueOptionsCount}
-            </p>
-          </div>
-          <div>
-            <p className="font-accent text-[9px] uppercase tracking-[0.14em] text-slate">
-              Shortlist
-            </p>
-            <p className="mt-1 font-display text-lg text-charcoal">
-              {savedVendorCount}
-            </p>
-          </div>
-        </div>
-      </article>
-    </motion.section>
   );
 }
 

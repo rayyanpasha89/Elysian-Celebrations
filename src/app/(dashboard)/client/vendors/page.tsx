@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer, staggerItem } from "@/animations/variants";
 import { ListEmptyState } from "@/components/dashboard/list-empty-state";
-import { dashBtn, dashCard, dashLabel, statusBadgeBase } from "@/lib/dashboard-styles";
+import { dashBtn, dashLabel, statusBadgeBase } from "@/lib/dashboard-styles";
 import { categoryCopy } from "@/lib/vendor-offering";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +21,64 @@ const categories = [
 ] as const;
 
 type Cat = (typeof categories)[number];
+
+const eventNeedFilters = [
+  {
+    id: "full-plan",
+    day: "Whole plan",
+    label: "All open vendor gaps",
+    category: "All",
+    intent: "Scan the full sourcing board before narrowing by function.",
+    support: ["Food", "Decor", "Photo", "Entertainment"],
+  },
+  {
+    id: "welcome",
+    day: "Arrival",
+    label: "Welcome dinner",
+    category: "Catering",
+    intent: "Start with menu flow, bars, dietary needs, and guest hospitality.",
+    support: ["Menu", "Live counters", "Service team"],
+  },
+  {
+    id: "daytime",
+    day: "Day events",
+    label: "Haldi and mehendi",
+    category: "Decor",
+    intent: "Find the partner who can translate mood, color, florals, and setup.",
+    support: ["Theme", "Florals", "Installations"],
+  },
+  {
+    id: "sangeet",
+    day: "Evening",
+    label: "Sangeet and cocktail",
+    category: "Music & DJ",
+    intent: "Source the energy layer: DJ, performers, sound checks, and show flow.",
+    support: ["DJ", "Performance", "Production"],
+  },
+  {
+    id: "ceremony",
+    day: "Main day",
+    label: "Ceremony coverage",
+    category: "Photography",
+    intent: "Protect the key moments with team size, edit timelines, and deliverables.",
+    support: ["Candid", "Film", "Albums"],
+  },
+  {
+    id: "looks",
+    day: "Family prep",
+    label: "Looks and styling",
+    category: "Makeup",
+    intent: "Cover bridal, groom, family, trials, and getting-ready timing.",
+    support: ["Trials", "Draping", "Touch-ups"],
+  },
+] as const satisfies ReadonlyArray<{
+  id: string;
+  day: string;
+  label: string;
+  category: Cat;
+  intent: string;
+  support: readonly string[];
+}>;
 
 const categoryApiSlug: Record<Exclude<Cat, "All">, string | null> = {
   Photography: "photography",
@@ -139,7 +198,7 @@ type VendorOffering = VendorOfferingBlueprint & {
 
 const DEFAULT_OFFERING_BLUEPRINT: VendorOfferingBlueprint = {
   promise:
-    "A complete wedding service scope with planning notes, pricing cues, and deliverables that can be matched to individual events.",
+    "A complete event service scope with planning notes, pricing cues, and deliverables that can be matched to individual functions.",
   inclusions: [
     "Pre-event consultation",
     "Event-specific scope alignment",
@@ -207,7 +266,7 @@ const OFFERING_BLUEPRINTS: Record<string, VendorOfferingBlueprint> = {
   },
   photography: {
     promise:
-      "Coverage planning, team size, deliverables, edit timelines, and story-led documentation across the full wedding.",
+      "Coverage planning, team size, deliverables, edit timelines, and story-led documentation across the full event.",
     inclusions: [
       "Lead photographer and supporting team",
       "Candid, traditional, and detail coverage",
@@ -374,8 +433,47 @@ function groupCatalogueItems(items: CatalogueRow[]) {
   }));
 }
 
+function catalogueCountFromVendor(vendor: VendorCardApi) {
+  return (vendor.services ?? []).reduce(
+    (total, service) => total + (service.items?.length ?? 0),
+    0
+  );
+}
+
+function pluralize(count: number, singular: string, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function serviceSummary(vendor: VendorCardApi) {
+  const serviceCount = vendor.services?.length ?? 0;
+  const catalogueCount = catalogueCountFromVendor(vendor);
+  if (serviceCount === 0 && catalogueCount === 0) return "Scope on request";
+  return [
+    serviceCount > 0 ? pluralize(serviceCount, "package") : null,
+    catalogueCount > 0 ? pluralize(catalogueCount, "catalogue row") : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function sourceCopy(source: "vendor" | "suggested") {
+  return source === "vendor" ? "Vendor listed" : "Planning prompt";
+}
+
+function BriefMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="font-accent text-[9px] uppercase tracking-[0.18em] text-ivory/45">
+        {label}
+      </p>
+      <p className="mt-1 font-display text-xl text-ivory">{value}</p>
+    </div>
+  );
+}
+
 export default function ClientVendorsPage() {
   const [cat, setCat] = useState<Cat>("All");
+  const [activeNeedId, setActiveNeedId] = useState<string>("full-plan");
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [vendors, setVendors] = useState<VendorCardApi[]>([]);
@@ -441,12 +539,6 @@ export default function ClientVendorsPage() {
   }, [cat, q]);
 
   useEffect(() => {
-    if (!selectedSlug && vendors.length > 0) {
-      setSelectedSlug(vendors[0].slug);
-    }
-  }, [selectedSlug, vendors]);
-
-  useEffect(() => {
     if (!selectedSlug) {
       setSelectedVendor(null);
       setDetailError(null);
@@ -497,8 +589,50 @@ export default function ClientVendorsPage() {
     return list;
   }, [vendors, cat, savedSlugs, showSavedOnly]);
 
-  const selectedSummary = selectedVendor ?? vendors.find((vendor) => vendor.slug === selectedSlug) ?? null;
+  useEffect(() => {
+    if (loading) return;
+    if (filtered.length === 0) {
+      if (selectedSlug !== null) setSelectedSlug(null);
+      return;
+    }
+    if (selectedSlug && filtered.some((vendor) => vendor.slug === selectedSlug)) {
+      return;
+    }
+    const firstVendor = filtered[0];
+    if (firstVendor) setSelectedSlug(firstVendor.slug);
+  }, [filtered, loading, selectedSlug]);
+
+  const activeNeed =
+    eventNeedFilters.find((need) => need.id === activeNeedId) ?? null;
+  const selectedSummary =
+    selectedVendor ?? vendors.find((vendor) => vendor.slug === selectedSlug) ?? null;
   const savedCount = savedSlugs.length;
+  const resultStats = useMemo(
+    () => ({
+      vendors: filtered.length,
+      packages: filtered.reduce(
+        (total, vendor) => total + (vendor.services?.length ?? 0),
+        0
+      ),
+      catalogue: filtered.reduce(
+        (total, vendor) => total + catalogueCountFromVendor(vendor),
+        0
+      ),
+    }),
+    [filtered]
+  );
+
+  const chooseNeed = (need: (typeof eventNeedFilters)[number]) => {
+    setActiveNeedId(need.id);
+    setCat(need.category);
+    setQ("");
+    setShowSavedOnly(false);
+  };
+
+  const chooseCategory = (nextCat: Cat) => {
+    setActiveNeedId(nextCat === "All" ? "full-plan" : "");
+    setCat(nextCat);
+  };
 
   const toggleSaved = async (slug: string) => {
     const isSaved = savedSlugs.includes(slug);
@@ -536,106 +670,243 @@ export default function ClientVendorsPage() {
 
   return (
     <motion.div variants={staggerContainer} initial="hidden" animate="visible">
-      <motion.div variants={fadeUp} className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-        <div className="max-w-3xl">
-          <p className={dashLabel}>Discovery</p>
-          <h2 className="font-display mt-2 text-3xl font-semibold text-charcoal md:text-4xl">
-            Vendors
-          </h2>
-          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate">
-            A curated vendor marketplace with real profiles, real pricing cues, and
-            a shortlist synced to your account so your planning follows you across
-            sessions and devices.
-          </p>
-          {savedCount === 0 ? (
-            <div className="mt-4 border border-dashed border-gold-primary/30 bg-gold-primary/8 px-4 py-3">
-              <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-gold-dark">
-                Start your shortlist
-              </p>
-              <p className="mt-1 text-sm leading-relaxed text-charcoal">
-                Open a profile and tap <span className="text-gold-dark">Shortlist</span> to
-                save vendors here. You can compare their catalogues, scope, and
-                imagery before reaching out.
-              </p>
-            </div>
-          ) : null}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="border border-charcoal/8 bg-ivory px-4 py-3">
-            <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
-              Saved to your account
+      <motion.section
+        variants={fadeUp}
+        className="relative overflow-hidden border border-charcoal/10 bg-ivory"
+      >
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,169,110,0.22),transparent_32%),linear-gradient(135deg,rgba(231,223,201,0.66),rgba(245,240,226,0.92)_52%,rgba(164,172,134,0.18))]" />
+        <div className="relative grid gap-6 p-5 md:p-7 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="max-w-3xl">
+            <p className={dashLabel}>Vendor sourcing board</p>
+            <h2 className="font-display mt-2 max-w-2xl text-3xl font-semibold leading-tight text-charcoal md:text-5xl">
+              Choose vendors for the function, not the directory.
+            </h2>
+            <p className="mt-4 max-w-2xl text-sm leading-relaxed text-slate md:text-base">
+              Start with an event day or requirement, then compare packages,
+              catalogue rows, pricing cues, and fit before adding anyone to your
+              shortlist.
             </p>
-            <p className="mt-1 font-display text-lg text-charcoal">{savedCount}</p>
+            <div className="mt-5 flex flex-wrap items-center gap-3">
+              <Link href="/client/wedding" className={dashBtn}>
+                Open event plan
+              </Link>
+              <button
+                type="button"
+                onClick={() => setShowSavedOnly((value) => !value)}
+                className={cn(
+                  "font-accent inline-flex items-center justify-center border px-5 py-3 text-[11px] uppercase tracking-[0.2em] transition-all duration-500",
+                  showSavedOnly
+                    ? "border-gold-primary bg-gold-primary/10 text-gold-dark"
+                    : "border-charcoal/15 text-charcoal hover:border-gold-primary hover:text-gold-dark"
+                )}
+              >
+                {showSavedOnly ? "Showing shortlist" : "View shortlist"}
+              </button>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowSavedOnly((value) => !value)}
-            className={cn(
-              "font-accent inline-flex items-center justify-center border px-4 py-3 text-[10px] uppercase tracking-[0.2em] transition-all duration-500",
-              showSavedOnly
-                ? "border-gold-primary bg-gold-primary/10 text-gold-dark"
-                : "border-charcoal/15 text-charcoal hover:border-gold-primary hover:text-gold-dark"
-            )}
-          >
-            {showSavedOnly ? "Showing saved" : "View saved"}
-          </button>
+
+          <div className="border border-charcoal/10 bg-charcoal p-4 text-ivory shadow-[0_24px_80px_rgba(51,61,41,0.16)]">
+            <p className="font-accent text-[10px] uppercase tracking-[0.22em] text-gold-light">
+              Current brief
+            </p>
+            <h3 className="mt-2 font-display text-2xl leading-tight">
+              {activeNeed?.label ?? cat}
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-ivory/70">
+              {activeNeed?.intent ??
+                "Manual category filter selected. Use the function lanes below to return to plan-first sourcing."}
+            </p>
+            <div className="mt-5 grid grid-cols-3 gap-2 border-t border-ivory/10 pt-4">
+              <BriefMetric label="Saved" value={String(savedCount)} />
+              <BriefMetric label="Matches" value={String(resultStats.vendors)} />
+              <BriefMetric label="Packages" value={String(resultStats.packages)} />
+            </div>
+            {savedCount === 0 ? (
+              <div className="mt-4 border border-dashed border-gold-light/30 bg-ivory/5 p-3">
+                <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-gold-light">
+                  Shortlist starts here
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-ivory/68">
+                  Open a brief and save vendors with real profiles, service
+                  scope, and catalogue detail.
+                </p>
+              </div>
+            ) : null}
+          </div>
         </div>
-      </motion.div>
+      </motion.section>
 
-      <motion.div variants={fadeUp} className="mt-8">
-        <label htmlFor="vendor-disc-search" className={dashLabel}>
-          Search
-        </label>
-        <input
-          id="vendor-disc-search"
-          type="search"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Name, city, or style"
-          className="mt-3 w-full max-w-xl border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm text-charcoal outline-none transition-colors focus:border-gold-primary"
-        />
-      </motion.div>
-
-      <motion.div variants={fadeUp} className="mt-8 flex flex-wrap items-center gap-2 border-b border-charcoal/15 pb-4">
-        {categories.map((c) => {
-          const active = cat === c;
+      <motion.section
+        variants={fadeUp}
+        className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3"
+        aria-label="Function based vendor filters"
+      >
+        {eventNeedFilters.map((need) => {
+          const active = activeNeedId === need.id;
           return (
             <button
-              key={c}
+              key={need.id}
               type="button"
-              onClick={() => setCat(c)}
+              aria-pressed={active}
+              onClick={() => chooseNeed(need)}
               className={cn(
-                "font-accent border px-3 py-2 text-[10px] uppercase tracking-[0.15em] transition-colors",
+                "group border p-4 text-left transition-all duration-300",
                 active
-                  ? "border-gold-primary bg-gold-primary/10 text-gold-dark"
-                  : "border-charcoal/10 text-slate hover:border-gold-primary hover:text-charcoal"
+                  ? "border-gold-primary bg-gold-primary/10 shadow-[0_16px_50px_rgba(201,169,110,0.12)]"
+                  : "border-charcoal/8 bg-ivory hover:border-gold-primary/50 hover:bg-cream/35"
               )}
             >
-              {c}
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-slate">
+                    {need.day}
+                  </p>
+                  <h3 className="mt-2 font-display text-xl leading-tight text-charcoal">
+                    {need.label}
+                  </h3>
+                </div>
+                <span
+                  className={cn(
+                    "font-accent border px-2 py-1 text-[10px] uppercase tracking-[0.14em]",
+                    active
+                      ? "border-gold-primary/50 text-gold-dark"
+                      : "border-charcoal/10 text-slate group-hover:border-gold-primary/35"
+                  )}
+                >
+                  {need.category}
+                </span>
+              </div>
+              <p className="mt-3 text-sm leading-relaxed text-slate">
+                {need.intent}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {need.support.map((item) => (
+                  <span
+                    key={`${need.id}-${item}`}
+                    className="border border-charcoal/10 bg-ivory px-2 py-1 font-heading text-[11px] text-charcoal/75"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
             </button>
           );
         })}
-      </motion.div>
+      </motion.section>
 
-      <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+      <motion.section
+        variants={fadeUp}
+        className="mt-6 border border-charcoal/8 bg-ivory p-4 md:p-5"
+      >
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,380px)] lg:items-end">
+          <div>
+            <p className={dashLabel}>Refine this brief</p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {categories.map((c) => {
+                const active = cat === c;
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => chooseCategory(c)}
+                    className={cn(
+                      "font-accent border px-3 py-2 text-[10px] uppercase tracking-[0.15em] transition-colors",
+                      active
+                        ? "border-gold-primary bg-gold-primary/10 text-gold-dark"
+                        : "border-charcoal/10 text-slate hover:border-gold-primary hover:text-charcoal"
+                    )}
+                  >
+                    {c}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div>
+            <label htmlFor="vendor-disc-search" className={dashLabel}>
+              Search within matches
+            </label>
+            <input
+              id="vendor-disc-search"
+              type="search"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Vendor, city, style, or package"
+              className="mt-3 w-full border border-charcoal/15 bg-cream/30 px-4 py-3 font-heading text-sm text-charcoal outline-none transition-colors placeholder:text-charcoal/35 focus:border-gold-primary"
+            />
+          </div>
+        </div>
+      </motion.section>
+
+      <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_440px]">
         <div>
+          <div className="mb-4 flex flex-col gap-3 border-b border-charcoal/10 pb-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className={dashLabel}>Matching vendor briefs</p>
+              <h3 className="mt-1 font-display text-2xl text-charcoal">
+                {activeNeed?.label ?? `${cat} vendors`}
+              </h3>
+              <p className="mt-1 text-sm leading-relaxed text-slate">
+                {showSavedOnly
+                  ? "Showing only vendors saved to your account."
+                  : activeNeed?.intent ??
+                    "Category view is active. Open a function lane when you want event-plan-first sourcing."}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <span className="border border-charcoal/10 bg-ivory px-3 py-2 font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
+                {pluralize(resultStats.vendors, "vendor")}
+              </span>
+              <span className="border border-charcoal/10 bg-ivory px-3 py-2 font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
+                {pluralize(resultStats.catalogue, "catalogue row")}
+              </span>
+            </div>
+          </div>
+
           {loading ? (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-2">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-72 animate-pulse border border-charcoal/8 bg-charcoal/5" />
+                <div
+                  key={i}
+                  className="h-80 animate-pulse border border-charcoal/8 bg-charcoal/5"
+                />
               ))}
             </div>
           ) : filtered.length === 0 ? (
-            <ListEmptyState
-              title={showSavedOnly ? "No saved vendors yet" : q.trim() ? "No vendors match your search" : "No vendors in this destination"}
+            <VendorDiscoveryEmptyState
+              title={
+                showSavedOnly
+                  ? "No shortlisted vendors for this planning pass"
+                  : q.trim()
+                    ? "No vendors match this brief"
+                    : "No vendors published for this need yet"
+              }
               hint={
                 showSavedOnly
-                  ? "Shortlist vendors to keep a synced list attached to your account."
+                  ? "Browse the sourcing board and save vendors from their brief."
                   : q.trim()
-                    ? "Try a different name or category."
-                    : "Select a different location or check back later as more vendors are added."
+                    ? "Clear search or move back to the full plan to widen the pool."
+                    : "Try all open gaps or another function while the catalogue grows."
               }
+              primaryLabel={
+                showSavedOnly
+                  ? "Browse all vendors"
+                  : q.trim()
+                    ? "Clear search"
+                    : "Show all gaps"
+              }
+              onPrimary={() => {
+                if (showSavedOnly) {
+                  setShowSavedOnly(false);
+                  return;
+                }
+                if (q.trim()) {
+                  setQ("");
+                  return;
+                }
+                chooseNeed(eventNeedFilters[0]);
+              }}
             />
           ) : (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -645,81 +916,125 @@ export default function ClientVendorsPage() {
                 const isSaved = savedSlugs.includes(v.slug);
                 const isSelected = selectedSlug === v.slug;
                 const offering = offeringForVendor(v);
+                const fit = offering.eventFit.slice(0, 3);
+                const catalogueCount = catalogueCountFromVendor(v);
 
                 return (
                   <motion.article
                     key={v.id}
                     variants={staggerItem}
                     className={cn(
-                      dashCard,
-                      "border transition-all duration-300",
+                      "overflow-hidden border bg-ivory transition-all duration-300",
                       isSelected
-                        ? "border-gold-primary/45 shadow-[0_20px_50px_rgba(201,169,110,0.12)]"
-                        : "border-charcoal/8"
+                        ? "border-gold-primary/55 shadow-[0_20px_60px_rgba(201,169,110,0.16)]"
+                        : "border-charcoal/8 hover:border-gold-primary/35"
                     )}
                   >
-                    <div className="aspect-[4/3] border border-charcoal/10 bg-[radial-gradient(circle_at_top_left,rgba(201,169,110,0.22),transparent_35%),linear-gradient(145deg,#111827_0%,#292536_55%,#0f172a_100%)]" />
-                    <div className="mt-4 flex flex-wrap items-start justify-between gap-2">
-                      <div>
-                        <h3 className="font-display text-lg text-charcoal">{v.business_name}</h3>
-                        <p className="mt-1 text-sm text-slate">{loc}</p>
+                    <div className="relative min-h-36 overflow-hidden border-b border-charcoal/8 bg-[radial-gradient(circle_at_top_left,rgba(201,169,110,0.30),transparent_35%),linear-gradient(135deg,#333D29_0%,#414833_54%,#1f2717_100%)] p-4 text-ivory">
+                      <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full border border-gold-light/20" />
+                      <div className="relative flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-gold-light">
+                            Function fit
+                          </p>
+                          <p className="mt-2 font-display text-2xl leading-tight">
+                            {fit[0] ?? "Event support"}
+                          </p>
+                        </div>
+                        <span className="border border-ivory/15 px-2 py-1 font-accent text-[10px] uppercase tracking-[0.14em] text-ivory/75">
+                          {catName}
+                        </span>
                       </div>
-                      <span
-                        className={cn(
-                          statusBadgeBase,
-                          v.is_verified
-                            ? "border-sage/50 text-sage"
-                            : "border-gold-primary/50 text-gold-dark"
-                        )}
-                      >
-                        {catName}
-                      </span>
+                      <div className="relative mt-5 flex flex-wrap gap-2">
+                        {fit.map((eventName) => (
+                          <span
+                            key={`${v.id}-${eventName}`}
+                            className="border border-ivory/15 bg-ivory/8 px-2 py-1 font-heading text-[11px] text-ivory/80"
+                          >
+                            {eventName}
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                    <p className="font-heading mt-3 line-clamp-2 text-sm text-slate">
-                      {v.short_bio ?? "Open the profile for more detail and pricing context."}
-                    </p>
-                    <div className="mt-4 border border-charcoal/8 bg-cream/35 p-3">
-                      <p className={dashLabel}>What they cover</p>
-                      <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate">
-                        {offering.promise}
+
+                    <div className="p-5">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="font-display text-xl leading-tight text-charcoal">
+                            {v.business_name}
+                          </h3>
+                          <p className="mt-1 text-sm text-slate">{loc}</p>
+                        </div>
+                        <span
+                          className={cn(
+                            statusBadgeBase,
+                            v.is_verified
+                              ? "border-sage/50 text-sage"
+                              : "border-gold-primary/50 text-gold-dark"
+                          )}
+                        >
+                          {v.is_verified ? "Verified" : "Profile"}
+                        </span>
+                      </div>
+                      <p className="font-heading mt-3 line-clamp-2 text-sm leading-relaxed text-slate">
+                        {v.short_bio ??
+                          "Open the brief for scope, pricing, catalogue, and review context."}
                       </p>
-                    </div>
-                    <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                      <div className="border border-charcoal/8 bg-cream/40 p-3">
-                        <p className={dashLabel}>Rating</p>
-                        <p className="mt-2 font-display text-lg text-charcoal">{ratingLabel(v.rating)}</p>
+
+                      <div className="mt-4 border border-charcoal/8 bg-cream/35 p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className={dashLabel}>Need coverage</p>
+                          <span className="font-accent text-[10px] uppercase tracking-[0.14em] text-gold-dark">
+                            {sourceCopy(offering.sources.promise)}
+                          </span>
+                        </div>
+                        <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-slate">
+                          {offering.promise}
+                        </p>
                       </div>
-                      <div className="border border-charcoal/8 bg-cream/40 p-3">
-                        <p className={dashLabel}>Starting from</p>
-                        <p className="mt-2 font-display text-lg text-charcoal">{priceRangeFromVendor(v)}</p>
+
+                      <div className="mt-4 grid grid-cols-2 gap-3">
+                        <MetricCard label="Starting from" value={priceRangeFromVendor(v)} />
+                        <MetricCard label="Rating" value={ratingLabel(v.rating)} />
                       </div>
-                    </div>
-                    <div className="mt-4 flex flex-wrap items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedSlug(v.slug)}
-                        className={dashBtn}
-                      >
-                        View Profile
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void toggleSaved(v.slug)}
-                        disabled={syncingSlug === v.slug}
-                        className={cn(
-                          savedBtn,
-                          syncingSlug === v.slug && "cursor-wait opacity-70",
-                          isSaved
-                            ? "border-gold-primary bg-gold-primary/10 text-gold-dark"
-                            : "border-charcoal/20 text-charcoal hover:border-gold-primary hover:text-gold-dark"
-                        )}
-                      >
-                        {syncingSlug === v.slug
-                          ? "Saving..."
-                          : isSaved
-                            ? "Saved"
-                            : "Shortlist"}
-                      </button>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <span className="border border-charcoal/10 bg-ivory px-2.5 py-1.5 font-heading text-[11px] text-charcoal/75">
+                          {serviceSummary(v)}
+                        </span>
+                        {catalogueCount > 0 ? (
+                          <span className="border border-gold-primary/25 bg-gold-primary/8 px-2.5 py-1.5 font-heading text-[11px] text-gold-dark">
+                            Catalogue preview ready
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <div className="mt-5 flex flex-wrap items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSlug(v.slug)}
+                          className={dashBtn}
+                        >
+                          {isSelected ? "Brief open" : "Open brief"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void toggleSaved(v.slug)}
+                          disabled={syncingSlug === v.slug}
+                          className={cn(
+                            savedBtn,
+                            syncingSlug === v.slug && "cursor-wait opacity-70",
+                            isSaved
+                              ? "border-gold-primary bg-gold-primary/10 text-gold-dark"
+                              : "border-charcoal/20 text-charcoal hover:border-gold-primary hover:text-gold-dark"
+                          )}
+                        >
+                          {syncingSlug === v.slug
+                            ? "Saving..."
+                            : isSaved
+                              ? "Shortlisted"
+                              : "Shortlist"}
+                        </button>
+                      </div>
                     </div>
                   </motion.article>
                 );
@@ -729,37 +1044,69 @@ export default function ClientVendorsPage() {
         </div>
 
         <aside className="self-start">
-          <div className="sticky top-6 border border-charcoal/8 bg-ivory p-5">
-            <p className={dashLabel}>Profile preview</p>
-            {detailLoading ? (
-              <div className="mt-4 space-y-3 animate-pulse">
-                <div className="h-56 bg-charcoal/5" />
-                <div className="h-6 w-48 bg-charcoal/5" />
-                <div className="h-4 w-32 bg-charcoal/5" />
-                <div className="h-24 bg-charcoal/5" />
-              </div>
-            ) : detailError ? (
-              <div className="mt-4">
+          <div className="sticky top-6 overflow-hidden border border-charcoal/8 bg-ivory">
+            <div className="border-b border-charcoal/8 bg-cream/35 p-5">
+              <p className={dashLabel}>Selected vendor brief</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate">
+                Review fit, services, catalogue rows, and proof before adding the
+                vendor to your event plan shortlist.
+              </p>
+            </div>
+            <div className="p-5">
+              {detailLoading ? (
+                <div className="space-y-3 animate-pulse">
+                  <div className="h-48 bg-charcoal/5" />
+                  <div className="h-6 w-48 bg-charcoal/5" />
+                  <div className="h-4 w-32 bg-charcoal/5" />
+                  <div className="h-24 bg-charcoal/5" />
+                </div>
+              ) : detailError ? (
                 <ListEmptyState title="Could not load profile" hint={detailError} />
-              </div>
-            ) : selectedSummary ? (
-              <VendorDetailPanel
-                vendor={selectedVendor ?? selectedSummary}
-                isSaved={savedSlugs.includes(selectedSummary.slug)}
-                saving={syncingSlug === selectedSummary.slug}
-                onToggleSaved={() => void toggleSaved(selectedSummary.slug)}
-                onSelectSlug={setSelectedSlug}
-              />
-            ) : (
-              <ListEmptyState
-                title="Open a vendor profile"
-                hint="Pick a vendor card to see the full profile, services, and reviews here."
-              />
-            )}
+              ) : selectedSummary ? (
+                <VendorDetailPanel
+                  vendor={selectedVendor ?? selectedSummary}
+                  isSaved={savedSlugs.includes(selectedSummary.slug)}
+                  saving={syncingSlug === selectedSummary.slug}
+                  onToggleSaved={() => void toggleSaved(selectedSummary.slug)}
+                />
+              ) : (
+                <ListEmptyState
+                  title="Open a vendor brief"
+                  hint="Pick a vendor card to compare packages, catalogue rows, and shortlist fit."
+                />
+              )}
+            </div>
           </div>
         </aside>
       </div>
     </motion.div>
+  );
+}
+
+function VendorDiscoveryEmptyState({
+  title,
+  hint,
+  primaryLabel,
+  onPrimary,
+}: {
+  title: string;
+  hint: string;
+  primaryLabel: string;
+  onPrimary: () => void;
+}) {
+  return (
+    <div className="border border-dashed border-charcoal/15 bg-ivory p-8 text-center">
+      <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-gold-dark">
+        Sourcing gap
+      </p>
+      <h3 className="mt-3 font-display text-2xl text-charcoal">{title}</h3>
+      <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate">
+        {hint}
+      </p>
+      <button type="button" onClick={onPrimary} className={cn(dashBtn, "mt-5")}>
+        {primaryLabel}
+      </button>
+    </div>
   );
 }
 
@@ -768,33 +1115,47 @@ function VendorDetailPanel({
   isSaved,
   saving,
   onToggleSaved,
-  onSelectSlug,
 }: {
   vendor: VendorDetailApi | VendorCardApi;
   isSaved: boolean;
   saving: boolean;
   onToggleSaved: () => void;
-  onSelectSlug: (slug: string) => void;
 }) {
   const reviews = sortReviews("reviews" in vendor ? vendor.reviews : null);
   const services = (vendor.services ?? []).slice(0, 6);
   const offering = offeringForVendor(vendor);
   const catalogueItems = catalogueItemsFromServices(services);
+  const categoryDetails = categoryCopy(vendor.category?.slug);
   const detailCopy =
     "description" in vendor
       ? vendor.description ?? vendor.short_bio ?? "Detailed profile available below."
-      : vendor.short_bio ?? "Open the profile for the full vendor detail."
+      : vendor.short_bio ?? "Open the profile for the full vendor detail.";
 
   return (
-    <div className="mt-4 space-y-5">
-      <div className="aspect-[4/3] overflow-hidden border border-charcoal/10 bg-[radial-gradient(circle_at_top_right,rgba(201,169,110,0.28),transparent_35%),linear-gradient(155deg,#111827_0%,#1f2937_55%,#0b1220_100%)]" />
+    <div className="space-y-5">
+      <div className="relative overflow-hidden border border-charcoal/10 bg-[radial-gradient(circle_at_top_right,rgba(201,169,110,0.30),transparent_35%),linear-gradient(145deg,#333D29_0%,#414833_58%,#1f2717_100%)] p-4 text-ivory">
+        <div className="absolute -bottom-12 -right-10 h-36 w-36 rounded-full border border-gold-light/18" />
+        <div className="relative">
+          <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-gold-light">
+            Sourcing brief
+          </p>
+          <h3 className="mt-3 font-display text-3xl leading-tight">
+            {vendor.business_name}
+          </h3>
+          <p className="mt-2 text-sm text-ivory/68">
+            {formatLocation(vendor.city, vendor.country)}
+          </p>
+          <div className="mt-5 grid grid-cols-2 gap-2">
+            <BriefMetric label="Price cue" value={priceRangeFromVendor(vendor)} />
+            <BriefMetric label="Packages" value={String(services.length)} />
+          </div>
+        </div>
+      </div>
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="font-display text-2xl text-charcoal">{vendor.business_name}</h3>
-          <p className="mt-1 text-sm text-slate">
-            {formatLocation(vendor.city, vendor.country)}
-          </p>
+          <p className={dashLabel}>Vendor context</p>
+          <p className="mt-2 text-sm leading-relaxed text-slate">{detailCopy}</p>
         </div>
         <span
           className={cn(
@@ -805,10 +1166,6 @@ function VendorDetailPanel({
           {vendor.category?.name ?? "Vendor"}
         </span>
       </div>
-
-      <p className="text-sm leading-relaxed text-slate">
-        {detailCopy}
-      </p>
 
       <div className="border border-charcoal/10 bg-[radial-gradient(circle_at_top_left,rgba(201,169,110,0.2),transparent_34%),linear-gradient(145deg,#111827_0%,#1f2937_58%,#0b1220_100%)] p-4 text-ivory">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -859,15 +1216,14 @@ function VendorDetailPanel({
               : "border-charcoal/20 text-charcoal hover:border-gold-primary hover:text-gold-dark"
           )}
         >
-          {saving ? "Saving..." : isSaved ? "Saved" : "Shortlist"}
+          {saving ? "Saving..." : isSaved ? "Shortlisted" : "Shortlist"}
         </button>
-        <button
-          type="button"
-          onClick={() => onSelectSlug(vendor.slug)}
+        <a
+          href="#vendor-services"
           className="font-accent inline-flex items-center justify-center border border-charcoal/15 px-4 py-2.5 text-[11px] uppercase tracking-[0.2em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark"
         >
-          Refresh profile
-        </button>
+          Review packages
+        </a>
       </div>
 
       <div>
@@ -901,29 +1257,34 @@ function VendorDetailPanel({
       {catalogueItems.length > 0 ? (
         <div>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className={dashLabel}>{categoryCopy(vendor.category?.slug).catalogueLabel}</p>
+            <div>
+              <p className={dashLabel}>Catalogue preview</p>
+              <h4 className="mt-1 font-display text-xl text-charcoal">
+                {categoryDetails.catalogueLabel}
+              </h4>
+            </div>
             <span className="font-accent border border-gold-primary/40 bg-gold-primary/8 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-gold-dark">
-              {catalogueItems.length} listed by vendor
+              {pluralize(catalogueItems.length, "row")}
             </span>
           </div>
           <div className="mt-3 space-y-4">
             {groupCatalogueItems(catalogueItems).map((group) => (
-              <div key={group.itemType} className="border border-charcoal/8 bg-cream/35 p-3">
+              <div key={group.itemType} className="border border-charcoal/8 bg-cream/35 p-4">
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-gold-dark">
-                    {categoryCopy(vendor.category?.slug).groupHeadings[group.itemType] ??
+                    {categoryDetails.groupHeadings[group.itemType] ??
                       offeringLabel(group.itemType)}
                   </p>
                   <span className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
-                    {group.items.length}
+                    {pluralize(group.items.length, "item")}
                   </span>
                 </div>
-                <ul className="mt-3 list-none space-y-2 pl-0">
+                <ul className="mt-3 list-none space-y-3 pl-0">
                   {group.items.slice(0, 6).map((item) => (
-                    <li key={item.id} className="border-t border-charcoal/8 pt-2 first:border-t-0 first:pt-0">
-                      <div className="flex flex-wrap items-start gap-3">
+                    <li key={item.id} className="border-t border-charcoal/8 pt-3 first:border-t-0 first:pt-0">
+                      <div className="flex items-start gap-3">
                         {item.image_urls && item.image_urls.length > 0 ? (
-                          <div className="h-14 w-14 shrink-0 overflow-hidden border border-charcoal/10 bg-cream/40">
+                          <div className="h-16 w-16 shrink-0 overflow-hidden border border-charcoal/10 bg-ivory">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={item.image_urls[0]}
@@ -932,54 +1293,56 @@ function VendorDetailPanel({
                             />
                           </div>
                         ) : null}
-                        <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="font-heading text-sm text-charcoal">
-                              {item.name}
-                            </p>
-                            <p className="mt-1 font-accent text-[10px] uppercase tracking-[0.14em] text-slate">
-                              {item.serviceName}
-                            </p>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="font-heading text-base leading-tight text-charcoal">
+                                {item.name}
+                              </p>
+                              <p className="mt-1 font-accent text-[10px] uppercase tracking-[0.14em] text-slate">
+                                {item.serviceName}
+                              </p>
+                            </div>
+                            {item.dietary_tags?.length ? (
+                              <span className="border border-sage/30 bg-ivory px-2 py-1 font-heading text-[11px] text-sage">
+                                {item.dietary_tags.slice(0, 2).join(", ")}
+                              </span>
+                            ) : null}
                           </div>
-                          {item.dietary_tags?.length ? (
-                            <span className="border border-sage/30 px-2 py-1 font-heading text-[11px] text-sage">
-                              {item.dietary_tags.slice(0, 2).join(", ")}
-                            </span>
+                          {item.description ? (
+                            <p className="mt-2 text-xs leading-relaxed text-slate">
+                              {item.description}
+                            </p>
+                          ) : null}
+                          {item.image_urls && item.image_urls.length > 1 ? (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {item.image_urls.slice(1, 5).map((url, i) => (
+                                <div
+                                  key={`${url}-${i}`}
+                                  className="h-10 w-10 overflow-hidden border border-charcoal/10 bg-ivory"
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={url}
+                                    alt=""
+                                    className="h-full w-full object-cover"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                          {item.reference_url ? (
+                            <a
+                              href={item.reference_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-2 inline-flex font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark hover:text-gold-primary"
+                            >
+                              View moodboard
+                            </a>
                           ) : null}
                         </div>
                       </div>
-                      {item.description ? (
-                        <p className="mt-1 text-xs leading-relaxed text-slate">
-                          {item.description}
-                        </p>
-                      ) : null}
-                      {item.image_urls && item.image_urls.length > 1 ? (
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {item.image_urls.slice(1, 5).map((url, i) => (
-                            <div
-                              key={`${url}-${i}`}
-                              className="h-10 w-10 overflow-hidden border border-charcoal/10 bg-cream/40"
-                            >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={url}
-                                alt=""
-                                className="h-full w-full object-cover"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
-                      {item.reference_url ? (
-                        <a
-                          href={item.reference_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-2 inline-flex font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark hover:text-gold-primary"
-                        >
-                          View moodboard →
-                        </a>
-                      ) : null}
                     </li>
                   ))}
                 </ul>
@@ -990,7 +1353,12 @@ function VendorDetailPanel({
       ) : (
         <div>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className={dashLabel}>{categoryCopy(vendor.category?.slug).catalogueLabel}</p>
+            <div>
+              <p className={dashLabel}>Catalogue preview</p>
+              <h4 className="mt-1 font-display text-xl text-charcoal">
+                {categoryDetails.catalogueLabel}
+              </h4>
+            </div>
             <span className="font-accent border border-charcoal/15 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-slate">
               Not itemized yet
             </span>
@@ -1001,7 +1369,7 @@ function VendorDetailPanel({
               you reach out:
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              {categoryCopy(vendor.category?.slug).exampleItemNames.map((name) => (
+              {categoryDetails.exampleItemNames.map((name) => (
                 <span
                   key={name}
                   className="border border-charcoal/12 bg-ivory px-2.5 py-1.5 font-heading text-[11px] text-charcoal/80"
@@ -1014,10 +1382,15 @@ function VendorDetailPanel({
         </div>
       )}
 
-      <div>
-        <div className="flex items-center justify-between gap-3">
-          <p className={dashLabel}>Services and packages</p>
-          <span className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
+      <div id="vendor-services" className="scroll-mt-6">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className={dashLabel}>Services and packages</p>
+            <h4 className="mt-1 font-display text-xl text-charcoal">
+              Compare the actual sellable scope
+            </h4>
+          </div>
+          <span className="shrink-0 border border-charcoal/12 px-2 py-1 font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
             {services.length} listed
           </span>
         </div>
@@ -1028,11 +1401,16 @@ function VendorDetailPanel({
                 key={`${service.name ?? "service"}-${index}`}
                 className="border border-charcoal/8 bg-cream/40 p-4"
               >
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm text-charcoal">{service.name ?? "Service"}</p>
+                    <p className="font-accent text-[10px] uppercase tracking-[0.14em] text-gold-dark">
+                      Package {index + 1}
+                    </p>
+                    <p className="mt-1 font-heading text-base leading-tight text-charcoal">
+                      {service.name ?? "Service"}
+                    </p>
                     {service.service_scope ? (
-                      <p className="mt-2 text-xs leading-relaxed text-charcoal">
+                      <p className="mt-2 text-sm leading-relaxed text-charcoal">
                         {service.service_scope}
                       </p>
                     ) : null}
@@ -1042,7 +1420,7 @@ function VendorDetailPanel({
                       </p>
                     ) : null}
                   </div>
-                  <p className="shrink-0 text-right font-accent text-[10px] uppercase tracking-[0.15em] text-gold-dark">
+                  <p className="shrink-0 border border-gold-primary/35 bg-ivory px-2 py-1 text-right font-accent text-[10px] uppercase tracking-[0.15em] text-gold-dark">
                     {servicePriceLabel(service)}
                   </p>
                 </div>
@@ -1064,12 +1442,20 @@ function VendorDetailPanel({
                 />
                 {service.items?.length ? (
                   <div className="mt-3 border-t border-charcoal/8 pt-3">
-                    <p className="font-accent text-[10px] uppercase tracking-[0.14em] text-slate">
-                      Selectable items
-                    </p>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-accent text-[10px] uppercase tracking-[0.14em] text-slate">
+                        Catalogue rows attached
+                      </p>
+                      <span className="font-accent text-[10px] uppercase tracking-[0.14em] text-gold-dark">
+                        {pluralize(service.items.length, "row")}
+                      </span>
+                    </div>
                     <div className="mt-2 space-y-2">
                       {service.items.slice(0, 4).map((item) => (
-                        <div key={item.id} className="text-xs leading-relaxed text-slate">
+                        <div
+                          key={item.id}
+                          className="border border-charcoal/8 bg-ivory px-3 py-2 text-xs leading-relaxed text-slate"
+                        >
                           <span className="text-charcoal">{item.name}</span>
                           <span> · {offeringLabel(item.item_type)}</span>
                           {item.dietary_tags?.length ? (

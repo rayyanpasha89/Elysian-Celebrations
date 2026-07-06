@@ -123,23 +123,23 @@ function AtmosphereGallery() {
   const moments = [
     {
       image: MARKETING_IMAGES.editorial.ceremony,
-      label: "Arrival layer",
-      title: "The first minute sets the physics.",
-      copy: "Sightlines, welcome drinks, lighting, and movement get composed before the guest enters the room.",
+      label: "Arrival node",
+      title: "The first minute becomes a planned branch.",
+      copy: "Sightlines, welcome drinks, lighting, and movement are tied to the exact function they support.",
       height: "h-[480px] lg:h-[460px]",
     },
     {
       image: MARKETING_IMAGES.hero.tablescape,
-      label: "Hospitality layer",
-      title: "Food becomes part of the storyline.",
-      copy: "Menus, stations, service pacing, and dietary cues connect back to the function they belong to.",
+      label: "Hospitality node",
+      title: "Menus begin from real vendor offerings.",
+      copy: "Counters, courses, dietary cues, and add-ons come from catalogue rows before the client customizes.",
       height: "h-[420px] lg:h-[360px]",
     },
     {
       image: MARKETING_IMAGES.editorial.portrait,
-      label: "Memory layer",
-      title: "Every frame knows why it exists.",
-      copy: "Photo, film, decor, and family rhythm stay linked to the same plan instead of drifting apart.",
+      label: "Memory node",
+      title: "Every frame knows which moment it belongs to.",
+      copy: "Photo, film, decor, and family rhythm stay attached to the same branch of the plan.",
       height: "h-[520px] lg:h-[560px]",
     },
   ];
@@ -151,8 +151,8 @@ function AtmosphereGallery() {
         <div className="mb-10 grid gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,0.75fr)] lg:items-end">
           <SectionHeader
             eyebrow="Signature moments"
-            title="The beautiful parts now connect to the operating parts."
-            intro="A premium event cannot be only visual. The atmosphere, vendors, food, movement, and budget need to speak to each other from the first brief."
+            title="Atmosphere now has coordinates."
+            intro="The page is no longer selling pretty scenes alone. It shows how every scene belongs to a day, a function, a vendor decision, and a budget consequence."
             align="start"
             titleMaxWidth="max-w-3xl"
           />
@@ -163,9 +163,9 @@ function AtmosphereGallery() {
             </p>
             <div className="mt-4 grid gap-3">
               {[
-                "Each function gets its own vendor and service logic.",
-                "Menus start from shortlisted offerings, not blank typing.",
-                "Custom requests stay visible for quote follow-up.",
+                "Each moment lives inside a day and function branch.",
+                "Vendor catalogues create the first menu, setup, or service draft.",
+                "Quote-only requests stay visible instead of polluting estimates.",
               ].map((note, index) => (
                 <div
                   key={note}
@@ -243,23 +243,36 @@ function SectionDivider({ variant }: { variant: "soft" | "gold" }) {
 function AssuranceStrip() {
   const signals = [
     {
-      eyebrow: "Spatial planning",
-      copy: "Days, functions, vendors, budgets, and readiness stay connected in one spatial plan.",
+      eyebrow: "Event atlas",
+      copy: "Days, functions, venues, vendors, budget, and readiness now sit on one map.",
     },
     {
-      eyebrow: "Tap, don’t type",
-      copy: "Couples select real vendor offerings first, then customize what needs a quote.",
+      eyebrow: "Catalogue-first",
+      copy: "Couples pick real offerings before customizing menus, setups, coverage, or logistics.",
     },
     {
-      eyebrow: "Readiness engine",
-      copy: "The platform shows what is complete, partial, or missing before execution.",
+      eyebrow: "Operations pulse",
+      copy: "Missing vendors, quote items, guests, and run-of-show gaps become visible early.",
     },
   ];
 
   return (
     <section className="relative overflow-hidden bg-midnight text-ivory">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_30%,rgba(201,169,110,0.14),transparent_28%),radial-gradient(circle_at_82%_30%,rgba(164,172,134,0.1),transparent_24%),linear-gradient(180deg,#333d29,#414833)]" />
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:120px_120px] opacity-[0.10]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_30%,rgba(182,173,144,0.15),transparent_28%),radial-gradient(circle_at_82%_30%,rgba(164,172,134,0.12),transparent_24%),linear-gradient(135deg,#333d29,#414833_54%,#582f0e_140%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(245,240,226,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(245,240,226,0.045)_1px,transparent_1px)] bg-[size:120px_120px] opacity-[0.10]" />
+      <svg
+        className="pointer-events-none absolute inset-x-0 top-1/2 hidden h-32 -translate-y-1/2 text-gold-primary/22 lg:block"
+        viewBox="0 0 1200 120"
+        fill="none"
+        aria-hidden
+      >
+        <path
+          d="M40 74 C230 12 325 112 486 52 C642 -6 725 94 874 42 C1002 -2 1086 42 1160 72"
+          stroke="currentColor"
+          strokeDasharray="10 14"
+          strokeLinecap="round"
+        />
+      </svg>
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold-primary/40 to-transparent" />
       <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-gold-primary/40 to-transparent" />
       <div className="relative z-10 mx-auto max-w-7xl px-[var(--section-padding-x)] py-12 md:py-16">
@@ -274,15 +287,17 @@ function AssuranceStrip() {
             <div
               key={signal.eyebrow}
               className={cn(
-                "group relative overflow-hidden border border-white/8 bg-white/[0.03] p-6 backdrop-blur-md transition-all duration-500 hover:border-gold-primary/35 hover:bg-white/[0.055]",
+                "group relative overflow-hidden border border-white/8 bg-white/[0.035] p-6 backdrop-blur-md transition-all duration-500 hover:-translate-y-1 hover:border-gold-primary/35 hover:bg-white/[0.06] hover:shadow-[0_28px_90px_rgba(0,0,0,0.20)]",
                 index === 1 && "motion-safe:lg:-translate-y-3"
               )}
             >
               <div className="absolute -right-12 -top-16 h-32 w-32 rounded-full bg-gold-primary/10 blur-2xl transition-transform duration-700 group-hover:scale-125" />
+              <div className="absolute left-6 top-6 h-12 w-12 rounded-full border border-gold-primary/20" />
+              <div className="absolute left-[2.7rem] top-[2.7rem] h-2 w-2 rounded-full bg-gold-light" />
               <span className="font-accent absolute bottom-4 right-4 text-[10px] uppercase tracking-[0.22em] text-ivory/24">
                 {String(index + 1).padStart(2, "0")}
               </span>
-              <p className="font-accent text-[10px] uppercase tracking-[0.24em] text-gold-light">
+              <p className="font-accent pl-16 text-[10px] uppercase tracking-[0.24em] text-gold-light">
                 {signal.eyebrow}
               </p>
               <p className="mt-4 max-w-xs font-heading text-sm leading-relaxed text-ivory/80">
