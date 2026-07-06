@@ -2,6 +2,10 @@
 
 Luxury destination wedding planning platform built with Next.js, Clerk, and Supabase.
 
+## Project memory
+
+Future agents should read [`PROJECT_MEMORY.md`](./PROJECT_MEMORY.md) after `AGENTS.md` before changing product flows, dashboard UX, Supabase schema, or deployment wiring.
+
 ## Local development
 
 1. Copy `.env.example` to `.env` and fill in Clerk and Supabase keys.
