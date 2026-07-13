@@ -67,6 +67,17 @@ export async function PATCH(
       return apiError("Not authorized to update this booking", 403);
     }
 
+    // Quotes and payment records are commercial data. Clients and vendors can
+    // still progress a booking and add shared notes, but only the operations
+    // team can alter amounts through this general booking endpoint.
+    const isOperationsRole = session.role === "admin" || session.role === "manager";
+    if (
+      (body.totalAmount !== undefined || body.paidAmount !== undefined) &&
+      !isOperationsRole
+    ) {
+      return apiError("Only the operations team can update booking amounts", 403);
+    }
+
     const allowedFields: Record<string, unknown> = {};
     if (body.status !== undefined) {
       if (typeof body.status !== "string" || !BOOKING_STATUSES.has(body.status)) {

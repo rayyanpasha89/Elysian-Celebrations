@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer, staggerItem } from "@/animations/variants";
@@ -116,6 +116,8 @@ function itemTypeLabel(value: string) {
 }
 
 export default function VendorBookingsPage() {
+  const searchParams = useSearchParams();
+  const requestedBookingId = searchParams.get("bookingId");
   const [tab, setTab] = useState<Tab>("All");
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<ApiBooking[]>([]);
@@ -180,6 +182,17 @@ export default function VendorBookingsPage() {
     if (tab === "Confirmed") return list.filter((b) => b.status === "CONFIRMED");
     return list.filter((b) => b.status === "COMPLETED");
   }, [tab, list]);
+
+  // Inquiries, calendar, and messages deep-link here. Always honour that
+  // booking first instead of silently opening the first row in the ledger.
+  useEffect(() => {
+    if (!requestedBookingId || !list.some((booking) => booking.id === requestedBookingId)) {
+      return;
+    }
+
+    setTab("All");
+    setSelectedBookingId(requestedBookingId);
+  }, [list, requestedBookingId]);
 
   useEffect(() => {
     if (!selectedBookingId && filtered[0]?.id) {

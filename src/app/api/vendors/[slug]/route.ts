@@ -61,9 +61,11 @@ export async function GET(
     const { data: vendor, error } = await supabase
       .from("vendor_profiles")
       .select(
-        `*, category:vendor_categories(name, slug), services:vendor_services(*, items:vendor_service_items(id, item_type, name, description, dietary_tags, image_urls, reference_url, sort_order)), reviews(*, client:client_profiles(user_id))`
+        `*, category:vendor_categories(name, slug), services:vendor_services!inner(*, items:vendor_service_items(id, item_type, name, description, dietary_tags, image_urls, reference_url, sort_order)), reviews(*, client:client_profiles(user_id))`
       )
       .eq("slug", slug)
+      .eq("is_verified", true)
+      .eq("services.is_active", true)
       .single();
 
     if (error || !vendor) {

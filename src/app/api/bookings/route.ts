@@ -259,6 +259,7 @@ export async function POST(request: NextRequest) {
       .from("vendor_profiles")
       .select("id")
       .eq("id", vendorProfileId)
+      .eq("is_verified", true)
       .maybeSingle();
 
     if (vendorProfileError) {
@@ -267,7 +268,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!vendorProfile) {
-      return apiError("Vendor not found", 404);
+      return apiError("This vendor is not available for client bookings", 409);
     }
 
     if (vendorServiceId) {
@@ -275,6 +276,7 @@ export async function POST(request: NextRequest) {
         .from("vendor_services")
         .select("id, vendor_profile_id")
         .eq("id", vendorServiceId)
+        .eq("is_active", true)
         .maybeSingle();
 
       if (serviceError) {
@@ -283,7 +285,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (!service || service.vendor_profile_id !== vendorProfileId) {
-        return apiError("Selected service does not belong to this vendor", 400);
+        return apiError("This service is not available for booking", 409);
       }
     }
 

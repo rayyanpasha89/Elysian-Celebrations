@@ -77,9 +77,13 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from("vendor_profiles")
       .select(
-        `*, ${categoryRelation}, services:vendor_services(id, name, description, service_scope, base_price, max_price, unit, event_type_fit, inclusions, deliverables, add_ons, items:vendor_service_items(id, item_type, name, description, dietary_tags, image_urls, reference_url, sort_order))`,
+        `*, ${categoryRelation}, services:vendor_services!inner(id, name, description, service_scope, base_price, max_price, unit, event_type_fit, inclusions, deliverables, add_ons, items:vendor_service_items(id, item_type, name, description, dietary_tags, image_urls, reference_url, sort_order))`,
         { count: "exact" }
       )
+      // Marketplace discovery is a client-facing promise: only approved
+      // partners with bookable services belong in this result set.
+      .eq("is_verified", true)
+      .eq("services.is_active", true)
       .order("is_featured", { ascending: false })
       .order("rating", { ascending: false });
 

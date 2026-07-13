@@ -107,6 +107,7 @@ export async function addSavedVendorSlug(userId: string, slug: string) {
     .from("vendor_profiles")
     .select("id, slug")
     .eq("slug", normalizedSlug)
+    .eq("is_verified", true)
     .maybeSingle();
 
   if (vendorErr) {
@@ -114,7 +115,7 @@ export async function addSavedVendorSlug(userId: string, slug: string) {
   }
 
   if (!vendor?.id || !vendor.slug) {
-    throw new SavedVendorError("Vendor not found", 404);
+    throw new SavedVendorError("This vendor is not available to shortlist", 409);
   }
 
   const { error } = await supabase.from("saved_vendors").upsert(

@@ -219,9 +219,10 @@ async function resolveVendorLink(
 ) {
   if (vendorServiceId) {
     const { data: service, error } = await supabase
-    .from("vendor_services")
+      .from("vendor_services")
       .select("id, vendor_profile_id")
       .eq("id", vendorServiceId)
+      .eq("is_active", true)
       .maybeSingle();
 
     if (error) {
@@ -230,7 +231,7 @@ async function resolveVendorLink(
     }
 
     if (!service?.id) {
-      return { error: apiError("Vendor service not found", 404) };
+      return { error: apiError("Vendor service is not available", 409) };
     }
 
     if (
@@ -241,6 +242,22 @@ async function resolveVendorLink(
       return {
         error: apiError("Vendor service does not belong to selected vendor", 400),
       };
+    }
+
+    const { data: vendor, error: vendorError } = await supabase
+      .from("vendor_profiles")
+      .select("id")
+      .eq("id", service.vendor_profile_id)
+      .eq("is_verified", true)
+      .maybeSingle();
+
+    if (vendorError) {
+      console.error("vendor_profiles load:", vendorError);
+      return { error: apiError("Failed to validate vendor", 500) };
+    }
+
+    if (!vendor?.id) {
+      return { error: apiError("Vendor is not available", 409) };
     }
 
     return {
@@ -255,6 +272,7 @@ async function resolveVendorLink(
       .from("vendor_profiles")
       .select("id")
       .eq("id", vendorProfileId)
+      .eq("is_verified", true)
       .maybeSingle();
 
     if (error) {
@@ -263,7 +281,7 @@ async function resolveVendorLink(
     }
 
     if (!vendor?.id) {
-      return { error: apiError("Vendor not found", 404) };
+      return { error: apiError("Vendor is not available", 409) };
     }
   }
 
