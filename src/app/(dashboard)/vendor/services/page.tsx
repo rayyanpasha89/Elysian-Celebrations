@@ -130,6 +130,7 @@ function buildPayload(draft: DraftState, defaultItemType: string) {
     items: draft.items
       .filter((item) => item.name.trim())
       .map((item, index) => ({
+        ...(item.id ? { id: item.id } : {}),
         itemType: item.itemType || defaultItemType,
         name: item.name.trim(),
         description: item.description.trim(),
@@ -234,14 +235,23 @@ export default function VendorServicesPage() {
   }, [load]);
 
   const remove = async (id: string) => {
+    const service = services.find((entry) => entry.id === id);
+    if (
+      !window.confirm(
+        `Remove ${service?.name ?? "this service"}? This permanently removes its catalogue and reference imagery.`
+      )
+    ) {
+      return;
+    }
+
     try {
       const res = await fetch(`/api/vendor/services/${id}`, { method: "DELETE" });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
       setServices((s) => s.filter((x) => x.id !== id));
       toast.success("Service removed");
-    } catch {
-      toast.error("Failed to delete");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete service");
     }
   };
 

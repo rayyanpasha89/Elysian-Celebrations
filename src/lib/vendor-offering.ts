@@ -6,6 +6,7 @@ export type VendorOfferingArrays = {
 };
 
 export type VendorServiceItemInput = {
+  id: string | null;
   itemType: string;
   name: string;
   description: string | null;
@@ -88,6 +89,10 @@ export function normalizeServiceItems(raw: unknown): VendorServiceItemInput[] {
   for (const candidate of raw) {
     if (!candidate || typeof candidate !== "object") continue;
     const entry = candidate as Record<string, unknown>;
+    const id =
+      typeof entry.id === "string" && entry.id.trim()
+        ? entry.id.trim().slice(0, 80)
+        : null;
     const name =
       typeof entry.name === "string"
         ? entry.name.replace(/\s+/g, " ").trim()
@@ -115,6 +120,7 @@ export function normalizeServiceItems(raw: unknown): VendorServiceItemInput[] {
       ? Math.max(0, Math.min(9999, Math.floor(sortOrderRaw)))
       : null;
     items.push({
+      id,
       itemType,
       name: name.slice(0, 120),
       description,

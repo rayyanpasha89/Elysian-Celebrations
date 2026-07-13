@@ -10,6 +10,41 @@ import {
   normalizeOfferingArrays,
   normalizeServiceItems,
 } from "@/lib/vendor-offering";
+import { deleteVendorServiceImage } from "@/lib/supabase/storage";
+
+type ExistingServiceItem = {
+  id: string;
+  image_urls: string[] | null;
+};
+
+function itemPayload(
+  item: ReturnType<typeof normalizeServiceItems>[number],
+  vendorServiceId: string,
+  fallbackSortOrder: number
+) {
+  return {
+    vendor_service_id: vendorServiceId,
+    item_type: item.itemType,
+    name: item.name,
+    description: item.description,
+    dietary_tags: item.dietaryTags,
+    image_urls: item.imageUrls,
+    reference_url: item.referenceUrl,
+    sort_order: item.sortOrder ?? fallbackSortOrder,
+  };
+}
+
+async function cleanupRemovedImages(
+  existingItems: ExistingServiceItem[],
+  nextItems: ReturnType<typeof normalizeServiceItems>
+) {
+  const retainedUrls = new Set(nextItems.flatMap((item) => item.imageUrls));
+  const removedUrls = [...new Set(existingItems.flatMap((item) => item.image_urls ?? []))].filter(
+    (url) => !retainedUrls.has(url)
+  );
+
+  await Promise.all(removedUrls.map((url) => deleteVendorServiceImage(url)));
+}
 
 export async function PATCH(
   request: NextRequest,
@@ -71,32 +106,62 @@ export async function PATCH(
 
     if (Array.isArray(body.items)) {
       const items = normalizeServiceItems(body.items);
-      const { error: deleteError } = await supabase
+      const { data: existingItemsData, error: existingItemsError } = await supabase
         .from("vendor_service_items")
-        .delete()
+        .select("id, image_urls")
         .eq("vendor_service_id", id);
-      if (deleteError) {
-        console.error("vendor_service_items reset:", deleteError);
+      if (existingItemsError) {
+        console.error("vendor_service_items load:", existingItemsError);
+        return apiError("Failed to load catalogue items", 500);
       }
-      if (items.length > 0) {
-        const { error: insertError } = await supabase
+
+      const existingItems = (existingItemsData ?? []) as ExistingServiceItem[];
+      const existingById = new Map(existingItems.map((item) => [item.id, item]));
+      const retainedIds = new Set<string>();
+
+      for (const [index, item] of items.entries()) {
+        const payload = itemPayload(item, id, index);
+        const existingItem = item.id ? existingById.get(item.id) : null;
+
+        if (existingItem) {
+          retainedIds.add(existingItem.id);
+          const { error: updateItemError } = await supabase
+            .from("vendor_service_items")
+            .update(payload)
+            .eq("id", existingItem.id)
+            .eq("vendor_service_id", id);
+          if (updateItemError) {
+            console.error("vendor_service_items update:", updateItemError);
+            return apiError("Failed to update catalogue item", 500);
+          }
+          continue;
+        }
+
+        const { error: insertItemError } = await supabase
           .from("vendor_service_items")
-          .insert(
-            items.map((item, index) => ({
-              vendor_service_id: id,
-              item_type: item.itemType,
-              name: item.name,
-              description: item.description,
-              dietary_tags: item.dietaryTags,
-              image_urls: item.imageUrls,
-              reference_url: item.referenceUrl,
-              sort_order: item.sortOrder ?? index,
-            }))
-          );
-        if (insertError) {
-          console.error("vendor_service_items insert:", insertError);
+          .insert(payload);
+        if (insertItemError) {
+          console.error("vendor_service_items insert:", insertItemError);
+          return apiError("Failed to add catalogue item", 500);
         }
       }
+
+      const removedIds = existingItems
+        .filter((item) => !retainedIds.has(item.id))
+        .map((item) => item.id);
+      if (removedIds.length > 0) {
+        const { error: deleteItemsError } = await supabase
+          .from("vendor_service_items")
+          .delete()
+          .in("id", removedIds)
+          .eq("vendor_service_id", id);
+        if (deleteItemsError) {
+          console.error("vendor_service_items delete:", deleteItemsError);
+          return apiError("Failed to remove catalogue item", 500);
+        }
+      }
+
+      await cleanupRemovedImages(existingItems, items);
     }
 
     const { data: row, error: fetchError } = await supabase
@@ -139,6 +204,45 @@ export async function DELETE(
       .maybeSingle();
     if (!vp) return apiError("Vendor profile not found", 404);
 
+    const [{ data: service, error: serviceError }, { data: bookings, error: bookingsError }, { data: items, error: itemsError }] =
+      await Promise.all([
+        supabase
+          .from("vendor_services")
+          .select("id")
+          .eq("id", id)
+          .eq("vendor_profile_id", vp.id)
+          .maybeSingle(),
+        supabase
+          .from("bookings")
+          .select("id")
+          .eq("vendor_service_id", id)
+          .limit(1),
+        supabase
+          .from("vendor_service_items")
+          .select("id, image_urls")
+          .eq("vendor_service_id", id),
+      ]);
+
+    if (serviceError) {
+      console.error("vendor_services load:", serviceError);
+      return apiError("Failed to load service", 500);
+    }
+    if (!service) return apiError("Service not found", 404);
+    if (bookingsError) {
+      console.error("vendor_services bookings check:", bookingsError);
+      return apiError("Failed to check service bookings", 500);
+    }
+    if ((bookings ?? []).length > 0) {
+      return apiError(
+        "This service is attached to a booking. Deactivate it to hide it from new client selections.",
+        409
+      );
+    }
+    if (itemsError) {
+      console.error("vendor_service_items load:", itemsError);
+      return apiError("Failed to load service media", 500);
+    }
+
     const { error } = await supabase
       .from("vendor_services")
       .delete()
@@ -149,6 +253,12 @@ export async function DELETE(
       console.error("vendor_services delete:", error);
       return apiError("Failed to delete service", 500);
     }
+
+    await Promise.all(
+      ((items ?? []) as ExistingServiceItem[])
+        .flatMap((item) => item.image_urls ?? [])
+        .map((url) => deleteVendorServiceImage(url))
+    );
 
     return apiSuccess({ ok: true });
   } catch (e) {
