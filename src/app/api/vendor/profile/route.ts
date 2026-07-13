@@ -39,19 +39,23 @@ export async function GET() {
 
   try {
     const supabase = createAdminSupabaseClient();
-    const { data: cats } = await supabase
-      .from("vendor_categories")
-      .select("id, name, slug")
-      .order("sort_order", { ascending: true });
-
-    const { data: vp, error } = await supabase
-      .from("vendor_profiles")
-      .select(
-        `id, business_name, short_bio, city, state, country, experience, cover_image, portfolio,
-        category:vendor_categories(id, name, slug)`
-      )
-      .eq("user_id", session.userId)
-      .maybeSingle();
+    // Category choices and the signed-in vendor profile are independent.
+    // Keep this route to one round-trip window instead of making the editor
+    // wait for the category query before it can load existing data.
+    const [{ data: cats }, { data: vp, error }] = await Promise.all([
+      supabase
+        .from("vendor_categories")
+        .select("id, name, slug")
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("vendor_profiles")
+        .select(
+          `id, business_name, short_bio, city, state, country, experience, cover_image, portfolio,
+          category:vendor_categories(id, name, slug)`
+        )
+        .eq("user_id", session.userId)
+        .maybeSingle(),
+    ]);
 
     if (error) {
       console.error("vendor_profiles:", error);
