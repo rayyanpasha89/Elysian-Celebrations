@@ -11,17 +11,16 @@ export const TEST_AUTH_ROLES: UserRole[] = [
 ];
 
 export function isTestAuthEnabled() {
+  // Test-role switching is a local development convenience only. Never honor
+  // a bypass flag in a production build, even if a deployment environment was
+  // accidentally copied from a developer machine.
+  if (process.env.NODE_ENV === "production") return false;
+
   const enabled =
     process.env.ELYSIAN_TEST_AUTH_BYPASS === "1" ||
     process.env.ELYSIAN_TEST_AUTH_BYPASS === "true";
 
-  if (!enabled) return false;
-
-  const allowProduction =
-    process.env.ELYSIAN_TEST_AUTH_ALLOW_PRODUCTION === "1" ||
-    process.env.ELYSIAN_TEST_AUTH_ALLOW_PRODUCTION === "true";
-
-  return process.env.NODE_ENV !== "production" || allowProduction;
+  return enabled;
 }
 
 export function testAuthDefaultRole(): UserRole {

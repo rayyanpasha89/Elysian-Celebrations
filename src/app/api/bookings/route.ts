@@ -6,8 +6,13 @@ import {
   apiError,
   apiSuccess,
 } from "@/lib/api-utils";
+import {
+  EVENT_READINESS_SELECT,
+  eventReadinessPercent,
+  type EventReadinessRow,
+} from "@/lib/event-readiness";
 
-const BOOKING_SELECT = `*, client:client_profiles(id, user_id, partner_name, weddings(destination:destinations(name))), vendor:vendor_profiles(business_name, slug, user_id), service:vendor_services(id, name, description, service_scope, base_price, max_price, unit, event_type_fit, inclusions, deliverables, add_ons, items:vendor_service_items(id, item_type, name, description, dietary_tags, image_urls, reference_url, sort_order)), event:wedding_events(id, name, event_type, date, start_time, end_time, venue, guest_count, estimated_budget, food_style, menu_notes, decor_style, decor_notes, attire_notes, notes, wedding_day:wedding_days(id, name, date, notes), logistics:wedding_event_logistics(guest_arrival_time, vendor_load_in_time, family_call_time, transport_notes, rooming_notes, weather_plan, ceremony_notes), menus:wedding_event_menus(id, name, meal_period, service_style, notes, sort_order, items:wedding_event_menu_items(id, name, course, dietary_tags, notes, sort_order)))`;
+const BOOKING_SELECT = `id, client_profile_id, vendor_profile_id, vendor_service_id, wedding_event_id, status, event_date, total_amount, vendor_amount, final_price, price_published, service_fee, paid_amount, notes, created_at, updated_at, client:client_profiles(id, partner_name, weddings(destination:destinations(name))), vendor:vendor_profiles(business_name, slug), service:vendor_services(id, name, description, service_scope, base_price, max_price, unit, event_type_fit, inclusions, deliverables, add_ons, items:vendor_service_items(id, item_type, name, description, dietary_tags, image_urls, reference_url, sort_order)), event:wedding_events(id, name, event_type, date, start_time, end_time, venue, guest_count, estimated_budget, food_style, menu_notes, decor_style, decor_notes, attire_notes, notes, wedding_day:wedding_days(id, name, date, notes), logistics:wedding_event_logistics(guest_arrival_time, vendor_load_in_time, family_call_time, transport_notes, rooming_notes, weather_plan, ceremony_notes), menus:wedding_event_menus(id, name, meal_period, service_style, notes, sort_order, items:wedding_event_menu_items(id, name, course, dietary_tags, notes, sort_order)))`;
 
 type Relation<T> = T | T[] | null | undefined;
 
@@ -69,9 +74,27 @@ type BookingEventRow = {
 };
 
 type BookingRow = {
+  status?: string | null;
+  wedding_event_id?: string | null;
   event_date?: string | null;
+  total_amount?: number | null;
+  vendor_amount?: number | null;
+  final_price?: number | null;
+  price_published?: boolean | null;
+  service_fee?: number | null;
   event?: Relation<BookingEventRow>;
 };
+
+function stripRelationUserId(value: unknown) {
+  const strip = (entry: unknown) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return entry;
+    const safeEntry = { ...(entry as Record<string, unknown>) };
+    delete safeEntry.user_id;
+    return safeEntry;
+  };
+
+  return Array.isArray(value) ? value.map(strip) : strip(value);
+}
 
 function relationOne<T>(relation: Relation<T>) {
   if (Array.isArray(relation)) {
@@ -151,6 +174,54 @@ function withEventContext<T extends BookingRow>(booking: T) {
   };
 }
 
+function withRoleSafePricing<T extends BookingRow>(
+  booking: T,
+  role: "client" | "vendor" | "admin" | "manager",
+  clientFinalPriceVisible = false
+) {
+  const enriched = withEventContext(booking);
+  const finalVisibleToClient =
+    role === "client" &&
+    clientFinalPriceVisible &&
+    booking.price_published === true &&
+    booking.final_price != null;
+
+  const safe = { ...enriched } as Record<string, unknown>;
+  safe.client = stripRelationUserId(safe.client);
+  safe.vendor = stripRelationUserId(safe.vendor);
+  delete safe.vendor_cost;
+  delete safe.vendor_amount;
+  delete safe.final_price;
+  delete safe.price_published;
+  delete safe.service_fee;
+  delete safe.event;
+
+  if (role === "client") {
+    safe.total_amount = finalVisibleToClient
+      ? booking.final_price
+      : null;
+    safe.pricing_state = finalVisibleToClient ? "final" : "pending";
+  } else if (role === "vendor") {
+    safe.total_amount = booking.vendor_amount ?? booking.total_amount;
+    safe.pricing_state = "vendor_amount";
+  } else if (role === "admin") {
+    safe.vendor_amount = booking.vendor_amount ?? null;
+    safe.final_price = booking.final_price ?? null;
+    safe.price_published = Boolean(booking.price_published);
+    safe.service_fee = booking.service_fee ?? null;
+    safe.pricing_state = booking.price_published ? "published" : "draft";
+  } else {
+    const publishedFinal =
+      booking.price_published && booking.final_price != null
+        ? booking.final_price
+        : null;
+    safe.total_amount = publishedFinal ?? booking.total_amount;
+    safe.pricing_state = publishedFinal != null ? "published" : "vendor_amount";
+  }
+
+  return safe;
+}
+
 export async function GET(request: NextRequest) {
   const session = await getAuthSession();
   if (session instanceof NextResponse) return session;
@@ -209,7 +280,79 @@ export async function GET(request: NextRequest) {
       return apiError("Failed to fetch bookings", 500);
     }
 
-    return apiSuccess({ bookings: (bookings ?? []).map(withEventContext) });
+    const clientVisiblePricingEvents = new Set<string>();
+    if (session.role === "client") {
+      const eventIds = [
+        ...new Set(
+          (bookings ?? [])
+            .map((booking) => booking.wedding_event_id as string | null)
+            .filter((id): id is string => Boolean(id))
+        ),
+      ];
+      if (eventIds.length > 0) {
+        const [
+          { data: pricingRows, error: pricingError },
+          { data: readinessRows, error: readinessError },
+        ] = await Promise.all([
+          supabase
+            .from("bookings")
+            .select("wedding_event_id, status, final_price, price_published")
+            .in("wedding_event_id", eventIds),
+          supabase
+            .from("wedding_events")
+            .select(EVENT_READINESS_SELECT)
+            .in("id", eventIds),
+        ]);
+        if (pricingError || readinessError) {
+          console.error(
+            "Booking pricing visibility error:",
+            pricingError ?? readinessError
+          );
+        } else {
+          const readyEventIds = new Set(
+            ((readinessRows ?? []) as unknown as EventReadinessRow[])
+              .filter((event) => eventReadinessPercent(event) >= 100)
+              .map((event) => event.id)
+          );
+          const stateByEvent = new Map<
+            string,
+            { active: number; published: number }
+          >();
+          for (const row of pricingRows ?? []) {
+            if (!row.wedding_event_id || row.status === "CANCELLED") continue;
+            const state = stateByEvent.get(row.wedding_event_id) ?? {
+              active: 0,
+              published: 0,
+            };
+            state.active += 1;
+            if (row.price_published && row.final_price != null) state.published += 1;
+            stateByEvent.set(row.wedding_event_id, state);
+          }
+          for (const [eventId, state] of stateByEvent) {
+            if (
+              readyEventIds.has(eventId) &&
+              state.active > 0 &&
+              state.active === state.published
+            ) {
+              clientVisiblePricingEvents.add(eventId);
+            }
+          }
+        }
+      }
+    }
+
+    return apiSuccess({
+      bookings: (bookings ?? []).map((booking) =>
+        withRoleSafePricing(
+          booking,
+          session.role,
+          Boolean(
+            booking.wedding_event_id &&
+              clientVisiblePricingEvents.has(booking.wedding_event_id as string)
+          )
+        )
+      ),
+    });
   } catch (error) {
     console.error("Bookings list error:", error);
     return apiError("Internal server error", 500);
@@ -346,7 +489,7 @@ export async function POST(request: NextRequest) {
       return apiError("Failed to create booking", 500);
     }
 
-    return apiSuccess(withEventContext(booking), 201);
+    return apiSuccess(withRoleSafePricing(booking, session.role), 201);
   } catch (error) {
     console.error("Booking create error:", error);
     return apiError("Internal server error", 500);

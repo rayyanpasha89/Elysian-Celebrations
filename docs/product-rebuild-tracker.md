@@ -27,7 +27,9 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
   - `20260601000100_add_vendor_service_item_media.sql`
   - `20260601000200_enable_message_realtime.sql`
   - `20260604000100_event_platform_definition_layer.sql`
-  - `20260604000200_add_event_requirements.sql`
+- `20260604000200_add_event_requirements.sql`
+- `20260713122345_final_pricing_fee_model.sql`
+- `20260713124846_preserve_legacy_vendor_amounts.sql`
 - Remote table/column checks passed for:
   - `wedding_event_menus`
   - `wedding_event_menu_items`
@@ -45,17 +47,28 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
   - `wedding_events.time_block`
   - `wedding_events.requirement_payload`
   - `wedding_event_requirements`
+  - `bookings.vendor_amount`
+  - generated `bookings.service_fee`
+  - final-price validation constraints and the vendor-amount immutability trigger
 
 ## Shipped Recently
 
-- Added presentational building blocks for the Layer 2 "mind-map celebration board" under `src/components/dashboard/event-flow/` — `FlowNode` (day/event variants with distinct shapes), `StepOrbit` (breakdown-step tokens), `FlowConnector`, `FlowEmptyState`, plus `MindMapLegend` (Center=Day / Branch=Function / Orbit=Steps + status colours) and `MindMapGuide` (pick a day → function branch → step orbit). All controlled, accessible, dependency-light, and exported via the barrel `index.ts`. Intentionally NOT wired into `client/wedding/page.tsx` yet — ready for Codex to consume when the board lands.
+- Replaced the active admin margin/negotiation workflow with one complete final-price contract. Vendors submit one quote, `bookings.vendor_amount` freezes with that first quote, admins set a complete `final_price`, and Supabase generates `service_fee = final_price - vendor_amount`. Published client prices cannot be empty, final prices cannot undercut the vendor amount, and the legacy negotiation table is retained read-only only for historical audit compatibility.
+- Rebuilt `/admin/pricing` around client → day → function → vendor-pick drill-down. The editor exposes the fixed vendor amount, one final client price, the automatically calculated Elysian fee, and an explicit publish/unpublish action. `/admin/revenue` now reports final value, vendor base, Elysian fee, category contribution, and client contribution with no margin/GST/negotiation language.
+- Added multi-angle spend intelligence to `/client/budget` with a live pie/donut view and selector for function, day, category (including food), vendor, final-versus-estimate, and paid-versus-due analysis. Published final prices replace estimates only when every active pick for the function is published and the function definition is complete.
+- Hardened booking pricing privacy by projecting role-specific response shapes: clients do not receive vendor amount, fee, draft final price, or Clerk identity IDs; vendors see only their amount; managers see the published client total or vendor amount without fee data; admins receive the full commercial record.
+- Unified client estimate and final-price visibility behind one shared 10-check event-readiness contract. Cost estimates, published totals, and booking details stay sealed until the function reaches 100%; unpublished vendor quotes and sealed final totals are never serialized to the client.
+- Locked the Supabase public schema behind the server API with migration `20260713130159_lock_public_schema_behind_server_api.sql`. RLS is enabled on all 39 public tables, `anon` and `authenticated` have zero table/sequence/function privileges, and only role-checked Next.js handlers use `service_role`.
+- Made test-role switching development-only. Production builds now ignore the test-auth bypass unconditionally, so a copied environment flag or `?testRole=admin` query cannot grant portal access outside local development.
+- Closed admin and cross-role QA defects around suspended-user authorization, manager vendor response mapping, unpublished review leakage, cross-vendor storage deletion, vendor inquiry deletion, and admin service deletion with linked-booking protection.
+- Added the Layer 2 "mind-map celebration board" under `src/components/dashboard/event-flow/` and wired its radial `CelebrationCanvas` into the client event planner. The reusable kit includes shaped day/function nodes, step orbits, connectors, status language, a map legend, and guided empty states; the same drill-down interaction now also powers admin final pricing.
 - Added the event-platform definition layer so Elysian can move beyond wedding-only planning. Migration `20260604000100_event_platform_definition_layer.sql` adds `weddings.event_type`, `custom_event_type`, `event_platform_version`, and `definition_payload`, plus `wedding_events.time_block` and `requirement_payload`. The remote Supabase database has the migration applied and column checks passed.
 - Added `src/lib/event-platform.ts` as the shared source of truth for the new flow: 14 top-level event types including custom events, Morning/Afternoon/Evening time blocks, requirement categories for food/decor/photo-video/entertainment/hospitality/logistics/custom needs, a finalization checklist, and safe JSON payload normalization for future custom requirements.
 - Updated `/api/wedding` to accept either the old onboarding payload or a new layered `eventDefinition.days[].timeBlocks[]` payload. Old wedding onboarding still creates the classic starter plan; new event-definition payloads create real day/time-block events with stable event IDs that budgets, bookings, menus, vendors, logistics, and tasks can keep using.
 - Updated `/api/wedding/events` and `/api/wedding/events/[id]` so individual events can store and return `time_block` plus a sanitized `requirement_payload`, giving the frontend a safe backend path for Layer 2 customization without another route rewrite.
 - Added structured Layer 2 requirement persistence through migration `20260604000200_add_event_requirements.sql`. Each event block can now own `wedding_event_requirements` rows with category, title, status, priority, linked vendor/service, sanitized JSON payload, notes, and sort order. `/api/wedding/events/[id]/requirements` supports client-owned GET and id-preserving PUT sync, and `/api/wedding` now hydrates requirements alongside menus, logistics, tasks, bookings, and vendor selections.
 - Added vendor catalogue media: new `vendor_service_items.image_urls text[]` and `reference_url text` columns (migration `20260601000100_add_vendor_service_item_media.sql`), with the vendor offering normalizer enforcing http/https-only URLs, a six-image cap, and per-URL length caps. Vendor editor now supports both Supabase Storage uploads and pasted public URLs per catalogue row, plus remove controls. Client vendor previews and the Event Editor's `ServiceOfferingPreview` render thumbnails + optional moodboard links with graceful text-only fallback.
-- Enabled Supabase Realtime for `messages` (migration `20260601000200_enable_message_realtime.sql`). Client, vendor, and manager inboxes subscribe per booking thread and refresh through `/api/messages`, so live updates preserve server-side role projection and privacy checks.
+- Retained the `messages` realtime publication migration for future JWT-bridged sessions, but removed unsafe direct-browser subscriptions after the public schema lockdown. Client, vendor, and manager inboxes currently use visibility-aware eight-second refreshes through `/api/messages`, preserving server-side role projection and privacy checks until Clerk-to-Supabase JWT bridging is introduced.
 - Added real vendor profile-view tracking through the existing `vendor_profile_views` table. Vendor detail API records non-owner profile views, `/api/dashboard/vendor` and `/api/vendor/analytics` surface monthly view counts, and analytics no longer hard-code profile views to `0`.
 - Closed dashboard dead-route gaps with real pages for `/vendor/portfolio`, `/vendor/reviews`, `/vendor/inquiries`, `/vendor/calendar`, and `/manager/weddings`.
 - Replaced blog seed placeholder bodies with real editorial copy for the seeded blog posts.
@@ -106,6 +119,16 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
 - Remote SQL checks for media columns and `messages` realtime publication membership
 - Remote SQL checks for event-platform definition columns on `weddings` and `wedding_events`
 - Remote SQL checks for `wedding_event_requirements` columns
+- Remote migration synchronization through `20260713122345_final_pricing_fee_model.sql`
+- Remote migration synchronization through `20260713124846_preserve_legacy_vendor_amounts.sql`, preserving all three legacy agreed vendor amounts and their historical fee value
+- Remote migration synchronization through `20260713130159_lock_public_schema_behind_server_api.sql`
+- Remote SQL checks for generated `bookings.service_fee`, all three final-pricing constraints, the vendor-amount lock trigger, and zero negative fees
+- Remote SQL proof: 39/39 public tables have RLS, browser roles have zero table/function grants, service role retains all 39 tables, and pricing has zero invalid finals, invalid publications, or fee mismatches
+- Direct Supabase REST proof that the publishable key receives HTTP 401 / permission denied for `bookings`
+- Live role-based API checks confirming no fee/vendor/draft-final/Clerk-ID leakage to client, vendor, or manager booking responses, and no sealed final total in `/api/budget`
+- Live browser checks for admin final-pricing drill-down/editor, admin fee intelligence, client spend selector across all six dimensions, manager vendor data, and vendor quote entry
+- Live regression of all 15 admin routes, mobile navigation, notifications, account menu, destination creation form, client booking price privacy, and vendor quote editor remount behavior
+- `127.0.0.1` development hydration/HMR verification with `allowedDevOrigins`, plus zero measured overlap from the collapsed local test-role dock
 - Local dev server started at `http://localhost:3000`
 - Basic HTTP smoke check passed for `/`
 - Browser smoke check passed for `/` after the marketing updates, with no fresh console errors.
@@ -115,19 +138,16 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
 
 ## Current Rebuild Order
 
-1. Bookings should treat `wedding_event_id` as the source of truth and return event/day/menu/logistics context.
-2. Event tasks should surface in `/client/timeline` and dashboard previews instead of living only inside the wedding editor.
-3. Saved vendors should use the Supabase `saved_vendors` table instead of Clerk metadata.
-4. Event planning menu/task saves should become id-preserving upserts instead of destructive replacement.
-5. Budget item event linking can later be expanded from one event per item to split allocations with a `budget_item_allocations` table.
-6. Vercel deploy state should be checked in the dashboard or through CLI after `vercel login` / `VERCEL_TOKEN`.
-
-Items 1, 2, and 3 are implemented in the follow-up slice and should be rechecked after every related refactor.
+1. Replace Clerk development credentials with live production keys before public launch.
+2. Add Clerk-to-Supabase JWT bridging before restoring direct Supabase Realtime subscriptions.
+3. Add automated authenticated browser regression for pricing, booking, vendor, admin, and budget flows.
+4. Expand one-event budget links into split allocations only when a real planning case requires it.
+5. Add true drag ordering for vendor catalogue media and rows.
 
 ## Known Risks
 
-- Vercel auto-deploy is assumed from the connected GitHub project, but local CLI verification is blocked by missing Vercel credentials.
+- Vercel CLI is linked and authenticated, but the current Production environment still uses Clerk development keys. Replace both Clerk keys with live credentials before launch.
 - The current event-linked budget model supports one event per budget line item.
 - Vendor service catalogue rows support image/reference attachments, but true drag ordering is still deferred.
 - Manager booking notes and payment amounts can be viewed, but inline manager editing is still intentionally limited to status actions.
-- Messages are real booking threads with persisted unread state and realtime refresh, but visible read receipts and per-message attachments are still future work.
+- Messages are real booking threads with persisted unread state and visibility-aware API polling; direct Realtime awaits a Clerk-to-Supabase JWT bridge. Visible read receipts and per-message attachments remain future work.

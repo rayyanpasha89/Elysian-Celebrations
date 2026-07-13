@@ -12,12 +12,13 @@ type VendorDashboardPayload = {
   stats: {
     totalBookings: number;
     pendingInquiries: number;
-    confirmedBookings: number;
+    activeBookings: number;
     avgRating: number;
-    revenueMonth: number;
+    paidToDate: number;
+    outstandingAmount: number;
     profileViews: number;
   };
-  pendingInquiries: { id: string; couple: string; destination: string; date: string; service: string }[];
+  pendingInquiries: { id: string; couple: string; location: string; date: string; service: string }[];
   upcomingEvents: { couple: string; event: string; date: string; location: string }[];
   needsOnboarding?: boolean;
   subtitle?: string;
@@ -142,11 +143,13 @@ export default function VendorDashboard() {
 
           {/* Revenue highlight */}
           <div className="flex flex-col items-center justify-center border border-gold-primary/20 bg-cream/40 px-8 py-6 text-center">
-            <p className={dashLabel}>Revenue this month</p>
+            <p className={dashLabel}>Paid to date</p>
             <p className="font-display mt-2 text-4xl font-semibold text-charcoal lg:text-5xl">
-              {formatRevenue(stats.revenueMonth)}
+              {formatRevenue(stats.paidToDate)}
             </p>
-            <p className="font-heading mt-1 text-xs text-slate">{stats.confirmedBookings} confirmed booking{stats.confirmedBookings !== 1 ? "s" : ""}</p>
+            <p className="font-heading mt-1 text-xs text-slate">
+              {formatRevenue(stats.outstandingAmount)} outstanding across {stats.activeBookings} active booking{stats.activeBookings !== 1 ? "s" : ""}
+            </p>
           </div>
         </div>
       </motion.div>
@@ -204,7 +207,7 @@ export default function VendorDashboard() {
                   <div>
                     <p className="font-heading text-sm font-medium text-charcoal">{inq.couple}</p>
                     <p className="font-accent mt-0.5 text-[10px] uppercase tracking-[0.12em] text-slate">
-                      {inq.destination || "—"} · {inq.service}
+                      {inq.location} · {inq.service}
                     </p>
                   </div>
                   <div className="text-right">

@@ -8,7 +8,7 @@ import { dashLabel, statusBadgeBase } from "@/lib/dashboard-styles";
 import { cn } from "@/lib/utils";
 
 type AdminDashboardPayload = {
-  usersByRole: { client: number; vendor: number; admin: number };
+  usersByRole: { client: number; vendor: number; manager: number; admin: number };
   weddingsCount: number;
   bookingsByStatus: Record<string, number>;
   newContactInquiries: number;
@@ -126,7 +126,10 @@ async function getJson<T>(url: string): Promise<T> {
 function summarize(data: AdminDashboardState) {
   const { summary, clients, venues, vendors } = data;
   const totalUsers =
-    summary.usersByRole.client + summary.usersByRole.vendor + (summary.usersByRole.admin ?? 0);
+    summary.usersByRole.client +
+    summary.usersByRole.vendor +
+    (summary.usersByRole.manager ?? 0) +
+    (summary.usersByRole.admin ?? 0);
   const totalBookings = Object.values(summary.bookingsByStatus).reduce((sum, count) => sum + count, 0);
   const activeBookings =
     (summary.bookingsByStatus.CONFIRMED ?? 0) +

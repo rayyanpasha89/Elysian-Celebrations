@@ -574,7 +574,7 @@ function SortableBudgetItem({
                 <textarea
                   defaultValue={item.notes}
                   onBlur={(event) => onUpdate({ notes: event.target.value })}
-                  placeholder="Vendor, negotiation notes, what is included..."
+                  placeholder="Vendor, inclusions, payment terms, or internal notes..."
                   className="mt-2 min-h-[88px] w-full border border-charcoal/12 bg-transparent px-3 py-3 text-sm text-charcoal outline-none transition-colors focus:border-gold-primary"
                 />
               </div>

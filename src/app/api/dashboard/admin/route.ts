@@ -17,12 +17,12 @@ export async function GET() {
     const supabase = createAdminSupabaseClient();
 
     const [
-      { data: usersByRole },
-      { count: weddingsCount },
-      { data: bookingRows },
-      { count: newInquiriesCount },
-      { data: pendingVendors },
-      { data: recentInquiries },
+      usersResult,
+      eventsResult,
+      bookingsResult,
+      inquiriesCountResult,
+      pendingVendorsResult,
+      recentInquiriesResult,
     ] = await Promise.all([
       supabase.from("users").select("role"),
       supabase
@@ -48,11 +48,29 @@ export async function GET() {
         .limit(5),
     ]);
 
-    const roleCounts = { client: 0, vendor: 0, admin: 0 };
+    const firstError = [
+      usersResult.error,
+      eventsResult.error,
+      bookingsResult.error,
+      inquiriesCountResult.error,
+      pendingVendorsResult.error,
+      recentInquiriesResult.error,
+    ].find(Boolean);
+    if (firstError) throw firstError;
+
+    const usersByRole = usersResult.data;
+    const weddingsCount = eventsResult.count;
+    const bookingRows = bookingsResult.data;
+    const newInquiriesCount = inquiriesCountResult.count;
+    const pendingVendors = pendingVendorsResult.data;
+    const recentInquiries = recentInquiriesResult.data;
+
+    const roleCounts = { client: 0, vendor: 0, manager: 0, admin: 0 };
     for (const u of usersByRole ?? []) {
       const r = String(u.role ?? "").toUpperCase();
       if (r === "CLIENT") roleCounts.client++;
       else if (r === "VENDOR") roleCounts.vendor++;
+      else if (r === "MANAGER") roleCounts.manager++;
       else if (r === "ADMIN") roleCounts.admin++;
     }
 

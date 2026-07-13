@@ -13,9 +13,9 @@ import {
   Sparkles,
 } from "lucide-react";
 import { AnimatedCounter } from "@/components/shared/animated-counter";
+import { SpendIntelligence } from "@/components/dashboard/budget/spend-intelligence";
 import { cn, formatCurrency } from "@/lib/utils";
 
-const GST_RATE = 0.18;
 const dashLabel = "font-accent text-[10px] uppercase tracking-[0.2em] text-slate";
 
 // ─── API shapes ─────────────────────────────────────────────────────────────
@@ -25,6 +25,7 @@ type EventPlanEvent = {
   name: string;
   startTime: string | null;
   estimatedSpend: number;
+  readinessPercent: number;
 };
 type EventPlanDay = {
   id: string;
@@ -40,17 +41,20 @@ type PlanLineItem = {
   serviceName: string | null;
   categoryName: string;
   estimatedCost: number;
+  displayCost: number;
+  costState: "estimate" | "final";
+  paidAmount: number;
   stage: "selected" | "booked" | "confirmed";
 };
 type ConfirmedEvent = {
   eventId: string;
-  finalTotal: number;
+  finalTotal: number | null;
   locked: boolean;
 };
 
 // ─── Derived model ──────────────────────────────────────────────────────────
 
-type FnState = "locked" | "awaiting" | "estimate";
+type FnState = "locked" | "awaiting" | "estimate" | "planning";
 type FnRow = {
   eventId: string;
   name: string;
@@ -60,6 +64,7 @@ type FnRow = {
   finalTotal: number | null;
   state: FnState;
   display: number;
+  readinessPercent: number;
 };
 type DaySection = {
   id: string;
@@ -134,10 +139,17 @@ export default function CostEstimationPage() {
             ? evPicks.reduce((s, p) => s + p.estimatedCost, 0)
             : ev.estimatedSpend;
           const conf = confByEvent.get(ev.id);
-          const locked = Boolean(conf && conf.locked);
-          const state: FnState = locked ? "locked" : conf ? "awaiting" : "estimate";
+          const ready = ev.readinessPercent >= 100;
+          const locked = Boolean(conf && conf.locked && ready);
+          const state: FnState = locked
+            ? "locked"
+            : conf
+              ? "awaiting"
+              : ready
+                ? "estimate"
+                : "planning";
           const finalTotal = conf ? conf.finalTotal : null;
-          const display = locked ? finalTotal ?? 0 : estimate;
+          const display = ready ? (locked ? finalTotal ?? 0 : estimate) : 0;
           return {
             eventId: ev.id,
             name: ev.name,
@@ -147,6 +159,7 @@ export default function CostEstimationPage() {
             finalTotal,
             state,
             display,
+            readinessPercent: ev.readinessPercent,
           };
         });
         return {
@@ -165,6 +178,10 @@ export default function CostEstimationPage() {
       .reduce((s, f) => s + (f.finalTotal ?? 0), 0);
     const lockedCount = allFns.filter((f) => f.state === "locked").length;
     const awaitingCount = allFns.filter((f) => f.state === "awaiting").length;
+    const planningCount = allFns.filter((f) => f.state === "planning").length;
+    const unlockedPicks = allFns
+      .filter((f) => f.state === "locked" || f.state === "estimate")
+      .flatMap((f) => f.picks);
 
     return {
       days,
@@ -174,8 +191,9 @@ export default function CostEstimationPage() {
       estimateTotal: projected - confirmedTotal,
       lockedCount,
       awaitingCount,
+      planningCount,
+      unlockedPicks,
       fnCount: allFns.length,
-      gst: Math.round(confirmedTotal * GST_RATE),
       confirmedPct: allFns.length ? Math.round((lockedCount / allFns.length) * 100) : 0,
     };
   }, [spend, picks, confirmed]);
@@ -263,43 +281,37 @@ export default function CostEstimationPage() {
               <AnimatedCounter target={model.projected} formatter={(v) => formatCurrency(v)} />
             </div>
             <p className="mt-3 max-w-md text-sm leading-relaxed text-ivory/70">
-              Your projected total. We negotiate and lock the final price on every
-              function — until then you see a live estimate from your picks.
+              Your visible total combines only 100%-ready function estimates with
+              final prices published by Elysian. Every confirmed amount is complete.
             </p>
             <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2">
               <SplitStat icon={Lock} label="Confirmed by Elysian" value={lakh(model.confirmedTotal)} sub={`${model.lockedCount} locked`} gold />
-              <SplitStat icon={Clock} label="Still estimated" value={lakh(model.estimateTotal)} sub={`${model.fnCount - model.lockedCount} pending`} />
-              {model.gst > 0 ? (
-                <SplitStat label="+ GST (18%)" value={lakh(model.gst)} sub="on confirmed" />
-              ) : null}
+              <SplitStat icon={Clock} label="Still estimated" value={lakh(model.estimateTotal)} sub={`${model.allFns.filter((fn) => fn.state === "estimate").length} unlocked`} />
+              <SplitStat label="Waiting on plan" value={`${model.planningCount}`} sub="unlock at 100%" />
             </div>
           </div>
           <ConfirmRing pct={model.confirmedPct} locked={model.lockedCount} total={model.fnCount} />
         </div>
       </motion.section>
 
-      {/* How it works + breakdown bar */}
-      <motion.section variants={fade} className="border border-charcoal/10 bg-ivory p-5">
-        <div className="flex items-center justify-between">
-          <p className={dashLabel}>Where it goes</p>
-          <span className="font-accent text-[10px] uppercase tracking-[0.14em] text-slate">
-            {model.fnCount} functions
-          </span>
-        </div>
-        <BreakdownBar functions={model.allFns} total={model.projected} />
-        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5">
-          <Legend cls="bg-gold-primary" label="Confirmed (locked)" />
-          <Legend cls="bg-gold-primary/40" label="Awaiting reveal" />
-          <Legend cls="bg-charcoal/25" label="Estimate" />
-        </div>
-        {model.awaitingCount > 0 ? (
-          <p className="mt-3 flex items-center gap-1.5 text-xs text-slate">
-            <Sparkles className="h-3.5 w-3.5 text-gold-dark" />
-            {model.awaitingCount} {model.awaitingCount === 1 ? "function has" : "functions have"} a
-            confirmed Elysian price — finish them to 100% to reveal it.
-          </p>
-        ) : null}
-      </motion.section>
+      <motion.div variants={fade}>
+        <SpendIntelligence
+          projected={model.projected}
+          days={model.days}
+          picks={model.unlockedPicks}
+        />
+      </motion.div>
+
+      {model.awaitingCount > 0 ? (
+        <motion.p
+          variants={fade}
+          className="flex items-center gap-1.5 border border-gold-primary/20 bg-gold-primary/5 px-4 py-3 text-xs text-slate"
+        >
+          <Sparkles className="h-3.5 w-3.5 text-gold-dark" />
+          {model.awaitingCount} {model.awaitingCount === 1 ? "function has" : "functions have"} a
+          published final price that appears once its event details are complete.
+        </motion.p>
+      ) : null}
 
       {/* Filter */}
       <motion.div variants={fade} className="flex flex-wrap items-center gap-2">
@@ -396,14 +408,16 @@ function FunctionRow({ fn, open, onToggle }: { fn: FnRow; open: boolean; onToggl
             <span className="inline-flex items-center gap-1 font-accent text-[10px] uppercase tracking-[0.14em] text-gold-dark">
               <Lock className="h-3 w-3" /> Sealed
             </span>
+          ) : fn.state === "planning" ? (
+            <span className="inline-flex items-center gap-1 font-accent text-[10px] uppercase tracking-[0.14em] text-slate">
+              <Lock className="h-3 w-3" /> {fn.readinessPercent}% ready
+            </span>
           ) : (
             <p className={cn("font-display text-lg", fn.state === "locked" ? "text-gold-dark" : "text-charcoal")}>
               {formatCurrency(fn.display)}
             </p>
           )}
-          {fn.state === "locked" ? (
-            <p className="text-[10px] text-slate">+{formatCurrency(Math.round(fn.display * GST_RATE))} GST</p>
-          ) : fn.state === "estimate" ? (
+          {fn.state === "estimate" ? (
             <p className="font-accent text-[9px] uppercase tracking-[0.12em] text-slate">estimate</p>
           ) : null}
         </div>
@@ -422,16 +436,21 @@ function FunctionRow({ fn, open, onToggle }: { fn: FnRow; open: boolean; onToggl
               {fn.state === "locked" ? (
                 <div className="flex items-center gap-2 border border-sage/30 bg-sage/8 px-3 py-2 text-xs text-charcoal">
                   <CheckCircle2 className="h-4 w-4 text-sage" />
-                  Final price confirmed & locked by Elysian — {formatCurrency(fn.display)} + {formatCurrency(Math.round(fn.display * GST_RATE))} GST.
+                  Final complete price confirmed and published by Elysian — {formatCurrency(fn.display)}.
                 </div>
               ) : fn.state === "awaiting" ? (
                 <div className="flex items-center gap-2 border border-gold-primary/30 bg-gold-primary/8 px-3 py-2 text-xs text-charcoal">
                   <Lock className="h-4 w-4 text-gold-dark" />
                   Elysian has locked your final price. Finish this function to 100% to reveal it.
                 </div>
+              ) : fn.state === "planning" ? (
+                <div className="flex items-center gap-2 border border-charcoal/12 bg-cream/35 px-3 py-2 text-xs text-charcoal">
+                  <Lock className="h-4 w-4 text-slate" />
+                  Finish this function to 100% to unlock its estimate. It is currently {fn.readinessPercent}% ready.
+                </div>
               ) : (
                 <p className="text-xs leading-relaxed text-slate">
-                  This is a live estimate from your picks. Elysian will negotiate and confirm the final price.
+                  This is a live estimate from your current vendor picks. Elysian will publish one complete final price when it is ready.
                 </p>
               )}
 
@@ -451,7 +470,7 @@ function FunctionRow({ fn, open, onToggle }: { fn: FnRow; open: boolean; onToggl
                           <span className={cn("border px-1.5 py-0.5 font-accent text-[9px] uppercase tracking-[0.12em]", chip.cls)}>
                             {chip.label}
                           </span>
-                          {fn.state !== "locked" ? (
+                          {fn.state === "estimate" ? (
                             <span className="font-heading text-xs text-slate">
                               ~{formatCurrency(p.estimatedCost)}
                             </span>
@@ -478,6 +497,7 @@ const STATE_META: Record<FnState, { label: string; bar: string; chip: string }> 
   locked: { label: "Confirmed", bar: "bg-gold-primary", chip: "border-gold-primary/40 bg-gold-primary/10 text-gold-dark" },
   awaiting: { label: "Sealed", bar: "bg-gold-primary/50", chip: "border-gold-primary/30 bg-gold-primary/5 text-gold-dark" },
   estimate: { label: "Estimate", bar: "bg-charcoal/25", chip: "border-charcoal/15 bg-charcoal/5 text-slate" },
+  planning: { label: "Planning", bar: "bg-charcoal/15", chip: "border-charcoal/12 bg-cream/50 text-slate" },
 };
 
 // ─── Pieces ─────────────────────────────────────────────────────────────────
@@ -535,34 +555,5 @@ function ConfirmRing({ pct, locked, total }: { pct: number; locked: number; tota
         </span>
       </div>
     </div>
-  );
-}
-
-function BreakdownBar({ functions, total }: { functions: FnRow[]; total: number }) {
-  const segs = functions.filter((f) => f.display > 0);
-  const colour = (s: FnState) =>
-    s === "locked" ? "bg-gold-primary" : s === "awaiting" ? "bg-gold-primary/40" : "bg-charcoal/25";
-  return (
-    <div className="mt-3 flex h-4 w-full overflow-hidden rounded-full bg-charcoal/8">
-      {segs.map((f, i) => (
-        <motion.div
-          key={f.eventId}
-          title={`${f.name} · ${formatCurrency(f.display)}`}
-          initial={{ width: 0 }}
-          animate={{ width: `${(f.display / Math.max(total, 1)) * 100}%` }}
-          transition={{ duration: 0.6, delay: i * 0.04, ease: [0.16, 1, 0.3, 1] }}
-          className={cn("h-full border-r border-ivory/50 last:border-r-0", colour(f.state))}
-        />
-      ))}
-    </div>
-  );
-}
-
-function Legend({ cls, label }: { cls: string; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 font-accent text-[10px] uppercase tracking-[0.12em] text-slate">
-      <span className={cn("h-2 w-2 rounded-full", cls)} />
-      {label}
-    </span>
   );
 }

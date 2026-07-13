@@ -54,7 +54,9 @@ export async function PATCH(
 
     const { data: booking, error: loadErr } = await supabase
       .from("bookings")
-      .select("*, client:client_profiles(user_id), vendor:vendor_profiles(user_id)")
+      .select(
+        "id, status, total_amount, vendor_amount, paid_amount, notes, client:client_profiles(user_id), vendor:vendor_profiles(user_id)"
+      )
       .eq("id", id)
       .maybeSingle();
 
@@ -76,15 +78,26 @@ export async function PATCH(
       return apiError("Not authorized to update this booking", 403);
     }
 
-    // Quotes and payment records are commercial data. Clients and vendors can
-    // still progress a booking and add shared notes, but only the operations
-    // team can alter amounts through this general booking endpoint.
+    // The vendor's first quote is the only write path for total_amount. Admins
+    // set the separate final client price through /api/admin/pricing; allowing
+    // operations to rewrite the quote here would reintroduce negotiation.
     const isOperationsRole = session.role === "admin" || session.role === "manager";
+    const vendorSendingQuote =
+      session.role === "vendor" &&
+      booking.status === "INQUIRY" &&
+      body.status === "QUOTE_SENT";
+    if (body.totalAmount !== undefined && !vendorSendingQuote) {
+      return apiError("Only the vendor can submit the initial fixed quote", 403);
+    }
+    if (body.paidAmount !== undefined && !isOperationsRole) {
+      return apiError("Only the operations team can update payments", 403);
+    }
     if (
-      (body.totalAmount !== undefined || body.paidAmount !== undefined) &&
-      !isOperationsRole
+      vendorSendingQuote &&
+      body.totalAmount === undefined &&
+      booking.vendor_amount == null
     ) {
-      return apiError("Only the operations team can update booking amounts", 403);
+      return apiError("Add a quote amount before marking the quote as sent", 400);
     }
 
     const allowedFields: Record<string, unknown> = {};
@@ -110,7 +123,20 @@ export async function PATCH(
     if (body.totalAmount !== undefined) {
       const totalAmount = normalizeMoney(body.totalAmount);
       if (totalAmount === undefined) return apiError("Invalid total amount", 400);
+      if (vendorSendingQuote && (totalAmount == null || totalAmount <= 0)) {
+        return apiError("Quote amount must be greater than zero", 400);
+      }
+      if (
+        vendorSendingQuote &&
+        booking.vendor_amount != null &&
+        totalAmount !== booking.vendor_amount
+      ) {
+        return apiError("The vendor quote is already locked for this booking", 409);
+      }
       allowedFields.total_amount = totalAmount;
+      if (vendorSendingQuote && booking.vendor_amount == null) {
+        allowedFields.vendor_amount = totalAmount;
+      }
     }
     if (body.paidAmount !== undefined) {
       const paidAmount = normalizeMoney(body.paidAmount);
@@ -123,12 +149,17 @@ export async function PATCH(
           ? body.notes.trim().slice(0, 1200)
           : null;
     }
+    if (Object.keys(allowedFields).length === 0) {
+      return apiError("Nothing to update", 400);
+    }
 
     const { data: updated, error } = await supabase
       .from("bookings")
       .update(allowedFields)
       .eq("id", id)
-      .select()
+      .select(
+        "id, client_profile_id, vendor_profile_id, vendor_service_id, wedding_event_id, status, event_date, total_amount, vendor_amount, paid_amount, notes, created_at, updated_at"
+      )
       .single();
 
     if (error) {
@@ -173,7 +204,6 @@ export async function DELETE(
 
     const isOwner =
       relationUserId(booking.client) === session.userId ||
-      relationUserId(booking.vendor) === session.userId ||
       session.role === "admin";
 
     if (!isOwner) {

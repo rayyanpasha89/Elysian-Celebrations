@@ -11,11 +11,12 @@ import { cn, formatCurrency } from "@/lib/utils";
 
 type Tab = "All" | "Inquiry" | "Confirmed" | "Completed";
 
-type UiStatus = "INQUIRY" | "CONFIRMED" | "COMPLETED";
+type UiStatus = "INQUIRY" | "QUOTE_SENT" | "CONFIRMED" | "COMPLETED";
 
 function mapStatus(raw: string): UiStatus {
   if (raw === "COMPLETED") return "COMPLETED";
   if (raw === "CONFIRMED" || raw === "DEPOSIT_PAID") return "CONFIRMED";
+  if (raw === "QUOTE_SENT") return "QUOTE_SENT";
   return "INQUIRY";
 }
 
@@ -86,7 +87,9 @@ type BookingEventContext = {
 };
 
 function statusClass(s: UiStatus) {
-  if (s === "INQUIRY") return "border-gold-primary/70 text-gold-dark";
+  if (s === "INQUIRY" || s === "QUOTE_SENT") {
+    return "border-gold-primary/70 text-gold-dark";
+  }
   if (s === "CONFIRMED") return "border-sage/70 text-sage";
   return "border-charcoal/40 text-charcoal";
 }
@@ -105,6 +108,7 @@ function formatDate(value: string | null) {
 
 function displayStatus(status: UiStatus) {
   if (status === "INQUIRY") return "Inquiry";
+  if (status === "QUOTE_SENT") return "Quote sent";
   if (status === "CONFIRMED") return "Confirmed";
   return "Completed";
 }
@@ -178,7 +182,9 @@ export default function VendorBookingsPage() {
 
   const filtered = useMemo(() => {
     if (tab === "All") return list;
-    if (tab === "Inquiry") return list.filter((b) => b.status === "INQUIRY");
+    if (tab === "Inquiry") {
+      return list.filter((b) => b.status === "INQUIRY" || b.status === "QUOTE_SENT");
+    }
     if (tab === "Confirmed") return list.filter((b) => b.status === "CONFIRMED");
     return list.filter((b) => b.status === "COMPLETED");
   }, [tab, list]);
@@ -203,13 +209,20 @@ export default function VendorBookingsPage() {
   const selectedBooking =
     list.find((booking) => booking.id === selectedBookingId) ?? filtered[0] ?? null;
 
-  const updateBookingStatus = async (id: string, status: string) => {
+  const updateBookingStatus = async (
+    id: string,
+    status: string,
+    totalAmount?: number
+  ) => {
     setStatusSavingId(id);
     try {
       const res = await fetch(`/api/bookings/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({
+          status,
+          ...(totalAmount !== undefined ? { totalAmount } : {}),
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Update failed");
@@ -340,7 +353,7 @@ export default function VendorBookingsPage() {
                     >
                       Open Brief
                     </button>
-                    {b.status === "INQUIRY" ? (
+                    {b.status === "INQUIRY" || b.status === "QUOTE_SENT" ? (
                       <button
                         type="button"
                         className="font-accent border border-charcoal/15 px-4 py-3 text-[11px] uppercase tracking-[0.2em] text-charcoal"
@@ -361,11 +374,12 @@ export default function VendorBookingsPage() {
             <p className={dashLabel}>Vendor brief</p>
             {selectedBooking ? (
               <VendorBookingBrief
+                key={selectedBooking.id}
                 booking={selectedBooking.raw}
                 uiStatus={selectedBooking.status}
                 savingStatus={statusSavingId === selectedBooking.id}
-                onStatusChange={(status) =>
-                  void updateBookingStatus(selectedBooking.id, status)
+                onStatusChange={(status, totalAmount) =>
+                  void updateBookingStatus(selectedBooking.id, status, totalAmount)
                 }
                 onRespond={() =>
                   router.push(`/vendor/messages?bookingId=${selectedBooking.id}`)
@@ -394,7 +408,7 @@ function VendorBookingBrief({
   booking: ApiBooking;
   uiStatus: UiStatus;
   savingStatus: boolean;
-  onStatusChange: (status: string) => void;
+  onStatusChange: (status: string, totalAmount?: number) => void;
   onRespond: () => void;
 }) {
   const serviceItems = (booking.service?.items ?? [])
@@ -404,6 +418,11 @@ function VendorBookingBrief({
     0,
     (booking.total_amount ?? 0) - (booking.paid_amount ?? 0)
   );
+  const [quoteAmount, setQuoteAmount] = useState(
+    String(booking.total_amount ?? booking.service?.base_price ?? "")
+  );
+  const parsedQuote = Number(quoteAmount);
+  const quoteIsValid = Number.isFinite(parsedQuote) && parsedQuote > 0;
 
   return (
     <div className="mt-4 space-y-5">
@@ -534,16 +553,37 @@ function VendorBookingBrief({
         </div>
       ) : null}
 
+      {uiStatus === "INQUIRY" ? (
+        <label className="block border border-gold-primary/25 bg-gold-primary/5 p-4">
+          <span className={dashLabel}>Your final vendor quote</span>
+          <span className="mt-2 flex items-center border border-charcoal/15 bg-ivory px-3 focus-within:border-gold-primary">
+            <span className="font-heading text-sm text-slate">₹</span>
+            <input
+              type="number"
+              min={1}
+              value={quoteAmount}
+              onChange={(event) => setQuoteAmount(event.target.value)}
+              placeholder="Enter one complete quote"
+              className="w-full bg-transparent px-2 py-3 font-heading text-sm text-charcoal outline-none"
+            />
+          </span>
+          <span className="mt-2 block text-xs leading-relaxed text-slate">
+            Send one complete vendor amount for this service. Elysian handles the
+            separate client-facing final price.
+          </span>
+        </label>
+      ) : null}
+
       <div className="flex flex-wrap gap-3 border-t border-charcoal/8 pt-4">
         {uiStatus === "INQUIRY" ? (
           <>
             <button
               type="button"
               className={dashBtn}
-              disabled={savingStatus}
-              onClick={() => onStatusChange("QUOTE_SENT")}
+              disabled={savingStatus || !quoteIsValid}
+              onClick={() => onStatusChange("QUOTE_SENT", Math.round(parsedQuote))}
             >
-              {savingStatus ? "Saving..." : "Mark quote sent"}
+              {savingStatus ? "Sending..." : "Send final quote"}
             </button>
             <button
               type="button"

@@ -1961,6 +1961,9 @@ async function seedBookings(
             ?.offsetDays ?? 0
         )
       : clientFixture.weddingDate;
+    const hasPublishedFinalPrice = ["CONFIRMED", "DEPOSIT_PAID", "COMPLETED"].includes(
+      fixture.status
+    );
 
     const { data: booking, error } = await supabase
       .from("bookings")
@@ -1972,6 +1975,11 @@ async function seedBookings(
         status: fixture.status,
         event_date: eventDate,
         total_amount: fixture.totalAmount,
+        vendor_amount: fixture.totalAmount,
+        final_price: hasPublishedFinalPrice
+          ? Math.round(fixture.totalAmount * 1.12)
+          : null,
+        price_published: hasPublishedFinalPrice,
         paid_amount: fixture.paidAmount,
         notes: fixture.notes,
       })

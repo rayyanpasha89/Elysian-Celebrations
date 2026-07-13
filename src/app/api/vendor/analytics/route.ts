@@ -7,6 +7,31 @@ import {
   requireRole,
 } from "@/lib/api-utils";
 
+const ACTIVE_BOOKING_STATUSES = new Set(["CONFIRMED", "DEPOSIT_PAID"]);
+const PAID_TO_DATE_STATUSES = new Set([
+  ...ACTIVE_BOOKING_STATUSES,
+  "COMPLETED",
+]);
+const QUOTE_PIPELINE_STATUSES = new Set(["INQUIRY", "QUOTE_SENT"]);
+
+function currentVendorAmount(booking: {
+  vendor_amount?: number | null;
+  total_amount?: number | null;
+}) {
+  return Math.max(0, booking.vendor_amount ?? booking.total_amount ?? 0);
+}
+
+function paidTowardVendorAmount(
+  booking: {
+    paid_amount?: number | null;
+    vendor_amount?: number | null;
+    total_amount?: number | null;
+  },
+  amount = currentVendorAmount(booking)
+) {
+  return Math.min(amount, Math.max(0, booking.paid_amount ?? 0));
+}
+
 function startOfWeek(date: Date) {
   const value = new Date(date);
   const day = value.getUTCDay();
@@ -33,18 +58,23 @@ export async function GET() {
 
   try {
     const supabase = createAdminSupabaseClient();
-    const { data: vendorProfile } = await supabase
+    const { data: vendorProfile, error: profileError } = await supabase
       .from("vendor_profiles")
       .select("id, rating, review_count")
       .eq("user_id", session.userId)
       .maybeSingle();
 
+    if (profileError) {
+      console.error("GET /api/vendor/analytics vendor profile", profileError);
+      return apiError("Failed to load vendor analytics", 500);
+    }
+
     if (!vendorProfile) {
       return apiSuccess({
         bookingsTotal: 0,
         bookingsByStatus: {},
-        revenueEstimate: 0,
-        paidThisMonth: 0,
+        paidToDate: 0,
+        outstandingAmount: 0,
         quotePipeline: 0,
         completedBookings: 0,
         liveInquiries: 0,
@@ -58,30 +88,41 @@ export async function GET() {
       });
     }
 
-    const { data: bookings, error } = await supabase
-      .from("bookings")
-      .select("status, total_amount, paid_amount, created_at, updated_at, event_date")
-      .eq("vendor_profile_id", vendorProfile.id);
-
-    if (error) {
-      console.error("GET /api/vendor/analytics bookings", error);
-      return apiError("Failed to load vendor analytics", 500);
-    }
-
     const now = new Date();
     const monthStart = new Date(
       Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0)
     );
     const currentWeekStart = startOfWeek(now);
-    const { count: profileViewsCount, error: viewsError } = await supabase
-      .from("vendor_profile_views")
-      .select("id", { count: "exact", head: true })
-      .eq("vendor_profile_id", vendorProfile.id)
-      .gte("created_at", monthStart.toISOString());
 
-    if (viewsError) {
-      console.error("GET /api/vendor/analytics profile views", viewsError);
+    const [bookingsResult, profileViewsResult] = await Promise.all([
+      supabase
+        .from("bookings")
+        .select(
+          "status, total_amount, vendor_amount, paid_amount, created_at"
+        )
+        .eq("vendor_profile_id", vendorProfile.id),
+      supabase
+        .from("vendor_profile_views")
+        .select("id", { count: "exact", head: true })
+        .eq("vendor_profile_id", vendorProfile.id)
+        .gte("created_at", monthStart.toISOString()),
+    ]);
+
+    const failedQuery = [
+      { name: "bookings", error: bookingsResult.error },
+      { name: "profile views", error: profileViewsResult.error },
+    ].find((result) => result.error);
+
+    if (failedQuery) {
+      console.error(
+        `GET /api/vendor/analytics ${failedQuery.name}`,
+        failedQuery.error
+      );
+      return apiError("Failed to load vendor analytics", 500);
     }
+
+    const bookings = bookingsResult.data;
+    const profileViewsCount = profileViewsResult.count;
 
     const weeklyInquiryVolume = Array.from({ length: 6 }, (_, index) => {
       const start = new Date(currentWeekStart);
@@ -97,8 +138,8 @@ export async function GET() {
     });
 
     const bookingsByStatus: Record<string, number> = {};
-    let revenueEstimate = 0;
-    let paidThisMonth = 0;
+    let paidToDate = 0;
+    let outstandingAmount = 0;
     let quotePipeline = 0;
     let completedBookings = 0;
     let liveInquiries = 0;
@@ -106,15 +147,19 @@ export async function GET() {
     for (const booking of bookings ?? []) {
       bookingsByStatus[booking.status] =
         (bookingsByStatus[booking.status] ?? 0) + 1;
-      revenueEstimate += booking.paid_amount ?? 0;
+      const amount = currentVendorAmount(booking);
+      const paidAmount = paidTowardVendorAmount(booking, amount);
 
-      const updatedAt = booking.updated_at ? new Date(booking.updated_at) : null;
-      if (updatedAt && updatedAt >= monthStart) {
-        paidThisMonth += booking.paid_amount ?? 0;
+      if (PAID_TO_DATE_STATUSES.has(booking.status)) {
+        paidToDate += paidAmount;
       }
 
-      if (booking.status !== "CANCELLED") {
-        quotePipeline += booking.total_amount ?? 0;
+      if (ACTIVE_BOOKING_STATUSES.has(booking.status)) {
+        outstandingAmount += Math.max(0, amount - paidAmount);
+      }
+
+      if (QUOTE_PIPELINE_STATUSES.has(booking.status)) {
+        quotePipeline += amount;
       }
 
       if (booking.status === "COMPLETED") {
@@ -138,8 +183,8 @@ export async function GET() {
     return apiSuccess({
       bookingsTotal: bookings?.length ?? 0,
       bookingsByStatus,
-      revenueEstimate,
-      paidThisMonth,
+      paidToDate,
+      outstandingAmount,
       quotePipeline,
       completedBookings,
       liveInquiries,

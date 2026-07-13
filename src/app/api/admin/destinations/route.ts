@@ -8,6 +8,36 @@ import {
 } from "@/lib/api-utils";
 import { slugify } from "@/lib/slug";
 
+const DESTINATION_COLUMNS =
+  "id, name, slug, country, tagline, starting_price, venue_count, is_active, sort_order";
+const MAX_INTEGER = 2_147_483_647;
+const MAX_NAME_LENGTH = 120;
+const MAX_COUNTRY_LENGTH = 80;
+const MAX_TAGLINE_LENGTH = 240;
+
+type DestinationPayload = Record<string, unknown>;
+
+async function createUniqueSlug(
+  supabase: ReturnType<typeof createAdminSupabaseClient>,
+  value: string
+) {
+  const base = slugify(value).slice(0, 88);
+
+  for (let suffix = 1; suffix <= 20; suffix += 1) {
+    const candidate = suffix === 1 ? base : `${base}-${suffix}`;
+    const { data, error } = await supabase
+      .from("destinations")
+      .select("id")
+      .eq("slug", candidate)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) return candidate;
+  }
+
+  return `${base}-${Date.now().toString(36)}`;
+}
+
 export async function GET() {
   const session = await getAuthSession();
   if (session instanceof NextResponse) return session;
@@ -18,9 +48,7 @@ export async function GET() {
     const supabase = createAdminSupabaseClient();
     const { data: rows, error } = await supabase
       .from("destinations")
-      .select(
-        "id, name, slug, country, tagline, starting_price, venue_count, is_active, sort_order, created_at"
-      )
+      .select(`${DESTINATION_COLUMNS}, created_at`)
       .order("sort_order", { ascending: true });
 
     if (error) {
@@ -41,53 +69,69 @@ export async function POST(request: NextRequest) {
   const roleCheck = requireRole(session, "admin");
   if (roleCheck) return roleCheck;
 
+  let body: DestinationPayload;
+  try {
+    const payload: unknown = await request.json();
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      return apiError("Request body must be a JSON object", 400);
+    }
+    body = payload as DestinationPayload;
+  } catch {
+    return apiError("Request body must be valid JSON", 400);
+  }
+
   try {
     const supabase = createAdminSupabaseClient();
-    const body = (await request.json()) as {
-      name?: string;
-      country?: string;
-      slug?: string;
-      tagline?: string;
-      startingPrice?: number;
-    };
-
     const name = typeof body.name === "string" ? body.name.trim() : "";
-    const country =
-      typeof body.country === "string" && body.country.trim()
-        ? body.country.trim()
-        : "";
+    const country = typeof body.country === "string" ? body.country.trim() : "";
+
     if (!name || !country) {
-      return apiError("Name and country are required");
+      return apiError("Name and country are required", 400);
+    }
+    if (name.length > MAX_NAME_LENGTH) {
+      return apiError(`Name must be ${MAX_NAME_LENGTH} characters or fewer`, 400);
+    }
+    if (country.length > MAX_COUNTRY_LENGTH) {
+      return apiError(`Country must be ${MAX_COUNTRY_LENGTH} characters or fewer`, 400);
     }
 
-    const baseSlug =
-      typeof body.slug === "string" && body.slug.trim()
-        ? slugify(body.slug.trim())
-        : slugify(name);
-
-    const { data: existing } = await supabase
-      .from("destinations")
-      .select("id")
-      .eq("slug", baseSlug)
-      .maybeSingle();
-
-    let slug = baseSlug;
-    if (existing) {
-      slug = `${baseSlug}-${Date.now().toString(36)}`;
+    if (
+      body.tagline !== undefined &&
+      body.tagline !== null &&
+      typeof body.tagline !== "string"
+    ) {
+      return apiError("Tagline must be text", 400);
+    }
+    const tagline =
+      typeof body.tagline === "string" ? body.tagline.trim() || null : null;
+    if (tagline && tagline.length > MAX_TAGLINE_LENGTH) {
+      return apiError(`Tagline must be ${MAX_TAGLINE_LENGTH} characters or fewer`, 400);
     }
 
-    const { data: maxRows } = await supabase
-      .from("destinations")
-      .select("sort_order")
-      .order("sort_order", { ascending: false })
-      .limit(1);
+    let startingPrice: number | null = null;
+    if (body.startingPrice !== undefined && body.startingPrice !== null) {
+      if (
+        typeof body.startingPrice !== "number" ||
+        !Number.isInteger(body.startingPrice) ||
+        body.startingPrice <= 0 ||
+        body.startingPrice > MAX_INTEGER
+      ) {
+        return apiError("Starting price must be a positive whole number of rupees", 400);
+      }
+      startingPrice = body.startingPrice;
+    }
 
-    const nextOrder = (maxRows?.[0]?.sort_order ?? 0) + 1;
+    const [slug, orderResult] = await Promise.all([
+      createUniqueSlug(supabase, name),
+      supabase
+        .from("destinations")
+        .select("sort_order")
+        .order("sort_order", { ascending: false })
+        .limit(1),
+    ]);
 
-    const startingPrice =
-      typeof body.startingPrice === "number" && body.startingPrice > 0
-        ? Math.floor(body.startingPrice)
-        : null;
+    if (orderResult.error) throw orderResult.error;
+    const nextOrder = (orderResult.data?.[0]?.sort_order ?? -1) + 1;
 
     const { data: row, error } = await supabase
       .from("destinations")
@@ -95,15 +139,12 @@ export async function POST(request: NextRequest) {
         name,
         slug,
         country,
-        tagline:
-          typeof body.tagline === "string" && body.tagline.trim()
-            ? body.tagline.trim()
-            : null,
+        tagline,
         starting_price: startingPrice,
         is_active: true,
         sort_order: nextOrder,
       })
-      .select()
+      .select(DESTINATION_COLUMNS)
       .single();
 
     if (error) {

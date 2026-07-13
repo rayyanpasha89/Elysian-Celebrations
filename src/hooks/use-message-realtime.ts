@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useEffect, useEffectEvent } from "react";
 
 type MessageThread = {
   id: string;
@@ -14,64 +13,37 @@ type UseMessageRealtimeOptions = {
 };
 
 /**
- * Subscribe per booking so the browser never needs to process unrelated
- * message payloads. The API remains the source of truth for role checks and
- * message projection; realtime only tells us when to refresh.
+ * Keep active threads fresh through the role-checked API. Clerk identities are
+ * not Supabase JWTs, so direct Postgres Realtime subscriptions would require
+ * unsafe anonymous table access. Visibility-aware polling preserves the API as
+ * the only data boundary until a Clerk-to-Supabase token bridge is introduced.
  */
 export function useMessageRealtime({
   conversations,
   enabled = true,
   onRefresh,
 }: UseMessageRealtimeOptions) {
-  const refreshRef = useRef(onRefresh);
-
-  useEffect(() => {
-    refreshRef.current = onRefresh;
-  }, [onRefresh]);
-
-  const bookingKey = useMemo(() => {
-    return conversations
-      .map((conversation) => conversation.id)
-      .filter(Boolean)
-      .sort()
-      .join("|");
-  }, [conversations]);
+  const refresh = useEffectEvent(() => onRefresh());
+  const bookingKey = conversations
+    .map((conversation) => conversation.id)
+    .filter(Boolean)
+    .sort()
+    .join("|");
 
   useEffect(() => {
     if (!enabled || !bookingKey) return;
 
-    const supabase = createClient();
-    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const scheduleRefresh = () => {
-      if (refreshTimer) return;
-      refreshTimer = setTimeout(() => {
-        refreshTimer = null;
-        void refreshRef.current();
-      }, 450);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        void refresh();
+      }
     };
-
-    const channels = bookingKey.split("|").map((bookingId) =>
-      supabase
-        .channel(`elysian-messages:${bookingId}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "messages",
-            filter: `booking_id=eq.${bookingId}`,
-          },
-          scheduleRefresh
-        )
-        .subscribe()
-    );
+    const interval = window.setInterval(refreshWhenVisible, 8_000);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
 
     return () => {
-      if (refreshTimer) clearTimeout(refreshTimer);
-      channels.forEach((channel) => {
-        void supabase.removeChannel(channel);
-      });
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
   }, [bookingKey, enabled]);
 }

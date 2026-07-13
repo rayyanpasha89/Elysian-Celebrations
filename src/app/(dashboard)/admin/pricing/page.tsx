@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
-import { ArrowLeft, IndianRupee, TrendingUp } from "lucide-react";
+import { ArrowLeft, BadgeIndianRupee, IndianRupee } from "lucide-react";
 import {
   CelebrationCanvas,
   type CanvasDay,
@@ -21,10 +21,9 @@ type Booking = {
   categoryName: string;
   listedPrice: number | null;
   totalAmount: number | null;
-  vendorCost: number | null;
   finalPrice: number | null;
   pricePublished: boolean;
-  margin: number | null;
+  fee: number | null;
 };
 type AdminEvent = {
   id: string;
@@ -43,18 +42,23 @@ type AdminClient = {
   name: string;
   email: string | null;
   wedding: { id: string; name: string; date: string | null } | null;
-  totals: { revenue: number; cost: number; margin: number; bookingCount: number; pricedCount: number };
+  totals: {
+    finalTotal: number;
+    vendorTotal: number;
+    feeTotal: number;
+    bookingCount: number;
+    pricedCount: number;
+  };
   readiness: { percent: number; eventCount: number; eventsReady: number };
   days: AdminDay[];
 };
 
 const dashLabel = "font-accent text-[10px] uppercase tracking-[0.2em] text-slate";
 
-/** Colour a node by margin health: green = all priced (no loss), amber = some
- *  still to price, red = a loss somewhere, grey = no picks. */
-function marginHealth(picks: number, priced: number, loss: boolean): FlowStatus {
+/** Colour a node by pricing completion: grey = no picks, amber = incomplete,
+ *  and green = every selected service has a final price. */
+function pricingHealth(picks: number, priced: number): FlowStatus {
   if (picks === 0) return "planned";
-  if (loss) return "gap";
   if (priced < picks) return "active";
   return "ready";
 }
@@ -106,18 +110,15 @@ export default function AdminPricingPage() {
   const canvasDays: CanvasDay[] = useMemo(() => {
     if (!selectedClient) return [];
     return selectedClient.days.map((day) => {
-      let dayMargin = 0;
+      let dayFee = 0;
       let dayPicks = 0;
       let dayPriced = 0;
-      let dayLoss = false;
       const events = day.events.map((ev) => {
-        const margin = ev.bookings.reduce((s, b) => s + (b.margin ?? 0), 0);
+        const fee = ev.bookings.reduce((sum, booking) => sum + (booking.fee ?? 0), 0);
         const priced = ev.bookings.filter((b) => b.finalPrice != null).length;
-        const loss = ev.bookings.some((b) => b.margin != null && b.margin < 0);
-        dayMargin += margin;
+        dayFee += fee;
         dayPicks += ev.bookings.length;
         dayPriced += priced;
-        if (loss) dayLoss = true;
         return {
           id: ev.id,
           title: ev.name,
@@ -127,9 +128,9 @@ export default function AdminPricingPage() {
               ? undefined
               : priced < ev.bookings.length
                 ? `${ev.bookings.length - priced} to price`
-                : `${lakh(margin)} margin`,
+                : `${lakh(fee)} fee`,
           meta: `${ev.bookings.length} picks`,
-          status: marginHealth(ev.bookings.length, priced, loss),
+          status: pricingHealth(ev.bookings.length, priced),
           readiness:
             ev.bookings.length > 0 ? Math.round((priced / ev.bookings.length) * 100) : 0,
           steps: ev.bookings.map((b) => ({
@@ -145,9 +146,9 @@ export default function AdminPricingPage() {
         dateLabel: day.date
           ? new Date(day.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
           : dayPicks > 0
-            ? `${lakh(dayMargin)} margin`
+            ? `${lakh(dayFee)} fee`
             : undefined,
-        status: marginHealth(dayPicks, dayPriced, dayLoss),
+        status: pricingHealth(dayPicks, dayPriced),
         readiness: dayPicks > 0 ? Math.round((dayPriced / dayPicks) * 100) : 0,
         events,
       };
@@ -170,7 +171,10 @@ export default function AdminPricingPage() {
   );
 
   const savePricing = useCallback(
-    async (bookingId: string, patch: { vendorCost?: number | null; finalPrice?: number | null; pricePublished?: boolean }) => {
+    async (
+      bookingId: string,
+      patch: { finalPrice?: number | null; pricePublished?: boolean }
+    ) => {
       try {
         const res = await fetch("/api/admin/pricing", {
           method: "PATCH",
@@ -180,10 +184,10 @@ export default function AdminPricingPage() {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error ?? "Failed to save");
         const updated = json.booking as {
-          vendorCost: number | null;
+          listedPrice: number | null;
           finalPrice: number | null;
           pricePublished: boolean;
-          margin: number | null;
+          fee: number | null;
         };
         // patch local state
         setClients((prev) =>
@@ -207,10 +211,11 @@ export default function AdminPricingPage() {
             ? { ...cur, booking: { ...cur.booking, ...updated } }
             : cur
         );
-        // recompute client totals after a moment (cheap: refetch)
         toast.success("Pricing saved");
+        return true;
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Failed to save");
+        return false;
       }
     },
     []
@@ -219,8 +224,9 @@ export default function AdminPricingPage() {
   // Recompute totals locally whenever bookings change (keeps headline live).
   const recomputed = useMemo(() => {
     return clients.map((c) => {
-      let revenue = 0,
-        cost = 0,
+      let finalTotal = 0,
+        vendorTotal = 0,
+        feeTotal = 0,
         bookingCount = 0,
         pricedCount = 0;
       for (const d of c.days)
@@ -228,26 +234,30 @@ export default function AdminPricingPage() {
           for (const b of e.bookings) {
             bookingCount += 1;
             if (b.finalPrice != null) {
-              revenue += b.finalPrice;
+              finalTotal += b.finalPrice;
               pricedCount += 1;
+              vendorTotal += b.listedPrice ?? 0;
+              feeTotal += b.fee ?? 0;
             }
-            if (b.vendorCost != null) cost += b.vendorCost;
           }
-      return { ...c, totals: { revenue, cost, margin: revenue - cost, bookingCount, pricedCount } };
+      return {
+        ...c,
+        totals: { finalTotal, vendorTotal, feeTotal, bookingCount, pricedCount },
+      };
     });
   }, [clients]);
   const liveGrand = useMemo(
     () =>
       recomputed.reduce(
         (a, c) => {
-          a.revenue += c.totals.revenue;
-          a.cost += c.totals.cost;
-          a.margin += c.totals.margin;
+          a.finalTotal += c.totals.finalTotal;
+          a.vendorTotal += c.totals.vendorTotal;
+          a.feeTotal += c.totals.feeTotal;
           a.priced += c.totals.pricedCount;
           a.bookings += c.totals.bookingCount;
           return a;
         },
-        { revenue: 0, cost: 0, margin: 0, priced: 0, bookings: 0 }
+        { finalTotal: 0, vendorTotal: 0, feeTotal: 0, priced: 0, bookings: 0 }
       ),
     [recomputed]
   );
@@ -262,7 +272,7 @@ export default function AdminPricingPage() {
 
   return (
     <div className="space-y-5">
-      {/* Hero — grand margin */}
+      {/* Hero */}
       <section className="relative overflow-hidden border border-charcoal/10 bg-midnight text-ivory">
         <div
           aria-hidden
@@ -271,20 +281,20 @@ export default function AdminPricingPage() {
         <div className="relative flex flex-col gap-6 p-6 md:flex-row md:items-end md:justify-between md:p-8">
           <div>
             <p className="font-accent text-[10px] uppercase tracking-[0.24em] text-gold-primary">
-              Pricing &amp; margin board
+              Final pricing board
             </p>
             <h1 className="mt-2 font-display text-3xl text-ivory md:text-4xl">
-              What we&apos;re making
+              One price, clearly composed
             </h1>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-ivory/70">
-              Negotiate the vendor cost and set the final client price on every
-              pick. Margin rolls up by event, day, client, and across all clients.
+              Set one complete client-facing price for every vendor pick. The vendor
+              amount stays fixed and Elysian&apos;s fee is calculated automatically.
             </p>
           </div>
           <div className="flex gap-6">
-            <HeroStat label="Revenue" value={lakh(liveGrand.revenue)} />
-            <HeroStat label="Vendor cost" value={lakh(liveGrand.cost)} muted />
-            <HeroStat label="Margin" value={lakh(liveGrand.margin)} gold />
+            <HeroStat label="Final value" value={lakh(liveGrand.finalTotal)} />
+            <HeroStat label="Vendor base" value={lakh(liveGrand.vendorTotal)} muted />
+            <HeroStat label="Elysian fee" value={lakh(liveGrand.feeTotal)} gold />
           </div>
         </div>
         <div className="relative flex flex-wrap gap-x-6 gap-y-1 border-t border-ivory/10 px-6 py-3 md:px-8">
@@ -314,9 +324,17 @@ export default function AdminPricingPage() {
 
       {!selectedClient ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {recomputed
-            .filter((c) => c.wedding)
-            .map((c) => (
+          {activeClients.length === 0 ? (
+            <div className="border border-dashed border-charcoal/15 bg-ivory p-8 sm:col-span-2 xl:col-span-3">
+              <p className="font-display text-xl text-charcoal">No vendor picks to price</p>
+              <p className="mt-2 text-sm text-slate">
+                Client plans appear here as soon as they select a vendor service.
+              </p>
+            </div>
+          ) : (
+            recomputed
+              .filter((c) => c.wedding && c.totals.bookingCount > 0)
+              .map((c) => (
               <button
                 key={c.id}
                 type="button"
@@ -342,8 +360,8 @@ export default function AdminPricingPage() {
                   </span>
                 </div>
                 <div className="mt-4 grid grid-cols-3 gap-2 border-t border-charcoal/8 pt-3">
-                  <MiniStat label="Margin" value={lakh(c.totals.margin)} tone="gold" />
-                  <MiniStat label="Revenue" value={lakh(c.totals.revenue)} />
+                  <MiniStat label="Fee" value={lakh(c.totals.feeTotal)} tone="gold" />
+                  <MiniStat label="Final" value={lakh(c.totals.finalTotal)} />
                   <MiniStat
                     label="Priced"
                     value={`${c.totals.pricedCount}/${c.totals.bookingCount}`}
@@ -355,7 +373,8 @@ export default function AdminPricingPage() {
                   />
                 </div>
               </button>
-            ))}
+              ))
+          )}
         </div>
       ) : (
         <div className="border border-charcoal/10 bg-ivory p-4 md:p-6">
@@ -367,11 +386,11 @@ export default function AdminPricingPage() {
               </h2>
             </div>
             <div className="flex gap-5">
-              <MiniStat label="Margin" value={formatCurrency(
-                recomputed.find((c) => c.id === selectedClient.id)?.totals.margin ?? 0
+              <MiniStat label="Fee" value={formatCurrency(
+                recomputed.find((c) => c.id === selectedClient.id)?.totals.feeTotal ?? 0
               )} tone="gold" />
-              <MiniStat label="Revenue" value={formatCurrency(
-                recomputed.find((c) => c.id === selectedClient.id)?.totals.revenue ?? 0
+              <MiniStat label="Final value" value={formatCurrency(
+                recomputed.find((c) => c.id === selectedClient.id)?.totals.finalTotal ?? 0
               )} />
             </div>
           </div>
@@ -393,7 +412,6 @@ export default function AdminPricingPage() {
             data={editing}
             onClose={() => setEditing(null)}
             onSave={savePricing}
-            onRefresh={refetch}
           />
         ) : null}
       </AnimatePresence>
@@ -448,100 +466,48 @@ function MiniStat({
 
 // ─── Pricing editor ─────────────────────────────────────────────────────────
 
-type NegEntry = {
-  id: string;
-  stage: string;
-  amount: number | null;
-  note: string | null;
-  created_at: string;
-};
-const GST_RATE = 0.18;
-const TARGET_MARGIN = 0.3;
-const NEG_META: Record<string, { label: string; dot: string }> = {
-  QUOTED: { label: "Quoted", dot: "bg-slate/50" },
-  COUNTERED: { label: "Countered", dot: "bg-gold-primary" },
-  AGREED: { label: "Agreed", dot: "bg-sage" },
-};
-
 function PricingEditor({
   data,
   onClose,
   onSave,
-  onRefresh,
 }: {
   data: { booking: Booking; eventName: string; clientName: string };
   onClose: () => void;
   onSave: (
     bookingId: string,
-    patch: { vendorCost?: number | null; finalPrice?: number | null; pricePublished?: boolean }
-  ) => Promise<void>;
-  onRefresh: () => void;
+    patch: { finalPrice?: number | null; pricePublished?: boolean }
+  ) => Promise<boolean>;
 }) {
   const { booking, eventName, clientName } = data;
-  const [cost, setCost] = useState(booking.vendorCost != null ? String(booking.vendorCost) : "");
   const [price, setPrice] = useState(booking.finalPrice != null ? String(booking.finalPrice) : "");
   const [busy, setBusy] = useState(false);
 
-  const [entries, setEntries] = useState<NegEntry[]>([]);
-  const [negStage, setNegStage] = useState<"QUOTED" | "COUNTERED" | "AGREED">("COUNTERED");
-  const [negAmount, setNegAmount] = useState("");
-  const [negNote, setNegNote] = useState("");
-  const [negBusy, setNegBusy] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch(`/api/admin/negotiation?bookingId=${booking.id}`);
-        const json = await res.json();
-        if (res.ok) setEntries((json.entries ?? []) as NegEntry[]);
-      } catch {
-        /* non-fatal */
-      }
-    })();
-  }, [booking.id]);
-
-  const costN = cost.trim() ? Number(cost) : null;
-  const priceN = price.trim() ? Number(price) : null;
-  const margin = priceN != null && costN != null ? priceN - costN : null;
-  const marginPct = margin != null && costN ? Math.round((margin / costN) * 100) : null;
-  const gst = priceN != null ? Math.round(priceN * GST_RATE) : null;
-  const suggested =
-    costN != null && costN > 0 ? Math.round((costN * (1 + TARGET_MARGIN)) / 1000) * 1000 : null;
+  const parsedPrice = price.trim() ? Number(price) : null;
+  const priceN = parsedPrice != null && Number.isFinite(parsedPrice) ? parsedPrice : null;
+  const hasInvalidNumber = price.trim().length > 0 && priceN == null;
+  const belowVendorPrice =
+    priceN != null && booking.listedPrice != null && priceN < booking.listedPrice;
+  const missingVendorAmount = booking.listedPrice == null;
+  const fee =
+    priceN != null && booking.listedPrice != null
+      ? priceN - booking.listedPrice
+      : null;
+  const canSave =
+    !hasInvalidNumber &&
+    !belowVendorPrice &&
+    !(missingVendorAmount && priceN != null);
+  const canPublish = canSave && priceN != null;
 
   const save = async (publish?: boolean) => {
     setBusy(true);
-    await onSave(booking.id, {
-      vendorCost: costN,
-      finalPrice: priceN,
-      ...(publish !== undefined ? { pricePublished: publish } : {}),
-    });
-    setBusy(false);
-    if (publish !== undefined) onClose();
-  };
-
-  const addEntry = async () => {
-    const amt = negAmount.trim() ? Number(negAmount) : null;
-    setNegBusy(true);
     try {
-      const res = await fetch("/api/admin/negotiation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId: booking.id, stage: negStage, amount: amt, note: negNote || null }),
+      const saved = await onSave(booking.id, {
+        finalPrice: priceN,
+        ...(publish !== undefined ? { pricePublished: publish } : {}),
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Failed to add entry");
-      setEntries((e) => [...e, json.entry as NegEntry]);
-      setNegAmount("");
-      setNegNote("");
-      if (negStage === "AGREED" && amt != null) {
-        setCost(String(amt)); // agreeing locks the cost
-        onRefresh();
-        toast.success("Agreed — cost locked");
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not add entry");
+      if (saved && publish !== undefined) onClose();
     } finally {
-      setNegBusy(false);
+      setBusy(false);
     }
   };
 
@@ -559,7 +525,7 @@ function PricingEditor({
         exit={{ opacity: 0, scale: 0.97, y: 8 }}
         transition={{ type: "spring", stiffness: 240, damping: 26 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg border border-charcoal/12 bg-ivory shadow-[0_40px_120px_rgba(51,61,41,0.35)]"
+        className="w-full max-w-xl border border-charcoal/12 bg-ivory shadow-[0_40px_120px_rgba(51,61,41,0.35)]"
       >
         <div className="flex items-start justify-between gap-3 border-b border-charcoal/10 px-5 py-4">
           <div className="min-w-0">
@@ -582,160 +548,90 @@ function PricingEditor({
         </div>
 
         <div className="px-5 py-5">
-          {booking.listedPrice != null ? (
-            <div className="mb-4 flex items-center justify-between border border-charcoal/10 bg-cream/30 px-3 py-2">
-              <span className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
-                Vendor listed price
-              </span>
-              <span className="font-heading text-sm text-charcoal">
-                {formatCurrency(booking.listedPrice)}
-              </span>
+          <div className="grid gap-px overflow-hidden border border-charcoal/10 bg-charcoal/10 sm:grid-cols-2">
+            <div className="bg-cream/50 px-4 py-3">
+              <p className="font-accent text-[9px] uppercase tracking-[0.16em] text-slate">
+                Vendor amount · fixed
+              </p>
+              <p className="mt-1 font-display text-xl text-charcoal">
+                {booking.listedPrice != null
+                  ? formatCurrency(booking.listedPrice)
+                  : "Not supplied"}
+              </p>
             </div>
-          ) : null}
+            <div className="bg-cream/50 px-4 py-3">
+              <p className="font-accent text-[9px] uppercase tracking-[0.16em] text-slate">
+                Client visibility
+              </p>
+              <p className={cn("mt-1 font-heading text-sm", booking.pricePublished ? "text-sage" : "text-gold-dark")}>
+                {booking.pricePublished ? "Published" : "Admin draft"}
+              </p>
+            </div>
+          </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="mt-5">
             <label className="block">
-              <span className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
-                Negotiated vendor cost
+              <span className="font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark">
+                Final client price
               </span>
-              <div className="mt-1.5 flex items-center border border-charcoal/15 px-3 focus-within:border-gold-primary">
-                <IndianRupee className="h-3.5 w-3.5 text-slate" />
-                <input
-                  type="number"
-                  value={cost}
-                  onChange={(e) => setCost(e.target.value)}
-                  placeholder="0"
-                  className="w-full bg-transparent py-2.5 font-heading text-sm text-charcoal outline-none"
-                />
-              </div>
-            </label>
-            <label className="block">
-              <span className="flex items-center justify-between gap-2">
-                <span className="font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark">
-                  Final client price
-                </span>
-                {suggested != null ? (
-                  <button
-                    type="button"
-                    onClick={() => setPrice(String(suggested))}
-                    className="font-accent text-[9px] uppercase tracking-[0.1em] text-gold-dark underline-offset-2 hover:underline"
-                  >
-                    +30% → {formatCurrency(suggested)}
-                  </button>
-                ) : null}
-              </span>
-              <div className="mt-1.5 flex items-center border border-gold-primary/50 px-3 focus-within:border-gold-primary">
+              <div
+                className={cn(
+                  "mt-1.5 flex items-center border px-3 focus-within:border-gold-primary",
+                  belowVendorPrice || hasInvalidNumber
+                    ? "border-rose"
+                    : "border-gold-primary/50"
+                )}
+              >
                 <IndianRupee className="h-3.5 w-3.5 text-gold-dark" />
                 <input
                   type="number"
+                  min={booking.listedPrice ?? 0}
+                  disabled={missingVendorAmount}
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
-                  placeholder="0"
-                  className="w-full bg-transparent py-2.5 font-heading text-sm text-charcoal outline-none"
+                  placeholder={booking.listedPrice != null ? String(booking.listedPrice) : "0"}
+                  className="w-full bg-transparent py-3 font-display text-lg text-charcoal outline-none"
                 />
               </div>
             </label>
+            {missingVendorAmount ? (
+              <p className="mt-2 text-xs text-rose">
+                The vendor must send a complete quote before Elysian can set the final price.
+              </p>
+            ) : belowVendorPrice ? (
+              <p className="mt-2 text-xs text-rose">
+                Final price cannot be below the fixed vendor amount.
+              </p>
+            ) : (
+              <p className="mt-2 text-xs leading-relaxed text-slate">
+                This is the complete amount the client will see. Tax and invoice
+                treatment stays in finance records and is not added again here.
+              </p>
+            )}
           </div>
 
           <div className="mt-4 flex items-center justify-between border border-charcoal/10 bg-charcoal/[0.03] px-4 py-3">
             <div className="flex items-center gap-2">
-              <TrendingUp className={cn("h-4 w-4", margin != null && margin >= 0 ? "text-sage" : "text-rose")} />
+              <BadgeIndianRupee className="h-4 w-4 text-gold-dark" />
               <span className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
-                Your margin
+                Elysian fee · calculated
               </span>
             </div>
             <div className="text-right">
-              <p className={cn("font-display text-xl", margin == null ? "text-slate" : margin >= 0 ? "text-sage" : "text-rose")}>
-                {margin != null ? formatCurrency(margin) : "—"}
+              <p className={cn("font-display text-xl", fee == null ? "text-slate" : "text-gold-dark")}>
+                {fee != null && fee >= 0 ? formatCurrency(fee) : "—"}
               </p>
-              {marginPct != null ? (
-                <p className="text-[11px] text-slate">{marginPct}% on cost</p>
-              ) : null}
             </div>
-          </div>
-
-          {gst != null ? (
-            <div className="mt-2 flex items-center justify-between px-1 text-xs text-slate">
-              <span>+ GST (18%)</span>
-              <span>
-                {formatCurrency(gst)} · client pays{" "}
-                <span className="text-charcoal">{formatCurrency((priceN ?? 0) + gst)}</span>
-              </span>
-            </div>
-          ) : null}
-
-          {/* Negotiation log */}
-          <div className="mt-5 border-t border-charcoal/8 pt-4">
-            <p className={dashLabel}>Negotiation</p>
-            {entries.length > 0 ? (
-              <ul className="mt-2 space-y-1.5">
-                {entries.map((e) => (
-                  <li key={e.id} className="flex items-center gap-2 text-xs">
-                    <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", NEG_META[e.stage]?.dot ?? "bg-slate/50")} />
-                    <span className="font-accent uppercase tracking-[0.12em] text-slate">
-                      {NEG_META[e.stage]?.label ?? e.stage}
-                    </span>
-                    {e.amount != null ? (
-                      <span className="font-heading text-charcoal">{formatCurrency(e.amount)}</span>
-                    ) : null}
-                    {e.note ? <span className="truncate text-slate">· {e.note}</span> : null}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-1 text-xs text-slate">No negotiation logged yet.</p>
-            )}
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <div className="inline-flex border border-charcoal/12 p-0.5">
-                {(["QUOTED", "COUNTERED", "AGREED"] as const).map((st) => (
-                  <button
-                    key={st}
-                    type="button"
-                    onClick={() => setNegStage(st)}
-                    className={cn(
-                      "px-2.5 py-1.5 font-accent text-[9px] uppercase tracking-[0.1em] transition-colors",
-                      negStage === st ? "bg-charcoal text-ivory" : "text-slate hover:text-charcoal"
-                    )}
-                  >
-                    {NEG_META[st].label}
-                  </button>
-                ))}
-              </div>
-              <input
-                type="number"
-                value={negAmount}
-                onChange={(e) => setNegAmount(e.target.value)}
-                placeholder="Amount"
-                className="w-24 border border-charcoal/15 bg-transparent px-2 py-1.5 font-heading text-xs text-charcoal outline-none focus:border-gold-primary"
-              />
-              <input
-                value={negNote}
-                onChange={(e) => setNegNote(e.target.value)}
-                placeholder="Note"
-                className="min-w-0 flex-1 border border-charcoal/15 bg-transparent px-2 py-1.5 font-heading text-xs text-charcoal outline-none focus:border-gold-primary"
-              />
-              <button
-                type="button"
-                onClick={() => void addEntry()}
-                disabled={negBusy}
-                className="font-accent border border-charcoal/15 px-3 py-1.5 text-[9px] uppercase tracking-[0.12em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark disabled:opacity-40"
-              >
-                Log
-              </button>
-            </div>
-            <p className="mt-1.5 text-[10px] text-slate/70">
-              Marking &ldquo;Agreed&rdquo; locks that amount as the vendor cost.
-            </p>
           </div>
 
           <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
             <button
               type="button"
-              disabled={busy}
+              disabled={busy || !canSave}
               onClick={() => void save()}
               className="font-accent border border-charcoal/15 px-4 py-2.5 text-[10px] uppercase tracking-[0.18em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark disabled:opacity-40"
             >
-              Save draft
+              {busy ? "Saving..." : booking.pricePublished ? "Update price" : "Save price"}
             </button>
             {booking.pricePublished ? (
               <button
@@ -749,7 +645,7 @@ function PricingEditor({
             ) : (
               <button
                 type="button"
-                disabled={busy || priceN == null}
+                disabled={busy || !canPublish}
                 onClick={() => void save(true)}
                 className="font-accent inline-flex items-center justify-center border border-gold-primary bg-gold-primary px-5 py-2.5 text-[11px] uppercase tracking-[0.2em] text-midnight shadow-[0_14px_36px_rgba(201,169,110,0.18)] transition-all hover:bg-gold-dark hover:border-gold-dark disabled:opacity-50"
               >

@@ -515,7 +515,7 @@ insert into mood_board_items (mood_board_id, category, image_url, caption, sourc
     2
   );
 
-insert into bookings (client_profile_id, vendor_profile_id, vendor_service_id, wedding_event_id, status, event_date, total_amount, paid_amount, notes) values
+insert into bookings (client_profile_id, vendor_profile_id, vendor_service_id, wedding_event_id, status, event_date, total_amount, vendor_amount, final_price, price_published, paid_amount, notes) values
   (
     (select id from client_profiles where user_id = 'seed-client-priya'),
     (select id from vendor_profiles where slug = 'saffron-films'),
@@ -524,6 +524,9 @@ insert into bookings (client_profile_id, vendor_profile_id, vendor_service_id, w
     'CONFIRMED',
     now() + interval '120 days',
     240000,
+    240000,
+    268800,
+    true,
     120000,
     'Lead team locked. Need final shot list by 2 weeks before wedding.'
   ),
@@ -535,6 +538,9 @@ insert into bookings (client_profile_id, vendor_profile_id, vendor_service_id, w
     'QUOTE_SENT',
     now() + interval '120 days',
     320000,
+    320000,
+    null,
+    false,
     0,
     'Quote shared with two floral scale options.'
   ),
@@ -546,6 +552,9 @@ insert into bookings (client_profile_id, vendor_profile_id, vendor_service_id, w
     'INQUIRY',
     now() + interval '75 days',
     95000,
+    95000,
+    null,
+    false,
     0,
     'Need a hybrid Bollywood and Afrobeats set for the after-party.'
   );

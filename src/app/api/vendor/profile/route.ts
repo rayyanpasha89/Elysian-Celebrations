@@ -163,7 +163,7 @@ export async function PATCH(request: NextRequest) {
     await Promise.all(
       previousUrls
         .filter((url) => !retainedUrls.has(url))
-        .map((url) => deleteVendorMediaImage(url))
+        .map((url) => deleteVendorMediaImage(url, profile.id))
     );
 
     return apiSuccess({ coverImage, portfolio });

@@ -337,6 +337,7 @@ function VendorEditor({
   const [isFeatured, setIsFeatured] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [deletingServiceId, setDeletingServiceId] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -436,15 +437,30 @@ function VendorEditor({
   };
 
   const deleteService = async (id: string) => {
-    setServices((s) => s.filter((x) => x.id !== id));
+    const service = services.find((entry) => entry.id === id);
+    if (
+      deletingServiceId ||
+      !window.confirm(
+        `Remove ${service?.name ?? "this service"}? This permanently removes its catalogue and reference imagery.`
+      )
+    ) {
+      return;
+    }
+
+    setDeletingServiceId(id);
     try {
       const res = await fetch(`/api/admin/vendors/${vendorId}/services?serviceId=${id}`, {
         method: "DELETE",
       });
-      if (!res.ok) throw new Error("Failed");
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error ?? "Failed to delete service");
+      setServices((current) => current.filter((entry) => entry.id !== id));
+      toast.success("Service removed");
       onChanged();
-    } catch {
-      toast.error("Could not remove service");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete service");
+    } finally {
+      setDeletingServiceId(null);
     }
   };
 
@@ -527,6 +543,8 @@ function VendorEditor({
                     onChange={(next) => setServices((arr) => arr.map((x) => (x.id === svc.id ? next : x)))}
                     onSave={() => saveService(services.find((x) => x.id === svc.id) ?? svc)}
                     onDelete={() => deleteService(svc.id)}
+                    deleteDisabled={deletingServiceId !== null}
+                    isDeleting={deletingServiceId === svc.id}
                   />
                 ))
               )}
@@ -560,11 +578,15 @@ function ServiceRow({
   onChange,
   onSave,
   onDelete,
+  deleteDisabled,
+  isDeleting,
 }: {
   service: Service;
   onChange: (next: Service) => void;
   onSave: () => void;
   onDelete: () => void;
+  deleteDisabled: boolean;
+  isDeleting: boolean;
 }) {
   return (
     <div className="border border-charcoal/10 bg-cream/20 p-3">
@@ -575,7 +597,13 @@ function ServiceRow({
           onBlur={onSave}
           className="min-w-0 flex-1 border-b border-transparent bg-transparent py-1 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
         />
-        <button type="button" onClick={onDelete} aria-label="Delete service" className="text-slate hover:text-rose">
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={deleteDisabled}
+          aria-label={isDeleting ? "Deleting service" : "Delete service"}
+          className="text-slate hover:text-rose disabled:cursor-not-allowed disabled:opacity-40"
+        >
           <X className="h-3.5 w-3.5" />
         </button>
       </div>

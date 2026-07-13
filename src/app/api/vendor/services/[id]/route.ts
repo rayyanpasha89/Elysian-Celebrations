@@ -36,14 +36,20 @@ function itemPayload(
 
 async function cleanupRemovedImages(
   existingItems: ExistingServiceItem[],
-  nextItems: ReturnType<typeof normalizeServiceItems>
+  nextItems: ReturnType<typeof normalizeServiceItems>,
+  vendorProfileId: string,
+  vendorServiceId: string
 ) {
   const retainedUrls = new Set(nextItems.flatMap((item) => item.imageUrls));
   const removedUrls = [...new Set(existingItems.flatMap((item) => item.image_urls ?? []))].filter(
     (url) => !retainedUrls.has(url)
   );
 
-  await Promise.all(removedUrls.map((url) => deleteVendorServiceImage(url)));
+  await Promise.all(
+    removedUrls.map((url) =>
+      deleteVendorServiceImage(url, vendorProfileId, vendorServiceId)
+    )
+  );
 }
 
 export async function PATCH(
@@ -161,7 +167,7 @@ export async function PATCH(
         }
       }
 
-      await cleanupRemovedImages(existingItems, items);
+      await cleanupRemovedImages(existingItems, items, vp.id, id);
     }
 
     const { data: row, error: fetchError } = await supabase
@@ -257,7 +263,7 @@ export async function DELETE(
     await Promise.all(
       ((items ?? []) as ExistingServiceItem[])
         .flatMap((item) => item.image_urls ?? [])
-        .map((url) => deleteVendorServiceImage(url))
+        .map((url) => deleteVendorServiceImage(url, vp.id, id))
     );
 
     return apiSuccess({ ok: true });

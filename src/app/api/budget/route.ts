@@ -11,6 +11,11 @@ import {
   budgetColorForCategory,
   recommendedAllocation,
 } from "@/lib/budget-blueprint";
+import {
+  EVENT_READINESS_SELECT,
+  eventReadinessPercent,
+  type EventReadinessRow,
+} from "@/lib/event-readiness";
 
 type BudgetPayload = {
   budgetName: string;
@@ -67,6 +72,7 @@ type EventPlanSpendEvent = {
   date: string | null;
   startTime: string | null;
   estimatedSpend: number;
+  readinessPercent: number;
 };
 
 type EventPlanSpendSummary = {
@@ -107,9 +113,7 @@ async function getEventPlanSpendSummary(
         .order("sort_order", { ascending: true }),
       supabase
         .from("wedding_events")
-        .select(
-          "id, wedding_day_id, name, event_type, date, start_time, estimated_budget, sort_order"
-        )
+        .select(EVENT_READINESS_SELECT)
         .eq("wedding_id", wedding.id)
         .order("sort_order", { ascending: true }),
     ]);
@@ -120,7 +124,7 @@ async function getEventPlanSpendSummary(
   }
 
   const days = dayRows ?? [];
-  const events = eventRows ?? [];
+  const events = (eventRows ?? []) as unknown as EventReadinessRow[];
 
   const byDay = new Map<
     string,
@@ -143,6 +147,7 @@ async function getEventPlanSpendSummary(
       date: event.date,
       startTime: event.start_time,
       estimatedSpend: amount,
+      readinessPercent: eventReadinessPercent(event),
     };
     const dayId = event.wedding_day_id;
     if (dayId && byDay.has(dayId)) {
@@ -242,6 +247,9 @@ export type PlanLineItem = {
   serviceName: string | null;
   name: string;
   estimatedCost: number;
+  displayCost: number;
+  costState: "estimate" | "final";
+  paidAmount: number;
   status: string;
   stage: "selected" | "booked" | "confirmed";
 };
@@ -257,6 +265,9 @@ type RawBudgetBookingRow = {
   id: string;
   wedding_event_id: string | null;
   total_amount: number | null;
+  final_price: number | null;
+  price_published: boolean | null;
+  paid_amount: number | null;
   status: string | null;
   vendor:
     | {
@@ -300,14 +311,14 @@ async function getPlanVendorLineItems(profileId: string): Promise<PlanLineItem[]
     supabase.from("wedding_days").select("id, name").eq("wedding_id", wedding.id),
     supabase
       .from("wedding_events")
-      .select("id, wedding_day_id, name")
+      .select(EVENT_READINESS_SELECT)
       .eq("wedding_id", wedding.id),
   ]);
 
   const dayNameById = new Map(
     (dayRows ?? []).map((day) => [day.id as string, day.name as string])
   );
-  const events = eventRows ?? [];
+  const events = (eventRows ?? []) as unknown as EventReadinessRow[];
   const eventInfo = new Map(
     events.map((event) => [
       event.id as string,
@@ -316,6 +327,7 @@ async function getPlanVendorLineItems(profileId: string): Promise<PlanLineItem[]
         dayName: event.wedding_day_id
           ? dayNameById.get(event.wedding_day_id as string) ?? null
           : null,
+        ready: eventReadinessPercent(event) >= 100,
       },
     ])
   );
@@ -325,7 +337,7 @@ async function getPlanVendorLineItems(profileId: string): Promise<PlanLineItem[]
   const { data: bookings, error } = await supabase
     .from("bookings")
     .select(
-      `id, wedding_event_id, total_amount, status,
+      `id, wedding_event_id, total_amount, final_price, price_published, paid_amount, status,
        vendor:vendor_profiles(business_name, category:vendor_categories(slug)),
        service:vendor_services(name, base_price)`
     )
@@ -337,8 +349,25 @@ async function getPlanVendorLineItems(profileId: string): Promise<PlanLineItem[]
     return [];
   }
 
+  const bookingRows = (bookings ?? []) as RawBudgetBookingRow[];
+  const pricingByEvent = new Map<
+    string,
+    { active: number; published: number }
+  >();
+  for (const row of bookingRows) {
+    if (!row.wedding_event_id || row.status === "CANCELLED") continue;
+    const state = pricingByEvent.get(row.wedding_event_id) ?? {
+      active: 0,
+      published: 0,
+    };
+    state.active += 1;
+    if (row.price_published && row.final_price != null) state.published += 1;
+    pricingByEvent.set(row.wedding_event_id, state);
+  }
+
   const lineItems: PlanLineItem[] = [];
-  for (const row of (bookings ?? []) as RawBudgetBookingRow[]) {
+  for (const row of bookingRows) {
+    if (row.status === "CANCELLED") continue;
     const eventId = row.wedding_event_id;
     if (!eventId) continue;
     const info = eventInfo.get(eventId);
@@ -350,10 +379,22 @@ async function getPlanVendorLineItems(profileId: string): Promise<PlanLineItem[]
 
     const vendorName = vendor?.business_name?.trim() || "Vendor";
     const serviceName = service?.name?.trim() || null;
-    const estimatedCost = Math.max(
+    const catalogueEstimate = Math.max(
       0,
-      Math.round(row.total_amount ?? service?.base_price ?? 0)
+      Math.round(service?.base_price ?? 0)
     );
+    const pricingState = pricingByEvent.get(eventId);
+    const eventPricingComplete =
+      Boolean(pricingState?.active) &&
+      pricingState?.active === pricingState?.published;
+    const finalPriceVisible =
+      info.ready &&
+      eventPricingComplete &&
+      row.price_published === true &&
+      row.final_price != null;
+    const visibleCost = finalPriceVisible
+      ? Math.max(0, Math.round(row.final_price ?? 0))
+      : catalogueEstimate;
 
     lineItems.push({
       bookingId: row.id,
@@ -364,7 +405,13 @@ async function getPlanVendorLineItems(profileId: string): Promise<PlanLineItem[]
       vendorName,
       serviceName,
       name: serviceName ? `${vendorName} · ${serviceName}` : vendorName,
-      estimatedCost,
+      // Never return the vendor's submitted quote to the client. Once the
+      // final price is visible, both values converge so the service fee cannot
+      // be inferred by subtracting an estimate from the published total.
+      estimatedCost: visibleCost,
+      displayCost: visibleCost,
+      costState: finalPriceVisible ? "final" : "estimate",
+      paidAmount: Math.max(0, Math.round(row.paid_amount ?? 0)),
       status: row.status ?? "INQUIRY",
       stage: bookingStage(row.status),
     });
@@ -591,7 +638,7 @@ export type ConfirmedEvent = {
   eventId: string;
   eventName: string;
   dayName: string | null;
-  finalTotal: number;
+  finalTotal: number | null;
   locked: boolean;
 };
 
@@ -615,41 +662,57 @@ async function getConfirmedEventPricing(profileId: string): Promise<ConfirmedEve
     supabase.from("wedding_days").select("id, name").eq("wedding_id", wedding.id),
     supabase
       .from("wedding_events")
-      .select("id, name, wedding_day_id, venue, guest_count, start_time, end_time")
+      .select(EVENT_READINESS_SELECT)
       .eq("wedding_id", wedding.id),
   ]);
 
   const dayNameById = new Map((dayRows ?? []).map((d) => [d.id as string, d.name as string]));
-  const events = eventRows ?? [];
+  const events = (eventRows ?? []) as unknown as EventReadinessRow[];
   const eventIds = events.map((e) => e.id as string);
   if (eventIds.length === 0) return [];
 
   const { data: bookings } = await supabase
     .from("bookings")
-    .select("wedding_event_id, final_price, price_published")
+    .select("wedding_event_id, status, final_price, price_published")
     .in("wedding_event_id", eventIds);
 
-  const finalByEvent = new Map<string, number>();
+  const pricingByEvent = new Map<
+    string,
+    { active: number; published: number; finalTotal: number }
+  >();
   for (const b of bookings ?? []) {
-    if (!b.price_published || b.final_price == null) continue;
+    if (b.status === "CANCELLED") continue;
     const id = b.wedding_event_id as string;
-    finalByEvent.set(id, (finalByEvent.get(id) ?? 0) + (b.final_price as number));
+    const state = pricingByEvent.get(id) ?? {
+      active: 0,
+      published: 0,
+      finalTotal: 0,
+    };
+    state.active += 1;
+    if (b.price_published && b.final_price != null) {
+      state.published += 1;
+      state.finalTotal += b.final_price as number;
+    }
+    pricingByEvent.set(id, state);
   }
 
   const out: ConfirmedEvent[] = [];
   for (const e of events) {
-    const finalTotal = finalByEvent.get(e.id as string) ?? 0;
-    if (finalTotal <= 0) continue;
-    const ready =
-      Boolean((e.venue as string | null)?.trim()) &&
-      Boolean(e.guest_count) &&
-      Boolean(e.start_time) &&
-      Boolean(e.end_time);
+    const pricing = pricingByEvent.get(e.id as string);
+    if (
+      !pricing ||
+      pricing.active === 0 ||
+      pricing.published !== pricing.active ||
+      pricing.finalTotal < 0
+    ) {
+      continue;
+    }
+    const ready = eventReadinessPercent(e) >= 100;
     out.push({
       eventId: e.id as string,
       eventName: (e.name as string) ?? "Function",
       dayName: e.wedding_day_id ? dayNameById.get(e.wedding_day_id as string) ?? null : null,
-      finalTotal,
+      finalTotal: ready ? pricing.finalTotal : null,
       locked: ready,
     });
   }

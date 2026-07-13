@@ -202,21 +202,35 @@ export async function uploadVendorProfileImage({
   });
 }
 
+function getVendorMediaPath(publicUrl: string): string | null {
+  const url = new URL(publicUrl);
+  const marker = `/storage/v1/object/public/${VENDOR_MEDIA_BUCKET}/`;
+  if (!url.pathname.startsWith(marker)) return null;
+
+  return decodeURIComponent(url.pathname.slice(marker.length));
+}
+
+function isDirectChild(path: string, ownedPrefix: string): boolean {
+  const prefix = `${ownedPrefix}/`;
+  if (!path.startsWith(prefix)) return false;
+
+  const filename = path.slice(prefix.length);
+  return filename.length > 0 && !filename.includes("/");
+}
+
 /**
- * Best-effort cleanup. Caller passes the public URL we returned earlier; we
- * derive the storage path and remove. Failures are logged but not thrown —
- * orphan media is preferable to a save failure.
+ * Best-effort cleanup for a path owned by the authenticated vendor. The exact
+ * upload prefix is checked before creating an admin client so copied URLs can
+ * never authorize cross-vendor or cross-service deletion.
  */
-export async function deleteVendorMediaImage(publicUrl: string): Promise<void> {
+async function deleteOwnedVendorMediaImage(
+  publicUrl: string,
+  ownedPrefix: string
+): Promise<void> {
   try {
-    const url = new URL(publicUrl);
-    const marker = `/storage/v1/object/public/${VENDOR_MEDIA_BUCKET}/`;
-    const idx = url.pathname.indexOf(marker);
-    if (idx === -1) return;
-    const path = url.pathname.slice(idx + marker.length);
-    if (!path.startsWith("service-items/") && !path.startsWith("profiles/")) {
-      return;
-    }
+    const path = getVendorMediaPath(publicUrl);
+    if (!path || !isDirectChild(path, ownedPrefix)) return;
+
     const supabase = createAdminSupabaseClient();
     const { error } = await supabase.storage
       .from(VENDOR_MEDIA_BUCKET)
@@ -229,6 +243,23 @@ export async function deleteVendorMediaImage(publicUrl: string): Promise<void> {
   }
 }
 
-// Kept as an alias while existing catalogue routes migrate to the broader
-// media cleanup helper.
-export const deleteVendorServiceImage = deleteVendorMediaImage;
+export async function deleteVendorMediaImage(
+  publicUrl: string,
+  vendorProfileId: string
+): Promise<void> {
+  return deleteOwnedVendorMediaImage(
+    publicUrl,
+    `profiles/${vendorProfileId}`
+  );
+}
+
+export async function deleteVendorServiceImage(
+  publicUrl: string,
+  vendorProfileId: string,
+  vendorServiceId: string
+): Promise<void> {
+  return deleteOwnedVendorMediaImage(
+    publicUrl,
+    `service-items/${vendorProfileId}/${vendorServiceId}`
+  );
+}

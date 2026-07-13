@@ -15,16 +15,27 @@ export type AuthSession = {
   role: UserRole;
 };
 
+type StoredUserAuthorization = {
+  role: UserRole | null;
+  isActive: boolean;
+};
+
+type StoredUserAuthorizationLookup =
+  | ({ state: "found" } & StoredUserAuthorization)
+  | { state: "missing" }
+  | { state: "error" };
+
 const testUserCache: Partial<Record<UserRole, string>> = {};
 
 async function resolveRole(
   userId: string,
-  sessionClaims: Record<string, unknown> | undefined
+  sessionClaims: Record<string, unknown> | undefined,
+  storedRole: UserRole | null
 ): Promise<UserRole> {
   let role = roleFromSessionClaims(sessionClaims);
 
   if (!role) {
-    role = await fetchRoleFromSupabase(userId);
+    role = storedRole;
   }
 
   if (!role) {
@@ -51,11 +62,20 @@ export async function getOptionalAuthSession(): Promise<AuthSession | null> {
     return null;
   }
 
+  const storedUser = await fetchUserAuthorization(userId);
+  if (storedUser.state === "error") {
+    return null;
+  }
+  if (storedUser.state === "found" && !storedUser.isActive) {
+    return null;
+  }
+
   return {
     userId,
     role: await resolveRole(
       userId,
-      sessionClaims as Record<string, unknown> | undefined
+      sessionClaims as Record<string, unknown> | undefined,
+      storedUser.state === "found" ? storedUser.role : null
     ),
   };
 }
@@ -106,7 +126,7 @@ async function resolveTestAuthUserId(role: UserRole): Promise<string> {
 }
 
 /**
- * Get the authenticated Clerk session or return a 401 response.
+ * Get an active authenticated Clerk session or return a 401 response.
  * Role: JWT claims → Supabase `users.role` → Clerk publicMetadata.
  */
 export async function getAuthSession(): Promise<AuthSession | NextResponse> {
@@ -118,18 +138,28 @@ export async function getAuthSession(): Promise<AuthSession | NextResponse> {
   return session;
 }
 
-async function fetchRoleFromSupabase(userId: string): Promise<UserRole | null> {
+async function fetchUserAuthorization(
+  userId: string
+): Promise<StoredUserAuthorizationLookup> {
   try {
     const supabase = createAdminSupabaseClient();
     const { data, error } = await supabase
       .from("users")
-      .select("role")
+      .select("role, is_active")
       .eq("id", userId)
       .maybeSingle();
-    if (error || !data?.role) return null;
-    return normalizeRole(data.role as string);
+    if (error) {
+      console.error("User authorization lookup failed:", error);
+      return { state: "error" };
+    }
+    if (!data) return { state: "missing" };
+    return {
+      state: "found",
+      role: normalizeRole(data.role as string),
+      isActive: data.is_active !== false,
+    };
   } catch {
-    return null;
+    return { state: "error" };
   }
 }
 

@@ -21,6 +21,7 @@ type BookingRow = {
   status: string;
   event_date: string | null;
   total_amount: number | null;
+  pricing_state: "final" | "pending";
   paid_amount: number | null;
   notes: string | null;
   vendor: { business_name?: string; slug?: string } | null;
@@ -67,6 +68,12 @@ function statusClass(s: UiStatus) {
 
 function formatCurrency(amount: number) {
   return `₹${amount.toLocaleString("en-IN")}`;
+}
+
+function clientPrice(booking: BookingRow) {
+  return booking.pricing_state === "final" && booking.total_amount != null
+    ? formatCurrency(booking.total_amount)
+    : "Pending final price";
 }
 
 function formatDate(value: string | null) {
@@ -265,7 +272,7 @@ export default function ClientBookingsPage() {
                     </p>
                     <p>
                       <span className={dashLabel}>Amount </span>
-                      {formatCurrency(booking.total_amount ?? 0)}
+                      {clientPrice(booking)}
                     </p>
                     <p>
                       <span className={dashLabel}>Paid </span>
@@ -317,9 +324,23 @@ export default function ClientBookingsPage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <DetailMetric label="Event date" value={formatDate(selectedBooking.event_date)} />
-                  <DetailMetric label="Total" value={formatCurrency(selectedBooking.total_amount ?? 0)} />
+                  <DetailMetric label="Total" value={clientPrice(selectedBooking)} />
                   <DetailMetric label="Paid" value={formatCurrency(selectedBooking.paid_amount ?? 0)} />
-                  <DetailMetric label="Remaining" value={formatCurrency(Math.max(0, (selectedBooking.total_amount ?? 0) - (selectedBooking.paid_amount ?? 0)))} />
+                  <DetailMetric
+                    label="Remaining"
+                    value={
+                      selectedBooking.pricing_state === "final" &&
+                      selectedBooking.total_amount != null
+                        ? formatCurrency(
+                            Math.max(
+                              0,
+                              selectedBooking.total_amount -
+                                (selectedBooking.paid_amount ?? 0)
+                            )
+                          )
+                        : "Calculated after pricing"
+                    }
+                  />
                 </div>
 
                 {selectedBooking.event_context ? (

@@ -41,7 +41,7 @@ const DASHBOARD_ROUTE_TITLES: Record<string, string> = {
   "/vendor/messages": "Messages",
 
   "/admin": "Dashboard",
-  "/admin/pricing": "Pricing & Margin",
+  "/admin/pricing": "Final Pricing",
   "/admin/progress": "Client Progress",
   "/admin/revenue": "Revenue Dashboard",
   "/admin/vendors": "Vendors",

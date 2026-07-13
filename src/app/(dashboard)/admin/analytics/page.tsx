@@ -9,7 +9,7 @@ import { dashCard, dashLabel } from "@/lib/dashboard-styles";
 import { cn } from "@/lib/utils";
 
 type AnalyticsPayload = {
-  usersByRole: { client: number; vendor: number; admin: number };
+  usersByRole: { client: number; vendor: number; manager: number; admin: number };
   weddingsCount: number;
   bookingsByStatus: Record<string, number>;
   newContactInquiries: number;
@@ -56,7 +56,8 @@ export default function AdminAnalyticsPage() {
     () => [
       { label: "Clients", value: data?.usersByRole.client ?? 0, color: "#c9a96e" },
       { label: "Vendors", value: data?.usersByRole.vendor ?? 0, color: "#9bae8f" },
-      { label: "Admins", value: data?.usersByRole.admin ?? 0, color: "#7ba7c9" },
+      { label: "Managers", value: data?.usersByRole.manager ?? 0, color: "#a68a64" },
+      { label: "Admins", value: data?.usersByRole.admin ?? 0, color: "#414833" },
     ],
     [data]
   );
@@ -78,7 +79,7 @@ export default function AdminAnalyticsPage() {
       </motion.div>
 
       <motion.div variants={fadeUp} className="mt-10 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Total weddings" value={data?.weddingsCount ?? 0} />
+        <StatCard label="Event plans" value={data?.weddingsCount ?? 0} />
         <StatCard label="Registered vendors" value={data?.usersByRole.vendor ?? 0} />
         <StatCard label="Registered clients" value={data?.usersByRole.client ?? 0} />
         <StatCard label="New inquiries" value={data?.newContactInquiries ?? 0} />

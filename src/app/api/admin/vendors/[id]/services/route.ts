@@ -6,6 +6,12 @@ import {
   apiError,
   apiSuccess,
 } from "@/lib/api-utils";
+import { deleteVendorServiceImage } from "@/lib/supabase/storage";
+
+type ExistingServiceItem = {
+  id: string;
+  image_urls: string[] | null;
+};
 
 async function guard() {
   const session = await getAuthSession();
@@ -140,6 +146,48 @@ export async function DELETE(
     if (!serviceId) return apiError("serviceId is required", 400);
 
     const supabase = createAdminSupabaseClient();
+    const [
+      { data: service, error: serviceError },
+      { data: bookings, error: bookingsError },
+      { data: items, error: itemsError },
+    ] = await Promise.all([
+      supabase
+        .from("vendor_services")
+        .select("id")
+        .eq("id", serviceId)
+        .eq("vendor_profile_id", id)
+        .maybeSingle(),
+      supabase
+        .from("bookings")
+        .select("id")
+        .eq("vendor_service_id", serviceId)
+        .limit(1),
+      supabase
+        .from("vendor_service_items")
+        .select("id, image_urls")
+        .eq("vendor_service_id", serviceId),
+    ]);
+
+    if (serviceError) {
+      console.error("service load:", serviceError);
+      return apiError("Failed to load service", 500);
+    }
+    if (!service) return apiError("Service not found", 404);
+    if (bookingsError) {
+      console.error("service bookings check:", bookingsError);
+      return apiError("Failed to check service bookings", 500);
+    }
+    if ((bookings ?? []).length > 0) {
+      return apiError(
+        "This service is attached to a booking. Deactivate it to hide it from new client selections.",
+        409
+      );
+    }
+    if (itemsError) {
+      console.error("service media load:", itemsError);
+      return apiError("Failed to load service media", 500);
+    }
+
     const { error } = await supabase
       .from("vendor_services")
       .delete()
@@ -149,6 +197,13 @@ export async function DELETE(
       console.error("service delete:", error);
       return apiError("Failed to delete service", 500);
     }
+
+    await Promise.all(
+      ((items ?? []) as ExistingServiceItem[])
+        .flatMap((item) => item.image_urls ?? [])
+        .map((url) => deleteVendorServiceImage(url, id, serviceId))
+    );
+
     return apiSuccess({ message: "Service removed" });
   } catch (e) {
     console.error("DELETE services", e);

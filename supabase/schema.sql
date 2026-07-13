@@ -326,10 +326,27 @@ create table bookings (
   status booking_status not null default 'INQUIRY',
   event_date timestamptz,
   total_amount integer,
+  vendor_cost integer,
+  vendor_amount integer check (vendor_amount is null or vendor_amount >= 0),
+  final_price integer,
+  price_published boolean not null default false,
+  service_fee integer generated always as (
+    case
+      when final_price is null or vendor_amount is null then null
+      else final_price - vendor_amount
+    end
+  ) stored,
   paid_amount integer not null default 0,
   notes text,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  constraint bookings_final_price_valid check (
+    final_price is null
+    or (vendor_amount is not null and final_price >= vendor_amount)
+  ),
+  constraint bookings_published_price_complete check (
+    price_published = false or final_price is not null
+  )
 );
 
 -- ─── Saved Vendors ───────────────────────────────────────────
@@ -553,3 +570,52 @@ create trigger tr_message_thread_reads_updated before update on message_thread_r
 create trigger tr_guest_lists_updated before update on guest_lists for each row execute function update_updated_at();
 create trigger tr_mood_boards_updated before update on mood_boards for each row execute function update_updated_at();
 create trigger tr_blog_posts_updated before update on blog_posts for each row execute function update_updated_at();
+
+create or replace function lock_booking_vendor_amount()
+returns trigger as $$
+begin
+  if old.vendor_amount is not null
+     and new.vendor_amount is distinct from old.vendor_amount then
+    raise exception 'vendor_amount is immutable once captured';
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+create trigger bookings_lock_vendor_amount
+before update of vendor_amount on bookings
+for each row execute function lock_booking_vendor_amount();
+
+-- Clerk owns application authentication. Browser clients never query the
+-- public schema directly; role-checked Next.js handlers use service_role.
+-- Keep a fresh schema as closed as the production migration baseline.
+do $$
+declare
+  table_record record;
+begin
+  for table_record in
+    select tablename
+    from pg_tables
+    where schemaname = 'public'
+  loop
+    execute format(
+      'alter table public.%I enable row level security',
+      table_record.tablename
+    );
+    execute format(
+      'revoke all privileges on table public.%I from anon, authenticated',
+      table_record.tablename
+    );
+  end loop;
+end
+$$;
+
+revoke all privileges on all sequences in schema public from anon, authenticated;
+revoke execute on all functions in schema public from public, anon, authenticated;
+
+alter default privileges in schema public
+  revoke all privileges on tables from anon, authenticated;
+alter default privileges in schema public
+  revoke all privileges on sequences from anon, authenticated;
+alter default privileges in schema public
+  revoke execute on functions from public, anon, authenticated;

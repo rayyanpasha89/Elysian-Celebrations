@@ -16,9 +16,11 @@ export default function AdminSettingsPage() {
       <motion.section variants={fadeUp} className={dashCard}>
         <h3 className="font-display text-lg text-charcoal">Platform configuration</h3>
         <p className="font-heading mt-3 text-sm leading-relaxed text-slate">
-          Brand name, contact email, and commission rates are not stored in the application database. They are
-          typically set via your deployment environment, CMS, or operations runbook. This screen exists so admins
-          know where limits are—there is no hidden save here.
+          Brand name and contact email are managed through the deployment environment,
+          CMS, or operations runbook. Commercial pricing is handled per vendor pick in
+          Final Pricing: the vendor submits one fixed quote, Elysian sets one complete
+          client price, and the platform calculates the fixed service fee between them.
+          There is no commission-rate or negotiation setting on this page.
         </p>
         <p className="font-heading mt-4 text-sm leading-relaxed text-slate">
           To change which destinations appear on marketing surfaces, use the destinations catalogue: visibility

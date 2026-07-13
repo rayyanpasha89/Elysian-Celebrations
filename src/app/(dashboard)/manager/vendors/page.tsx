@@ -19,6 +19,16 @@ type VendorRow = {
   isFeatured: boolean;
 };
 
+type VendorApiRow = {
+  id: string;
+  businessName: string | null;
+  categoryName: string | null;
+  city: string | null;
+  rating: number | null;
+  isVerified: boolean;
+  isFeatured: boolean;
+};
+
 export default function ManagerVendorsPage() {
   const [loading, setLoading] = useState(true);
   const [vendors, setVendors] = useState<VendorRow[]>([]);
@@ -28,27 +38,17 @@ export default function ManagerVendorsPage() {
     const res = await fetch("/api/admin/vendors");
     const json = await res.json();
     if (!res.ok) throw new Error(json.error);
-    const raw = json.vendors ?? [];
+    const raw = (json.vendors ?? []) as VendorApiRow[];
     setVendors(
-      raw.map(
-        (v: {
-          id: string;
-          business_name: string;
-          city: string | null;
-          rating: number;
-          is_verified: boolean;
-          is_featured: boolean;
-          category: { name?: string } | null;
-        }) => ({
-          id: v.id,
-          name: v.business_name ?? "—",
-          category: (v.category as { name?: string } | null)?.name ?? "—",
-          city: v.city ?? "—",
-          rating: v.rating ?? 0,
-          isVerified: v.is_verified,
-          isFeatured: v.is_featured,
-        })
-      )
+      raw.map((v) => ({
+        id: v.id,
+        name: v.businessName ?? "—",
+        category: v.categoryName ?? "—",
+        city: v.city ?? "—",
+        rating: v.rating ?? 0,
+        isVerified: v.isVerified,
+        isFeatured: v.isFeatured,
+      }))
     );
   };
 

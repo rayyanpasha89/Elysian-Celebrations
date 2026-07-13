@@ -13,6 +13,7 @@ enum UserRole {
   CLIENT
   VENDOR
   ADMIN
+  MANAGER
 }
 
 model User {
@@ -28,13 +29,13 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  clientProfile ClientProfile?
-  vendorProfile VendorProfile?
-  accounts      Account[]
-  sessions      Session[]
-  sentMessages  Message[]      @relation("SentMessages")
-  threadReads   MessageThreadRead[]
-  notifications Notification[]
+  clientProfile      ClientProfile?
+  vendorProfile      VendorProfile?
+  accounts           Account[]
+  sessions           Session[]
+  sentMessages       Message[]           @relation("SentMessages")
+  threadReads        MessageThreadRead[]
+  notifications      Notification[]
   vendorProfileViews VendorProfileView[]
 
   @@map("users")
@@ -107,19 +108,19 @@ model ClientProfile {
 }
 
 model Wedding {
-  id              String        @id @default(cuid())
-  clientProfileId String
-  name            String
-  date            DateTime?
-  eventType       String        @default("wedding") @map("event_type")
-  customEventType String?       @map("custom_event_type")
-  eventPlatformVersion Int      @default(1) @map("event_platform_version")
-  definitionPayload Json        @default("{}") @map("definition_payload")
-  destinationId   String?
-  packageTierId   String?
-  status          WeddingStatus @default(PLANNING)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id                   String        @id @default(cuid())
+  clientProfileId      String
+  name                 String
+  date                 DateTime?
+  eventType            String        @default("wedding") @map("event_type")
+  customEventType      String?       @map("custom_event_type")
+  eventPlatformVersion Int           @default(1) @map("event_platform_version")
+  definitionPayload    Json          @default("{}") @map("definition_payload")
+  destinationId        String?
+  packageTierId        String?
+  status               WeddingStatus @default(PLANNING)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
 
   clientProfile ClientProfile  @relation(fields: [clientProfileId], references: [id], onDelete: Cascade)
   destination   Destination?   @relation(fields: [destinationId], references: [id])
@@ -155,36 +156,36 @@ model WeddingDay {
 }
 
 model WeddingEvent {
-  id              String    @id @default(cuid())
-  weddingId       String
-  weddingDayId    String?
-  name            String
-  eventType       String?
-  timeBlock       String?   @map("time_block")
-  date            DateTime?
-  startTime       String?
-  endTime         String?
-  venue           String?
-  guestCount      Int?
-  estimatedBudget Int?
-  foodStyle       String?
-  foodPreferences String[]  @default([])
-  menuNotes       String?
-  decorStyle      String?
-  decorNotes      String?
-  attireNotes     String?
-  notes           String?
-  requirementPayload Json   @default("{}") @map("requirement_payload")
-  sortOrder       Int       @default(0)
-  createdAt       DateTime  @default(now())
+  id                 String    @id @default(cuid())
+  weddingId          String
+  weddingDayId       String?
+  name               String
+  eventType          String?
+  timeBlock          String?   @map("time_block")
+  date               DateTime?
+  startTime          String?
+  endTime            String?
+  venue              String?
+  guestCount         Int?
+  estimatedBudget    Int?
+  foodStyle          String?
+  foodPreferences    String[]  @default([])
+  menuNotes          String?
+  decorStyle         String?
+  decorNotes         String?
+  attireNotes        String?
+  notes              String?
+  requirementPayload Json      @default("{}") @map("requirement_payload")
+  sortOrder          Int       @default(0)
+  createdAt          DateTime  @default(now())
 
-  wedding     Wedding                @relation(fields: [weddingId], references: [id], onDelete: Cascade)
-  weddingDay  WeddingDay?            @relation(fields: [weddingDayId], references: [id], onDelete: SetNull)
-  bookings    Booking[]
-  budgetItems BudgetItem[]
-  menus       WeddingEventMenu[]
-  logistics   WeddingEventLogistics?
-  tasks       WeddingEventTask[]
+  wedding      Wedding                   @relation(fields: [weddingId], references: [id], onDelete: Cascade)
+  weddingDay   WeddingDay?               @relation(fields: [weddingDayId], references: [id], onDelete: SetNull)
+  bookings     Booking[]
+  budgetItems  BudgetItem[]
+  menus        WeddingEventMenu[]
+  logistics    WeddingEventLogistics?
+  tasks        WeddingEventTask[]
   requirements WeddingEventRequirement[]
 
   @@map("wedding_events")
@@ -300,14 +301,14 @@ model VendorProfile {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category     VendorCategory      @relation(fields: [categoryId], references: [id])
-  services     VendorService[]
-  reviews      Review[]
-  bookings     Booking[]
-  savedBy      SavedVendor[]
-  destinations VendorDestination[]
-  profileViews VendorProfileView[]
+  user              User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category          VendorCategory            @relation(fields: [categoryId], references: [id])
+  services          VendorService[]
+  reviews           Review[]
+  bookings          Booking[]
+  savedBy           SavedVendor[]
+  destinations      VendorDestination[]
+  profileViews      VendorProfileView[]
   eventRequirements WeddingEventRequirement[]
 
   @@map("vendor_profiles")
@@ -340,9 +341,9 @@ model VendorService {
   addOns          String[] @default([])
   isActive        Boolean  @default(true)
 
-  vendorProfile VendorProfile @relation(fields: [vendorProfileId], references: [id], onDelete: Cascade)
-  bookings      Booking[]
-  items         VendorServiceItem[]
+  vendorProfile     VendorProfile             @relation(fields: [vendorProfileId], references: [id], onDelete: Cascade)
+  bookings          Booking[]
+  items             VendorServiceItem[]
   eventRequirements WeddingEventRequirement[]
 
   @@map("vendor_services")
@@ -494,15 +495,20 @@ model Booking {
   status          BookingStatus @default(INQUIRY)
   eventDate       DateTime?
   totalAmount     Int?
+  vendorCost      Int?          @map("vendor_cost")
+  vendorAmount    Int?          @map("vendor_amount")
+  finalPrice      Int?          @map("final_price")
+  serviceFee      Int?          @default(dbgenerated()) @map("service_fee")
+  pricePublished  Boolean       @default(false) @map("price_published")
   paidAmount      Int           @default(0)
   notes           String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  clientProfile ClientProfile  @relation(fields: [clientProfileId], references: [id], onDelete: Cascade)
-  vendorProfile VendorProfile  @relation(fields: [vendorProfileId], references: [id], onDelete: Cascade)
-  vendorService VendorService? @relation(fields: [vendorServiceId], references: [id])
-  weddingEvent  WeddingEvent?  @relation(fields: [weddingEventId], references: [id])
+  clientProfile ClientProfile       @relation(fields: [clientProfileId], references: [id], onDelete: Cascade)
+  vendorProfile VendorProfile       @relation(fields: [vendorProfileId], references: [id], onDelete: Cascade)
+  vendorService VendorService?      @relation(fields: [vendorServiceId], references: [id])
+  weddingEvent  WeddingEvent?       @relation(fields: [weddingEventId], references: [id])
   messages      Message[]
   threadReads   MessageThreadRead[]
 

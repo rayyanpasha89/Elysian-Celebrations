@@ -17,7 +17,7 @@ const navGroups: NavGroup[] = [
   {
     title: "Revenue",
     items: [
-      { label: "Pricing & Margin", href: "/admin/pricing" },
+      { label: "Final Pricing", href: "/admin/pricing" },
       { label: "Client Progress", href: "/admin/progress" },
       { label: "Revenue Dashboard", href: "/admin/revenue" },
     ],

@@ -7,6 +7,62 @@ import {
   apiSuccess,
 } from "@/lib/api-utils";
 
+const ACTIVE_BOOKING_STATUSES = ["CONFIRMED", "DEPOSIT_PAID"] as const;
+const ACTIVE_BOOKING_STATUS_SET = new Set<string>(ACTIVE_BOOKING_STATUSES);
+const PAID_TO_DATE_STATUSES = new Set<string>([
+  ...ACTIVE_BOOKING_STATUSES,
+  "COMPLETED",
+]);
+
+type Relation<T> = T | T[] | null | undefined;
+
+type WeddingEventRelation = {
+  name?: string | null;
+  date?: string | null;
+  venue?: string | null;
+  wedding?: Relation<{
+    destination?: Relation<{ name?: string | null }>;
+  }>;
+};
+
+function relationOne<T>(relation: Relation<T>) {
+  return Array.isArray(relation) ? relation[0] ?? null : relation ?? null;
+}
+
+function currentVendorAmount(booking: {
+  vendor_amount?: number | null;
+  total_amount?: number | null;
+}) {
+  return Math.max(0, booking.vendor_amount ?? booking.total_amount ?? 0);
+}
+
+function paidTowardVendorAmount(
+  booking: {
+    paid_amount?: number | null;
+    vendor_amount?: number | null;
+    total_amount?: number | null;
+  },
+  amount = currentVendorAmount(booking)
+) {
+  return Math.min(amount, Math.max(0, booking.paid_amount ?? 0));
+}
+
+function eventLocation(event: WeddingEventRelation | null) {
+  const wedding = relationOne(event?.wedding);
+  const destination = relationOne(wedding?.destination)?.name?.trim();
+  const venue = event?.venue?.trim();
+
+  if (
+    venue &&
+    destination &&
+    venue.toLocaleLowerCase() !== destination.toLocaleLowerCase()
+  ) {
+    return `${venue}, ${destination}`;
+  }
+
+  return venue || destination || "Location not specified";
+}
+
 export async function GET() {
   const session = await getAuthSession();
   if (session instanceof NextResponse) return session;
@@ -22,7 +78,7 @@ export async function GET() {
     const { data: vp, error: vErr } = await supabase
       .from("vendor_profiles")
       .select(
-        "id, business_name, slug, rating, review_count, is_verified, city, country"
+        "id, business_name, slug, rating, review_count, is_verified"
       )
       .eq("user_id", session.userId)
       .maybeSingle();
@@ -38,9 +94,10 @@ export async function GET() {
         stats: {
           totalBookings: 0,
           pendingInquiries: 0,
-          confirmedBookings: 0,
+          activeBookings: 0,
           avgRating: 0,
-          revenueMonth: 0,
+          paidToDate: 0,
+          outstandingAmount: 0,
           profileViews: 0,
         },
         pendingInquiries: [],
@@ -50,14 +107,14 @@ export async function GET() {
     }
 
     const [
-      { count: totalBookings },
-      { count: pendingInquiryCount },
-      { count: confirmedBookings },
-      { data: revenueRows },
-      { data: reviews },
-      { data: inquiryRows },
-      { data: upcoming },
-      { count: profileViewsCount },
+      totalBookingsResult,
+      pendingInquiriesResult,
+      activeBookingsResult,
+      bookingAmountsResult,
+      reviewsResult,
+      inquiryRowsResult,
+      upcomingResult,
+      profileViewsResult,
     ] = await Promise.all([
       supabase
         .from("bookings")
@@ -72,10 +129,10 @@ export async function GET() {
         .from("bookings")
         .select("id", { count: "exact", head: true })
         .eq("vendor_profile_id", vp.id)
-        .in("status", ["CONFIRMED", "DEPOSIT_PAID", "COMPLETED"]),
+        .in("status", [...ACTIVE_BOOKING_STATUSES]),
       supabase
         .from("bookings")
-        .select("paid_amount, updated_at")
+        .select("status, total_amount, vendor_amount, paid_amount")
         .eq("vendor_profile_id", vp.id),
       supabase
         .from("reviews")
@@ -85,7 +142,7 @@ export async function GET() {
       supabase
         .from("bookings")
         .select(
-          "id, event_date, notes, client:client_profiles(partner_name, user_id)"
+          "id, event_date, client:client_profiles(partner_name), service:vendor_services(name), wedding_event:wedding_events(date, venue, wedding:weddings(destination:destinations(name)))"
         )
         .eq("vendor_profile_id", vp.id)
         .eq("status", "INQUIRY")
@@ -94,7 +151,7 @@ export async function GET() {
       supabase
         .from("bookings")
         .select(
-          "event_date, client:client_profiles(partner_name), wedding_event:wedding_events(name)"
+          "event_date, client:client_profiles(partner_name), wedding_event:wedding_events(name, date, venue, wedding:weddings(destination:destinations(name)))"
         )
         .eq("vendor_profile_id", vp.id)
         .in("status", ["CONFIRMED", "DEPOSIT_PAID"])
@@ -109,12 +166,48 @@ export async function GET() {
         .gte("created_at", monthStart.toISOString()),
     ]);
 
-    const revenueMonth = (revenueRows ?? []).reduce((sum, row) => {
-      if (!row.updated_at) return sum;
-      return new Date(row.updated_at) >= monthStart
-        ? sum + (row.paid_amount ?? 0)
-        : sum;
-    }, 0);
+    const failedQuery = [
+      { name: "total bookings", error: totalBookingsResult.error },
+      { name: "pending inquiries", error: pendingInquiriesResult.error },
+      { name: "active bookings", error: activeBookingsResult.error },
+      { name: "booking amounts", error: bookingAmountsResult.error },
+      { name: "reviews", error: reviewsResult.error },
+      { name: "inquiry list", error: inquiryRowsResult.error },
+      { name: "upcoming events", error: upcomingResult.error },
+      { name: "profile views", error: profileViewsResult.error },
+    ].find((result) => result.error);
+
+    if (failedQuery) {
+      console.error(
+        `GET /api/dashboard/vendor ${failedQuery.name}`,
+        failedQuery.error
+      );
+      return apiError("Failed to load vendor dashboard", 500);
+    }
+
+    const totalBookings = totalBookingsResult.count;
+    const pendingInquiryCount = pendingInquiriesResult.count;
+    const activeBookings = activeBookingsResult.count;
+    const reviews = reviewsResult.data;
+    const inquiryRows = inquiryRowsResult.data;
+    const upcoming = upcomingResult.data;
+    const profileViewsCount = profileViewsResult.count;
+
+    let paidToDate = 0;
+    let outstandingAmount = 0;
+
+    for (const booking of bookingAmountsResult.data ?? []) {
+      const amount = currentVendorAmount(booking);
+      const paidAmount = paidTowardVendorAmount(booking, amount);
+
+      if (PAID_TO_DATE_STATUSES.has(booking.status)) {
+        paidToDate += paidAmount;
+      }
+
+      if (ACTIVE_BOOKING_STATUS_SET.has(booking.status)) {
+        outstandingAmount += Math.max(0, amount - paidAmount);
+      }
+    }
 
     const ratings = reviews ?? [];
     const avgRating =
@@ -123,33 +216,52 @@ export async function GET() {
         : vp.rating ?? 0;
 
     const inquiryList = (inquiryRows ?? []).map((row) => {
-      const c = row.client as { partner_name?: string; user_id?: string } | null;
+      const client = relationOne(
+        row.client as Relation<{ partner_name?: string | null }>
+      );
+      const service = relationOne(
+        row.service as Relation<{ name?: string | null }>
+      );
+      const weddingEvent = relationOne(
+        row.wedding_event as Relation<WeddingEventRelation>
+      );
+      const eventDate = weddingEvent?.date ?? row.event_date;
+
       return {
         id: row.id,
-        couple: c?.partner_name ?? "Couple",
-        destination: "—",
-        date: row.event_date
-          ? new Date(row.event_date).toLocaleDateString("en-IN", {
+        couple: client?.partner_name ?? "Couple",
+        location: eventLocation(weddingEvent),
+        date: eventDate
+          ? new Date(eventDate).toLocaleDateString("en-IN", {
               month: "short",
               day: "numeric",
               year: "numeric",
             })
           : "TBD",
-        service: "Booking inquiry",
+        service: service?.name?.trim() || "Service not specified",
       };
     });
 
     const upcomingEvents = (upcoming ?? []).map((u) => {
-      const c = u.client as { partner_name?: string } | null;
-      const we = u.wedding_event as { name?: string } | null;
-      const ed = u.event_date ? new Date(u.event_date) : null;
+      const client = relationOne(
+        u.client as Relation<{ partner_name?: string | null }>
+      );
+      const weddingEvent = relationOne(
+        u.wedding_event as Relation<WeddingEventRelation>
+      );
+      const eventDate = weddingEvent?.date ?? u.event_date;
+      const date = eventDate ? new Date(eventDate) : null;
+
       return {
-        couple: c?.partner_name ?? "Couple",
-        event: we?.name ?? "Event",
-        date: ed
-          ? ed.toLocaleDateString("en-IN", { month: "short", day: "numeric" })
+        couple: client?.partner_name ?? "Couple",
+        event: weddingEvent?.name?.trim() || "Event not specified",
+        date: date
+          ? date.toLocaleDateString("en-IN", {
+              month: "short",
+              day: "numeric",
+            })
           : "",
-        location: vp.city ?? vp.country ?? "",
+        location: eventLocation(weddingEvent),
       };
     });
 
@@ -165,9 +277,10 @@ export async function GET() {
       stats: {
         totalBookings: totalBookings ?? 0,
         pendingInquiries: pendingInquiryCount ?? 0,
-        confirmedBookings: confirmedBookings ?? 0,
+        activeBookings: activeBookings ?? 0,
         avgRating: Math.round(avgRating * 10) / 10,
-        revenueMonth,
+        paidToDate,
+        outstandingAmount,
         profileViews: profileViewsCount ?? 0,
       },
       pendingInquiries: inquiryList,

@@ -35,8 +35,8 @@ type WeeklyVolumePoint = {
 type VendorAnalyticsPayload = {
   bookingsTotal: number;
   bookingsByStatus: Record<string, number>;
-  revenueEstimate: number;
-  paidThisMonth: number;
+  paidToDate: number;
+  outstandingAmount: number;
   quotePipeline: number;
   completedBookings: number;
   liveInquiries: number;
@@ -49,8 +49,8 @@ type VendorAnalyticsPayload = {
 const emptyAnalytics: VendorAnalyticsPayload = {
   bookingsTotal: 0,
   bookingsByStatus: {},
-  revenueEstimate: 0,
-  paidThisMonth: 0,
+  paidToDate: 0,
+  outstandingAmount: 0,
   quotePipeline: 0,
   completedBookings: 0,
   liveInquiries: 0,
@@ -66,6 +66,7 @@ function formatLakhs(amount: number) {
 
 export default function VendorAnalyticsPage() {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [analytics, setAnalytics] =
     useState<VendorAnalyticsPayload>(emptyAnalytics);
 
@@ -83,8 +84,8 @@ export default function VendorAnalyticsPage() {
           setAnalytics({
             bookingsTotal: json.bookingsTotal ?? 0,
             bookingsByStatus: json.bookingsByStatus ?? {},
-            revenueEstimate: json.revenueEstimate ?? 0,
-            paidThisMonth: json.paidThisMonth ?? 0,
+            paidToDate: json.paidToDate ?? 0,
+            outstandingAmount: json.outstandingAmount ?? 0,
             quotePipeline: json.quotePipeline ?? 0,
             completedBookings: json.completedBookings ?? 0,
             liveInquiries: json.liveInquiries ?? 0,
@@ -94,9 +95,13 @@ export default function VendorAnalyticsPage() {
             weeklyInquiryVolume: json.weeklyInquiryVolume ?? [],
           });
         }
-      } catch {
+      } catch (fetchError) {
         if (!cancelled) {
-          setAnalytics(emptyAnalytics);
+          setError(
+            fetchError instanceof Error
+              ? fetchError.message
+              : "Failed to load analytics"
+          );
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -147,6 +152,14 @@ export default function VendorAnalyticsPage() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="border border-rose/20 bg-ivory p-6 text-charcoal">
+        <p className="font-heading text-sm">{error}</p>
+      </div>
+    );
+  }
+
   const activity = [
     {
       id: "inquiries",
@@ -168,13 +181,13 @@ export default function VendorAnalyticsPage() {
   const trends = [
     {
       title: "Quote pipeline",
-      sub: "Total booked or quoted value across active work",
+      sub: "Current vendor value of inquiry and quote-stage work",
       value: formatLakhs(analytics.quotePipeline),
     },
     {
-      title: "Paid this month",
-      sub: "Booking rows updated this month with paid value",
-      value: formatLakhs(analytics.paidThisMonth),
+      title: "Outstanding",
+      sub: "Current vendor amount less recorded payments on active bookings",
+      value: formatLakhs(analytics.outstandingAmount),
     },
   ];
 
@@ -196,8 +209,8 @@ export default function VendorAnalyticsPage() {
         <StatCard label="Reviews" value={analytics.reviewCount} />
         <StatCard label="Avg rating" value={analytics.rating} suffix="/5" />
         <StatCard
-          label="Revenue (paid)"
-          value={Math.round(analytics.revenueEstimate / 1000)}
+          label="Paid to date"
+          value={Math.round(analytics.paidToDate / 1000)}
           prefix="₹"
           suffix="K"
         />
