@@ -5,6 +5,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/server";
  *
  * Naming convention for paths:
  *   `service-items/{vendor_profile_id}/{vendor_service_id}/{uuid}.{ext}`
+ *   `profiles/{vendor_profile_id}/{uuid}.{ext}`
  *
  * Keeping the prefix structure makes it trivial to:
  *   - audit one vendor's storage usage
@@ -81,19 +82,12 @@ function extensionFor(mime: string): string {
   }
 }
 
-/**
- * Upload a single image File to the vendor-media bucket under the given
- * `vendorProfileId / vendorServiceId` prefix. Validates mime + size before
- * touching storage so callers can return clean 400s.
- */
-export async function uploadVendorServiceImage({
+async function uploadVendorImage({
   file,
-  vendorProfileId,
-  vendorServiceId,
+  pathPrefix,
 }: {
   file: File | Blob;
-  vendorProfileId: string;
-  vendorServiceId: string;
+  pathPrefix: string;
 }): Promise<{ ok: true; data: StoredImage } | { ok: false; error: UploadError }> {
   if (!file) {
     return { ok: false, error: { code: "no-file", message: "No file received" } };
@@ -132,7 +126,7 @@ export async function uploadVendorServiceImage({
   const ext = extensionFor(mime);
   // Crypto.randomUUID is available on Node 18+ which Next 15 ships against.
   const filename = `${crypto.randomUUID()}.${ext}`;
-  const path = `service-items/${vendorProfileId}/${vendorServiceId}/${filename}`;
+  const path = `${pathPrefix}/${filename}`;
 
   const supabase = createAdminSupabaseClient();
   const buffer = Buffer.from(await (file as Blob).arrayBuffer());
@@ -172,18 +166,57 @@ export async function uploadVendorServiceImage({
 }
 
 /**
+ * Upload a single catalogue image beneath the service it belongs to. The
+ * scoped path gives us safe ownership checks and targeted cleanup later.
+ */
+export async function uploadVendorServiceImage({
+  file,
+  vendorProfileId,
+  vendorServiceId,
+}: {
+  file: File | Blob;
+  vendorProfileId: string;
+  vendorServiceId: string;
+}): Promise<{ ok: true; data: StoredImage } | { ok: false; error: UploadError }> {
+  return uploadVendorImage({
+    file,
+    pathPrefix: `service-items/${vendorProfileId}/${vendorServiceId}`,
+  });
+}
+
+/**
+ * Upload a cover or portfolio image for a vendor profile. Profile media is
+ * kept separate from item imagery so replacing a catalogue never affects the
+ * vendor's wider visual identity.
+ */
+export async function uploadVendorProfileImage({
+  file,
+  vendorProfileId,
+}: {
+  file: File | Blob;
+  vendorProfileId: string;
+}): Promise<{ ok: true; data: StoredImage } | { ok: false; error: UploadError }> {
+  return uploadVendorImage({
+    file,
+    pathPrefix: `profiles/${vendorProfileId}`,
+  });
+}
+
+/**
  * Best-effort cleanup. Caller passes the public URL we returned earlier; we
  * derive the storage path and remove. Failures are logged but not thrown —
  * orphan media is preferable to a save failure.
  */
-export async function deleteVendorServiceImage(publicUrl: string): Promise<void> {
+export async function deleteVendorMediaImage(publicUrl: string): Promise<void> {
   try {
     const url = new URL(publicUrl);
     const marker = `/storage/v1/object/public/${VENDOR_MEDIA_BUCKET}/`;
     const idx = url.pathname.indexOf(marker);
     if (idx === -1) return;
     const path = url.pathname.slice(idx + marker.length);
-    if (!path.startsWith("service-items/")) return;
+    if (!path.startsWith("service-items/") && !path.startsWith("profiles/")) {
+      return;
+    }
     const supabase = createAdminSupabaseClient();
     const { error } = await supabase.storage
       .from(VENDOR_MEDIA_BUCKET)
@@ -195,3 +228,7 @@ export async function deleteVendorServiceImage(publicUrl: string): Promise<void>
     console.error("vendor-media delete parse failed:", err);
   }
 }
+
+// Kept as an alias while existing catalogue routes migrate to the broader
+// media cleanup helper.
+export const deleteVendorServiceImage = deleteVendorMediaImage;

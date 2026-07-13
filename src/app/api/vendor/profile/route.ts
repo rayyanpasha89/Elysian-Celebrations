@@ -7,6 +7,29 @@ import {
   apiSuccess,
 } from "@/lib/api-utils";
 import { buildVendorProfileSeed } from "@/lib/vendor-profile";
+import { deleteVendorMediaImage } from "@/lib/supabase/storage";
+
+const MAX_PORTFOLIO_IMAGES = 12;
+
+function normalizeImageUrl(value: unknown): string | null {
+  if (typeof value !== "string" || value.length > 2_000) return null;
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizePortfolio(value: unknown): string[] | null {
+  if (!Array.isArray(value) || value.length > MAX_PORTFOLIO_IMAGES) return null;
+
+  const urls = value.map(normalizeImageUrl);
+  if (urls.some((url) => url === null)) return null;
+
+  return Array.from(new Set(urls as string[]));
+}
 
 export async function GET() {
   const session = await getAuthSession();
@@ -24,7 +47,7 @@ export async function GET() {
     const { data: vp, error } = await supabase
       .from("vendor_profiles")
       .select(
-        `id, business_name, short_bio, city, state, country, experience,
+        `id, business_name, short_bio, city, state, country, experience, cover_image, portfolio,
         category:vendor_categories(id, name, slug)`
       )
       .eq("user_id", session.userId)
@@ -53,10 +76,95 @@ export async function GET() {
         state: vp.state ?? "",
         country: vp.country ?? "",
         experience: vp.experience ?? 0,
+        coverImage: vp.cover_image ?? null,
+        portfolio: vp.portfolio ?? [],
       },
     });
   } catch (e) {
     console.error("GET /api/vendor/profile", e);
+    return apiError("Internal server error", 500);
+  }
+}
+
+/**
+ * Persists media URLs returned from the authenticated upload route. The UI
+ * never needs direct Storage write access, and removed bucket files are
+ * cleaned up only after the database update succeeds.
+ */
+export async function PATCH(request: NextRequest) {
+  const session = await getAuthSession();
+  if (session instanceof NextResponse) return session;
+  const roleCheck = requireRole(session, "vendor");
+  if (roleCheck) return roleCheck;
+
+  try {
+    const body = (await request.json()) as Record<string, unknown>;
+    const hasCover = Object.hasOwn(body, "coverImage");
+    const hasPortfolio = Object.hasOwn(body, "portfolio");
+    if (!hasCover && !hasPortfolio) {
+      return apiError("No media changes supplied", 400);
+    }
+
+    const supabase = createAdminSupabaseClient();
+    const { data: profile, error: profileErr } = await supabase
+      .from("vendor_profiles")
+      .select("id, cover_image, portfolio")
+      .eq("user_id", session.userId)
+      .maybeSingle();
+
+    if (profileErr) {
+      console.error("vendor_profiles media:", profileErr);
+      return apiError("Failed to load profile", 500);
+    }
+    if (!profile) {
+      return apiError("Save your business profile before adding imagery", 409);
+    }
+
+    let coverImage = profile.cover_image ?? null;
+    if (hasCover) {
+      if (body.coverImage === null) {
+        coverImage = null;
+      } else {
+        coverImage = normalizeImageUrl(body.coverImage);
+        if (!coverImage) return apiError("Invalid cover image URL", 400);
+      }
+    }
+
+    let portfolio = Array.isArray(profile.portfolio) ? profile.portfolio : [];
+    if (hasPortfolio) {
+      const normalized = normalizePortfolio(body.portfolio);
+      if (!normalized) {
+        return apiError(`Portfolio must contain at most ${MAX_PORTFOLIO_IMAGES} valid images`, 400);
+      }
+      portfolio = normalized;
+    }
+
+    const { error: updateErr } = await supabase
+      .from("vendor_profiles")
+      .update({ cover_image: coverImage, portfolio })
+      .eq("id", profile.id);
+    if (updateErr) {
+      console.error("vendor_profiles media update:", updateErr);
+      return apiError("Failed to save media", 500);
+    }
+
+    const previousUrls = [
+      ...(profile.cover_image ? [profile.cover_image] : []),
+      ...(Array.isArray(profile.portfolio) ? profile.portfolio : []),
+    ];
+    const retainedUrls = new Set([
+      ...(coverImage ? [coverImage] : []),
+      ...portfolio,
+    ]);
+    await Promise.all(
+      previousUrls
+        .filter((url) => !retainedUrls.has(url))
+        .map((url) => deleteVendorMediaImage(url))
+    );
+
+    return apiSuccess({ coverImage, portfolio });
+  } catch (e) {
+    console.error("PATCH /api/vendor/profile", e);
     return apiError("Internal server error", 500);
   }
 }
