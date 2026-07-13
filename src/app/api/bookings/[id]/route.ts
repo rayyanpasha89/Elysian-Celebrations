@@ -24,6 +24,15 @@ const BOOKING_STATUSES = new Set([
   "CANCELLED",
 ]);
 
+// The vendor portal intentionally exposes only these two progression actions.
+// Keep the API aligned with that UI so a crafted request cannot skip payment,
+// confirmation, or operations review.
+const VENDOR_STATUS_TRANSITIONS: Record<string, readonly string[]> = {
+  INQUIRY: ["QUOTE_SENT"],
+  CONFIRMED: ["COMPLETED"],
+  DEPOSIT_PAID: ["COMPLETED"],
+};
+
 function normalizeMoney(value: unknown) {
   if (value === null) return null;
   const amount = typeof value === "number" ? value : Number(value);
@@ -82,6 +91,19 @@ export async function PATCH(
     if (body.status !== undefined) {
       if (typeof body.status !== "string" || !BOOKING_STATUSES.has(body.status)) {
         return apiError("Invalid booking status", 400);
+      }
+      if (!isOperationsRole) {
+        if (session.role !== "vendor") {
+          return apiError(
+            "Clients cannot change booking status. Message the vendor if plans change.",
+            403
+          );
+        }
+
+        const allowedTargets = VENDOR_STATUS_TRANSITIONS[booking.status] ?? [];
+        if (!allowedTargets.includes(body.status)) {
+          return apiError("This booking cannot move to that status yet", 409);
+        }
       }
       allowedFields.status = body.status;
     }
