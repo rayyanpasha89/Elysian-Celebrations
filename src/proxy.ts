@@ -43,8 +43,15 @@ async function clerkHandler(req: NextRequest, event: NextFetchEvent) {
       return;
     }
     if (isProtectedRoute(request)) {
-      await auth.protect();
-      const { sessionClaims } = await auth();
+      const { userId, sessionClaims } = await auth();
+      if (!userId) {
+        const signInUrl = new URL("/login", request.url);
+        signInUrl.searchParams.set(
+          "redirect_url",
+          `${request.nextUrl.pathname}${request.nextUrl.search}`
+        );
+        return NextResponse.redirect(signInUrl);
+      }
       const role = roleFromSessionClaims(
         sessionClaims as Record<string, unknown> | undefined
       );
