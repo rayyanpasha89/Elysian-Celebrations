@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { staggerItem } from "@/animations/variants";
 import { ListEmptyState } from "@/components/dashboard/list-empty-state";
 import { dashCard, dashLabel } from "@/lib/dashboard-styles";
-import type { Conversation } from "@/lib/messages-shared";
+import { formatMessageTime, type Conversation } from "@/lib/messages-shared";
 import { cn } from "@/lib/utils";
 
 /**
@@ -120,7 +120,7 @@ export function MessageThread({
                   {m.text}
                 </p>
                 <p className="font-accent mt-2 text-[9px] uppercase tracking-[0.15em] text-slate">
-                  {m.time}
+                  {formatMessageTime(m)}
                 </p>
               </div>
             </motion.div>

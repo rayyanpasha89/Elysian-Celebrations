@@ -18,8 +18,7 @@ type InquiryRow = {
   event_date: string | null;
   notes: string | null;
   created_at: string;
-  total_amount: number | null;
-  paid_amount: number | null;
+  vendor_amount: number | null;
   client: {
     partner_name: string | null;
     user: { name: string | null } | null;
@@ -68,13 +67,13 @@ async function loadInquiries(): Promise<LoadResult> {
   const { data, error } = await supabase
     .from("bookings")
     .select(
-      `id, status, event_date, notes, created_at, total_amount, paid_amount,
+      `id, status, event_date, notes, created_at, vendor_amount,
        client:client_profiles(partner_name, user:users(name)),
        service:vendor_services(name),
        wedding_event:wedding_events(name, event_type, date, venue, wedding_day:wedding_days(name))`
     )
     .eq("vendor_profile_id", vp.id)
-    .in("status", OPEN_INQUIRY_STATUSES as unknown as string[])
+    .in("status", OPEN_INQUIRY_STATUSES)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -94,8 +93,7 @@ async function loadInquiries(): Promise<LoadResult> {
       event_date: row.event_date,
       notes: row.notes,
       created_at: row.created_at,
-      total_amount: row.total_amount,
-      paid_amount: row.paid_amount,
+      vendor_amount: row.vendor_amount,
       client: client
         ? {
             partner_name: client.partner_name ?? null,
@@ -143,7 +141,7 @@ function relativeAge(raw: string) {
 }
 
 function statusLabel(status: string) {
-  if (status === "QUOTE_SENT") return "Quote sent";
+  if (status === "QUOTE_SENT") return "Pricing handoff";
   return status
     .toLowerCase()
     .split("_")
@@ -171,8 +169,9 @@ export default async function VendorInquiriesPage() {
             Inquiries
           </h2>
           <p className="mt-3 text-sm leading-relaxed text-slate">
-            Open bookings awaiting your reply or quote. Confirmed bookings move
-            to <Link href="/vendor/bookings" className="text-gold-dark underline-offset-2 hover:underline">your bookings ledger</Link>.
+            Review event requests here while Elysian handles every pricing
+            agreement with you offline. Confirmed bookings move to{" "}
+            <Link href="/vendor/bookings" className="text-gold-dark underline-offset-2 hover:underline">your bookings ledger</Link>.
           </p>
         </div>
         <Link href="/vendor/bookings" className={dashBtn}>
@@ -240,13 +239,13 @@ function InquiriesList({ inquiries }: { inquiries: InquiryRow[] }) {
   }
 
   const newInquiries = inquiries.filter((row) => row.status === "INQUIRY");
-  const quoted = inquiries.filter((row) => row.status === "QUOTE_SENT");
+  const pricingHandoffs = inquiries.filter((row) => row.status === "QUOTE_SENT");
 
   return (
     <div className="space-y-8">
       <div className="grid gap-3 sm:grid-cols-3">
         <MetricCard label="New inquiries" value={String(newInquiries.length)} hint="Awaiting your reply" tone={newInquiries.length > 0 ? "warning" : "neutral"} />
-        <MetricCard label="Quotes out" value={String(quoted.length)} hint="Waiting on couple response" />
+        <MetricCard label="Pricing handoffs" value={String(pricingHandoffs.length)} hint="Legacy records awaiting a decision" />
         <MetricCard label="Open pipeline" value={String(inquiries.length)} hint="Total awaiting decision" />
       </div>
 
@@ -298,9 +297,21 @@ function InquiryRowCard({ row }: { row: InquiryRow }) {
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <Tile label="Wedding event" value={eventName} secondary={row.wedding_event?.event_type ?? null} />
+        <Tile label="Event / celebration" value={eventName} secondary={row.wedding_event?.event_type ?? null} />
         <Tile label="Venue" value={venue ?? "Not shared yet"} />
-        <Tile label="Quote" value={row.total_amount ? formatCurrency(row.total_amount) : "Not quoted"} secondary={row.paid_amount && row.total_amount ? `${formatCurrency(row.paid_amount)} paid` : null} />
+        <Tile
+          label="Agreed payout"
+          value={
+            row.vendor_amount === null
+              ? "Pending Elysian"
+              : formatCurrency(row.vendor_amount)
+          }
+          secondary={
+            row.vendor_amount === null
+              ? "Pricing is agreed with Elysian offline"
+              : "Recorded by Elysian"
+          }
+        />
       </div>
 
       {row.notes ? (
@@ -314,7 +325,7 @@ function InquiryRowCard({ row }: { row: InquiryRow }) {
           href={`/vendor/messages?bookingId=${row.id}`}
           className={dashBtn}
         >
-          Reply in messages
+          Reply about event
         </Link>
         <Link
           href={`/vendor/bookings?bookingId=${row.id}`}

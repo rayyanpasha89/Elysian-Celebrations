@@ -173,6 +173,7 @@ export default function ClientMessagesPage() {
         from: "vendor" | "client";
         text: string;
         time: string;
+        createdAt: string;
       };
 
       setConversations((list) => {
@@ -194,6 +195,7 @@ export default function ClientMessagesPage() {
                     from: message.from,
                     text: message.text,
                     time: message.time,
+                    createdAt: message.createdAt,
                   },
                 ],
               }

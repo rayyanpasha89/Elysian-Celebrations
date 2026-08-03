@@ -60,7 +60,7 @@ export function Footer() {
               Elysian Celebrations
             </p>
             <h2 className="mt-4 max-w-2xl font-display text-4xl leading-tight text-ivory md:text-5xl">
-              Build the wedding with the same care as the celebration itself.
+              Build every event with the same care as the celebration itself.
             </h2>
             <p className="mt-4 max-w-xl text-sm leading-relaxed text-ivory/62">
               Destination planning, budget control, guest logistics, and curated
@@ -171,7 +171,7 @@ export function Footer() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <p>&copy; {new Date().getFullYear()} Elysian Celebrations. All rights reserved.</p>
             <p className="font-accent uppercase tracking-[0.18em] text-ivory/28">
-              Destination wedding planning system
+              Multi-day event planning system
             </p>
           </div>
         </div>

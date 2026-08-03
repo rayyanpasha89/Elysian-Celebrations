@@ -123,7 +123,7 @@ async function loadWeddings(): Promise<LoadResult> {
     return {
       id: row.id,
       name: row.name,
-      couple: client?.partner_name?.trim() || user?.name?.trim() || "Couple",
+      couple: client?.partner_name?.trim() || user?.name?.trim() || "Client",
       email: user?.email ?? null,
       destination: destination?.name ?? null,
       date: row.date,

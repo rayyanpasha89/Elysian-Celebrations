@@ -19,11 +19,11 @@ type Booking = {
   vendorName: string;
   serviceName: string | null;
   categoryName: string;
-  listedPrice: number | null;
-  totalAmount: number | null;
+  vendorPrice: number | null;
   finalPrice: number | null;
   pricePublished: boolean;
   fee: number | null;
+  updatedAt: string;
 };
 type AdminEvent = {
   id: string;
@@ -173,7 +173,12 @@ export default function AdminPricingPage() {
   const savePricing = useCallback(
     async (
       bookingId: string,
-      patch: { finalPrice?: number | null; pricePublished?: boolean }
+      patch: {
+        vendorPrice?: number | null;
+        fee?: number | null;
+        pricePublished?: boolean;
+        updatedAt: string;
+      }
     ) => {
       try {
         const res = await fetch("/api/admin/pricing", {
@@ -184,10 +189,11 @@ export default function AdminPricingPage() {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error ?? "Failed to save");
         const updated = json.booking as {
-          listedPrice: number | null;
+          vendorPrice: number | null;
           finalPrice: number | null;
           pricePublished: boolean;
           fee: number | null;
+          updatedAt: string;
         };
         // patch local state
         setClients((prev) =>
@@ -236,7 +242,7 @@ export default function AdminPricingPage() {
             if (b.finalPrice != null) {
               finalTotal += b.finalPrice;
               pricedCount += 1;
-              vendorTotal += b.listedPrice ?? 0;
+              vendorTotal += b.vendorPrice ?? 0;
               feeTotal += b.fee ?? 0;
             }
           }
@@ -287,13 +293,13 @@ export default function AdminPricingPage() {
               One price, clearly composed
             </h1>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-ivory/70">
-              Set one complete client-facing price for every vendor pick. The vendor
-              amount stays fixed and Elysian&apos;s fee is calculated automatically.
+              Record the vendor price agreed offline, add Elysian&apos;s flat fee, and
+              publish one complete client total. No portal negotiation or quote wait.
             </p>
           </div>
           <div className="flex gap-6">
             <HeroStat label="Final value" value={lakh(liveGrand.finalTotal)} />
-            <HeroStat label="Vendor base" value={lakh(liveGrand.vendorTotal)} muted />
+            <HeroStat label="Vendor payouts" value={lakh(liveGrand.vendorTotal)} muted />
             <HeroStat label="Elysian fee" value={lakh(liveGrand.feeTotal)} gold />
           </div>
         </div>
@@ -318,7 +324,7 @@ export default function AdminPricingPage() {
             <ArrowLeft className="h-3.5 w-3.5" /> All clients
           </button>
         ) : (
-          <p className={dashLabel}>Select a client to price their picks</p>
+          <p className={dashLabel}>Select a client to record agreed pricing</p>
         )}
       </div>
 
@@ -326,7 +332,7 @@ export default function AdminPricingPage() {
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {activeClients.length === 0 ? (
             <div className="border border-dashed border-charcoal/15 bg-ivory p-8 sm:col-span-2 xl:col-span-3">
-              <p className="font-display text-xl text-charcoal">No vendor picks to price</p>
+              <p className="font-display text-xl text-charcoal">No vendor picks to price yet</p>
               <p className="mt-2 text-sm text-slate">
                 Client plans appear here as soon as they select a vendor service.
               </p>
@@ -400,7 +406,7 @@ export default function AdminPricingPage() {
             onOpenStep={(eventId, bookingId) => openBooking(eventId, bookingId)}
           />
           <p className="mt-3 text-center font-accent text-[10px] uppercase tracking-[0.16em] text-slate/60">
-            Drill day → event → vendor pick, then tap a pick to set its price
+            Drill day → event → vendor pick, then record the offline agreement
           </p>
         </div>
       )}
@@ -475,34 +481,55 @@ function PricingEditor({
   onClose: () => void;
   onSave: (
     bookingId: string,
-    patch: { finalPrice?: number | null; pricePublished?: boolean }
+    patch: {
+      vendorPrice?: number | null;
+      fee?: number | null;
+      pricePublished?: boolean;
+      updatedAt: string;
+    }
   ) => Promise<boolean>;
 }) {
   const { booking, eventName, clientName } = data;
-  const [price, setPrice] = useState(booking.finalPrice != null ? String(booking.finalPrice) : "");
+  const [vendorPrice, setVendorPrice] = useState(
+    booking.vendorPrice != null ? String(booking.vendorPrice) : ""
+  );
+  const [fee, setFee] = useState(
+    booking.fee != null ? String(booking.fee) : ""
+  );
   const [busy, setBusy] = useState(false);
 
-  const parsedPrice = price.trim() ? Number(price) : null;
-  const priceN = parsedPrice != null && Number.isFinite(parsedPrice) ? parsedPrice : null;
-  const hasInvalidNumber = price.trim().length > 0 && priceN == null;
-  const belowVendorPrice =
-    priceN != null && booking.listedPrice != null && priceN < booking.listedPrice;
-  const missingVendorAmount = booking.listedPrice == null;
-  const fee =
-    priceN != null && booking.listedPrice != null
-      ? priceN - booking.listedPrice
-      : null;
-  const canSave =
-    !hasInvalidNumber &&
-    !belowVendorPrice &&
-    !(missingVendorAmount && priceN != null);
-  const canPublish = canSave && priceN != null;
+  const vendorPriceN = vendorPrice.trim() ? Number(vendorPrice) : null;
+  const feeN = fee.trim() ? Number(fee) : null;
+  const vendorPriceInvalid =
+    vendorPrice.trim().length > 0 &&
+    (vendorPriceN == null ||
+      !Number.isFinite(vendorPriceN) ||
+      !Number.isInteger(vendorPriceN) ||
+      vendorPriceN <= 0);
+  const feeInvalid =
+    fee.trim().length > 0 &&
+    (feeN == null ||
+      !Number.isFinite(feeN) ||
+      !Number.isInteger(feeN) ||
+      feeN < 0);
+  const bothBlank = vendorPriceN == null && feeN == null;
+  const oneMissing = (vendorPriceN == null) !== (feeN == null);
+  const completePricing =
+    vendorPriceN != null &&
+    feeN != null &&
+    !vendorPriceInvalid &&
+    !feeInvalid;
+  const finalPrice = completePricing ? vendorPriceN + feeN : null;
+  const canSave = !oneMissing && !vendorPriceInvalid && !feeInvalid;
+  const canPublish = completePricing;
 
   const save = async (publish?: boolean) => {
     setBusy(true);
     try {
       const saved = await onSave(booking.id, {
-        finalPrice: priceN,
+        vendorPrice: bothBlank ? null : vendorPriceN,
+        fee: bothBlank ? null : feeN,
+        updatedAt: booking.updatedAt,
         ...(publish !== undefined ? { pricePublished: publish } : {}),
       });
       if (saved && publish !== undefined) onClose();
@@ -525,7 +552,7 @@ function PricingEditor({
         exit={{ opacity: 0, scale: 0.97, y: 8 }}
         transition={{ type: "spring", stiffness: 240, damping: 26 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-xl border border-charcoal/12 bg-ivory shadow-[0_40px_120px_rgba(51,61,41,0.35)]"
+        className="max-h-[calc(100dvh-2rem)] w-full max-w-2xl overflow-y-auto border border-charcoal/12 bg-ivory shadow-[0_40px_120px_rgba(51,61,41,0.35)]"
       >
         <div className="flex items-start justify-between gap-3 border-b border-charcoal/10 px-5 py-4">
           <div className="min-w-0">
@@ -547,19 +574,18 @@ function PricingEditor({
           </button>
         </div>
 
-        <div className="px-5 py-5">
-          <div className="grid gap-px overflow-hidden border border-charcoal/10 bg-charcoal/10 sm:grid-cols-2">
-            <div className="bg-cream/50 px-4 py-3">
-              <p className="font-accent text-[9px] uppercase tracking-[0.16em] text-slate">
-                Vendor amount · fixed
+        <div className="px-5 py-5 md:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 border border-charcoal/10 bg-cream/50 px-4 py-3">
+            <div>
+              <p className="font-accent text-[9px] uppercase tracking-[0.16em] text-gold-dark">
+                Offline agreement
               </p>
-              <p className="mt-1 font-display text-xl text-charcoal">
-                {booking.listedPrice != null
-                  ? formatCurrency(booking.listedPrice)
-                  : "Not supplied"}
+              <p className="mt-1 max-w-md text-xs leading-relaxed text-slate">
+                Confirm the vendor amount outside the portal, then record the fee and
+                publish the derived total. The vendor never sends a quote here.
               </p>
             </div>
-            <div className="bg-cream/50 px-4 py-3">
+            <div className="shrink-0 text-right">
               <p className="font-accent text-[9px] uppercase tracking-[0.16em] text-slate">
                 Client visibility
               </p>
@@ -569,15 +595,15 @@ function PricingEditor({
             </div>
           </div>
 
-          <div className="mt-5">
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <label className="block">
               <span className="font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark">
-                Final client price
+                Agreed vendor price
               </span>
               <div
                 className={cn(
                   "mt-1.5 flex items-center border px-3 focus-within:border-gold-primary",
-                  belowVendorPrice || hasInvalidNumber
+                  vendorPriceInvalid || oneMissing
                     ? "border-rose"
                     : "border-gold-primary/50"
                 )}
@@ -585,44 +611,77 @@ function PricingEditor({
                 <IndianRupee className="h-3.5 w-3.5 text-gold-dark" />
                 <input
                   type="number"
-                  min={booking.listedPrice ?? 0}
-                  disabled={missingVendorAmount}
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  placeholder={booking.listedPrice != null ? String(booking.listedPrice) : "0"}
+                  min={1}
+                  step={1}
+                  value={vendorPrice}
+                  onChange={(e) => setVendorPrice(e.target.value)}
+                  placeholder="Amount agreed offline"
                   className="w-full bg-transparent py-3 font-display text-lg text-charcoal outline-none"
                 />
               </div>
+              <span className="mt-1.5 block text-xs leading-relaxed text-slate">
+                The vendor&apos;s event-specific payout before Elysian&apos;s fee.
+              </span>
             </label>
-            {missingVendorAmount ? (
-              <p className="mt-2 text-xs text-rose">
-                The vendor must send a complete quote before Elysian can set the final price.
-              </p>
-            ) : belowVendorPrice ? (
-              <p className="mt-2 text-xs text-rose">
-                Final price cannot be below the fixed vendor amount.
-              </p>
-            ) : (
-              <p className="mt-2 text-xs leading-relaxed text-slate">
-                This is the complete amount the client will see. Tax and invoice
-                treatment stays in finance records and is not added again here.
-              </p>
-            )}
+
+            <label className="block">
+              <span className="font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark">
+                Elysian fee
+              </span>
+              <div
+                className={cn(
+                  "mt-1.5 flex items-center border px-3 focus-within:border-gold-primary",
+                  feeInvalid || oneMissing
+                    ? "border-rose"
+                    : "border-gold-primary/50"
+                )}
+              >
+                <IndianRupee className="h-3.5 w-3.5 text-gold-dark" />
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={fee}
+                  onChange={(e) => setFee(e.target.value)}
+                  placeholder="Flat service fee"
+                  className="w-full bg-transparent py-3 font-display text-lg text-charcoal outline-none"
+                />
+              </div>
+              <span className="mt-1.5 block text-xs leading-relaxed text-slate">
+                A flat INR amount, never a percentage or negotiable margin.
+              </span>
+            </label>
           </div>
 
-          <div className="mt-4 flex items-center justify-between border border-charcoal/10 bg-charcoal/[0.03] px-4 py-3">
+          {vendorPriceInvalid || feeInvalid || oneMissing ? (
+            <p className="mt-3 text-xs text-rose">
+              {oneMissing
+                ? "Enter both the vendor price and Elysian fee, or clear both."
+                : "Use whole-rupee amounts. Vendor price must be above zero and the fee cannot be negative."}
+            </p>
+          ) : null}
+
+          <div className="mt-5 flex items-center justify-between border border-gold-primary/35 bg-gold-primary/[0.08] px-4 py-4">
             <div className="flex items-center gap-2">
               <BadgeIndianRupee className="h-4 w-4 text-gold-dark" />
-              <span className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
-                Elysian fee · calculated
-              </span>
+              <div>
+                <p className="font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark">
+                  Client final price
+                </p>
+                <p className="mt-1 text-xs text-slate">Vendor price + flat Elysian fee</p>
+              </div>
             </div>
             <div className="text-right">
-              <p className={cn("font-display text-xl", fee == null ? "text-slate" : "text-gold-dark")}>
-                {fee != null && fee >= 0 ? formatCurrency(fee) : "—"}
+              <p className={cn("font-display text-2xl", finalPrice == null ? "text-slate" : "text-charcoal")}>
+                {finalPrice != null ? formatCurrency(finalPrice) : "Not set"}
               </p>
             </div>
           </div>
+
+          <p className="mt-2 text-xs leading-relaxed text-slate">
+            This is the only commercial amount shown to the client after publication.
+            Clearing both inputs also unpublishes the price.
+          </p>
 
           <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
             <button
@@ -631,7 +690,13 @@ function PricingEditor({
               onClick={() => void save()}
               className="font-accent border border-charcoal/15 px-4 py-2.5 text-[10px] uppercase tracking-[0.18em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark disabled:opacity-40"
             >
-              {busy ? "Saving..." : booking.pricePublished ? "Update price" : "Save price"}
+              {busy
+                ? "Saving..."
+                : booking.pricePublished
+                  ? "Update published price"
+                  : bothBlank
+                    ? "Clear pricing"
+                    : "Save draft"}
             </button>
             {booking.pricePublished ? (
               <button

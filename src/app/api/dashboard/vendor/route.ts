@@ -229,7 +229,7 @@ export async function GET() {
 
       return {
         id: row.id,
-        couple: client?.partner_name ?? "Couple",
+        couple: client?.partner_name ?? "Client",
         location: eventLocation(weddingEvent),
         date: eventDate
           ? new Date(eventDate).toLocaleDateString("en-IN", {
@@ -253,7 +253,7 @@ export async function GET() {
       const date = eventDate ? new Date(eventDate) : null;
 
       return {
-        couple: client?.partner_name ?? "Couple",
+        couple: client?.partner_name ?? "Client",
         event: weddingEvent?.name?.trim() || "Event not specified",
         date: date
           ? date.toLocaleDateString("en-IN", {

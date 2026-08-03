@@ -472,7 +472,7 @@ const BLOG_POST_FIXTURES = [
     excerpt:
       "A wedding budget becomes far more useful when it behaves like an investment plan instead of a punishment spreadsheet.",
     content:
-      "Most couples do not need more budget tabs. They need a system that separates what matters, what is still quoted, and what is already committed. The practical move is to establish category targets early, then update actuals only as decisions harden. That creates financial visibility without draining momentum from the creative work.",
+      "Most clients do not need more budget tabs. They need a system that separates what is estimated, what Elysian has finalized, and what is already paid. The practical move is to establish category direction early, then publish final prices only as decisions harden. That creates financial visibility without draining momentum from the creative work.",
     author: "Elysian Editorial",
     tags: ["budget", "planning", "guide"],
     is_published: true,
@@ -983,7 +983,7 @@ const BOOKING_FIXTURES = [
     vendorSlug: "house-of-petals",
     serviceName: "Sangeet Production Decor",
     eventName: "Sangeet Night",
-    status: "QUOTE_SENT",
+    status: "INQUIRY",
     totalAmount: 325000,
     paidAmount: 0,
     notes: "Family wants a richer stage look and lounge corners for elderly guests.",
@@ -1064,12 +1064,12 @@ const REVIEW_FIXTURES = [
 const MESSAGE_BLUEPRINTS: Record<string, string[]> = {
   "priya-photo": [
     "We loved the editorial examples on your profile. Can you also cover the welcome dinner?",
-    "Yes, we can extend coverage to the welcome dinner and build the final quote around both events.",
+    "Yes, we can extend coverage to the welcome dinner and confirm final pricing across both functions.",
     "Please include one quiet sunrise session if the schedule allows.",
   ],
   "priya-decor": [
     "Sharing the first Sangeet references. We want a stronger stage and warmer lighting.",
-    "We can move the quote toward a richer stage build and lounge corners without losing circulation space.",
+    "We can move the package toward a richer stage build and lounge corners without losing circulation space.",
   ],
   "priya-catering": [
     "Need Jain counters, kid-friendly breakfast, and room drops for close family.",
@@ -2041,7 +2041,7 @@ async function seedMessagesAndNotifications(
     {
       user_id: users.get("priya-arjun")?.id,
       type: "MESSAGE",
-      title: "Decor quote updated",
+      title: "Decor pricing updated",
       message: "House of Petals replied with a refined Sangeet stage approach.",
       link: "/client/messages",
     },

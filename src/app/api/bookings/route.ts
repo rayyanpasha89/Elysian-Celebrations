@@ -11,6 +11,24 @@ import {
   eventReadinessPercent,
   type EventReadinessRow,
 } from "@/lib/event-readiness";
+import type { Database } from "@/types/database.types";
+
+type BookingStatus = Database["public"]["Enums"]["booking_status"];
+
+const BOOKING_STATUS_VALUES = [
+  "INQUIRY",
+  "QUOTE_SENT",
+  "CONFIRMED",
+  "DEPOSIT_PAID",
+  "COMPLETED",
+  "CANCELLED",
+] as const satisfies readonly BookingStatus[];
+
+const BOOKING_STATUSES: ReadonlySet<string> = new Set(BOOKING_STATUS_VALUES);
+
+function isBookingStatus(value: string): value is BookingStatus {
+  return BOOKING_STATUSES.has(value);
+}
 
 const BOOKING_SELECT = `id, client_profile_id, vendor_profile_id, vendor_service_id, wedding_event_id, status, event_date, total_amount, vendor_amount, final_price, price_published, service_fee, paid_amount, notes, created_at, updated_at, client:client_profiles(id, partner_name, weddings(destination:destinations(name))), vendor:vendor_profiles(business_name, slug), service:vendor_services(id, name, description, service_scope, base_price, max_price, unit, event_type_fit, inclusions, deliverables, add_ons, items:vendor_service_items(id, item_type, name, description, dietary_tags, image_urls, reference_url, sort_order)), event:wedding_events(id, name, event_type, date, start_time, end_time, venue, guest_count, estimated_budget, food_style, menu_notes, decor_style, decor_notes, attire_notes, notes, wedding_day:wedding_days(id, name, date, notes), logistics:wedding_event_logistics(guest_arrival_time, vendor_load_in_time, family_call_time, transport_notes, rooming_notes, weather_plan, ceremony_notes), menus:wedding_event_menus(id, name, meal_period, service_style, notes, sort_order, items:wedding_event_menu_items(id, name, course, dietary_tags, notes, sort_order)))`;
 
@@ -74,7 +92,7 @@ type BookingEventRow = {
 };
 
 type BookingRow = {
-  status?: string | null;
+  status?: BookingStatus | null;
   wedding_event_id?: string | null;
   event_date?: string | null;
   total_amount?: number | null;
@@ -202,8 +220,9 @@ function withRoleSafePricing<T extends BookingRow>(
       : null;
     safe.pricing_state = finalVisibleToClient ? "final" : "pending";
   } else if (role === "vendor") {
-    safe.total_amount = booking.vendor_amount ?? booking.total_amount;
-    safe.pricing_state = "vendor_amount";
+    safe.total_amount = booking.vendor_amount ?? null;
+    safe.pricing_state =
+      booking.vendor_amount != null ? "agreed" : "pending_agreement";
   } else if (role === "admin") {
     safe.vendor_amount = booking.vendor_amount ?? null;
     safe.final_price = booking.final_price ?? null;
@@ -215,8 +234,13 @@ function withRoleSafePricing<T extends BookingRow>(
       booking.price_published && booking.final_price != null
         ? booking.final_price
         : null;
-    safe.total_amount = publishedFinal ?? booking.total_amount;
-    safe.pricing_state = publishedFinal != null ? "published" : "vendor_amount";
+    safe.total_amount = publishedFinal ?? booking.vendor_amount ?? null;
+    safe.pricing_state =
+      publishedFinal != null
+        ? "published"
+        : booking.vendor_amount != null
+          ? "agreed"
+          : "pending_agreement";
   }
 
   return safe;
@@ -239,7 +263,10 @@ export async function GET(request: NextRequest) {
       .select(BOOKING_SELECT)
       .order("created_at", { ascending: false });
 
-    if (status) {
+    if (status !== null) {
+      if (!isBookingStatus(status)) {
+        return apiError("Invalid booking status", 400);
+      }
       query = query.eq("status", status);
     }
 
@@ -285,8 +312,8 @@ export async function GET(request: NextRequest) {
       const eventIds = [
         ...new Set(
           (bookings ?? [])
-            .map((booking) => booking.wedding_event_id as string | null)
-            .filter((id): id is string => Boolean(id))
+            .map((booking) => booking.wedding_event_id)
+            .filter((id): id is string => typeof id === "string")
         ),
       ];
       if (eventIds.length > 0) {
@@ -485,6 +512,25 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
+      if (error.code === "23505" && weddingEventId) {
+        let existingQuery = supabase
+          .from("bookings")
+          .select(BOOKING_SELECT)
+          .eq("client_profile_id", clientProfile.id)
+          .eq("vendor_profile_id", vendorProfileId)
+          .eq("wedding_event_id", weddingEventId)
+          .neq("status", "CANCELLED");
+        existingQuery = vendorServiceId
+          ? existingQuery.eq("vendor_service_id", vendorServiceId)
+          : existingQuery.is("vendor_service_id", null);
+        const { data: existing, error: existingError } = await existingQuery
+          .limit(1)
+          .maybeSingle();
+
+        if (!existingError && existing) {
+          return apiSuccess(withRoleSafePricing(existing, session.role));
+        }
+      }
       console.error("Booking create error:", error);
       return apiError("Failed to create booking", 500);
     }

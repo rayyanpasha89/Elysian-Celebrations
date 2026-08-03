@@ -2,17 +2,42 @@
 
 import { useSyncExternalStore } from "react";
 
-export function useMediaQuery(query: string): boolean {
-  return useSyncExternalStore(
-    (onChange) => {
-      const media = window.matchMedia(query);
-      const listener = () => onChange();
-      media.addEventListener("change", listener);
-      return () => media.removeEventListener("change", listener);
+interface MediaQueryStore {
+  subscribe: (onChange: () => void) => () => void;
+  getSnapshot: () => boolean;
+}
+
+const stores = new Map<string, MediaQueryStore>();
+const getServerSnapshot = () => false;
+
+function getMediaQueryStore(query: string): MediaQueryStore {
+  const existing = stores.get(query);
+  if (existing) return existing;
+
+  let media: MediaQueryList | undefined;
+  const getMedia = () => {
+    media ??= window.matchMedia(query);
+    return media;
+  };
+
+  const store: MediaQueryStore = {
+    subscribe(onChange) {
+      const queryList = getMedia();
+      queryList.addEventListener("change", onChange);
+      return () => queryList.removeEventListener("change", onChange);
     },
-    () => window.matchMedia(query).matches,
-    () => false
-  );
+    getSnapshot() {
+      return getMedia().matches;
+    },
+  };
+
+  stores.set(query, store);
+  return store;
+}
+
+export function useMediaQuery(query: string): boolean {
+  const store = getMediaQueryStore(query);
+  return useSyncExternalStore(store.subscribe, store.getSnapshot, getServerSnapshot);
 }
 
 export function usePrefersReducedMotion(): boolean {

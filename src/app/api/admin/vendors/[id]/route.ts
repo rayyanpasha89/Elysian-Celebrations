@@ -6,6 +6,10 @@ import {
   apiError,
   apiSuccess,
 } from "@/lib/api-utils";
+import type { Database } from "@/types/database.types";
+
+type VendorProfileUpdate =
+  Database["public"]["Tables"]["vendor_profiles"]["Update"];
 
 async function guard() {
   const session = await getAuthSession();
@@ -86,7 +90,7 @@ export async function PATCH(
     const supabase = createAdminSupabaseClient();
     const body = (await request.json()) as Record<string, unknown>;
 
-    const updates: Record<string, unknown> = {};
+    const updates: VendorProfileUpdate = {};
     if (typeof body.businessName === "string" && body.businessName.trim())
       updates.business_name = body.businessName.trim();
     if (body.city !== undefined)

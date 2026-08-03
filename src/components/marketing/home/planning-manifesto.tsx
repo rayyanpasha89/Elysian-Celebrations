@@ -8,7 +8,7 @@ const pillars = [
     icon: WalletCards,
     title: "Budget Follows Structure",
     description:
-      "Per-person food, vendor packages, custom quotes, and paid visibility stay tied to the branch that created them.",
+      "Per-person food, vendor packages, manually confirmed requests, and paid visibility stay tied to the branch that created them.",
     href: "/#packages",
   },
   {

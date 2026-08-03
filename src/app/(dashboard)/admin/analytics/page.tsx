@@ -5,7 +5,12 @@ import { motion } from "framer-motion";
 import { fadeUp, staggerContainer } from "@/animations/variants";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { DonutChart, type DonutSegment } from "@/components/dashboard/ui-kit";
-import { dashCard, dashLabel } from "@/lib/dashboard-styles";
+import {
+  DASHBOARD_CHART_PALETTE,
+  dashBtn,
+  dashCard,
+  dashLabel,
+} from "@/lib/dashboard-styles";
 import { cn } from "@/lib/utils";
 
 type AnalyticsPayload = {
@@ -26,17 +31,30 @@ function statusLabel(status: string) {
 export default function AdminAnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<AnalyticsPayload | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
+        setLoading(true);
+        setLoadError(null);
         const res = await fetch("/api/admin/analytics");
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error);
+        const json = await res.json().catch(() => null);
+        if (!res.ok) {
+          throw new Error(json?.error ?? "Analytics could not be loaded.");
+        }
         if (!cancelled) setData(json);
-      } catch {
-        if (!cancelled) setData(null);
+      } catch (error) {
+        if (!cancelled) {
+          setData(null);
+          setLoadError(
+            error instanceof Error
+              ? error.message
+              : "Analytics could not be loaded."
+          );
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -44,7 +62,7 @@ export default function AdminAnalyticsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
 
   const bookingStatusRows = useMemo(() => {
     return Object.entries(data?.bookingsByStatus ?? {}).sort((a, b) => b[1] - a[1]);
@@ -54,10 +72,10 @@ export default function AdminAnalyticsPage() {
 
   const accountSegments = useMemo<DonutSegment[]>(
     () => [
-      { label: "Clients", value: data?.usersByRole.client ?? 0, color: "#c9a96e" },
-      { label: "Vendors", value: data?.usersByRole.vendor ?? 0, color: "#9bae8f" },
-      { label: "Managers", value: data?.usersByRole.manager ?? 0, color: "#a68a64" },
-      { label: "Admins", value: data?.usersByRole.admin ?? 0, color: "#414833" },
+      { label: "Clients", value: data?.usersByRole.client ?? 0, color: DASHBOARD_CHART_PALETTE[2] },
+      { label: "Vendors", value: data?.usersByRole.vendor ?? 0, color: DASHBOARD_CHART_PALETTE[4] },
+      { label: "Managers", value: data?.usersByRole.manager ?? 0, color: DASHBOARD_CHART_PALETTE[5] },
+      { label: "Admins", value: data?.usersByRole.admin ?? 0, color: DASHBOARD_CHART_PALETTE[6] },
     ],
     [data]
   );
@@ -71,6 +89,40 @@ export default function AdminAnalyticsPage() {
     );
   }
 
+  if (loadError || !data) {
+    return (
+      <div>
+        <p className={dashLabel}>Platform</p>
+        <h2 className="font-display mt-2 text-3xl font-semibold text-charcoal">
+          Analytics
+        </h2>
+        <div
+          role="alert"
+          className={cn(
+            dashCard,
+            "mt-10 border-dashed border-gold-primary/45 bg-gold-primary/[0.04]"
+          )}
+        >
+          <p className={dashLabel}>Data unavailable</p>
+          <h3 className="mt-3 font-display text-2xl text-charcoal">
+            Analytics could not be loaded
+          </h3>
+          <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate">
+            {loadError ??
+              "The platform totals are unavailable right now. No values have been replaced with zeros."}
+          </p>
+          <button
+            type="button"
+            onClick={() => setReloadKey((key) => key + 1)}
+            className={cn(dashBtn, "mt-6")}
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <motion.div variants={staggerContainer} initial="hidden" animate="visible">
       <motion.div variants={fadeUp}>
@@ -79,10 +131,10 @@ export default function AdminAnalyticsPage() {
       </motion.div>
 
       <motion.div variants={fadeUp} className="mt-10 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Event plans" value={data?.weddingsCount ?? 0} />
-        <StatCard label="Registered vendors" value={data?.usersByRole.vendor ?? 0} />
-        <StatCard label="Registered clients" value={data?.usersByRole.client ?? 0} />
-        <StatCard label="New inquiries" value={data?.newContactInquiries ?? 0} />
+        <StatCard label="Event plans" value={data.weddingsCount} />
+        <StatCard label="Registered vendors" value={data.usersByRole.vendor} />
+        <StatCard label="Registered clients" value={data.usersByRole.client} />
+        <StatCard label="New inquiries" value={data.newContactInquiries} />
       </motion.div>
 
       <motion.div variants={fadeUp} className={cn(dashCard, "mt-10")}>

@@ -31,7 +31,7 @@ create table users (
 
 create table client_profiles (
   id uuid primary key default gen_random_uuid(),
-  user_id text unique not null references users(id) on delete cascade,
+  user_id text unique not null references users(id) on delete restrict,
   partner_name text,
   wedding_date timestamptz,
   estimated_budget integer,
@@ -55,7 +55,7 @@ create table vendor_categories (
 
 create table vendor_profiles (
   id uuid primary key default gen_random_uuid(),
-  user_id text unique not null references users(id) on delete cascade,
+  user_id text unique not null references users(id) on delete restrict,
   business_name text not null,
   slug text unique not null,
   category_id uuid not null references vendor_categories(id),
@@ -346,8 +346,31 @@ create table bookings (
   ),
   constraint bookings_published_price_complete check (
     price_published = false or final_price is not null
+  ),
+  constraint bookings_total_amount_matches_vendor_amount check (
+    total_amount is not distinct from vendor_amount
   )
 );
+
+create unique index bookings_unique_active_event_vendor_service
+  on bookings (
+    client_profile_id,
+    wedding_event_id,
+    vendor_profile_id,
+    vendor_service_id
+  ) nulls not distinct
+  where wedding_event_id is not null and status <> 'CANCELLED';
+
+comment on column bookings.vendor_amount is
+  'Event-specific vendor price agreed offline and recorded by Elysian operations.';
+comment on column bookings.total_amount is
+  'Legacy compatibility mirror constrained to equal vendor_amount.';
+comment on column bookings.final_price is
+  'Client-facing total derived from vendor_amount plus a flat Elysian service fee.';
+comment on column bookings.service_fee is
+  'Generated flat Elysian fee: final_price minus vendor_amount.';
+comment on column bookings.price_published is
+  'When true, final_price may be revealed to the client under application visibility rules.';
 
 -- ─── Saved Vendors ───────────────────────────────────────────
 
@@ -386,7 +409,7 @@ create table reviews (
 
 create table messages (
   id uuid primary key default gen_random_uuid(),
-  sender_id text not null references users(id) on delete cascade,
+  sender_id text not null references users(id) on delete restrict,
   booking_id uuid not null references bookings(id) on delete cascade,
   content text not null,
   is_read boolean not null default false,
@@ -520,26 +543,43 @@ create table contact_inquiries (
 create index idx_vendor_profiles_category on vendor_profiles(category_id);
 create index idx_vendor_profiles_rating on vendor_profiles(rating desc);
 create index idx_vendor_profiles_featured on vendor_profiles(is_featured) where is_featured = true;
+-- NOTE: names below must match supabase/migrations exactly. `create index if
+-- not exists` matches on NAME, not on columns — a second name over the same
+-- column silently creates a second physical B-tree in any environment that is
+-- provisioned from this file and then migrated.
+create index vendor_services_vendor_profile_idx on vendor_services(vendor_profile_id);
 create index idx_vendor_service_items_service on vendor_service_items(vendor_service_id, sort_order);
 create index idx_bookings_client on bookings(client_profile_id);
 create index idx_bookings_vendor on bookings(vendor_profile_id);
+create index bookings_wedding_event_idx on bookings(wedding_event_id);
+create index bookings_vendor_service_idx on bookings(vendor_service_id);
 create index idx_bookings_status on bookings(status);
 create index idx_saved_vendors_client on saved_vendors(client_profile_id);
 create index idx_saved_vendors_vendor on saved_vendors(vendor_profile_id);
-create index idx_weddings_event_type on weddings(event_type);
+create index weddings_client_profile_idx on weddings(client_profile_id);
 create index idx_wedding_days_wedding on wedding_days(wedding_id);
 create index idx_wedding_events_day on wedding_events(wedding_day_id);
-create index idx_wedding_events_time_block on wedding_events(time_block);
+create index wedding_events_wedding_idx on wedding_events(wedding_id);
 create index idx_wedding_event_menus_event on wedding_event_menus(wedding_event_id, sort_order);
 create index idx_wedding_event_menu_items_menu on wedding_event_menu_items(menu_id, sort_order);
 create index idx_wedding_event_tasks_event on wedding_event_tasks(wedding_event_id, sort_order);
 create index idx_wedding_event_requirements_event on wedding_event_requirements(wedding_event_id, sort_order);
 create index idx_wedding_event_requirements_category on wedding_event_requirements(category);
 create index idx_wedding_event_requirements_vendor on wedding_event_requirements(vendor_profile_id);
+create index wedding_event_requirements_vendor_service_idx on wedding_event_requirements(vendor_service_id);
 create index idx_budget_items_wedding_event on budget_items(wedding_event_id);
+create index budget_categories_budget_idx on budget_categories(budget_id);
+create index budget_items_category_idx on budget_items(budget_category_id);
 create index idx_vendor_profile_views_vendor on vendor_profile_views(vendor_profile_id);
 create index idx_vendor_profile_views_created_at on vendor_profile_views(created_at desc);
 create index idx_guests_list on guests(guest_list_id);
+create index timeline_items_wedding_idx on timeline_items(wedding_id);
+create index venues_destination_idx on venues(destination_id);
+-- Client-scoped singleton lookups: every request to GET /api/guests,
+-- GET /api/mood-boards and getOrCreateBudget filters on these.
+create index guest_lists_client_profile_idx on guest_lists(client_profile_id);
+create index mood_boards_client_profile_idx on mood_boards(client_profile_id);
+create index budgets_client_profile_idx on budgets(client_profile_id);
 create index idx_messages_booking on messages(booking_id);
 create index idx_message_thread_reads_user on message_thread_reads(user_id);
 create index idx_message_thread_reads_booking on message_thread_reads(booking_id);
@@ -570,21 +610,6 @@ create trigger tr_message_thread_reads_updated before update on message_thread_r
 create trigger tr_guest_lists_updated before update on guest_lists for each row execute function update_updated_at();
 create trigger tr_mood_boards_updated before update on mood_boards for each row execute function update_updated_at();
 create trigger tr_blog_posts_updated before update on blog_posts for each row execute function update_updated_at();
-
-create or replace function lock_booking_vendor_amount()
-returns trigger as $$
-begin
-  if old.vendor_amount is not null
-     and new.vendor_amount is distinct from old.vendor_amount then
-    raise exception 'vendor_amount is immutable once captured';
-  end if;
-  return new;
-end;
-$$ language plpgsql;
-
-create trigger bookings_lock_vendor_amount
-before update of vendor_amount on bookings
-for each row execute function lock_booking_vendor_amount();
 
 -- Clerk owns application authentication. Browser clients never query the
 -- public schema directly; role-checked Next.js handlers use service_role.

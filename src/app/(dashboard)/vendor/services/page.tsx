@@ -347,7 +347,7 @@ export default function VendorServicesPage() {
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate">
             Build packages that mirror what you actually offer — scope, inclusions,
             deliverables, add-ons, and itemized {copy.catalogueLabel.toLowerCase()}.
-            Couples see this exact catalogue on your public profile.
+            Clients see this exact catalogue on your public profile.
           </p>
         </div>
         <button
@@ -500,6 +500,10 @@ export default function VendorServicesPage() {
                                 <img
                                   src={url}
                                   alt=""
+                                  width={48}
+                                  height={48}
+                                  loading="lazy"
+                                  decoding="async"
                                   className="h-full w-full object-cover"
                                 />
                               </div>
@@ -797,7 +801,7 @@ function ServiceEditor({
               No itemized rows yet
             </p>
             <p className="mt-2 text-xs leading-relaxed text-slate">
-              Couples currently only see your package summary. Add rows for what
+              Clients currently only see your package summary. Add rows for what
               clients actually receive — e.g.{" "}
               <span className="text-charcoal">
                 {copy.exampleItemNames.join(", ")}
@@ -1037,7 +1041,7 @@ function ItemMediaEditor({
           Reference imagery
         </p>
         <p className="mt-1 text-[11px] leading-relaxed text-slate/80">
-          Up to {MAX_IMAGES} images per row. Couples see these as thumbnails on
+          Up to {MAX_IMAGES} images per row. Clients see these as thumbnails on
           your profile and inside the Event Editor catalogue preview.
         </p>
       </div>
@@ -1053,13 +1057,17 @@ function ItemMediaEditor({
               <img
                 src={url}
                 alt={`Reference ${i + 1}`}
+                width={56}
+                height={56}
+                loading="lazy"
+                decoding="async"
                 className="h-full w-full object-cover"
               />
               <button
                 type="button"
                 onClick={() => removeAt(i)}
                 aria-label="Remove image"
-                className="absolute right-0 top-0 flex h-4 w-4 items-center justify-center bg-midnight/70 text-[10px] text-ivory opacity-0 transition-opacity group-hover:opacity-100"
+                className="absolute right-0 top-0 flex h-4 w-4 items-center justify-center bg-midnight/70 text-[10px] text-ivory opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
               >
                 ×
               </button>

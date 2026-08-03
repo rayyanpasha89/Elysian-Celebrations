@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
 
     const requirementSeeds = buildDefaultRequirementsForEvent({
       eventName: event.name,
-      timeBlock: event.time_block,
+      timeBlock: normalizeTimeBlockKey(event.time_block),
       startTime: event.start_time,
     });
 
@@ -137,7 +137,10 @@ export async function POST(request: NextRequest) {
         .insert({
           wedding_event_id: event.id,
           name: `${event.name} Food and beverage plan`,
-          meal_period: mealPeriodForTimeBlock(event.time_block, event.start_time),
+          meal_period: mealPeriodForTimeBlock(
+            normalizeTimeBlockKey(event.time_block),
+            event.start_time
+          ),
           service_style: event.food_style ?? null,
           notes:
             event.menu_notes ??

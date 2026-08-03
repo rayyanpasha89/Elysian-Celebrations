@@ -3,7 +3,19 @@ export type MessageEntry = {
   from: "vendor" | "client";
   text: string;
   time: string;
+  createdAt?: string | null;
 };
+
+export function formatMessageTime(message: MessageEntry) {
+  if (!message.createdAt) return message.time;
+  const date = new Date(message.createdAt);
+  if (Number.isNaN(date.getTime())) return message.time;
+  return date.toLocaleString(undefined, {
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 export type BookingContext = {
   status: string;
@@ -96,7 +108,7 @@ export function firstMessageSuggestionsForClient(
     );
   }
   if (service?.name) {
-    tips.push(`Ask for a detailed quote and inclusions for ${service.name}.`);
+    tips.push(`Confirm the agreed scope and inclusions for ${service.name}.`);
   }
   if (event?.venue) {
     tips.push(`Share that the venue is ${event.venue} and ask about logistics.`);

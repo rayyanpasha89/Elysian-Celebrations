@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -23,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { fadeUp, staggerContainer } from "@/animations/variants";
+import { DASHBOARD_CHART_COLORS } from "@/lib/dashboard-styles";
 import { cn } from "@/lib/utils";
 
 // ─── Domain ─────────────────────────────────────────────────────────────────
@@ -44,9 +46,9 @@ type Guest = {
 };
 
 const SIDES: { key: GuestSide; label: string; short: string; color: string }[] = [
-  { key: "BRIDE", label: "Bride's side", short: "Bride", color: "#D4A0A0" },
-  { key: "GROOM", label: "Groom's side", short: "Groom", color: "#A4AC86" },
-  { key: "COUPLE", label: "Both / shared", short: "Both", color: "#C9A96E" },
+  { key: "BRIDE", label: "Bride's side", short: "Bride", color: DASHBOARD_CHART_COLORS.toffee },
+  { key: "GROOM", label: "Groom's side", short: "Groom", color: DASHBOARD_CHART_COLORS.sage },
+  { key: "COUPLE", label: "Both / shared", short: "Both", color: DASHBOARD_CHART_COLORS.camel },
 ];
 const SIDE_MAP = Object.fromEntries(SIDES.map((s) => [s.key, s])) as Record<
   GuestSide,
@@ -798,6 +800,7 @@ function GuestRow({
                     <button
                       key={s.key}
                       type="button"
+                      aria-pressed={guest.side === s.key}
                       onClick={() => onMutate(guest.id, { side: s.key })}
                       className={cn(
                         "px-3 py-1.5 font-accent text-[10px] uppercase tracking-[0.12em] transition-colors",
@@ -813,6 +816,7 @@ function GuestRow({
               <Field label="Plus one">
                 <button
                   type="button"
+                  aria-pressed={guest.plus_one}
                   onClick={() => onMutate(guest.id, { plus_one: !guest.plus_one })}
                   className={cn(
                     "inline-flex items-center gap-2 border px-3 py-2 font-accent text-[10px] uppercase tracking-[0.14em] transition-colors",
@@ -832,6 +836,7 @@ function GuestRow({
                     <button
                       key={meal}
                       type="button"
+                      aria-pressed={guest.meal_pref === meal}
                       onClick={() =>
                         onMutate(guest.id, {
                           meal_pref: guest.meal_pref === meal ? null : meal,
@@ -850,8 +855,9 @@ function GuestRow({
                 </div>
               </Field>
 
-              <Field label="Email">
+              <Field label="Email" controlId={`guest-${guest.id}-email`}>
                 <input
+                  id={`guest-${guest.id}-email`}
                   defaultValue={guest.email ?? ""}
                   onBlur={(e) => {
                     const v = e.target.value.trim();
@@ -861,8 +867,9 @@ function GuestRow({
                   className="w-full border border-charcoal/15 bg-transparent px-3 py-2 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
                 />
               </Field>
-              <Field label="Phone">
+              <Field label="Phone" controlId={`guest-${guest.id}-phone`}>
                 <input
+                  id={`guest-${guest.id}-phone`}
                   defaultValue={guest.phone ?? ""}
                   onBlur={(e) => {
                     const v = e.target.value.trim();
@@ -873,8 +880,13 @@ function GuestRow({
                 />
               </Field>
 
-              <Field label="Notes" className="md:col-span-2">
+              <Field
+                label="Notes"
+                controlId={`guest-${guest.id}-notes`}
+                className="md:col-span-2"
+              >
                 <input
+                  id={`guest-${guest.id}-notes`}
                   defaultValue={guest.notes ?? ""}
                   onBlur={(e) => {
                     const v = e.target.value.trim();
@@ -888,8 +900,16 @@ function GuestRow({
               <div className="md:col-span-2">
                 <button
                   type="button"
-                  onClick={() => onRemove(guest.id)}
-                  className="inline-flex items-center gap-1.5 border border-rose/35 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.14em] text-rose transition-colors hover:bg-rose hover:text-ivory"
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        `Remove ${guest.name}? Their RSVP, meal, contact, and seating details will be deleted.`
+                      )
+                    ) {
+                      onRemove(guest.id);
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 border border-rose/35 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.14em] text-rose transition-colors hover:bg-rose hover:text-ivory focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose"
                 >
                   <Trash2 className="h-3 w-3" /> Remove guest
                 </button>
@@ -906,17 +926,29 @@ function Field({
   label,
   children,
   className,
+  controlId,
 }: {
   label: string;
   children: ReactNode;
   className?: string;
+  controlId?: string;
 }) {
+  const labelId = useId();
+  const labelClassName =
+    "mb-1.5 block font-accent text-[10px] uppercase tracking-[0.16em] text-slate";
+
   return (
     <div className={className}>
-      <p className="mb-1.5 font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
-        {label}
-      </p>
-      {children}
+      {controlId ? (
+        <label htmlFor={controlId} className={labelClassName}>
+          {label}
+        </label>
+      ) : (
+        <p id={labelId} className={labelClassName}>
+          {label}
+        </p>
+      )}
+      {controlId ? children : <div role="group" aria-labelledby={labelId}>{children}</div>}
     </div>
   );
 }
@@ -971,7 +1003,9 @@ function SeatingPlanner({
           <p className={dashLabel}>Unseated</p>
           <span className="font-display text-lg text-charcoal">{unseated.length}</span>
         </div>
-        <p className="mt-1 text-xs text-slate">Drag a guest onto a table.</p>
+        <p className="mt-1 text-xs text-slate">
+          Choose a table from each guest menu, or drag on desktop.
+        </p>
         <div className="mt-3 space-y-2">
           {unseated.length === 0 ? (
             <p className="border border-dashed border-charcoal/12 px-3 py-6 text-center text-xs text-slate">
@@ -982,6 +1016,8 @@ function SeatingPlanner({
               <SeatChip
                 key={g.id}
                 guest={g}
+                tables={tables}
+                onAssign={(table) => assign(g.id, table)}
                 onDragStart={() => setDragId(g.id)}
                 onDragEnd={() => setDragId(null)}
               />
@@ -1054,7 +1090,7 @@ function SeatingPlanner({
                 <div className="mt-2 flex-1 space-y-1.5">
                   {here.length === 0 ? (
                     <p className="mt-4 text-center text-[11px] text-slate/60">
-                      Drop guests here
+                      Assign guests here
                     </p>
                   ) : (
                     here.map((g) => (
@@ -1062,6 +1098,8 @@ function SeatingPlanner({
                         key={g.id}
                         guest={g}
                         compact
+                        tables={tables}
+                        onAssign={(nextTable) => assign(g.id, nextTable)}
                         onDragStart={() => setDragId(g.id)}
                         onDragEnd={() => setDragId(null)}
                         onRemove={() => assign(g.id, null)}
@@ -1081,12 +1119,16 @@ function SeatingPlanner({
 function SeatChip({
   guest,
   compact,
+  tables,
+  onAssign,
   onDragStart,
   onDragEnd,
   onRemove,
 }: {
   guest: Guest;
   compact?: boolean;
+  tables: number[];
+  onAssign: (table: number | null) => void;
   onDragStart: () => void;
   onDragEnd: () => void;
   onRemove?: () => void;
@@ -1110,12 +1152,30 @@ function SeatChip({
         {guest.name}
         {guest.plus_one ? <span className="text-gold-dark"> +1</span> : null}
       </span>
+      <select
+        value={guest.table_number ?? ""}
+        aria-label={`Assign ${guest.name} to a table`}
+        draggable={false}
+        onPointerDown={(event) => event.stopPropagation()}
+        onChange={(event) => {
+          const table = event.target.value;
+          onAssign(table ? Number(table) : null);
+        }}
+        className="min-w-0 max-w-[6.5rem] border border-charcoal/15 bg-ivory px-1.5 py-1 font-accent text-[9px] uppercase tracking-[0.08em] text-charcoal outline-none focus-visible:border-gold-primary focus-visible:ring-2 focus-visible:ring-gold-primary/30"
+      >
+        <option value="">Unseated</option>
+        {tables.map((table) => (
+          <option key={table} value={table}>
+            Table {table}
+          </option>
+        ))}
+      </select>
       {onRemove ? (
         <button
           type="button"
           onClick={onRemove}
           aria-label="Unseat"
-          className="opacity-0 transition-opacity group-hover:opacity-100"
+          className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose"
         >
           <X className="h-3 w-3 text-slate" />
         </button>

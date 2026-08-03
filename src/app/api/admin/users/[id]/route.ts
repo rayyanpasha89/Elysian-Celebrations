@@ -7,9 +7,16 @@ import {
   apiError,
   apiSuccess,
 } from "@/lib/api-utils";
+import type { Database } from "@/types/database.types";
 
-const VALID_ROLES = ["CLIENT", "VENDOR", "MANAGER", "ADMIN"] as const;
-type ValidRole = (typeof VALID_ROLES)[number];
+type UserUpdate = Database["public"]["Tables"]["users"]["Update"];
+type ValidRole = NonNullable<UserUpdate["role"]>;
+
+const VALID_ROLES = ["CLIENT", "VENDOR", "MANAGER", "ADMIN"] as const satisfies readonly ValidRole[];
+
+function isValidRole(value: string): value is ValidRole {
+  return VALID_ROLES.some((role) => role === value);
+}
 
 export async function PATCH(
   request: NextRequest,
@@ -34,22 +41,15 @@ export async function PATCH(
       return apiError("Provide isActive or role", 400);
     }
 
-    const updates: Record<string, unknown> = {};
+    const updates: UserUpdate = {};
+    let requestedRole: ValidRole | null = null;
     if (typeof body.isActive === "boolean") updates.is_active = body.isActive;
 
     if (typeof body.role === "string") {
-      const role = body.role.toUpperCase() as ValidRole;
-      if (!VALID_ROLES.includes(role)) return apiError("Invalid role", 400);
+      const role = body.role.toUpperCase();
+      if (!isValidRole(role)) return apiError("Invalid role", 400);
       updates.role = role;
-      // Sync role to Clerk publicMetadata
-      try {
-        const clerk = await clerkClient();
-        await clerk.users.updateUserMetadata(id, {
-          publicMetadata: { role: role.toLowerCase() },
-        });
-      } catch (e) {
-        console.error("Clerk metadata update failed:", e);
-      }
+      requestedRole = role;
     }
 
     const { data: user, error } = await supabase
@@ -67,7 +67,26 @@ export async function PATCH(
       return apiError("User not found", 404);
     }
 
-    return apiSuccess({ user });
+    let clerkMetadataSynced = true;
+    if (requestedRole) {
+      try {
+        const clerk = await clerkClient();
+        await clerk.users.updateUserMetadata(id, {
+          publicMetadata: { role: requestedRole.toLowerCase() },
+        });
+      } catch (e) {
+        clerkMetadataSynced = false;
+        console.error("Clerk metadata update failed:", e);
+      }
+    }
+
+    return apiSuccess({
+      user,
+      clerkMetadataSynced,
+      warning: clerkMetadataSynced
+        ? null
+        : "Access was updated, but Clerk routing metadata still needs synchronization.",
+    });
   } catch (e) {
     console.error("PATCH /api/admin/users/[id]", e);
     return apiError("Internal server error", 500);

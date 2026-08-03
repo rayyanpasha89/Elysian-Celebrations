@@ -6,6 +6,26 @@ import {
   apiError,
   apiSuccess,
 } from "@/lib/api-utils";
+import type { Database } from "@/types/database.types";
+
+type ContactInquiryUpdate =
+  Database["public"]["Tables"]["contact_inquiries"]["Update"];
+type InquiryStatus = NonNullable<ContactInquiryUpdate["status"]>;
+
+const INQUIRY_STATUSES = [
+  "NEW",
+  "CONTACTED",
+  "IN_PROGRESS",
+  "CONVERTED",
+  "CLOSED",
+] as const satisfies readonly InquiryStatus[];
+
+function isInquiryStatus(value: unknown): value is InquiryStatus {
+  return (
+    typeof value === "string" &&
+    INQUIRY_STATUSES.some((status) => status === value)
+  );
+}
 
 export async function GET() {
   const session = await getAuthSession();
@@ -46,8 +66,11 @@ export async function PATCH(request: NextRequest) {
       return apiError("id is required");
     }
 
-    const updates: Record<string, unknown> = {};
-    if (typeof status === "string") updates.status = status;
+    const updates: ContactInquiryUpdate = {};
+    if (typeof status === "string") {
+      if (!isInquiryStatus(status)) return apiError("Invalid status", 400);
+      updates.status = status;
+    }
 
     const { data: row, error } = await supabase
       .from("contact_inquiries")

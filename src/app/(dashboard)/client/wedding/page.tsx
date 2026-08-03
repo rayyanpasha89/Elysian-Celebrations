@@ -2,12 +2,25 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  cloneElement,
+  isValidElement,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { CalendarClock, Check, ChevronDown, Clock, MapPin, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer } from "@/animations/variants";
-import { FinalizationBoard } from "@/components/dashboard/finalization-board";
+import {
+  FinalizationBoard,
+  type FinalizationGapTarget,
+} from "@/components/dashboard/finalization-board";
 import {
   CelebrationCanvas,
   FlowEmptyState,
@@ -174,6 +187,7 @@ type WeddingEvent = {
   notes: string | null;
   requirement_payload?: Record<string, unknown> | null;
   sort_order: number;
+  readinessPercent: number;
   menus: EventMenu[];
   logistics: EventLogistics | null;
   tasks: EventTask[];
@@ -469,7 +483,7 @@ const TASK_BLUEPRINTS = [
     tasks: [
       ["Confirm vendor scope and catalogue rows", "Planner"],
       ["Share final guest count and timing with vendors", "Planner"],
-      ["Collect quote, payment schedule, and cancellation terms", "Finance"],
+      ["Confirm final price, payment schedule, and cancellation terms", "Finance"],
     ],
   },
   {
@@ -870,13 +884,6 @@ function formatEventWindow(event: WeddingEvent) {
   return bits.length > 0 ? bits.join(" - ") : "Timing to be decided";
 }
 
-
-function readinessTone(percent: number) {
-  if (percent >= 100) return "border-sage/35 bg-sage/10 text-sage";
-  if (percent >= 70) return "border-gold-primary/35 bg-gold-primary/10 text-gold-dark";
-  return "border-charcoal/12 bg-cream/50 text-slate";
-}
-
 function findEventById(days: WeddingDay[], eventId: string | null) {
   if (!eventId) return null;
 
@@ -902,33 +909,8 @@ function findEventDay(days: WeddingDay[], eventId: string | null) {
   return null;
 }
 
-function eventReadinessPercent(event: WeddingEvent, venueOptions: VenueOption[]) {
-  const needsFood = (event.requirements ?? []).some(
-    (requirement) => requirement.category === "food"
-  );
-  const needsLogistics = (event.requirements ?? []).some(
-    (requirement) => requirement.category === "logistics"
-  );
-  const estimate = estimateEventSpend(event, venueOptions);
-  const checks = [
-    Boolean(event.name.trim()),
-    Boolean(event.date && event.start_time && event.end_time),
-    Boolean(event.venue?.trim()),
-    Boolean(event.guest_count && event.guest_count > 0),
-    (event.requirements ?? []).length > 0,
-    event.vendorSelections.length > 0 ||
-      (event.requirements ?? []).some(
-        (requirement) =>
-          Boolean(requirement.vendorProfileId) ||
-          Boolean(requirement.vendorServiceId)
-      ),
-    estimate.max > 0,
-    !needsFood || event.menus.length > 0,
-    !needsLogistics || hasLogisticsDetails(event.logistics),
-    event.tasks.length > 0,
-  ];
-  const complete = checks.filter(Boolean).length;
-  return Math.round((complete / checks.length) * 100);
+function eventReadinessPercent(event: WeddingEvent) {
+  return Math.min(100, Math.max(0, event.readinessPercent ?? 0));
 }
 
 function summarizeDayPlan(day: WeddingDay, venueOptions: VenueOption[]) {
@@ -944,7 +926,7 @@ function summarizeDayPlan(day: WeddingDay, venueOptions: VenueOption[]) {
     eventCount > 0
       ? Math.round(
           day.events.reduce(
-            (sum, event) => sum + eventReadinessPercent(event, venueOptions),
+            (sum, event) => sum + eventReadinessPercent(event),
             0
           ) / eventCount
         )
@@ -1247,15 +1229,6 @@ function gatedSpendEstimateLabel(
     : "Unlocks at 100%";
 }
 
-function gatedSpendEstimateCaption(
-  estimate: SpendEstimate,
-  readinessPercent: number
-) {
-  return readinessPercent >= 100
-    ? spendEstimateCaption(estimate)
-    : "Finish venue, guests, partners, menu/logistics, and tasks to reveal the estimate.";
-}
-
 function vendorCategorySection(
   categoryKey: PlannerVendorCategoryKey
 ): EditorSectionKey {
@@ -1455,6 +1428,31 @@ function firstMissingVendorCategory(event: WeddingEvent | null) {
 function firstVendorGapSection(event: WeddingEvent | null): EditorSectionKey {
   const missingCategory = firstMissingVendorCategory(event);
   return missingCategory ? vendorCategorySection(missingCategory) : "food";
+}
+
+function requirementCategorySection(
+  category: EventRequirementCategoryKey
+): EditorSectionKey {
+  if (category === "food") return "food";
+  if (category === "decor") return "design";
+  if (category === "photo-video") return "media";
+  if (category === "entertainment") return "entertainment";
+  if (category === "logistics" || category === "hospitality") return "logistics";
+  return "special";
+}
+
+function firstRequirementGapSection(event: WeddingEvent | null): EditorSectionKey {
+  if (!event) return "basics";
+  const unresolved = event.requirements.find(
+    (requirement) =>
+      requirement.status !== "CONFIRMED" && requirement.status !== "DONE"
+  );
+  if (unresolved) return requirementCategorySection(unresolved.category);
+  const needsFood = event.requirements.some(
+    (requirement) => requirement.category === "food"
+  );
+  if (needsFood && event.menus.length === 0) return "food";
+  return "basics";
 }
 
 function vendorDraftSelectionKey(selection: VendorDraftSelection) {
@@ -1760,14 +1758,47 @@ function applyVendorServiceToDraft({
   };
 }
 
+const DIALOG_FOCUSABLE_SELECTOR = [
+  "a[href]",
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  '[tabindex]:not([tabindex="-1"])',
+].join(",");
+
+function keepFocusInsideDialog(
+  event: KeyboardEvent,
+  container: HTMLElement | null
+) {
+  if (event.key !== "Tab" || !container) return;
+
+  const focusable = Array.from(
+    container.querySelectorAll<HTMLElement>(DIALOG_FOCUSABLE_SELECTOR)
+  ).filter((element) => element.offsetParent !== null);
+  if (focusable.length === 0) {
+    event.preventDefault();
+    container.focus();
+    return;
+  }
+
+  const first = focusable[0];
+  const last = focusable.at(-1) ?? first;
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
 export default function ClientWeddingPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<WeddingPayload | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  // Canvas tracks its own drill-down focus; we only keep the setter so the
-  // existing load/select flows can record the active day without a console warn.
-  const [, setFocusedDayId] = useState<string | null>(null);
+  const [activeCanvasDayId, setActiveCanvasDayId] = useState<string | null>(null);
   // Layer tab — Definition (what we're planning), Requirements (the existing
   // 7-step per-block editor, default), Finalization (gap checklist before
   // launch). Requirements is the primary work surface; the other two are
@@ -1777,17 +1808,12 @@ export default function ClientWeddingPage() {
   );
   const [showDayForm, setShowDayForm] = useState(false);
   const [dayDraft, setDayDraft] = useState({ name: "", date: "", notes: "" });
-  const [editingDayId, setEditingDayId] = useState<string | null>(null);
-  const [editingDayDraft, setEditingDayDraft] = useState({
-    name: "",
-    date: "",
-    notes: "",
-  });
   const [eventFormDayId, setEventFormDayId] = useState<string | null>(null);
   const [eventDraft, setEventDraft] = useState<EventCreationDraft>(
     createEventDraftForDay
   );
   const [detailDraft, setDetailDraft] = useState<EventDetailDraft | null>(null);
+  const [detailDraftSnapshot, setDetailDraftSnapshot] = useState<string | null>(null);
   const [editorSection, setEditorSection] = useState<EditorSectionKey>("basics");
   // Layer 2 editor is a zoom-open overlay: it appears only when a step is
   // picked, animating out of the tapped step's screen position so the map
@@ -1806,6 +1832,10 @@ export default function ClientWeddingPage() {
   const [savedVendorSlugs, setSavedVendorSlugs] = useState<string[]>([]);
   const [venueOptionsLoading, setVenueOptionsLoading] = useState(false);
   const [venueOptions, setVenueOptions] = useState<VenueOption[]>([]);
+  const createDayRequestRef = useRef(false);
+  const createEventRequestRef = useRef(false);
+  const editorDialogRef = useRef<HTMLDivElement>(null);
+  const eventFormDialogRef = useRef<HTMLDivElement>(null);
 
   const loadWedding = useCallback(async () => {
     const response = await fetch("/api/wedding");
@@ -1858,7 +1888,7 @@ export default function ClientWeddingPage() {
     const allEvents = data.days.flatMap((day) => day.events);
     if (allEvents.length === 0) {
       setSelectedEventId(null);
-      setFocusedDayId(data.days[0]?.id ?? null);
+      setActiveCanvasDayId(data.days[0]?.id ?? null);
       return;
     }
 
@@ -1866,18 +1896,23 @@ export default function ClientWeddingPage() {
     if (selectedEventId && !stillExists) {
       setSelectedEventId(null);
     }
-  }, [data, selectedEventId]);
+
+    if (
+      !activeCanvasDayId ||
+      !data.days.some((day) => day.id === activeCanvasDayId)
+    ) {
+      setActiveCanvasDayId(data.days[0]?.id ?? null);
+    }
+  }, [activeCanvasDayId, data, selectedEventId]);
 
   const wedding = data?.wedding ?? null;
+  const weddingId = wedding?.id ?? null;
+  const destinationSlug = wedding?.destination?.slug ?? null;
   const days = data?.days ?? EMPTY_DAYS;
   const selectedEvent = findEventById(days, selectedEventId);
   const selectedDay = findEventDay(days, selectedEventId);
-  const editingDay = editingDayId
-    ? days.find((day) => day.id === editingDayId) ?? null
-    : null;
-  const editingDayIndex = editingDay
-    ? days.findIndex((day) => day.id === editingDay.id)
-    : -1;
+  const activeCanvasDay =
+    days.find((day) => day.id === activeCanvasDayId) ?? selectedDay ?? days[0] ?? null;
   const eventFormDay = eventFormDayId
     ? days.find((day) => day.id === eventFormDayId) ?? null
     : null;
@@ -1901,7 +1936,7 @@ export default function ClientWeddingPage() {
               .slice()
               .sort((left, right) => left.sort_order - right.sort_order)
               .map((event) => {
-                const readiness = eventReadinessPercent(event, venueOptions);
+                const readiness = eventReadinessPercent(event);
                 const resolvedVenue = findVenueByValue(venueOptions, event.venue);
                 const venueLabel = resolvedVenue?.name ?? event.venue?.trim() ?? "";
                 return {
@@ -1930,21 +1965,24 @@ export default function ClientWeddingPage() {
 
   useEffect(() => {
     if (selectedDay) {
-      setFocusedDayId(selectedDay.id);
+      setActiveCanvasDayId(selectedDay.id);
     }
   }, [selectedDay]);
 
   useEffect(() => {
     if (!selectedEvent) {
       setDetailDraft(null);
+      setDetailDraftSnapshot(null);
       return;
     }
 
-    setDetailDraft(buildDetailDraft(selectedEvent));
+    const nextDraft = buildDetailDraft(selectedEvent);
+    setDetailDraft(nextDraft);
+    setDetailDraftSnapshot(JSON.stringify(nextDraft));
   }, [selectedEvent]);
 
   useEffect(() => {
-    if (!wedding) return;
+    if (!weddingId) return;
 
     let cancelled = false;
 
@@ -1959,8 +1997,8 @@ export default function ClientWeddingPage() {
               limit: "12",
             });
 
-            if (wedding.destination?.slug) {
-              params.set("destination", wedding.destination.slug);
+            if (destinationSlug) {
+              params.set("destination", destinationSlug);
             }
 
             const response = await fetch(`/api/vendors?${params.toString()}`);
@@ -2002,10 +2040,10 @@ export default function ClientWeddingPage() {
     return () => {
       cancelled = true;
     };
-  }, [wedding]);
+  }, [destinationSlug, weddingId]);
 
   useEffect(() => {
-    if (!wedding) return;
+    if (!weddingId) return;
 
     let cancelled = false;
 
@@ -2027,19 +2065,19 @@ export default function ClientWeddingPage() {
     return () => {
       cancelled = true;
     };
-  }, [wedding]);
+  }, [weddingId]);
 
   useEffect(() => {
-    if (!wedding) return;
+    if (!weddingId) return;
 
     let cancelled = false;
 
     (async () => {
       setVenueOptionsLoading(true);
       try {
-        const params = new URLSearchParams({ limit: "12" });
-        if (wedding.destination?.slug) {
-          params.set("destination", wedding.destination.slug);
+        const params = new URLSearchParams({ limit: "30" });
+        if (destinationSlug) {
+          params.set("destination", destinationSlug);
         }
 
         const response = await fetch(`/api/venues?${params.toString()}`);
@@ -2067,7 +2105,7 @@ export default function ClientWeddingPage() {
     return () => {
       cancelled = true;
     };
-  }, [wedding]);
+  }, [destinationSlug, weddingId]);
 
   const totalEvents = useMemo(
     () => days.reduce((sum, day) => sum + day.events.length, 0),
@@ -2103,11 +2141,11 @@ export default function ClientWeddingPage() {
     if (events.length === 0) return 0;
     return Math.round(
       events.reduce(
-        (sum, event) => sum + eventReadinessPercent(event, venueOptions),
+        (sum, event) => sum + eventReadinessPercent(event),
         0
       ) / events.length
     );
-  }, [days, venueOptions]);
+  }, [days]);
 
   const detailSpendEstimate = useMemo(() => {
     if (!selectedEvent || !detailDraft) return null;
@@ -2119,12 +2157,26 @@ export default function ClientWeddingPage() {
     });
   }, [detailDraft, selectedEvent, venueOptions, vendorOptions]);
 
+  const isEditorDirty = useMemo(
+    () =>
+      detailDraft !== null &&
+      detailDraftSnapshot !== null &&
+      JSON.stringify(detailDraft) !== detailDraftSnapshot,
+    [detailDraft, detailDraftSnapshot]
+  );
+
   const openEventSection = useCallback(
     (eventId: string, section: EditorSectionKey = "basics") => {
+      const event = findEventById(days, eventId);
+      if (!event) return;
+
+      const nextDraft = buildDetailDraft(event);
       setSelectedEventId(eventId);
+      setDetailDraft(nextDraft);
+      setDetailDraftSnapshot(JSON.stringify(nextDraft));
       setEditorSection(section);
     },
-    []
+    [days]
   );
 
   // Open the editor overlay on a step pick, remembering where the tap came from
@@ -2142,7 +2194,15 @@ export default function ClientWeddingPage() {
     [openEventSection]
   );
 
-  const closeEditor = useCallback(() => setEditorOpen(false), []);
+  const closeEditor = useCallback(() => {
+    if (
+      isEditorDirty &&
+      !window.confirm("Discard the unsaved changes in this event step?")
+    ) {
+      return;
+    }
+    setEditorOpen(false);
+  }, [isEditorDirty]);
 
   // The panel grows from the tapped step toward the centre of the screen.
   const editorMotion = useMemo(() => {
@@ -2165,20 +2225,55 @@ export default function ClientWeddingPage() {
     };
   }, [editorOrigin, prefersReducedMotion]);
 
+  // Read through a ref so the dialog effect below never re-runs when
+  // closeEditor changes identity. It depends on isEditorDirty, which flips on
+  // the first keystroke — re-running the effect would restore focus to the
+  // canvas mid-typing and then steal it back to the panel.
+  const closeEditorRef = useRef(closeEditor);
+  useEffect(() => {
+    closeEditorRef.current = closeEditor;
+  }, [closeEditor]);
+
   // Esc closes the editor; lock background scroll while it is open.
   useEffect(() => {
     if (!editorOpen) return;
+    const previousActive = document.activeElement as HTMLElement | null;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setEditorOpen(false);
+      if (event.key === "Escape") closeEditorRef.current();
+      keepFocusInsideDialog(event, editorDialogRef.current);
     };
     window.addEventListener("keydown", onKey);
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const frame = window.requestAnimationFrame(() => editorDialogRef.current?.focus());
     return () => {
+      window.cancelAnimationFrame(frame);
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = previousOverflow;
+      previousActive?.focus();
     };
   }, [editorOpen]);
+
+  useEffect(() => {
+    if (!eventFormDay) return;
+    const previousActive = document.activeElement as HTMLElement | null;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setEventFormDayId(null);
+      keepFocusInsideDialog(event, eventFormDialogRef.current);
+    };
+    window.addEventListener("keydown", onKey);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const frame = window.requestAnimationFrame(() =>
+      eventFormDialogRef.current?.focus()
+    );
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+      previousActive?.focus();
+    };
+  }, [eventFormDay]);
 
   // Hide the dedicated sections for needs the client didn't ask for. Cross-cutting
   // sections (basics, special, tasks, notes) always show. If the event carries no
@@ -2223,32 +2318,35 @@ export default function ClientWeddingPage() {
   }, []);
 
   const resolveFinalizationCheck = useCallback(
-    (checkKey: string) => {
-      if (checkKey === "definition") {
+    (checkKey: string, targetEventId?: string) => {
+      if (checkKey === "definition" && !targetEventId) {
         setLayer("definition");
         return;
       }
 
       const firstEvent = days.flatMap((day) => day.events)[0] ?? null;
-      if (!selectedEventId && firstEvent) {
-        setSelectedEventId(firstEvent.id);
-      }
-      const targetEvent = selectedEvent ?? firstEvent;
+      const targetEvent =
+        findEventById(days, targetEventId ?? null) ?? selectedEvent ?? firstEvent;
 
       const sectionByCheck: Record<string, EditorSectionKey> = {
-        requirements: "food",
+        definition: "basics",
+        requirements: firstRequirementGapSection(targetEvent),
         vendors: firstVendorGapSection(targetEvent),
         budget: "basics",
-        "guests-hotels": "logistics",
-        "run-of-show": "notes",
+        "guests-hotels":
+          !targetEvent?.guest_count || targetEvent.guest_count <= 0
+            ? "basics"
+            : "logistics",
+        "run-of-show": targetEvent?.tasks.length === 0 ? "tasks" : "logistics",
       };
 
       setLayer("requirements");
-      setEditorSection(sectionByCheck[checkKey] ?? "basics");
+      if (!targetEvent) return;
+      openEventSection(targetEvent.id, sectionByCheck[checkKey] ?? "basics");
       setEditorOrigin(null);
       setEditorOpen(true);
     },
-    [days, selectedEvent, selectedEventId]
+    [days, openEventSection, selectedEvent]
   );
 
   // Keep the active section within the set the selected event actually exposes,
@@ -2263,6 +2361,8 @@ export default function ClientWeddingPage() {
 
   const createDay = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (createDayRequestRef.current) return;
+    createDayRequestRef.current = true;
     setSavingDay(true);
 
     try {
@@ -2289,59 +2389,7 @@ export default function ClientWeddingPage() {
         error instanceof Error ? error.message : "Failed to add day"
       );
     } finally {
-      setSavingDay(false);
-    }
-  };
-
-  const saveDayEdits = async (dayId: string) => {
-    setSavingDay(true);
-
-    try {
-      const response = await fetch(`/api/wedding/days/${dayId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: editingDayDraft.name,
-          date: editingDayDraft.date || null,
-          notes: editingDayDraft.notes.trim() || null,
-        }),
-      });
-      const json = await response.json();
-      if (!response.ok) {
-        throw new Error(json.error ?? "Failed to update day");
-      }
-
-      await refreshWedding();
-      setEditingDayId(null);
-      toast.success("Day updated");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to update day"
-      );
-    } finally {
-      setSavingDay(false);
-    }
-  };
-
-  const deleteDay = async (dayId: string) => {
-    setSavingDay(true);
-
-    try {
-      const response = await fetch(`/api/wedding/days/${dayId}`, {
-        method: "DELETE",
-      });
-      const json = await response.json();
-      if (!response.ok) {
-        throw new Error(json.error ?? "Failed to delete day");
-      }
-
-      await refreshWedding();
-      toast.success("Day removed");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to delete day"
-      );
-    } finally {
+      createDayRequestRef.current = false;
       setSavingDay(false);
     }
   };
@@ -2358,53 +2406,17 @@ export default function ClientWeddingPage() {
     setEventDraft(createEventDraftForDay(day));
   };
 
-  const moveDay = async (dayId: string, direction: -1 | 1) => {
-    const dayIndex = days.findIndex((day) => day.id === dayId);
-    const otherDay = days[dayIndex + direction];
-    const currentDay = days[dayIndex];
-
-    if (!currentDay || !otherDay) return;
-
-    setSavingDay(true);
-
-    try {
-      const [resA, resB] = await Promise.all([
-        fetch(`/api/wedding/days/${currentDay.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sortOrder: otherDay.sort_order }),
-        }),
-        fetch(`/api/wedding/days/${otherDay.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sortOrder: currentDay.sort_order }),
-        }),
-      ]);
-      const [jsonA, jsonB] = await Promise.all([
-        resA.json() as Promise<{ error?: string }>,
-        resB.json() as Promise<{ error?: string }>,
-      ]);
-      if (!resA.ok) {
-        throw new Error(jsonA.error ?? "Failed to reorder days");
-      }
-      if (!resB.ok) {
-        throw new Error(jsonB.error ?? "Failed to reorder days");
-      }
-
-      await refreshWedding();
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not reorder days"
-      );
-    } finally {
-      setSavingDay(false);
-    }
-  };
-
   const createEvent = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!eventFormDayId || !eventDraft.name.trim()) return;
+    if (
+      createEventRequestRef.current ||
+      !eventFormDayId ||
+      !eventDraft.name.trim()
+    ) {
+      return;
+    }
 
+    createEventRequestRef.current = true;
     setSavingEvent(true);
 
     try {
@@ -2445,6 +2457,7 @@ export default function ClientWeddingPage() {
         error instanceof Error ? error.message : "Failed to add event"
       );
     } finally {
+      createEventRequestRef.current = false;
       setSavingEvent(false);
     }
   };
@@ -2461,6 +2474,15 @@ export default function ClientWeddingPage() {
         ),
       ])
     ) as Record<PlannerVendorCategoryKey, EventVendorSelection[]>;
+
+    const additions: {
+      categoryLabel: string;
+      selection: VendorDraftSelection;
+    }[] = [];
+    const removals: {
+      categoryLabel: string;
+      selection: EventVendorSelection;
+    }[] = [];
 
     for (const category of PLANNER_VENDOR_CATEGORIES) {
       const currentSelections = currentSelectionsByCategory[category.key];
@@ -2487,20 +2509,27 @@ export default function ClientWeddingPage() {
           );
         }
 
-        const deleteResponse = await fetch(`/api/bookings/${currentSelection.id}`, {
-          method: "DELETE",
+        removals.push({
+          categoryLabel: category.label,
+          selection: currentSelection,
         });
-        const deleteJson = await deleteResponse.json();
-        if (!deleteResponse.ok) {
-          throw new Error(
-            deleteJson.error ?? `Failed to clear ${category.label.toLowerCase()}`
-          );
-        }
       }
 
       for (const nextSelection of nextSelections) {
         if (currentByKey.has(vendorDraftSelectionKey(nextSelection))) continue;
 
+        additions.push({
+          categoryLabel: category.label,
+          selection: nextSelection,
+        });
+      }
+    }
+
+    // Create replacements before deleting draft inquiries. If a create fails,
+    // the user's existing selections remain intact and the final refresh shows
+    // any successfully-created rows instead of hiding server truth.
+    for (const addition of additions) {
+      const nextSelection = addition.selection;
         const createResponse = await fetch("/api/bookings", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -2515,9 +2544,23 @@ export default function ClientWeddingPage() {
         const createJson = await createResponse.json();
         if (!createResponse.ok) {
           throw new Error(
-            createJson.error ?? `Failed to save ${category.label.toLowerCase()}`
+            createJson.error ??
+              `Failed to save ${addition.categoryLabel.toLowerCase()}`
           );
         }
+    }
+
+    for (const removal of removals) {
+      const deleteResponse = await fetch(
+        `/api/bookings/${removal.selection.id}`,
+        { method: "DELETE" }
+      );
+      const deleteJson = await deleteResponse.json();
+      if (!deleteResponse.ok) {
+        throw new Error(
+          deleteJson.error ??
+            `Failed to clear ${removal.categoryLabel.toLowerCase()}`
+        );
       }
     }
   };
@@ -2605,13 +2648,21 @@ export default function ClientWeddingPage() {
       }
 
       await syncVendorSelections(selectedEvent, draftToSave);
-      await refreshWedding();
       toast.success(options.successMessage ?? "Event plan saved");
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to save event"
       );
     } finally {
+      try {
+        await refreshWedding();
+      } catch (refreshError) {
+        toast.error(
+          refreshError instanceof Error
+            ? `${refreshError.message}. Reload to restore the live plan.`
+            : "Reload to restore the live plan."
+        );
+      }
       setSavingDetail(false);
     }
   };
@@ -2677,8 +2728,9 @@ export default function ClientWeddingPage() {
 
       setData({ wedding: null, days: [] });
       setSelectedEventId(null);
-      setFocusedDayId(null);
+      setActiveCanvasDayId(null);
       setDetailDraft(null);
+      setDetailDraftSnapshot(null);
       setLayer("definition");
       toast.success("Event plan deleted. Start a fresh structure when you're ready.");
       router.replace("/client/onboarding");
@@ -3182,7 +3234,7 @@ export default function ClientWeddingPage() {
               <button
                 type="button"
                 className={cn(dashBtn, "w-full md:w-auto")}
-                onClick={() => openEventFormForDay(selectedDay ?? days[0])}
+                onClick={() => openEventFormForDay(activeCanvasDay)}
               >
                 Add event
               </button>
@@ -3264,9 +3316,7 @@ export default function ClientWeddingPage() {
             <div className="mt-4">
               <FlowEmptyState
                 title="Map your event structure"
-                description="Start with one day, then branch into morning, afternoon, and evening functions before opening the editor."
-                actionLabel="Create day"
-                onAction={() => setShowDayForm(true)}
+                description="Use Add day above, then open a function branch to edit its steps."
               />
             </div>
           ) : (
@@ -3274,157 +3324,15 @@ export default function ClientWeddingPage() {
               <CelebrationCanvas
                 eventTitle={wedding?.name ?? "Your event"}
                 days={canvasDays}
+                onActiveDayChange={setActiveCanvasDayId}
                 onOpenStep={(eventId, stepId, origin) =>
                   openEditorStep(eventId, stepId as EditorSectionKey, origin)
                 }
-                onAddDay={() => {
-                  setEventFormDayId(null);
-                  setEditingDayId(null);
-                  setShowDayForm(true);
-                }}
-                onAddFunction={(dayId) =>
-                  openEventFormForDay(days.find((day) => day.id === dayId) ?? null)
-                }
-                onEditDay={(dayId) => {
-                  const day = days.find((entry) => entry.id === dayId);
-                  if (!day) return;
-                  setShowDayForm(false);
-                  setEventFormDayId(null);
-                  setEditingDayId(day.id);
-                  setEditingDayDraft({
-                    name: day.name,
-                    date: day.date ? day.date.slice(0, 10) : "",
-                    notes: day.notes ?? "",
-                  });
-                }}
-                onDeleteDay={(dayId) => void deleteDay(dayId)}
               />
             </div>
           )}
 
-          {/* Edit-day overlay — opened from the day hub on the canvas. */}
-          <AnimatePresence>
-            {editingDay ? (
-              <motion.div
-                key="edit-day-overlay"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[115] flex items-center justify-center bg-midnight/45 p-4 backdrop-blur"
-                onClick={() => setEditingDayId(null)}
-              >
-                <motion.div
-                  initial={
-                    prefersReducedMotion
-                      ? { opacity: 0 }
-                      : { opacity: 0, scale: 0.95, y: 12 }
-                  }
-                  animate={
-                    prefersReducedMotion
-                      ? { opacity: 1 }
-                      : { opacity: 1, scale: 1, y: 0 }
-                  }
-                  exit={
-                    prefersReducedMotion
-                      ? { opacity: 0 }
-                      : { opacity: 0, scale: 0.97, y: 8 }
-                  }
-                  transition={{ type: "spring", stiffness: 240, damping: 26 }}
-                  onClick={(event) => event.stopPropagation()}
-                  className="w-full max-w-lg border border-charcoal/12 bg-ivory p-5 shadow-[0_40px_120px_rgba(51,61,41,0.35)]"
-                >
-                  <div className="flex items-center justify-between gap-3 border-b border-charcoal/10 pb-3">
-                    <p className={dashLabel}>Edit day</p>
-                    <button
-                      type="button"
-                      onClick={() => setEditingDayId(null)}
-                      aria-label="Close"
-                      className="inline-flex h-8 w-8 items-center justify-center border border-charcoal/15 text-lg leading-none text-slate transition-colors hover:border-gold-primary hover:text-gold-dark"
-                    >
-                      <span aria-hidden>×</span>
-                    </button>
-                  </div>
-                  <div className="mt-4 space-y-3">
-                    <input
-                      type="text"
-                      value={editingDayDraft.name}
-                      onChange={(event) =>
-                        setEditingDayDraft((current) => ({
-                          ...current,
-                          name: event.target.value,
-                        }))
-                      }
-                      className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-display text-lg text-charcoal outline-none focus:border-gold-primary"
-                    />
-                    <input
-                      type="date"
-                      value={editingDayDraft.date}
-                      onChange={(event) =>
-                        setEditingDayDraft((current) => ({
-                          ...current,
-                          date: event.target.value,
-                        }))
-                      }
-                      className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                    />
-                    <Field label="Day notes">
-                      <textarea
-                        value={editingDayDraft.notes}
-                        onChange={(event) =>
-                          setEditingDayDraft((current) => ({
-                            ...current,
-                            notes: event.target.value,
-                          }))
-                        }
-                        className="min-h-[88px] w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                        placeholder="Logistics, dress code, venue notes..."
-                      />
-                    </Field>
-                  </div>
-                  <div className="mt-5 grid gap-2 border-t border-charcoal/8 pt-4 sm:flex sm:flex-wrap sm:items-center">
-                    <p className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
-                      Order
-                    </p>
-                    <button
-                      type="button"
-                      className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark disabled:cursor-not-allowed disabled:opacity-40"
-                      onClick={() => void moveDay(editingDay.id, -1)}
-                      disabled={editingDayIndex <= 0 || savingDay}
-                    >
-                      Earlier
-                    </button>
-                    <button
-                      type="button"
-                      className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark disabled:cursor-not-allowed disabled:opacity-40"
-                      onClick={() => void moveDay(editingDay.id, 1)}
-                      disabled={editingDayIndex >= days.length - 1 || savingDay}
-                    >
-                      Later
-                    </button>
-                  </div>
-                  <div className="mt-4 grid gap-3 sm:flex sm:flex-wrap">
-                    <button
-                      type="button"
-                      className={cn(dashBtn, "w-full sm:w-auto")}
-                      disabled={savingDay}
-                      onClick={() => void saveDayEdits(editingDay.id)}
-                    >
-                      {savingDay ? "Saving..." : "Save day"}
-                    </button>
-                    <button
-                      type="button"
-                      className="inline-flex w-full items-center justify-center border border-charcoal/15 px-4 py-3 font-accent text-[11px] uppercase tracking-[0.18em] text-charcoal sm:w-auto"
-                      onClick={() => setEditingDayId(null)}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </motion.div>
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
-
-          {/* Add-function overlay — opened from the day hub on the canvas. */}
+          {/* Add-function overlay — opened from the single Layer 2 command bar. */}
           <AnimatePresence>
             {eventFormDay ? (
               <motion.div
@@ -3436,6 +3344,11 @@ export default function ClientWeddingPage() {
                 onClick={() => setEventFormDayId(null)}
               >
                 <motion.div
+                  ref={eventFormDialogRef}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="add-event-dialog-title"
+                  tabIndex={-1}
                   initial={
                     prefersReducedMotion
                       ? { opacity: 0 }
@@ -3458,7 +3371,10 @@ export default function ClientWeddingPage() {
                   <div className="flex items-center justify-between gap-3 border-b border-charcoal/10 px-5 py-4">
                     <div className="min-w-0">
                       <p className={dashLabel}>Add function</p>
-                      <p className="mt-0.5 truncate font-display text-lg text-charcoal">
+                      <p
+                        id="add-event-dialog-title"
+                        className="mt-0.5 truncate font-display text-lg text-charcoal"
+                      >
                         {eventFormDay.name}
                       </p>
                     </div>
@@ -3478,76 +3394,85 @@ export default function ClientWeddingPage() {
                       run-of-show tasks.
                     </p>
                     <div className="mt-4 grid gap-3">
-                      <input
-                        type="text"
-                        value={eventDraft.name}
-                        onChange={(event) =>
-                          setEventDraft((current) => ({
-                            ...current,
-                            name: event.target.value,
-                            eventType: event.target.value || current.eventType,
-                          }))
-                        }
-                        placeholder="Function name / type"
-                        className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                      />
-                      <select
-                        value={eventDraft.timeBlock}
-                        onChange={(event) => {
-                          const timeBlock = event.target.value as EventTimeBlockKey;
-                          const defaults = timeBlockDefaults(timeBlock);
-                          setEventDraft((current) => ({
-                            ...current,
-                            timeBlock,
-                            startTime: defaults.defaultStartTime,
-                            endTime: defaults.defaultEndTime,
-                          }));
-                        }}
-                        className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                      >
-                        {EVENT_TIME_BLOCKS.map((option) => (
-                          <option key={option.key} value={option.key}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="date"
-                        value={eventDraft.date}
-                        onChange={(event) =>
-                          setEventDraft((current) => ({
-                            ...current,
-                            date: event.target.value,
-                          }))
-                        }
-                        className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                      />
+                      <Field label="Function name and type">
+                        <input
+                          type="text"
+                          value={eventDraft.name}
+                          onChange={(event) =>
+                            setEventDraft((current) => ({
+                              ...current,
+                              name: event.target.value,
+                              eventType: event.target.value || current.eventType,
+                            }))
+                          }
+                          placeholder="Function name / type"
+                          className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                        />
+                      </Field>
+                      <Field label="Time block">
+                        <select
+                          value={eventDraft.timeBlock}
+                          onChange={(event) => {
+                            const timeBlock = event.target.value as EventTimeBlockKey;
+                            const defaults = timeBlockDefaults(timeBlock);
+                            setEventDraft((current) => ({
+                              ...current,
+                              timeBlock,
+                              startTime: defaults.defaultStartTime,
+                              endTime: defaults.defaultEndTime,
+                            }));
+                          }}
+                          className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                        >
+                          {EVENT_TIME_BLOCKS.map((option) => (
+                            <option key={option.key} value={option.key}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label="Date">
+                        <input
+                          type="date"
+                          value={eventDraft.date}
+                          onChange={(event) =>
+                            setEventDraft((current) => ({
+                              ...current,
+                              date: event.target.value,
+                            }))
+                          }
+                          className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                        />
+                      </Field>
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <input
-                          type="time"
-                          value={eventDraft.startTime}
-                          onChange={(event) =>
-                            setEventDraft((current) => ({
-                              ...current,
-                              startTime: event.target.value,
-                            }))
-                          }
-                          className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                        />
-                        <input
-                          type="time"
-                          value={eventDraft.endTime}
-                          onChange={(event) =>
-                            setEventDraft((current) => ({
-                              ...current,
-                              endTime: event.target.value,
-                            }))
-                          }
-                          className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                        />
+                        <Field label="Start time">
+                          <input
+                            type="time"
+                            value={eventDraft.startTime}
+                            onChange={(event) =>
+                              setEventDraft((current) => ({
+                                ...current,
+                                startTime: event.target.value,
+                              }))
+                            }
+                            className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                          />
+                        </Field>
+                        <Field label="End time">
+                          <input
+                            type="time"
+                            value={eventDraft.endTime}
+                            onChange={(event) =>
+                              setEventDraft((current) => ({
+                                ...current,
+                                endTime: event.target.value,
+                              }))
+                            }
+                            className="border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                          />
+                        </Field>
                       </div>
-                      <div>
-                        <p className={dashLabel}>Venue or area</p>
+                      <Field label="Venue or area">
                         <VenuePicker
                           venues={venueOptions}
                           loading={venueOptionsLoading}
@@ -3558,7 +3483,7 @@ export default function ClientWeddingPage() {
                             setEventDraft((current) => ({ ...current, venue }))
                           }
                         />
-                      </div>
+                      </Field>
                     </div>
                     <div className="mt-5 grid gap-3 sm:flex sm:flex-wrap">
                       <button
@@ -3593,11 +3518,13 @@ export default function ClientWeddingPage() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               onClick={closeEditor}
-              role="dialog"
-              aria-modal="true"
-              aria-label={`${selectedEvent.name} editor`}
             >
               <motion.div
+                ref={editorDialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="event-editor-dialog-title"
+                tabIndex={-1}
                 onClick={(event) => event.stopPropagation()}
                 initial={editorMotion.initial}
                 animate={editorMotion.animate}
@@ -3608,7 +3535,10 @@ export default function ClientWeddingPage() {
                 <div className="flex items-center justify-between gap-3 border-b border-charcoal/10 bg-ivory/95 px-5 py-4 backdrop-blur">
                   <div className="min-w-0">
                     <p className={dashLabel}>Event editor</p>
-                    <p className="mt-0.5 truncate font-display text-lg text-charcoal">
+                    <p
+                      id="event-editor-dialog-title"
+                      className="mt-0.5 truncate font-display text-lg text-charcoal"
+                    >
                       {selectedEvent.name}
                     </p>
                   </div>
@@ -3623,114 +3553,65 @@ export default function ClientWeddingPage() {
                 </div>
                 <div className="flex-1 overflow-y-auto px-5 py-5 md:px-6">
                   <div className="space-y-5">
-                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                  <div className="min-w-0">
-                    <button
-                      type="button"
-                      onClick={closeEditor}
-                      className="inline-flex items-center gap-1.5 font-accent text-[10px] uppercase tracking-[0.18em] text-slate transition-colors hover:text-gold-dark"
-                    >
-                      <span aria-hidden>←</span> Back to steps
-                    </button>
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <h4 className="font-display text-2xl text-charcoal">
-                        {activeEditorSection.label}
-                      </h4>
-                      <span className="border border-gold-primary/35 bg-gold-primary/10 px-2 py-1 font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark">
-                        {selectedEvent.name}
-                      </span>
-                    </div>
+                <div>
+                  <button
+                    type="button"
+                    onClick={closeEditor}
+                    className="inline-flex items-center gap-1.5 font-accent text-[10px] uppercase tracking-[0.18em] text-slate transition-colors hover:text-gold-dark"
+                  >
+                    <span aria-hidden>←</span> Back to steps
+                  </button>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <h4 className="font-display text-2xl text-charcoal">
+                      {activeEditorSection.label}
+                    </h4>
+                    <span className="border border-gold-primary/35 bg-gold-primary/10 px-2 py-1 font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark">
+                      {selectedEvent.name}
+                    </span>
                   </div>
 
-                  {/* When & where — pinned top-right, shown on every step */}
-                  <div className="shrink-0 border border-charcoal/10 bg-cream/30 p-3 md:w-60">
-                    <p className={dashLabel}>When &amp; where</p>
-                    <dl className="mt-2 space-y-2">
-                      <div className="flex items-start gap-2">
-                        <CalendarClock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold-dark" />
-                        <div className="min-w-0">
-                          <dt className="font-accent text-[9px] uppercase tracking-[0.14em] text-slate/70">
-                            Date
-                          </dt>
-                          <dd className="font-heading text-xs text-charcoal">
-                            {detailDraft.date
-                              ? new Date(detailDraft.date).toLocaleDateString("en-IN", {
-                                  weekday: "short",
-                                  day: "numeric",
-                                  month: "short",
-                                })
-                              : "To be decided"}
-                          </dd>
-                        </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-y border-charcoal/8 py-3">
+                    <p className={cn(dashLabel, "mr-1")}>When &amp; where</p>
+                    <dl className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                      <div className="inline-flex items-center gap-1.5">
+                        <CalendarClock className="h-3.5 w-3.5 shrink-0 text-gold-dark" />
+                        <dt className="sr-only">Date</dt>
+                        <dd className="font-heading text-xs text-charcoal">
+                          {detailDraft.date
+                            ? new Date(detailDraft.date).toLocaleDateString("en-IN", {
+                                weekday: "short",
+                                day: "numeric",
+                                month: "short",
+                              })
+                            : "Date TBD"}
+                        </dd>
                       </div>
-                      <div className="flex items-start gap-2">
-                        <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold-dark" />
-                        <div className="min-w-0">
-                          <dt className="font-accent text-[9px] uppercase tracking-[0.14em] text-slate/70">
-                            Time
-                          </dt>
-                          <dd className="font-heading text-xs text-charcoal">
-                            {detailDraft.startTime
-                              ? `${detailDraft.startTime}${detailDraft.endTime ? ` – ${detailDraft.endTime}` : ""}`
-                              : "To be decided"}
-                          </dd>
-                        </div>
+                      <div className="inline-flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5 shrink-0 text-gold-dark" />
+                        <dt className="sr-only">Time</dt>
+                        <dd className="font-heading text-xs text-charcoal">
+                          {detailDraft.startTime
+                            ? `${detailDraft.startTime}${detailDraft.endTime ? ` – ${detailDraft.endTime}` : ""}`
+                            : "Time TBD"}
+                        </dd>
                       </div>
-                      <div className="flex items-start gap-2">
-                        <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold-dark" />
-                        <div className="min-w-0">
-                          <dt className="font-accent text-[9px] uppercase tracking-[0.14em] text-slate/70">
-                            Venue
-                          </dt>
-                          <dd className="truncate font-heading text-xs text-charcoal">
-                            {detailDraft.venue || "To be decided"}
-                          </dd>
-                        </div>
+                      <div className="inline-flex min-w-0 items-center gap-1.5">
+                        <MapPin className="h-3.5 w-3.5 shrink-0 text-gold-dark" />
+                        <dt className="sr-only">Venue</dt>
+                        <dd className="max-w-[13rem] truncate font-heading text-xs text-charcoal">
+                          {detailDraft.venue || "Venue TBD"}
+                        </dd>
                       </div>
                     </dl>
                     {activeEditorSection.key !== "basics" ? (
                       <button
                         type="button"
                         onClick={() => setEditorSection("basics")}
-                        className="mt-3 w-full border border-charcoal/15 py-1.5 font-accent text-[9px] uppercase tracking-[0.14em] text-slate transition-colors hover:border-gold-primary hover:text-gold-dark"
+                        className="font-accent text-[9px] uppercase tracking-[0.14em] text-slate transition-colors hover:text-gold-dark"
                       >
-                        Edit in Basics
+                        Edit basics
                       </button>
                     ) : null}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div
-                    className={cn(
-                      "border p-3 transition-colors",
-                      readinessTone(
-                        selectedEvent
-                          ? eventReadinessPercent(selectedEvent, venueOptions)
-                          : 0
-                      )
-                    )}
-                  >
-                    <p className={dashLabel}>Ready</p>
-                    <p className="mt-1 font-display text-lg">
-                      {selectedEvent
-                        ? eventReadinessPercent(selectedEvent, venueOptions)
-                        : 0}
-                      %
-                    </p>
-                  </div>
-                  <div className="border border-charcoal/8 bg-cream/35 p-3">
-                    <p className={dashLabel}>Est. cost</p>
-                    <p className="mt-1 font-display text-base leading-tight text-charcoal">
-                      {detailSpendEstimate
-                        ? gatedSpendEstimateLabel(
-                            detailSpendEstimate,
-                            selectedEvent
-                              ? eventReadinessPercent(selectedEvent, venueOptions)
-                              : 0
-                          )
-                        : "Pending"}
-                    </p>
                   </div>
                 </div>
 
@@ -3891,44 +3772,6 @@ export default function ClientWeddingPage() {
                         )
                       }
                     />
-                  </Field>
-                  <Field label="Derived spend estimate">
-                    <div className="border border-gold-primary/25 bg-gold-primary/8 p-4">
-                      <p className="font-display text-2xl text-charcoal">
-                        {detailSpendEstimate
-                          ? gatedSpendEstimateLabel(
-                              detailSpendEstimate,
-                              selectedEvent
-                                ? eventReadinessPercent(selectedEvent, venueOptions)
-                                : 0
-                            )
-                          : "Estimate pending"}
-                      </p>
-                      <p className="mt-2 text-xs leading-relaxed text-slate">
-                        {detailSpendEstimate
-                          ? gatedSpendEstimateCaption(
-                              detailSpendEstimate,
-                              selectedEvent
-                                ? eventReadinessPercent(selectedEvent, venueOptions)
-                                : 0
-                            )
-                          : "Pick a venue and packages to generate this."}
-                      </p>
-                      {detailSpendEstimate?.sources.length &&
-                      selectedEvent &&
-                      eventReadinessPercent(selectedEvent, venueOptions) >= 100 ? (
-                        <div className="mt-3 flex flex-wrap gap-1.5">
-                          {detailSpendEstimate.sources.slice(0, 4).map((source) => (
-                            <span
-                              key={source}
-                              className="border border-charcoal/10 bg-ivory/60 px-2 py-1 font-heading text-[10px] text-slate"
-                            >
-                              {source}
-                            </span>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
                   </Field>
                 </div>
 
@@ -4442,7 +4285,9 @@ export default function ClientWeddingPage() {
                       <p className={dashLabel}>Special requirements</p>
                       <p className="mt-1 text-sm text-slate">
                         Use this only for unusual needs that do not fit food,
-                        design, photo/film, entertainment, or logistics.
+                        design, photo/film, entertainment, or logistics. Special
+                        items stay outside the automatic estimate until Elysian
+                        confirms and publishes their final price.
                       </p>
                     </div>
 
@@ -4968,15 +4813,44 @@ function VenuePicker({
 }) {
   const selectedVenue = venues.find((venue) => venueMatchesValue(venue, value));
   const [showCustom, setShowCustom] = useState(false);
+  const [search, setSearch] = useState("");
   const visibleVenues = compact ? venues.slice(0, 4) : venues.slice(0, 6);
   const customValueActive = Boolean(value && !selectedVenue);
   const customOpen = showCustom || customValueActive;
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredVenues = normalizedSearch
+    ? venues.filter((venue) =>
+        [venue.name, venue.address, venueDestinationLabel(venue)]
+          .filter(Boolean)
+          .some((field) => field!.toLowerCase().includes(normalizedSearch))
+      )
+    : venues;
+  const dropdownVenues =
+    selectedVenue && !filteredVenues.some((venue) => venue.id === selectedVenue.id)
+      ? [selectedVenue, ...filteredVenues]
+      : filteredVenues;
+  const catalogueCoversSearch = venues.some(
+    (venue) => venue.name.trim().toLowerCase() === normalizedSearch
+  );
+  const canUseCustom =
+    !loading &&
+    ((Boolean(normalizedSearch) && !catalogueCoversSearch) || venues.length === 0);
 
   // Compact pull-down — used in the Basics editor so it doesn't eat the page.
   if (dropdown) {
     const selectValue = selectedVenue ? selectedVenue.name : customValueActive ? "__custom__" : "";
     return (
       <div className="space-y-2">
+        {venues.length > 6 ? (
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search venue, city, or area"
+            aria-label="Search venue catalogue"
+            className="w-full border border-charcoal/15 bg-transparent px-3 py-2.5 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+          />
+        ) : null}
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
             <select
@@ -4986,7 +4860,7 @@ function VenuePicker({
                 const next = event.target.value;
                 if (next === "__custom__") {
                   setShowCustom(true);
-                  onChange("");
+                  if (selectedVenue) onChange(search.trim());
                 } else {
                   setShowCustom(false);
                   onChange(next);
@@ -4995,7 +4869,7 @@ function VenuePicker({
               className="w-full appearance-none border border-charcoal/15 bg-transparent px-3 py-2.5 pr-9 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
             >
               <option value="">{loading ? "Loading venues…" : "Select a venue…"}</option>
-              {venues.map((venue) => {
+              {dropdownVenues.map((venue) => {
                 const dest = venueDestinationLabel(venue);
                 return (
                   <option key={venue.id} value={venue.name}>
@@ -5004,7 +4878,7 @@ function VenuePicker({
                   </option>
                 );
               })}
-              <option value="__custom__">Custom area…</option>
+              {customOpen ? <option value="__custom__">Custom area…</option> : null}
             </select>
             <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate" />
           </div>
@@ -5021,6 +4895,20 @@ function VenuePicker({
             </button>
           ) : null}
         </div>
+        {canUseCustom && !customOpen ? (
+          <button
+            type="button"
+            onClick={() => {
+              setShowCustom(true);
+              onChange(search.trim());
+            }}
+            className="font-accent text-[9px] uppercase tracking-[0.14em] text-gold-dark underline decoration-gold-primary/30 underline-offset-4"
+          >
+            {normalizedSearch
+              ? `Use “${search.trim()}” as a custom venue`
+              : "Enter a custom venue"}
+          </button>
+        ) : null}
         {customOpen ? (
           <input
             type="text"
@@ -5078,6 +4966,10 @@ function VenuePicker({
                     <img
                       src={venue.hero_image}
                       alt=""
+                      width={800}
+                      height={320}
+                      loading="lazy"
+                      decoding="async"
                       className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                   </span>
@@ -5741,6 +5633,10 @@ function ServiceOfferingPreview({
                             <img
                               src={item.image_urls[0]}
                               alt=""
+                              width={40}
+                              height={40}
+                              loading="lazy"
+                              decoding="async"
                               className="h-full w-full object-cover"
                             />
                           </span>
@@ -5979,6 +5875,7 @@ type CheckResult = {
   description: string;
   status: "ok" | "missing" | "partial";
   detail: string;
+  targets?: FinalizationGapTarget[];
 };
 
 function computeFinalizationChecks(
@@ -6032,6 +5929,99 @@ function computeFinalizationChecks(
   ).length;
   const missingTasks = allEvents.filter((event) => event.tasks.length === 0).length;
 
+  const buildTargets = (
+    predicate: (event: WeddingEvent) => boolean,
+    describe: (event: WeddingEvent) => string
+  ): FinalizationGapTarget[] =>
+    days.flatMap((day) =>
+      day.events
+        .filter(predicate)
+        .map((event) => ({
+          eventId: event.id,
+          eventName: event.name,
+          dayName: day.name,
+          detail: describe(event),
+        }))
+    );
+
+  const definitionTargets = buildTargets(
+    (event) =>
+      !event.name.trim() ||
+      !event.date ||
+      !event.start_time ||
+      !event.end_time ||
+      !event.venue?.trim(),
+    (event) => {
+      const gaps = [
+        !event.date ? "date" : null,
+        !event.start_time || !event.end_time ? "time" : null,
+        !event.venue?.trim() ? "venue" : null,
+      ].filter(Boolean);
+      return `${gaps.join(", ") || "basic details"} needed`;
+    }
+  );
+  const requirementTargets = buildTargets(
+    (event) => {
+      const unresolved = event.requirements.some(
+        (requirement) =>
+          requirement.status !== "CONFIRMED" && requirement.status !== "DONE"
+      );
+      const needsFood = event.requirements.some(
+        (requirement) => requirement.category === "food"
+      );
+      return (
+        event.requirements.length === 0 ||
+        unresolved ||
+        (needsFood && event.menus.length === 0)
+      );
+    },
+    (event) => {
+      if (event.requirements.length === 0) return "requirements missing";
+      const needsFood = event.requirements.some(
+        (requirement) => requirement.category === "food"
+      );
+      if (needsFood && event.menus.length === 0) return "food plan missing";
+      return "needs unresolved";
+    }
+  );
+  const vendorTargets = buildTargets(
+    (event) => Boolean(firstMissingVendorCategory(event)),
+    (event) => {
+      const category = firstMissingVendorCategory(event);
+      return category ? `${category.replaceAll("-", " ")} partner needed` : "partner needed";
+    }
+  );
+  const budgetTargets = buildTargets(
+    (event) => {
+      const estimate = estimateEventSpend(event, venueOptions);
+      return estimate.max <= 0 || estimate.missingCount > 0;
+    },
+    (event) => {
+      const estimate = estimateEventSpend(event, venueOptions);
+      return estimate.max <= 0
+        ? "pricing inputs missing"
+        : `${estimate.missingCount} price gap(s)`;
+    }
+  );
+  const guestTargets = buildTargets(
+    (event) => {
+      const hospitalityDraft = event.requirements.some(
+        (requirement) =>
+          requirement.category === "hospitality" && requirement.status === "DRAFT"
+      );
+      return !event.guest_count || event.guest_count <= 0 || hospitalityDraft;
+    },
+    (event) =>
+      !event.guest_count || event.guest_count <= 0
+        ? "guest count needed"
+        : "hospitality still in draft"
+  );
+  const runOfShowTargets = buildTargets(
+    (event) => event.tasks.length === 0 || !hasLogisticsDetails(event.logistics),
+    (event) =>
+      event.tasks.length === 0 ? "tasks missing" : "logistics details missing"
+  );
+
   return EVENT_FINALIZATION_CHECKLIST.map((entry): CheckResult => {
     switch (entry.key) {
       case "definition":
@@ -6051,6 +6041,16 @@ function computeFinalizationChecks(
             description: entry.description,
             status: "missing",
             detail: "No time blocks have been added yet.",
+          };
+        }
+        if (definitionTargets.length > 0) {
+          return {
+            key: entry.key,
+            label: entry.label,
+            description: entry.description,
+            status: "partial",
+            detail: `${definitionTargets.length} function(s) still need date, time, or venue details.`,
+            targets: definitionTargets,
           };
         }
         return {
@@ -6077,6 +6077,7 @@ function computeFinalizationChecks(
             description: entry.description,
             status: "missing",
             detail: `${eventsMissingRequirements} block(s) still need requirement cards.`,
+            targets: requirementTargets,
           };
         }
         if (unresolvedRequirements > 0 || missingFoodMenus > 0) {
@@ -6086,6 +6087,7 @@ function computeFinalizationChecks(
             description: entry.description,
             status: "partial",
             detail: `${unresolvedRequirements} need(s) unresolved · ${missingFoodMenus} food plan(s) missing.`,
+            targets: requirementTargets,
           };
         }
         return {
@@ -6102,6 +6104,7 @@ function computeFinalizationChecks(
           description: entry.description,
           status: missingVendors === 0 && totalEvents > 0 ? "ok" : "partial",
           detail: `${missingVendors} of ${totalEvents} block(s) still have a partner or package gap.`,
+          targets: vendorTargets,
         };
       case "budget":
         return {
@@ -6113,6 +6116,7 @@ function computeFinalizationChecks(
             missingBudget === 0 && totalEvents > 0
               ? `${spendEstimateLabel(totalSpendEstimate)} derived · ${spendEstimateCaption(totalSpendEstimate)}.`
               : `${missingBudget} block(s) need venue/package pricing · ${pricingGaps} service price gap(s).`,
+          targets: budgetTargets,
         };
       case "guests-hotels":
         return {
@@ -6126,6 +6130,7 @@ function computeFinalizationChecks(
               ? "ok"
               : "partial",
           detail: `${missingGuestCount} guest count gap(s) · ${draftHospitalityRequirements} hospitality draft(s).`,
+          targets: guestTargets,
         };
       case "run-of-show":
         return {
@@ -6137,6 +6142,7 @@ function computeFinalizationChecks(
               ? "ok"
               : "partial",
           detail: `${missingTasks} block(s) without tasks · ${missingLogistics} without logistics.`,
+          targets: runOfShowTargets,
         };
       default: {
         const fallback = entry as unknown as {
@@ -6202,10 +6208,37 @@ function Field({
   children: React.ReactNode;
   className?: string;
 }) {
+  const generatedId = useId();
+  const isNativeControl =
+    isValidElement<{ id?: string }>(children) &&
+    typeof children.type === "string" &&
+    ["input", "select", "textarea"].includes(children.type);
+  const controlId = isNativeControl
+    ? children.props.id ?? generatedId
+    : undefined;
+  const labelId = `${generatedId}-label`;
+
   return (
-    <div className={className}>
-      <p className={dashLabel}>{label}</p>
-      <div className="mt-2">{children}</div>
+    <div
+      className={className}
+      {...(!isNativeControl
+        ? { role: "group", "aria-labelledby": labelId }
+        : {})}
+    >
+      {isNativeControl ? (
+        <label htmlFor={controlId} className={dashLabel}>
+          {label}
+        </label>
+      ) : (
+        <span id={labelId} className={dashLabel}>
+          {label}
+        </span>
+      )}
+      <div className="mt-2">
+        {isNativeControl
+          ? cloneElement(children, { id: controlId })
+          : children}
+      </div>
     </div>
   );
 }

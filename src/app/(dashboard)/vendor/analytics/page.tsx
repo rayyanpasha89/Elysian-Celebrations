@@ -5,21 +5,26 @@ import { motion } from "framer-motion";
 import { fadeUp, staggerContainer, staggerItem } from "@/animations/variants";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { BarChart, DonutChart, type DonutSegment } from "@/components/dashboard/ui-kit";
-import { dashCard, dashLabel } from "@/lib/dashboard-styles";
+import {
+  DASHBOARD_CHART_COLORS,
+  DASHBOARD_CHART_PALETTE,
+  dashCard,
+  dashLabel,
+} from "@/lib/dashboard-styles";
 
 const STATUS_COLORS: Record<string, string> = {
-  CONFIRMED: "#9bae8f",
-  COMPLETED: "#7ba7c9",
-  PENDING: "#c9a96e",
-  QUOTE_PENDING: "#c9a96e",
-  QUOTED: "#c9a96e",
-  IN_PROGRESS: "#c9a96e",
-  CANCELLED: "#c98b8b",
-  DECLINED: "#c98b8b",
+  CONFIRMED: DASHBOARD_CHART_COLORS.sage,
+  COMPLETED: DASHBOARD_CHART_COLORS.olive,
+  PENDING: DASHBOARD_CHART_COLORS.camel,
+  QUOTE_SENT: DASHBOARD_CHART_COLORS.camel,
+  IN_PROGRESS: DASHBOARD_CHART_COLORS.toffee,
+  CANCELLED: DASHBOARD_CHART_COLORS.walnut,
+  DECLINED: DASHBOARD_CHART_COLORS.saddle,
 };
-const STATUS_PALETTE = ["#c9a96e", "#9bae8f", "#7ba7c9", "#c98b8b", "#b58fae", "#8a8f98"];
 
 function formatStatusLabel(status: string) {
+  if (status === "QUOTE_SENT") return "Pricing handoff";
+
   return status
     .split("_")
     .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
@@ -35,9 +40,7 @@ type WeeklyVolumePoint = {
 type VendorAnalyticsPayload = {
   bookingsTotal: number;
   bookingsByStatus: Record<string, number>;
-  paidToDate: number;
-  outstandingAmount: number;
-  quotePipeline: number;
+  agreedPipelineValue: number;
   completedBookings: number;
   liveInquiries: number;
   profileViews: number;
@@ -49,9 +52,7 @@ type VendorAnalyticsPayload = {
 const emptyAnalytics: VendorAnalyticsPayload = {
   bookingsTotal: 0,
   bookingsByStatus: {},
-  paidToDate: 0,
-  outstandingAmount: 0,
-  quotePipeline: 0,
+  agreedPipelineValue: 0,
   completedBookings: 0,
   liveInquiries: 0,
   profileViews: 0,
@@ -84,9 +85,7 @@ export default function VendorAnalyticsPage() {
           setAnalytics({
             bookingsTotal: json.bookingsTotal ?? 0,
             bookingsByStatus: json.bookingsByStatus ?? {},
-            paidToDate: json.paidToDate ?? 0,
-            outstandingAmount: json.outstandingAmount ?? 0,
-            quotePipeline: json.quotePipeline ?? 0,
+            agreedPipelineValue: json.agreedPipelineValue ?? 0,
             completedBookings: json.completedBookings ?? 0,
             liveInquiries: json.liveInquiries ?? 0,
             profileViews: json.profileViews ?? 0,
@@ -131,7 +130,9 @@ export default function VendorAnalyticsPage() {
         .map(([key, value], index) => ({
           label: formatStatusLabel(key),
           value,
-          color: STATUS_COLORS[key] ?? STATUS_PALETTE[index % STATUS_PALETTE.length],
+          color:
+            STATUS_COLORS[key] ??
+            DASHBOARD_CHART_PALETTE[index % DASHBOARD_CHART_PALETTE.length],
         })),
     [analytics.bookingsByStatus]
   );
@@ -163,7 +164,7 @@ export default function VendorAnalyticsPage() {
   const activity = [
     {
       id: "inquiries",
-      text: `${analytics.liveInquiries} live inquiries or quote-stage bookings in the pipeline`,
+      text: `${analytics.liveInquiries} live inquiries or pricing-handoff bookings in the pipeline`,
       time: "Pipeline",
     },
     {
@@ -180,14 +181,14 @@ export default function VendorAnalyticsPage() {
 
   const trends = [
     {
-      title: "Quote pipeline",
-      sub: "Current vendor value of inquiry and quote-stage work",
-      value: formatLakhs(analytics.quotePipeline),
+      title: "Agreed pipeline",
+      sub: "Recorded vendor payouts on inquiries and legacy pricing handoffs",
+      value: formatLakhs(analytics.agreedPipelineValue),
     },
     {
-      title: "Outstanding",
-      sub: "Current vendor amount less recorded payments on active bookings",
-      value: formatLakhs(analytics.outstandingAmount),
+      title: "Open requests",
+      sub: "Inquiries and legacy pricing handoffs awaiting a decision",
+      value: String(analytics.liveInquiries),
     },
   ];
 
@@ -208,19 +209,13 @@ export default function VendorAnalyticsPage() {
         <StatCard label="Profile views" value={analytics.profileViews} />
         <StatCard label="Reviews" value={analytics.reviewCount} />
         <StatCard label="Avg rating" value={analytics.rating} suffix="/5" />
-        <StatCard
-          label="Paid to date"
-          value={Math.round(analytics.paidToDate / 1000)}
-          prefix="₹"
-          suffix="K"
-        />
       </motion.div>
 
       <div className="mt-10 grid gap-6 lg:grid-cols-2">
         <motion.div variants={fadeUp} className={dashCard}>
           <h3 className="font-display text-lg text-charcoal">Inquiry volume</h3>
           <p className="font-heading mt-2 text-sm text-slate">
-            Weekly inquiry and quote-stage activity from real booking data.
+            Weekly inquiry and pricing-handoff activity from real booking data.
           </p>
           <BarChart
             className="mt-8"

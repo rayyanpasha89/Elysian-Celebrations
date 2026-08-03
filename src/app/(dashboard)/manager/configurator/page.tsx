@@ -57,28 +57,44 @@ export default function EventConfiguratorPage() {
   const [catering, setCatering] = useState("");
   const [entertainment, setEntertainment] = useState("");
   const [photography, setPhotography] = useState("");
+  const [destinationsLoading, setDestinationsLoading] = useState(true);
+  const [destinationsError, setDestinationsError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
+        setDestinationsLoading(true);
+        setDestinationsError(null);
         const res = await fetch("/api/destinations");
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error);
+        const json = await res.json().catch(() => null);
+        if (!res.ok) {
+          throw new Error(json?.error ?? "Destinations could not be loaded.");
+        }
         if (!cancelled) setDestinations(json.destinations ?? []);
-      } catch {
-        if (!cancelled) setDestinations([]);
+      } catch (error) {
+        if (!cancelled) {
+          setDestinationsError(
+            error instanceof Error
+              ? error.message
+              : "Destinations could not be loaded."
+          );
+        }
+      } finally {
+        if (!cancelled) setDestinationsLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [reloadKey]);
 
   const dest = destinations.find((d) => d.id === selectedDest);
   const tier = packageTiers.find((t) => t.name === selectedTier);
 
   const estimate = useMemo(() => {
-    const basePrice = dest?.starting_price ?? 1500000;
-    const tierMult = tier?.multiplier ?? 1;
+    if (!dest || !tier || !dest.starting_price) return null;
+    const basePrice = dest.starting_price;
+    const tierMult = tier.multiplier;
     const guestMult = Math.max(1, guestCount / 100);
     const addonCount = [decorTheme, catering, entertainment, photography].filter(Boolean).length;
     const addonMult = 1 + addonCount * 0.08;
@@ -105,24 +121,45 @@ export default function EventConfiguratorPage() {
         <div className={dashCard}>
           <h3 className="font-display text-lg text-charcoal">Configuration Panel</h3>
           <p className="mt-4 font-heading text-sm text-slate">
-            Select destination, venue, date, package tier, guest count, decor theme,
-            catering style, entertainment, and photography.
+            Select a destination, planning tier, guest count, and service direction.
+            This is a conversation aid; confirmed pricing still comes from the
+            admin-owned final-price workflow.
           </p>
           <div className="mt-8 space-y-6">
             <div>
-              <label className={dashLabel}>Destination</label>
+              <label htmlFor="manager-configurator-destination" className={dashLabel}>
+                Destination
+              </label>
               <select
+                id="manager-configurator-destination"
                 value={selectedDest}
                 onChange={(e) => setSelectedDest(e.target.value)}
+                disabled={destinationsLoading || Boolean(destinationsError)}
                 className="mt-3 w-full border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm outline-none focus:border-gold-primary"
               >
-                <option value="">Select destination</option>
+                <option value="">
+                  {destinationsLoading ? "Loading destinations..." : "Select destination"}
+                </option>
                 {destinations.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.name}, {d.country}
                   </option>
                 ))}
               </select>
+              {destinationsError ? (
+                <div role="alert" className="mt-3 border border-rose/35 bg-rose/[0.07] px-3 py-3">
+                  <p className="text-xs leading-relaxed text-charcoal">
+                    {destinationsError} No fallback price has been inserted.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setReloadKey((key) => key + 1)}
+                    className="mt-2 font-accent text-[9px] uppercase tracking-[0.16em] text-gold-dark underline decoration-gold-primary/35 underline-offset-4"
+                  >
+                    Try again
+                  </button>
+                </div>
+              ) : null}
             </div>
             <div>
               <p className={dashLabel}>Package Tier</p>
@@ -228,16 +265,18 @@ export default function EventConfiguratorPage() {
           <div className={dashCard}>
             <p className={dashLabel}>Estimated Budget</p>
             <motion.p
-              key={estimate}
+              key={estimate ?? "pending"}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3 }}
               className="font-display mt-3 text-4xl font-semibold tracking-tight text-charcoal"
             >
-              {formatINR(estimate)}
+              {estimate === null ? "Pricing pending" : formatINR(estimate)}
             </motion.p>
             <p className="font-heading mt-2 text-xs text-slate">
-              Rough estimate based on selections. Final pricing varies by vendor availability and dates.
+              {estimate === null
+                ? "Choose a destination with a published starting price and a planning tier to see a directional range."
+                : "Directional only. Admin publishes the final client price after offline vendor confirmation."}
             </p>
           </div>
 

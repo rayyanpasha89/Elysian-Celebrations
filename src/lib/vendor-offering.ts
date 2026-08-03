@@ -178,7 +178,7 @@ const FALLBACK_COPY: CategoryCopy = {
     "On-ground execution",
     "Final handover",
   ],
-  exampleDeliverables: ["Proposal", "Quote breakdown", "Execution checklist"],
+  exampleDeliverables: ["Proposal", "Final-pricing breakdown", "Execution checklist"],
   exampleAddOns: ["Custom add-on", "Extended hours"],
   exampleEventFit: ["Welcome", "Main event", "Reception"],
   exampleItemNames: ["Discovery call", "Scope sheet", "Execution day"],
@@ -219,7 +219,7 @@ const CATEGORY_COPY: Record<string, CategoryCopy> = {
     exampleDeliverables: [
       "Menu proposal",
       "Tasting notes",
-      "Per-person quote",
+      "Per-person pricing",
       "Service checklist",
     ],
     exampleAddOns: [

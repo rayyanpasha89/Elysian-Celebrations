@@ -62,7 +62,7 @@ export default function ClientLayout({
       <div className="lg:pl-64">
         <Topbar
           userName={user?.fullName ?? "Client"}
-          userRole={dashboardRoleLabel(user?.publicMetadata?.role, "Couple")}
+          userRole={dashboardRoleLabel(user?.publicMetadata?.role, "Client")}
         />
         <main className="px-6 py-8 lg:px-8">{children}</main>
       </div>

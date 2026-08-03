@@ -105,7 +105,7 @@ function PortfolioGallery({ profile }: { profile: PortfolioRow }) {
       <div className={cn(dashCard, "border-dashed border-gold-primary/40 bg-gold-primary/8")}>
         <p className={cn(dashLabel, "text-gold-dark")}>Empty portfolio</p>
         <p className="mt-2 font-heading text-sm leading-relaxed text-charcoal">
-          Couples haven&apos;t seen anything from you yet. Add a strong cover
+          Clients haven&apos;t seen anything from you yet. Add a strong cover
           image and 4–8 portfolio shots that lead with your strongest work.
         </p>
         <Link href="/vendor/profile" className={cn(dashBtn, "mt-4")}>
@@ -138,6 +138,10 @@ function PortfolioGallery({ profile }: { profile: PortfolioRow }) {
             <img
               src={cover}
               alt={`${profile.business_name ?? "Vendor"} cover`}
+              width={1600}
+              height={900}
+              loading="lazy"
+              decoding="async"
               className="h-[320px] w-full object-cover md:h-[420px]"
             />
             <span className="absolute left-4 top-4 border border-gold-primary/40 bg-midnight/60 px-2 py-1 font-accent text-[10px] uppercase tracking-[0.18em] text-gold-light backdrop-blur">
@@ -181,6 +185,10 @@ function PortfolioGallery({ profile }: { profile: PortfolioRow }) {
                 <img
                   src={url}
                   alt={`Portfolio ${i + 1}`}
+                  width={800}
+                  height={1000}
+                  loading="lazy"
+                  decoding="async"
                   className="h-full w-full object-cover transition-transform duration-500 hover:scale-[1.03]"
                 />
                 <figcaption className="absolute bottom-2 right-2 border border-charcoal/10 bg-ivory/85 px-2 py-0.5 font-accent text-[10px] uppercase tracking-[0.18em] text-charcoal/70">

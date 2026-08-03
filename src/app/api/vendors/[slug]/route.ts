@@ -3,7 +3,6 @@ import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import {
   apiError,
   apiSuccess,
-  getOptionalAuthSession,
 } from "@/lib/api-utils";
 
 type SelectedReview = {
@@ -29,50 +28,6 @@ function toPublicReviews(reviews: unknown) {
     }));
 }
 
-async function recordVendorProfileView({
-  supabase,
-  vendorId,
-  ownerUserId,
-}: {
-  supabase: ReturnType<typeof createAdminSupabaseClient>;
-  vendorId: string;
-  ownerUserId: string | null;
-}) {
-  try {
-    const session = await getOptionalAuthSession();
-    const viewerUserId = session?.userId ?? null;
-
-    if (viewerUserId && viewerUserId === ownerUserId) {
-      return;
-    }
-
-    if (viewerUserId) {
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-      const { data: recent } = await supabase
-        .from("vendor_profile_views")
-        .select("id")
-        .eq("vendor_profile_id", vendorId)
-        .eq("viewer_user_id", viewerUserId)
-        .gte("created_at", oneHourAgo)
-        .limit(1)
-        .maybeSingle();
-
-      if (recent) return;
-    }
-
-    const { error } = await supabase.from("vendor_profile_views").insert({
-      vendor_profile_id: vendorId,
-      viewer_user_id: viewerUserId,
-    });
-
-    if (error) {
-      console.error("Vendor profile view insert failed:", error);
-    }
-  } catch (error) {
-    console.error("Vendor profile view tracking failed:", error);
-  }
-}
-
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
@@ -96,17 +51,15 @@ export async function GET(
       return apiError("Vendor not found", 404);
     }
 
-    const { user_id: ownerUserId, reviews, ...publicVendor } = vendor;
-
-    await recordVendorProfileView({
-      supabase,
-      vendorId: vendor.id,
-      ownerUserId,
-    });
+    const publicVendor = {
+      ...vendor,
+      user_id: undefined,
+      reviews: undefined,
+    };
 
     return apiSuccess({
       ...publicVendor,
-      reviews: toPublicReviews(reviews),
+      reviews: toPublicReviews(vendor.reviews),
     });
   } catch (error) {
     console.error("Vendor detail error:", error);

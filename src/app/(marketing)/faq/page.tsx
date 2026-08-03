@@ -17,7 +17,7 @@ const faqs = [
   {
     question: "How is budgeting handled?",
     answer:
-      "The planning flow separates target allocation, quoted spend, actual spend, and paid amounts. That makes drift visible earlier than a static spreadsheet typically would.",
+      "The planning flow separates estimates, admin-published final prices, actual spend, and paid amounts. That makes drift visible earlier than a static spreadsheet typically would.",
   },
   {
     question: "How quickly do you respond to inquiries?",

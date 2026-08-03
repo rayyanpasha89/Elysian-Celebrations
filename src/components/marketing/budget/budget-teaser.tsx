@@ -8,15 +8,16 @@ import { useInViewAnimation } from "@/hooks/use-in-view-animation";
 import { AnimatedCounter } from "@/components/shared/animated-counter";
 import { MagneticButton } from "@/components/shared/magnetic-button";
 import { SectionHeader } from "@/components/marketing/shared/marketing-primitives";
+import { DASHBOARD_CHART_PALETTE } from "@/lib/dashboard-styles";
 import { formatCurrency } from "@/lib/utils";
 
 const budgetBreakdown = [
-  { label: "Venue & Hospitality", percent: 35, color: "#C9A96E" },
-  { label: "Decor & Design", percent: 20, color: "#D4A0A0" },
-  { label: "Catering", percent: 15, color: "#9CAF88" },
-  { label: "Photography & Video", percent: 12, color: "#A4AC86" },
-  { label: "Entertainment", percent: 8, color: "#D4A843" },
-  { label: "Others", percent: 10, color: "#656D4A" },
+  { label: "Venue & Hospitality", percent: 35, color: DASHBOARD_CHART_PALETTE[2] },
+  { label: "Decor & Design", percent: 20, color: DASHBOARD_CHART_PALETTE[1] },
+  { label: "Catering", percent: 15, color: DASHBOARD_CHART_PALETTE[4] },
+  { label: "Photography & Video", percent: 12, color: DASHBOARD_CHART_PALETTE[3] },
+  { label: "Entertainment", percent: 8, color: DASHBOARD_CHART_PALETTE[0] },
+  { label: "Others", percent: 10, color: DASHBOARD_CHART_PALETTE[7] },
 ];
 
 const budgetNotes = [
@@ -33,7 +34,7 @@ const budgetNotes = [
   {
     icon: Layers3,
     title: "Control points",
-    body: "Keep quotes, actuals, and paid amounts visible in one planning rhythm.",
+    body: "Keep estimates, final prices, and paid amounts in one planning rhythm.",
   },
 ];
 
@@ -77,7 +78,7 @@ export function BudgetTeaser() {
                   <span className="text-gold-primary">before the details scatter.</span>
                 </>
               }
-              intro="This is the planning surface where the celebration becomes legible: target allocations, real quotes, and visible spend move together so the experience stays intentional instead of improvised."
+              intro="This is the planning surface where the event becomes legible: estimates, admin-published final prices, and paid amounts move together so every decision stays intentional."
               align="start"
               titleMaxWidth="max-w-xl"
               className="mb-8"

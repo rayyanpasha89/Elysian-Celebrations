@@ -2,6 +2,19 @@ import { createAdminSupabaseClient } from "@/lib/supabase/server";
 
 type AdminClient = ReturnType<typeof createAdminSupabaseClient>;
 
+/**
+ * Length ceilings for client-supplied guest fields. The columns are unbounded
+ * `text`, so without these a single authenticated client can write arbitrarily
+ * large rows. Shared by the create and update handlers so the two cannot drift.
+ */
+export const GUEST_FIELD_LIMITS = {
+  name: 120,
+  email: 200,
+  phone: 40,
+  meal_pref: 80,
+  notes: 1000,
+} as const;
+
 export async function getClientProfileId(
   supabase: AdminClient,
   userId: string

@@ -1,6 +1,6 @@
 # Elysian Celebrations Project Memory
 
-Last updated: 2026-07-06
+Last updated: 2026-08-02
 
 This is the durable memory file for Codex, Claude, Cursor, and any future agent working in this repo. Read this after `AGENTS.md` and before making product, frontend, backend, Supabase, or deployment decisions.
 
@@ -49,6 +49,7 @@ Current model:
 - Client can set dates per day.
 - Client defines enabled time blocks per day: Morning, Afternoon, Evening.
 - Each time block captures title, start/end time, venue/area, guest count, and selected needs.
+- Step 5 is deliberately compact: one day can be open, function rows start collapsed, and the context trail reads `Day / All time blocks` or `Day / Morning|Afternoon|Evening`.
 - Needs are selected from food, decor, photo-video, entertainment, hospitality, logistics. Custom needs are added later, not during onboarding.
 - Form submission must never auto-create the event. Continue and Create buttons must stay `type="button"`. Creation is only via the explicit Create button handler.
 
@@ -65,7 +66,9 @@ Current direction:
 - The flowchart/mind-map/canvas is the primary object.
 - The board should show event hub -> days -> functions/time blocks -> step tokens.
 - Users pick a day, then a function, then a step.
+- Maps render at most six day/function nodes per page so the supported 14-day structure stays readable instead of colliding.
 - The editor opens only after a step token is selected.
+- Add Day and Add Event exist only in the Layer 2 workspace header; Add Event targets the day currently opened in the canvas.
 - Do not place large instructional/explanation cards above the canvas. The canvas must be the focus.
 - Day nodes should show date and day identity, not generic "Day 1" if date/name is known.
 - Function nodes should show basic details directly: function name/type, time, venue, guests, readiness.
@@ -74,8 +77,8 @@ Current direction:
 
 Layer 2 sections:
 
-- Basics - function name/type, date, time, venue dropdown, guest count, live estimate context.
-- Food - vendor services first, menu rows second, custom/special items separate for quote-only handling.
+- Basics - function name/type, date, time, venue dropdown, and guest count. Spend estimation remains available to the budget and plan-summary logic rather than adding another card inside the scoped editor.
+- Food - vendor services first, menu rows second, custom/special items separated for manual pricing.
 - Design/decor - vendor setups and catalogue rows first, notes/customization second.
 - Vendors/services - vendors should be embedded in each relevant need, not a disconnected standalone tab.
 - Logistics/hospitality - vendor-backed where relevant, plus transport, rooming, weather, access, family/vendor call times.
@@ -111,14 +114,28 @@ This layer should not be a passive summary. It should expose gaps and jump users
 - Vendor catalogues should show what vendors actually offer: menu sections, counters, setups, deliverables, performances, looks, add-ons, images, and reference URLs.
 - Users can select multiple vendors and multiple services from the same vendor where the event needs it.
 - Selecting catalogue rows should save and keep the editor open. Do not reload the user back to the start of the vendor selection journey.
-- Special/custom items should be separated from estimated-price items because they need quote confirmation.
+- Special/custom items should be separated from estimated-price items because Elysian must confirm their pricing manually.
 - Food and other guest-count-sensitive estimates should support per-person logic.
-- Event/day estimates should only feel final once the relevant plan is complete enough. Before that, show ranges, missing inputs, or "needs quote".
+- Event/day estimates should only feel final once the relevant plan is complete enough. Before that, show ranges, missing inputs, or "pricing pending".
 - Budget and event plan must trend toward true two-way sync: planner selections create/update budget lines, and budget changes reflect back into planner estimates.
 - Do not use "My Wedding" in new user-facing copy. Use event/celebration language.
 - Do not add large static explanation blocks above actual work surfaces.
 - Mobile action rows must not overlap. Save/Create/Delete buttons need clear wrapping, spacing, and full-width behavior when space is tight.
 - Reduced-motion users should get instant state changes, not hidden or broken content.
+
+## Commercial Pricing Model
+
+Pricing is an Elysian-operated workflow, not an in-app vendor negotiation flow.
+
+1. Elysian and the vendor agree the event-specific vendor price offline.
+2. An admin records the agreed vendor price and one flat INR Elysian fee in `/admin/pricing`.
+3. The API derives the client final price as `vendor_amount + service_fee` and stores it in `final_price`.
+4. Admin explicitly publishes or unpublishes that client total.
+5. Vendors never type, submit, revise, or negotiate a quote in the portal. They only see their agreed payout after Elysian records it.
+6. Clients never receive the vendor payout or Elysian fee. They only receive a published final price when the existing readiness rules allow it.
+7. Managers may see the operationally relevant published total or agreed vendor payout, but never the fee breakdown.
+
+`bookings.vendor_amount` is admin-owned and may be corrected when an offline agreement changes. `bookings.service_fee` remains a generated database value equal to `final_price - vendor_amount`; it is a flat amount, not a percentage, margin, commission, or negotiable rate. `bookings.total_amount` is retained only as a compatibility mirror for older code and data. New commercial writes must go through `/api/admin/pricing`.
 
 ## Roles And Portals
 
@@ -251,14 +268,16 @@ Admin should align with client and vendor flows. Admin-managed venues/vendors/pa
 
 Stack:
 
-- Next.js App Router, currently `next@16.2.7`.
+- Next.js App Router, currently `next@16.2.12` with patched PostCSS and Sharp overrides.
 - React `19.2.4`.
 - Clerk for auth.
 - Supabase Postgres for product data.
 - Supabase Storage for vendor catalogue media.
 - Prisma schema is present as a model reference, but app routes primarily use Supabase clients.
 - Tailwind CSS v4.
-- Framer Motion, GSAP, Lenis for animation.
+- Framer Motion and Lenis for animation and scroll behavior. GSAP is not part
+  of the active stack; the package was removed because the application had no
+  imports.
 
 Important env variables are listed in `.env.example`. Never commit actual values.
 
@@ -435,6 +454,7 @@ npm run db:migrations
 npm run db:push
 npm run db:push:seed
 npm run db:query -- --sql "select now();"
+npm run db:types
 npm run seed
 ```
 
@@ -495,36 +515,57 @@ Planner input direction: chips, pickers, swatches, steppers, dropdowns. Avoid ra
 
 As of this memory update:
 
-- Main branch is clean before this doc change.
+- `main` is the deployment branch and pushes to it trigger the linked Vercel production project.
 - Recent local verification for the app has used `npm run lint`, `npx tsc --noEmit --pretty false`, and `npm run build`.
 - Recent pushes go directly to `origin/main`, which Vercel auto-deploys.
 - `.vercel` is linked locally to the Vercel project.
 - The marketing hero and event-system story have been redesigned around the event platform.
 - The planner now uses a radial `CelebrationCanvas` for the event map.
+- Layer 1 step 5 uses nested day/function accordions with a persistent `Day / time block` context trail, reducing the full multi-day form to one open function at a time.
+- Layer 2 keeps Add Day and Add Event in the workspace header only. Opening a shaped step token mounts one scoped editor, with compact date/time/venue context under its heading rather than a second side card.
 - Venue selection is present in onboarding time blocks and planner basics through dropdown/custom venue UI.
+- Venue dropdowns load up to 30 matching catalogue records, support local search,
+  and reveal custom entry only when the catalogue does not cover the user's query.
 - Vendor service selection in the planner supports multiple selections and catalogue row application.
-- The client budget page has been reshaped into cost estimation tied to event plan/vendor picks.
+- Client vendor discovery derives its sourcing lanes from the actual plan's
+  day/function requirements and current selections; no hardcoded Haldi/Sangeet
+  lane list remains.
+- The client budget page is read-only spend intelligence tied to event-plan and
+  vendor selections. It supports function, day, category, vendor, pricing-state,
+  and paid/due views. The old drag-budget UI/store is removed.
 - Vendor catalogue media support exists through Supabase Storage helper and `vendor_service_items.image_urls`.
+- Commercial pricing is admin-owned: `/admin/pricing` records the agreed vendor payout and flat Elysian fee, derives the client final, and controls publication. Client APIs gate published finals behind 100% function readiness and never serialize vendor payout or fee data.
+- Supabase browser/server factories use generated `Database` types, and dynamic
+  API write payloads are compile-checked against table insert/update contracts.
+  `npm run db:types` prefers the pinned official CLI when a management token is
+  available and otherwise reads the linked PostgreSQL catalogue directly.
+- Mood-board items retain category and creation metadata through migration
+  `20260802000500_restore_mood_board_item_metadata.sql`.
 
 ## Known Gaps And Active Priorities
 
 These are the highest-value next directions. Confirm against source before editing because parts may already be in progress.
 
-1. Landing page consistency: the hero is stronger than some lower sections. Continue rewriting the full page so the story is coherent from first fold to contact.
-2. Marketing performance: keep 3D scroll effects fast. Reduce giant slow widgets. Use reduced-motion guards.
-3. Planner clarity: keep removing clutter above/beside the flowchart. The map is the main interface.
-4. Planner editing: ensure save/create/delete buttons never overlap or collapse into each other.
-5. Venue selection: every venue field should prefer dropdown catalogue selection with custom fallback.
-6. Vendor flow: client vendor listing should follow event/function needs, not generic browsing.
-7. Vendor selection: allow multiple vendors/services where real events need it, and allow deselection cleanly.
-8. Catalogue application: selecting vendor rows should save and keep the user in the same editor context.
-9. Budget sync: true two-way sync between event plan selections and budget line items remains a major product target.
-10. Estimates: per-person food and guest-count-sensitive pricing need deeper logic.
-11. Special requests: quote-only items should be clearly excluded from automatic estimates until quoted.
-12. Admin/manager alignment: admin/manager pages should manage the same event, venue, vendor, catalogue, and budget concepts that clients see.
-13. Messaging: Supabase Realtime has been enabled historically, but verify live behavior. Attachments/read receipts remain future work unless already shipped.
-14. Media: vendor item media exists, but real cloud storage behavior should be verified after migrations/env are confirmed.
-15. Legacy naming: schema/routes still use wedding names. Do not rush a destructive rename; change user-facing copy first.
+1. Transaction boundary: move event creation and per-function multi-table saves
+   into reviewed Postgres RPCs so rollback is guaranteed rather than compensated.
+2. Venue normalization: add `wedding_events.venue_id` while preserving the text
+   snapshot/custom-area fallback, then add capacity and destination validation.
+3. Financial ledger: split client receipts from vendor payouts instead of using
+   `bookings.paid_amount` for both operational directions.
+4. Legacy singleton ownership: decide whether budgets and guest lists belong to a
+   client or an event, then merge existing duplicates before adding uniqueness.
+5. Messaging scale: add booking-scoped incremental reads/pagination while keeping
+   the role-checked API boundary used by Clerk identities.
+6. Rendering architecture: decompose the large client planner and move stable
+   dashboard reads server-side without regressing the radial interaction model.
+7. Planner editing: keep save/create/delete actions regression-tested across
+   narrow mobile widths and preserve authoritative refresh after partial errors.
+8. Estimates: deepen per-person food and guest-sensitive pricing using real
+   service units while preserving manual-pricing disclosure for custom requests.
+9. Admin/manager alignment: continue mapping operations surfaces onto the same
+   event, venue, vendor, catalogue, readiness, and spend concepts clients see.
+10. Legacy naming: schema/routes still use wedding names. Do not rush a destructive
+    rename; keep changing user-facing vocabulary first.
 
 ## Verification Commands
 
@@ -611,7 +652,7 @@ Preferred:
 - vendor service
 - catalogue row
 - special request
-- quote needed
+- manual pricing needed
 - readiness
 - finalization
 - run-of-show

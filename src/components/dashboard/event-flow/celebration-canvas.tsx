@@ -13,7 +13,7 @@
  * breadcrumb zoom back out. Reduced-motion aware.
  */
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ArrowLeft,
@@ -29,7 +29,6 @@ import {
   MapPin,
   Music,
   Palette,
-  Plus,
   StickyNote,
   Store,
   Truck,
@@ -142,23 +141,30 @@ export function CelebrationCanvas({
   eventTitle,
   days,
   onOpenStep,
-  onAddDay,
-  onAddFunction,
-  onEditDay,
-  onDeleteDay,
+  onActiveDayChange,
   className,
 }: {
   eventTitle: string;
   days: CanvasDay[];
   onOpenStep: (eventId: string, stepId: string, origin: { x: number; y: number }) => void;
-  onAddDay?: () => void;
-  onAddFunction?: (dayId: string) => void;
-  onEditDay?: (dayId: string) => void;
-  onDeleteDay?: (dayId: string) => void;
+  onActiveDayChange?: (dayId: string) => void;
   className?: string;
 }) {
   const reduce = useReducedMotion();
   const [level, setLevel] = useState<Level>({ kind: "event" });
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const shouldFocusHubRef = useRef(false);
+
+  const navigate = useCallback(
+    (nextLevel: Level) => {
+      if (nextLevel.kind !== "event") {
+        onActiveDayChange?.(nextLevel.dayId);
+      }
+      shouldFocusHubRef.current = true;
+      setLevel(nextLevel);
+    },
+    [onActiveDayChange]
+  );
 
   const activeDay =
     level.kind === "event" ? null : days.find((d) => d.id === level.dayId) ?? null;
@@ -177,18 +183,25 @@ export function CelebrationCanvas({
         ? { kind: "event" }
         : level;
 
-  const breadcrumb = useMemo(() => {
-    const parts: { label: string; onClick: () => void }[] = [
-      { label: eventTitle || "Event", onClick: () => setLevel({ kind: "event" }) },
-    ];
-    if (activeDay)
-      parts.push({
-        label: activeDay.title,
-        onClick: () => setLevel({ kind: "day", dayId: activeDay.id }),
-      });
-    if (activeEvent) parts.push({ label: activeEvent.title, onClick: () => {} });
-    return parts;
-  }, [eventTitle, activeDay, activeEvent]);
+  const breadcrumb: { label: string; level: Level }[] = [
+    { label: eventTitle || "Event", level: { kind: "event" } },
+  ];
+  if (activeDay) {
+    breadcrumb.push({
+      label: activeDay.title,
+      level: { kind: "day", dayId: activeDay.id },
+    });
+  }
+  if (activeDay && activeEvent) {
+    breadcrumb.push({
+      label: activeEvent.title,
+      level: {
+        kind: "function",
+        dayId: activeDay.id,
+        eventId: activeEvent.id,
+      },
+    });
+  }
 
   const enter = reduce
     ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } }
@@ -202,8 +215,11 @@ export function CelebrationCanvas({
     : { type: "spring" as const, stiffness: 240, damping: 28 };
 
   const goBack = () => {
-    if (safeLevel.kind === "function") setLevel({ kind: "day", dayId: safeLevel.dayId });
-    else if (safeLevel.kind === "day") setLevel({ kind: "event" });
+    if (safeLevel.kind === "function") {
+      navigate({ kind: "day", dayId: safeLevel.dayId });
+    } else if (safeLevel.kind === "day") {
+      navigate({ kind: "event" });
+    }
   };
 
   const levelKey =
@@ -213,8 +229,29 @@ export function CelebrationCanvas({
         ? `day:${safeLevel.dayId}`
         : `fn:${safeLevel.eventId}`;
 
+  useEffect(() => {
+    if (!shouldFocusHubRef.current) return;
+    shouldFocusHubRef.current = false;
+    const frame = window.requestAnimationFrame(() => {
+      canvasRef.current
+        ?.querySelector<HTMLElement>("[data-map-hub]")
+        ?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [levelKey]);
+
+  const levelAnnouncement =
+    safeLevel.kind === "event"
+      ? `${eventTitle || "Event"}, day map`
+      : safeLevel.kind === "day"
+        ? `${activeDay?.title ?? "Day"}, function map`
+        : `${activeEvent?.title ?? "Function"}, planning steps`;
+
   return (
-    <div className={cn("relative", className)}>
+    <div ref={canvasRef} className={cn("relative", className)}>
+      <p className="sr-only" aria-live="polite">
+        {levelAnnouncement}
+      </p>
       {/* Breadcrumb + back */}
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
@@ -238,7 +275,7 @@ export function CelebrationCanvas({
                 {index > 0 ? <span className="text-charcoal/30">/</span> : null}
                 <button
                   type="button"
-                  onClick={crumb.onClick}
+                  onClick={() => navigate(crumb.level)}
                   disabled={last}
                   className={cn(
                     "max-w-[12rem] truncate font-accent text-[10px] uppercase tracking-[0.14em] transition-colors",
@@ -251,26 +288,6 @@ export function CelebrationCanvas({
             );
           })}
         </div>
-        {safeLevel.kind === "event" && onAddDay ? (
-          <AddButton label="Add day" onClick={onAddDay} />
-        ) : null}
-        {safeLevel.kind === "day" && activeDay ? (
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-            {onAddFunction ? (
-              <AddButton label="Add function" onClick={() => onAddFunction(activeDay.id)} />
-            ) : null}
-            {onEditDay ? (
-              <GhostButton label="Edit day" onClick={() => onEditDay(activeDay.id)} />
-            ) : null}
-            {onDeleteDay && activeDay.events.length === 0 ? (
-              <GhostButton
-                label="Delete day"
-                tone="danger"
-                onClick={() => onDeleteDay(activeDay.id)}
-              />
-            ) : null}
-          </div>
-        ) : null}
       </div>
 
       {/* Function-level detail strip: date · time · venue near the breadcrumb */}
@@ -342,7 +359,7 @@ export function CelebrationCanvas({
                       ? []
                       : [`${day.readiness}% ready`],
                   status: day.status,
-                  onClick: () => setLevel({ kind: "day", dayId: day.id }),
+                  onClick: () => navigate({ kind: "day", dayId: day.id }),
                 }))}
               />
             ) : null}
@@ -359,7 +376,7 @@ export function CelebrationCanvas({
                       ? `${activeDay.title} · ${activeDay.readiness}% ready`
                       : `${activeDay.readiness}% ready`,
                   status: activeDay.status,
-                  onClick: () => setLevel({ kind: "event" }),
+                  onClick: () => navigate({ kind: "event" }),
                 }}
                 emptyHint={
                   activeDay.events.length === 0 ? "Add a function to this day." : undefined
@@ -375,7 +392,11 @@ export function CelebrationCanvas({
                   ],
                   status: event.status,
                   onClick: () =>
-                    setLevel({ kind: "function", dayId: activeDay.id, eventId: event.id }),
+                    navigate({
+                      kind: "function",
+                      dayId: activeDay.id,
+                      eventId: event.id,
+                    }),
                 }))}
               />
             ) : null}
@@ -383,6 +404,9 @@ export function CelebrationCanvas({
             {safeLevel.kind === "function" && activeEvent ? (
               <StepLevel
                 event={activeEvent}
+                onBack={() =>
+                  navigate({ kind: "day", dayId: safeLevel.dayId })
+                }
                 onOpenStep={(stepId, origin) => onOpenStep(activeEvent.id, stepId, origin)}
               />
             ) : null}
@@ -420,7 +444,18 @@ function RadialLevel({
   nodes: RadialNode[];
   emptyHint?: string;
 }) {
-  const positions = radialPositions(nodes.length, nodes.length > 4 ? 40 : 36);
+  const pageSize = 6;
+  const pageCount = Math.max(1, Math.ceil(nodes.length / pageSize));
+  const [page, setPage] = useState(0);
+  const safePage = Math.min(page, pageCount - 1);
+  const visibleNodes = nodes.slice(
+    safePage * pageSize,
+    (safePage + 1) * pageSize
+  );
+  const positions = radialPositions(
+    visibleNodes.length,
+    visibleNodes.length > 4 ? 40 : 36
+  );
   const hubTone = FLOW_STATUS_META[hub.status];
 
   return (
@@ -434,7 +469,10 @@ function RadialLevel({
             y1="50"
             x2={pos.x}
             y2={pos.y}
-            className={cn("stroke-[0.4]", strokeForStatus(nodes[i]?.status))}
+            className={cn(
+              "stroke-[0.4]",
+              strokeForStatus(visibleNodes[i]?.status)
+            )}
             strokeDasharray="1.4 1.1"
             strokeLinecap="round"
           />
@@ -444,6 +482,7 @@ function RadialLevel({
       {/* hub */}
       <div className="absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
         <button
+          data-map-hub
           type="button"
           onClick={hub.onClick}
           disabled={!hub.onClick}
@@ -468,7 +507,7 @@ function RadialLevel({
       </div>
 
       {/* child nodes */}
-      {nodes.map((node, i) => {
+      {visibleNodes.map((node, i) => {
         const pos = positions[i];
         const tone = FLOW_STATUS_META[node.status];
         return (
@@ -482,7 +521,9 @@ function RadialLevel({
               onClick={node.onClick}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.96 }}
-              aria-label={`Open ${node.title}`}
+              aria-label={`${node.title}, ${tone.label}${
+                node.subtitle ? `, ${node.subtitle}` : ""
+              }${node.details?.length ? `, ${node.details.join(", ")}` : ""}`}
               className={cn(
                 "flex w-full flex-col items-center gap-1.5 border bg-ivory px-3 py-3 text-center shadow-[0_10px_28px_rgba(51,61,41,0.08)] transition-colors",
                 "border-charcoal/12 hover:border-gold-primary/50",
@@ -522,6 +563,40 @@ function RadialLevel({
         );
       })}
 
+      {pageCount > 1 ? (
+        <div className="absolute right-3 top-3 z-30 flex items-center border border-charcoal/10 bg-ivory/90 shadow-[0_8px_24px_rgba(51,61,41,0.08)] backdrop-blur">
+          <button
+            type="button"
+            onClick={() => setPage(Math.max(0, safePage - 1))}
+            disabled={safePage === 0}
+            aria-label="Show previous map nodes"
+            className={cn(
+              "inline-flex h-9 w-9 items-center justify-center border-r border-charcoal/10 font-heading text-sm text-charcoal disabled:cursor-not-allowed disabled:opacity-30",
+              FOCUS_RING
+            )}
+          >
+            ←
+          </button>
+          <span className="px-2.5 font-accent text-[9px] uppercase tracking-[0.12em] text-slate">
+            {safePage + 1} / {pageCount}
+          </span>
+          <button
+            type="button"
+            onClick={() =>
+              setPage(Math.min(pageCount - 1, safePage + 1))
+            }
+            disabled={safePage === pageCount - 1}
+            aria-label="Show next map nodes"
+            className={cn(
+              "inline-flex h-9 w-9 items-center justify-center border-l border-charcoal/10 font-heading text-sm text-charcoal disabled:cursor-not-allowed disabled:opacity-30",
+              FOCUS_RING
+            )}
+          >
+            →
+          </button>
+        </div>
+      ) : null}
+
       {emptyHint ? (
         <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-center font-accent text-[10px] uppercase tracking-[0.14em] text-slate/70">
           {emptyHint}
@@ -533,9 +608,11 @@ function RadialLevel({
 
 function StepLevel({
   event,
+  onBack,
   onOpenStep,
 }: {
   event: CanvasEvent;
+  onBack: () => void;
   onOpenStep: (stepId: string, origin: { x: number; y: number }) => void;
 }) {
   const positions = radialPositions(event.steps.length, event.steps.length > 4 ? 40 : 34);
@@ -558,7 +635,16 @@ function StepLevel({
         ))}
       </svg>
 
-      <div className="absolute left-1/2 top-1/2 z-20 flex h-28 w-28 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border-2 border-gold-primary/60 bg-ivory p-2 text-center shadow-[0_18px_50px_rgba(51,61,41,0.12)] sm:h-32 sm:w-32">
+      <button
+        data-map-hub
+        type="button"
+        onClick={onBack}
+        aria-label={`Back to function map from ${event.title}`}
+        className={cn(
+          "absolute left-1/2 top-1/2 z-20 flex h-28 w-28 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border-2 border-gold-primary/60 bg-ivory p-2 text-center shadow-[0_18px_50px_rgba(51,61,41,0.12)] transition-transform hover:scale-[1.03] sm:h-32 sm:w-32",
+          FOCUS_RING
+        )}
+      >
         <span className={cn("h-1.5 w-1.5 rounded-full", hubTone.dot)} />
         <span className="mt-1 line-clamp-2 font-display text-sm leading-tight text-charcoal">
           {event.title}
@@ -566,7 +652,7 @@ function StepLevel({
         <span className="mt-1 font-accent text-[8px] uppercase tracking-[0.12em] text-slate">
           {event.readiness}% ready
         </span>
-      </div>
+      </button>
 
       {event.steps.map((step, i) => {
         const pos = positions[i];
@@ -587,7 +673,7 @@ function StepLevel({
               }}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.92 }}
-              aria-label={`Edit ${step.label}`}
+              aria-label={`Edit ${step.label}, ${tone.label}`}
               className={cn("group flex w-16 flex-col items-center gap-1.5", FOCUS_RING)}
             >
               <span className="relative h-12 w-12">
@@ -617,48 +703,6 @@ function StepLevel({
         );
       })}
     </div>
-  );
-}
-
-function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "inline-flex shrink-0 items-center gap-1.5 border border-gold-primary/45 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark transition-colors hover:bg-gold-primary/10",
-        FOCUS_RING
-      )}
-    >
-      <Plus className="h-3.5 w-3.5" />
-      {label}
-    </button>
-  );
-}
-
-function GhostButton({
-  label,
-  onClick,
-  tone = "neutral",
-}: {
-  label: string;
-  onClick: () => void;
-  tone?: "neutral" | "danger";
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "inline-flex shrink-0 items-center gap-1.5 border px-3 py-2 font-accent text-[10px] uppercase tracking-[0.16em] transition-colors",
-        tone === "danger"
-          ? "border-rose/35 text-rose hover:bg-rose hover:text-ivory"
-          : "border-charcoal/15 text-charcoal hover:border-gold-primary hover:text-gold-dark",
-        FOCUS_RING
-      )}
-    >
-      {label}
-    </button>
   );
 }
 

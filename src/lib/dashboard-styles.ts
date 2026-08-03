@@ -1,5 +1,29 @@
 import { cn } from "@/lib/utils";
 
+export const DASHBOARD_CHART_COLORS = {
+  walnut: "#582F0E",
+  saddle: "#7F4F24",
+  toffee: "#936639",
+  camel: "#A68A64",
+  khaki: "#B6AD90",
+  drySage: "#C2C5AA",
+  sage: "#A4AC86",
+  olive: "#656D4A",
+  ebony: "#414833",
+  charcoal: "#333D29",
+} as const;
+
+export const DASHBOARD_CHART_PALETTE = [
+  DASHBOARD_CHART_COLORS.walnut,
+  DASHBOARD_CHART_COLORS.saddle,
+  DASHBOARD_CHART_COLORS.camel,
+  DASHBOARD_CHART_COLORS.olive,
+  DASHBOARD_CHART_COLORS.sage,
+  DASHBOARD_CHART_COLORS.toffee,
+  DASHBOARD_CHART_COLORS.ebony,
+  DASHBOARD_CHART_COLORS.khaki,
+] as const;
+
 export const dashCard = "border border-charcoal/8 bg-ivory p-6";
 
 export const dashBtn =

@@ -90,6 +90,8 @@ export default function CostEstimationPage() {
   const [picks, setPicks] = useState<PlanLineItem[]>([]);
   const [confirmed, setConfirmed] = useState<ConfirmedEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [filter, setFilter] = useState<"all" | "confirmed" | "estimate">("all");
   const [open, setOpen] = useState<string | null>(null);
@@ -97,6 +99,9 @@ export default function CostEstimationPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      setLoading(true);
+      setLoadError(null);
+      setNeedsOnboarding(false);
       try {
         const res = await fetch("/api/budget");
         const json = await res.json();
@@ -110,8 +115,12 @@ export default function CostEstimationPage() {
         setPicks((json.planLineItems as PlanLineItem[] | null) ?? []);
         setConfirmed((json.confirmedEvents as ConfirmedEvent[] | null) ?? []);
       } catch (error) {
-        if (!cancelled)
-          toast.error(error instanceof Error ? error.message : "Failed to load");
+        if (!cancelled) {
+          const message =
+            error instanceof Error ? error.message : "Failed to load";
+          setLoadError(message);
+          toast.error(message);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -119,7 +128,7 @@ export default function CostEstimationPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
 
   const model = useMemo(() => {
     const picksByEvent = new Map<string, PlanLineItem[]>();
@@ -221,6 +230,28 @@ export default function CostEstimationPage() {
         >
           Complete onboarding
         </Link>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="border border-rose/25 bg-rose/5 p-8">
+        <p className={dashLabel}>Cost estimate unavailable</p>
+        <h1 className="mt-2 font-display text-3xl text-charcoal">
+          Live pricing could not be loaded.
+        </h1>
+        <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate">
+          Your event plan and vendor selections are unchanged. Retry before
+          treating any total as current.
+        </p>
+        <button
+          type="button"
+          onClick={() => setReloadKey((key) => key + 1)}
+          className="mt-5 border border-charcoal bg-charcoal px-5 py-3 font-accent text-[10px] uppercase tracking-[0.18em] text-ivory transition-colors hover:bg-ebony"
+        >
+          Retry pricing
+        </button>
       </div>
     );
   }
@@ -539,7 +570,7 @@ function ConfirmRing({ pct, locked, total }: { pct: number; locked: number; tota
           cy="60"
           r={r}
           fill="none"
-          stroke="#C9A96E"
+          stroke="var(--gold-primary)"
           strokeWidth="8"
           strokeLinecap="round"
           strokeDasharray={c}

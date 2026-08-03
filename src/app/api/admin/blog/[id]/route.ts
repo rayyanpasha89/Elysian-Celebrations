@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { getAuthSession, requireRole, apiError, apiSuccess } from "@/lib/api-utils";
+import type { Database } from "@/types/database.types";
+
+type BlogPostUpdate = Database["public"]["Tables"]["blog_posts"]["Update"];
 
 export async function PATCH(
   request: NextRequest,
@@ -17,7 +20,7 @@ export async function PATCH(
     const supabase = createAdminSupabaseClient();
     const body = (await request.json()) as { isPublished?: boolean };
 
-    const updates: Record<string, unknown> = {};
+    const updates: BlogPostUpdate = {};
     if (typeof body.isPublished === "boolean") {
       updates.is_published = body.isPublished;
       updates.published_at = body.isPublished ? new Date().toISOString() : null;

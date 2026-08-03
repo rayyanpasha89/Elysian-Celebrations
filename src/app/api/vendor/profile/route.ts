@@ -8,6 +8,12 @@ import {
 } from "@/lib/api-utils";
 import { buildVendorProfileSeed } from "@/lib/vendor-profile";
 import { deleteVendorMediaImage } from "@/lib/supabase/storage";
+import type { Database } from "@/types/database.types";
+
+type VendorProfileInsert =
+  Database["public"]["Tables"]["vendor_profiles"]["Insert"];
+type VendorProfileUpdate =
+  Database["public"]["Tables"]["vendor_profiles"]["Update"];
 
 const MAX_PORTFOLIO_IMAGES = 12;
 
@@ -143,9 +149,13 @@ export async function PATCH(request: NextRequest) {
       portfolio = normalized;
     }
 
+    const mediaUpdate: VendorProfileUpdate = {
+      cover_image: coverImage,
+      portfolio,
+    };
     const { error: updateErr } = await supabase
       .from("vendor_profiles")
-      .update({ cover_image: coverImage, portfolio })
+      .update(mediaUpdate)
       .eq("id", profile.id);
     if (updateErr) {
       console.error("vendor_profiles media update:", updateErr);
@@ -217,7 +227,7 @@ export async function PUT(request: NextRequest) {
         categoryId: requestedCategoryId,
       });
 
-      const { error: insertErr } = await supabase.from("vendor_profiles").insert({
+      const profileInsert: VendorProfileInsert = {
         user_id: session.userId,
         ...seed,
         short_bio: typeof shortBio === "string" ? shortBio : null,
@@ -227,7 +237,10 @@ export async function PUT(request: NextRequest) {
           typeof experience === "number" && !Number.isNaN(experience)
             ? Math.max(0, Math.floor(experience))
             : null,
-      });
+      };
+      const { error: insertErr } = await supabase
+        .from("vendor_profiles")
+        .insert(profileInsert);
 
       if (insertErr) {
         console.error("vendor_profiles insert:", insertErr);
@@ -237,7 +250,7 @@ export async function PUT(request: NextRequest) {
       return apiSuccess({ ok: true, created: true }, 201);
     }
 
-    const updates: Record<string, unknown> = {};
+    const updates: VendorProfileUpdate = {};
     if (typeof businessName === "string") updates.business_name = normalizedName;
     if (typeof shortBio === "string") updates.short_bio = shortBio;
     if (typeof city === "string") updates.city = city;

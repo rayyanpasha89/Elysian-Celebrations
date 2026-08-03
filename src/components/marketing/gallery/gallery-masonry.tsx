@@ -86,6 +86,7 @@ function MasonryItem({
 export function GalleryMasonry({ images }: { images: GalleryImage[] }) {
   const [category, setCategory] = useState<GalleryCategory | "all">("all");
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   // Category chips with live counts, ordered by how many frames each holds.
   const categories = useMemo(() => {
@@ -114,17 +115,40 @@ export function GalleryMasonry({ images }: { images: GalleryImage[] }) {
 
   useEffect(() => {
     if (active == null) return;
+    const previousActive = document.activeElement as HTMLElement | null;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") setActiveIndex(null);
       if (event.key === "ArrowRight") step(1);
       if (event.key === "ArrowLeft") step(-1);
+      if (event.key === "Tab") {
+        const focusable = Array.from(
+          dialogRef.current?.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+          ) ?? []
+        );
+        const first = focusable[0];
+        const last = focusable.at(-1);
+        if (!first || !last) {
+          event.preventDefault();
+          dialogRef.current?.focus();
+        } else if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
     };
     window.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const frame = window.requestAnimationFrame(() => dialogRef.current?.focus());
     return () => {
+      window.cancelAnimationFrame(frame);
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
+      previousActive?.focus();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, filtered.length]);
@@ -174,11 +198,16 @@ export function GalleryMasonry({ images }: { images: GalleryImage[] }) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Image preview"
             onClick={() => setActiveIndex(null)}
           >
+            <div
+              ref={dialogRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Image preview: ${active.alt}`}
+              tabIndex={-1}
+              className="relative flex h-full w-full items-center justify-center outline-none"
+            >
             <button
               type="button"
               data-cursor="pointer"
@@ -243,6 +272,7 @@ export function GalleryMasonry({ images }: { images: GalleryImage[] }) {
                 <p className="font-heading">{active.alt}</p>
               </div>
             </motion.div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

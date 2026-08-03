@@ -16,10 +16,18 @@
  */
 
 import { ArrowRight, CheckCircle2, CircleDashed, CircleSlash } from "lucide-react";
+import { ProgressRing } from "@/components/dashboard/ui-kit";
 import { dashCard, dashLabel } from "@/lib/dashboard-styles";
 import { cn } from "@/lib/utils";
 
 export type FinalizationCheckStatus = "ok" | "partial" | "missing";
+
+export type FinalizationGapTarget = {
+  eventId: string;
+  eventName: string;
+  dayName: string;
+  detail?: string;
+};
 
 export type FinalizationCheck = {
   key: string;
@@ -27,6 +35,7 @@ export type FinalizationCheck = {
   description: string;
   status: FinalizationCheckStatus;
   detail: string;
+  targets?: FinalizationGapTarget[];
 };
 
 const STATUS_META: Record<
@@ -76,54 +85,13 @@ function actionLabel(check: FinalizationCheck) {
   }
 }
 
-function ProgressRing({ percent }: { percent: number }) {
-  const radius = 34;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (percent / 100) * circumference;
-  return (
-    <div className="relative h-24 w-24 shrink-0">
-      <svg viewBox="0 0 80 80" className="h-full w-full -rotate-90">
-        <circle
-          cx="40"
-          cy="40"
-          r={radius}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="5"
-          className="text-charcoal/10"
-        />
-        <circle
-          cx="40"
-          cy="40"
-          r={radius}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="5"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          className="text-gold-primary transition-[stroke-dashoffset] duration-700 ease-out"
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-display text-2xl leading-none text-charcoal">
-          {percent}%
-        </span>
-        <span className="font-accent text-[8px] uppercase tracking-[0.18em] text-slate">
-          Ready
-        </span>
-      </div>
-    </div>
-  );
-}
-
 export function FinalizationBoard({
   checks,
   onResolve,
   className,
 }: {
   checks: FinalizationCheck[];
-  onResolve: (checkKey: string) => void;
+  onResolve: (checkKey: string, eventId?: string) => void;
   className?: string;
 }) {
   const total = checks.length || 1;
@@ -140,6 +108,7 @@ export function FinalizationBoard({
     (a, b) => STATUS_META[a.status].order - STATUS_META[b.status].order
   );
   const nextGap = ordered.find((check) => check.status !== "ok");
+  const nextGapTarget = nextGap?.targets?.[0];
 
   return (
     <section className={cn("mt-8 space-y-5", className)}>
@@ -175,7 +144,7 @@ export function FinalizationBoard({
           ) : nextGap ? (
             <button
               type="button"
-              onClick={() => onResolve(nextGap.key)}
+              onClick={() => onResolve(nextGap.key, nextGapTarget?.eventId)}
               className="group inline-flex items-center gap-2 border border-gold-primary bg-gold-primary px-5 py-3 font-accent text-[11px] uppercase tracking-[0.2em] text-midnight transition-colors hover:bg-gold-dark"
             >
               Open next gap
@@ -212,9 +181,37 @@ export function FinalizationBoard({
               <p className="mt-4 border-t border-charcoal/10 pt-3 text-xs text-charcoal">
                 {check.detail}
               </p>
+              {check.targets?.length ? (
+                <div className="mt-3 space-y-2" aria-label={`${check.label} gaps`}>
+                  {check.targets.slice(0, 4).map((target) => (
+                    <button
+                      key={`${check.key}-${target.eventId}`}
+                      type="button"
+                      onClick={() => onResolve(check.key, target.eventId)}
+                      className="flex w-full items-center justify-between gap-3 border border-charcoal/10 bg-ivory/70 px-3 py-2 text-left transition-colors hover:border-gold-primary/55 focus-visible:border-gold-primary focus-visible:outline-none"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate font-heading text-sm text-charcoal">
+                          {target.eventName}
+                        </span>
+                        <span className="mt-0.5 block font-accent text-[9px] uppercase tracking-[0.14em] text-slate">
+                          {target.dayName}
+                          {target.detail ? ` · ${target.detail}` : ""}
+                        </span>
+                      </span>
+                      <ArrowRight className="h-3.5 w-3.5 shrink-0 text-gold-dark" />
+                    </button>
+                  ))}
+                  {check.targets.length > 4 ? (
+                    <p className="font-accent text-[9px] uppercase tracking-[0.14em] text-slate">
+                      + {check.targets.length - 4} more gap(s)
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
               <button
                 type="button"
-                onClick={() => onResolve(check.key)}
+                onClick={() => onResolve(check.key, check.targets?.[0]?.eventId)}
                 className={cn(
                   "mt-4 inline-flex w-fit items-center gap-2 border px-3 py-2 font-accent text-[10px] uppercase tracking-[0.16em] transition-colors",
                   check.status === "ok"

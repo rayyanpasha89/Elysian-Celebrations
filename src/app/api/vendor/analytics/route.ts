@@ -12,20 +12,18 @@ const PAID_TO_DATE_STATUSES = new Set([
   ...ACTIVE_BOOKING_STATUSES,
   "COMPLETED",
 ]);
-const QUOTE_PIPELINE_STATUSES = new Set(["INQUIRY", "QUOTE_SENT"]);
+const OPEN_PRICING_STATUSES = new Set(["INQUIRY", "QUOTE_SENT"]);
 
 function currentVendorAmount(booking: {
   vendor_amount?: number | null;
-  total_amount?: number | null;
 }) {
-  return Math.max(0, booking.vendor_amount ?? booking.total_amount ?? 0);
+  return Math.max(0, booking.vendor_amount ?? 0);
 }
 
 function paidTowardVendorAmount(
   booking: {
     paid_amount?: number | null;
     vendor_amount?: number | null;
-    total_amount?: number | null;
   },
   amount = currentVendorAmount(booking)
 ) {
@@ -75,7 +73,7 @@ export async function GET() {
         bookingsByStatus: {},
         paidToDate: 0,
         outstandingAmount: 0,
-        quotePipeline: 0,
+        agreedPipelineValue: 0,
         completedBookings: 0,
         liveInquiries: 0,
         profileViews: 0,
@@ -98,7 +96,7 @@ export async function GET() {
       supabase
         .from("bookings")
         .select(
-          "status, total_amount, vendor_amount, paid_amount, created_at"
+          "status, vendor_amount, paid_amount, created_at"
         )
         .eq("vendor_profile_id", vendorProfile.id),
       supabase
@@ -140,7 +138,7 @@ export async function GET() {
     const bookingsByStatus: Record<string, number> = {};
     let paidToDate = 0;
     let outstandingAmount = 0;
-    let quotePipeline = 0;
+    let agreedPipelineValue = 0;
     let completedBookings = 0;
     let liveInquiries = 0;
 
@@ -158,8 +156,8 @@ export async function GET() {
         outstandingAmount += Math.max(0, amount - paidAmount);
       }
 
-      if (QUOTE_PIPELINE_STATUSES.has(booking.status)) {
-        quotePipeline += amount;
+      if (OPEN_PRICING_STATUSES.has(booking.status)) {
+        agreedPipelineValue += amount;
       }
 
       if (booking.status === "COMPLETED") {
@@ -185,7 +183,7 @@ export async function GET() {
       bookingsByStatus,
       paidToDate,
       outstandingAmount,
-      quotePipeline,
+      agreedPipelineValue,
       completedBookings,
       liveInquiries,
       profileViews: profileViewsCount ?? 0,

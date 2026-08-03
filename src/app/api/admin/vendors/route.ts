@@ -7,6 +7,10 @@ import {
   apiSuccess,
 } from "@/lib/api-utils";
 import { slugify } from "@/lib/slug";
+import type { Database } from "@/types/database.types";
+
+type VendorProfileInsert =
+  Database["public"]["Tables"]["vendor_profiles"]["Insert"];
 
 function firstRel<T>(v: T | T[] | null | undefined): T | null {
   return Array.isArray(v) ? v[0] ?? null : v ?? null;
@@ -101,7 +105,7 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminSupabaseClient();
     const slug = await uniqueSlug(supabase, businessName);
 
-    const insert: Record<string, unknown> = {
+    const insert: VendorProfileInsert = {
       business_name: businessName,
       slug,
       category_id: typeof body.categoryId === "string" ? body.categoryId : null,

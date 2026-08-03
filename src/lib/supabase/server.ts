@@ -5,11 +5,12 @@ import {
   getSupabaseSecretKey,
   getSupabaseUrl,
 } from "@/lib/supabase/env";
+import type { Database } from "@/types/database.types";
 
 export async function createServerSupabaseClient() {
   const cookieStore = await cookies();
 
-  return createServerClient(
+  return createServerClient<Database>(
     getSupabaseUrl(),
     getSupabasePublishableKey(),
     {
@@ -36,7 +37,7 @@ export async function createServerSupabaseClient() {
  * Use only in API routes, never expose to client.
  */
 export function createAdminSupabaseClient() {
-  return createServerClient(
+  return createServerClient<Database>(
     getSupabaseUrl(),
     getSupabaseSecretKey(),
     {

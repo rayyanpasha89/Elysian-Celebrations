@@ -1,14 +1,7 @@
+import dynamic from "next/dynamic";
 import { HeroSection } from "@/components/marketing/hero/hero-section";
-import { DestinationCarousel } from "@/components/marketing/destinations/destination-carousel";
-import { JourneySteps } from "@/components/marketing/how-it-works/journey-steps";
-import { PackageSection } from "@/components/marketing/packages/package-section";
-import { VendorMarquee } from "@/components/marketing/vendors/vendor-marquee";
-import { BudgetTeaser } from "@/components/marketing/budget/budget-teaser";
-import { TestimonialCarousel } from "@/components/marketing/testimonials/testimonial-carousel";
-import { FoundersSection } from "@/components/marketing/about/founders-section";
 import { PlanningManifesto } from "@/components/marketing/home/planning-manifesto";
 import { EventSystemShowcase } from "@/components/marketing/home/event-system-showcase";
-import { ContactForm } from "@/components/marketing/contact/contact-form";
 import {
   OrnamentRule,
   SectionEyebrow,
@@ -16,6 +9,47 @@ import {
 } from "@/components/marketing/shared/marketing-primitives";
 import { cn } from "@/lib/utils";
 import { MARKETING_IMAGES } from "@/lib/marketing-images";
+
+const DestinationCarousel = dynamic(() =>
+  import("@/components/marketing/destinations/destination-carousel").then(
+    (module) => module.DestinationCarousel
+  )
+);
+const JourneySteps = dynamic(() =>
+  import("@/components/marketing/how-it-works/journey-steps").then(
+    (module) => module.JourneySteps
+  )
+);
+const PackageSection = dynamic(() =>
+  import("@/components/marketing/packages/package-section").then(
+    (module) => module.PackageSection
+  )
+);
+const VendorMarquee = dynamic(() =>
+  import("@/components/marketing/vendors/vendor-marquee").then(
+    (module) => module.VendorMarquee
+  )
+);
+const BudgetTeaser = dynamic(() =>
+  import("@/components/marketing/budget/budget-teaser").then(
+    (module) => module.BudgetTeaser
+  )
+);
+const TestimonialCarousel = dynamic(() =>
+  import("@/components/marketing/testimonials/testimonial-carousel").then(
+    (module) => module.TestimonialCarousel
+  )
+);
+const FoundersSection = dynamic(() =>
+  import("@/components/marketing/about/founders-section").then(
+    (module) => module.FoundersSection
+  )
+);
+const ContactForm = dynamic(() =>
+  import("@/components/marketing/contact/contact-form").then(
+    (module) => module.ContactForm
+  )
+);
 
 // The marketing home stays publicly viewable even when signed in, so the
 // dashboard "Back to Site" link and the logo work. Post-login routing to the
@@ -78,7 +112,7 @@ export default function HomePage() {
                 chapter="08"
                 eyebrow="Concierge brief"
                 title="Start with the event you want to shape."
-                intro="Bring the event type, destination, guest frame, and the moments you already know. We’ll turn it into a first structure: days, functions, vendor direction, budget logic, and what needs a quote."
+                intro="Bring the event type, destination, guest frame, and the moments you already know. We’ll turn it into a first structure: days, functions, vendor direction, spend logic, and what needs manual confirmation."
                 align="start"
                 titleMaxWidth="max-w-xl"
               />
@@ -165,7 +199,7 @@ function AtmosphereGallery() {
               {[
                 "Each moment lives inside a day and function branch.",
                 "Vendor catalogues create the first menu, setup, or service draft.",
-                "Quote-only requests stay visible instead of polluting estimates.",
+                "Manually priced requests stay visible instead of polluting estimates.",
               ].map((note, index) => (
                 <div
                   key={note}
@@ -252,7 +286,7 @@ function AssuranceStrip() {
     },
     {
       eyebrow: "Operations pulse",
-      copy: "Missing vendors, quote items, guests, and run-of-show gaps become visible early.",
+      copy: "Missing vendors, pending prices, guests, and run-of-show gaps become visible early.",
     },
   ];
 

@@ -180,7 +180,7 @@ export const EVENT_FINALIZATION_CHECKLIST = [
   {
     key: "budget",
     label: "Budget is reconciled",
-    description: "Planned, quoted, paid, and due amounts are aligned by day and event.",
+    description: "Estimated, final, paid, and due amounts are aligned by day and function.",
   },
   {
     key: "guests-hotels",
@@ -245,7 +245,7 @@ export type EventDefinitionPayload = {
     finalization: string;
   };
   days: EventDefinitionDay[];
-  finalizationChecklist: typeof EVENT_FINALIZATION_CHECKLIST;
+  finalizationChecklist: Array<(typeof EVENT_FINALIZATION_CHECKLIST)[number]>;
 };
 
 export type EventDefinitionPlanDay = {
@@ -735,7 +735,7 @@ export function buildEventDefinitionPayload(
       input.eventDate,
       eventType.customEventType ?? eventType.eventTypeLabel
     ),
-    finalizationChecklist: EVENT_FINALIZATION_CHECKLIST,
+    finalizationChecklist: [...EVENT_FINALIZATION_CHECKLIST],
   };
 }
 

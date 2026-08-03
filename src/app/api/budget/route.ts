@@ -82,11 +82,25 @@ type EventPlanSpendSummary = {
   days: EventPlanSpendDay[];
 };
 
-async function getEventPlanSpendSummary(
-  profileId: string
-): Promise<EventPlanSpendSummary | null> {
-  const supabase = createAdminSupabaseClient();
+type EventPlanDayRow = {
+  id: string;
+  name: string;
+  date: string | null;
+  sort_order: number | null;
+};
 
+type EventPlanContext = {
+  wedding: { id: string; name: string };
+  days: EventPlanDayRow[];
+  events: EventReadinessRow[];
+  dayNameById: Map<string, string>;
+  eventIds: string[];
+};
+
+async function loadEventPlanContext(
+  profileId: string
+): Promise<EventPlanContext | null> {
+  const supabase = createAdminSupabaseClient();
   const { data: wedding, error: weddingError } = await supabase
     .from("weddings")
     .select("id, name")
@@ -96,13 +110,9 @@ async function getEventPlanSpendSummary(
     .maybeSingle();
 
   if (weddingError) {
-    console.error("getEventPlanSpendSummary wedding:", weddingError);
-    return null;
+    throw weddingError;
   }
-
-  if (!wedding) {
-    return null;
-  }
+  if (!wedding) return null;
 
   const [{ data: dayRows, error: daysError }, { data: eventRows, error: eventsError }] =
     await Promise.all([
@@ -119,12 +129,25 @@ async function getEventPlanSpendSummary(
     ]);
 
   if (daysError || eventsError) {
-    console.error("getEventPlanSpendSummary days/events:", daysError ?? eventsError);
-    return null;
+    throw daysError ?? eventsError;
   }
 
-  const days = dayRows ?? [];
+  const days = (dayRows ?? []) as EventPlanDayRow[];
   const events = (eventRows ?? []) as unknown as EventReadinessRow[];
+  return {
+    wedding,
+    days,
+    events,
+    dayNameById: new Map(days.map((day) => [day.id, day.name])),
+    eventIds: events.map((event) => event.id),
+  };
+}
+
+function getEventPlanSpendSummary(
+  context: EventPlanContext | null
+): EventPlanSpendSummary | null {
+  if (!context) return null;
+  const { wedding, days, events } = context;
 
   const byDay = new Map<
     string,
@@ -294,31 +317,12 @@ type RawBudgetBookingRow = {
  * of the two-way sync. (The reverse direction already rolls budget items back
  * into each event's estimated_budget on save.)
  */
-async function getPlanVendorLineItems(profileId: string): Promise<PlanLineItem[]> {
+async function getPlanVendorLineItems(
+  context: EventPlanContext | null
+): Promise<PlanLineItem[]> {
+  if (!context || context.eventIds.length === 0) return [];
   const supabase = createAdminSupabaseClient();
-
-  const { data: wedding } = await supabase
-    .from("weddings")
-    .select("id")
-    .eq("client_profile_id", profileId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (!wedding) return [];
-
-  const [{ data: dayRows }, { data: eventRows }] = await Promise.all([
-    supabase.from("wedding_days").select("id, name").eq("wedding_id", wedding.id),
-    supabase
-      .from("wedding_events")
-      .select(EVENT_READINESS_SELECT)
-      .eq("wedding_id", wedding.id),
-  ]);
-
-  const dayNameById = new Map(
-    (dayRows ?? []).map((day) => [day.id as string, day.name as string])
-  );
-  const events = (eventRows ?? []) as unknown as EventReadinessRow[];
+  const { dayNameById, events, eventIds } = context;
   const eventInfo = new Map(
     events.map((event) => [
       event.id as string,
@@ -331,8 +335,6 @@ async function getPlanVendorLineItems(profileId: string): Promise<PlanLineItem[]
       },
     ])
   );
-  const eventIds = events.map((event) => event.id as string);
-  if (eventIds.length === 0) return [];
 
   const { data: bookings, error } = await supabase
     .from("bookings")
@@ -345,8 +347,7 @@ async function getPlanVendorLineItems(profileId: string): Promise<PlanLineItem[]
     .order("created_at", { ascending: true });
 
   if (error) {
-    console.error("getPlanVendorLineItems bookings:", error);
-    return [];
+    throw error;
   }
 
   const bookingRows = (bookings ?? []) as RawBudgetBookingRow[];
@@ -405,7 +406,7 @@ async function getPlanVendorLineItems(profileId: string): Promise<PlanLineItem[]
       vendorName,
       serviceName,
       name: serviceName ? `${vendorName} · ${serviceName}` : vendorName,
-      // Never return the vendor's submitted quote to the client. Once the
+      // Never return the privately agreed vendor payout to the client. Once the
       // final price is visible, both values converge so the service fee cannot
       // be inferred by subtracting an estimate from the published total.
       estimatedCost: visibleCost,
@@ -647,34 +648,19 @@ export type ConfirmedEvent = {
  * flag is true once the client's own event is "complete enough" (venue, guests,
  * and times set) — only then do we reveal the confirmed amount.
  */
-async function getConfirmedEventPricing(profileId: string): Promise<ConfirmedEvent[]> {
+async function getConfirmedEventPricing(
+  context: EventPlanContext | null
+): Promise<ConfirmedEvent[]> {
+  if (!context || context.eventIds.length === 0) return [];
   const supabase = createAdminSupabaseClient();
-  const { data: wedding } = await supabase
-    .from("weddings")
-    .select("id")
-    .eq("client_profile_id", profileId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (!wedding) return [];
+  const { dayNameById, events, eventIds } = context;
 
-  const [{ data: dayRows }, { data: eventRows }] = await Promise.all([
-    supabase.from("wedding_days").select("id, name").eq("wedding_id", wedding.id),
-    supabase
-      .from("wedding_events")
-      .select(EVENT_READINESS_SELECT)
-      .eq("wedding_id", wedding.id),
-  ]);
-
-  const dayNameById = new Map((dayRows ?? []).map((d) => [d.id as string, d.name as string]));
-  const events = (eventRows ?? []) as unknown as EventReadinessRow[];
-  const eventIds = events.map((e) => e.id as string);
-  if (eventIds.length === 0) return [];
-
-  const { data: bookings } = await supabase
+  const { data: bookings, error: bookingsError } = await supabase
     .from("bookings")
     .select("wedding_event_id, status, final_price, price_published")
     .in("wedding_event_id", eventIds);
+
+  if (bookingsError) throw bookingsError;
 
   const pricingByEvent = new Map<
     string,
@@ -731,16 +717,17 @@ export async function GET() {
       return apiSuccess({ needsOnboarding: true, budget: null });
     }
 
-    const [budget, eventPlanSpend, planLineItems, confirmedEvents] = await Promise.all([
-      loadBudgetPayload(profileId),
-      getEventPlanSpendSummary(profileId),
-      getPlanVendorLineItems(profileId),
-      getConfirmedEventPricing(profileId),
+    const eventPlanContext = await loadEventPlanContext(profileId);
+    const [planLineItems, confirmedEvents] = await Promise.all([
+      getPlanVendorLineItems(eventPlanContext),
+      getConfirmedEventPricing(eventPlanContext),
     ]);
     return apiSuccess({
       needsOnboarding: false,
-      budget,
-      eventPlanSpend,
+      // Legacy editable-budget tables are intentionally excluded from reads.
+      // The planner and admin-published prices are the live source of truth.
+      budget: null,
+      eventPlanSpend: getEventPlanSpendSummary(eventPlanContext),
       planLineItems,
       confirmedEvents,
     });
@@ -983,11 +970,12 @@ export async function PUT(request: NextRequest) {
 
     await syncWeddingEventEstimatesFromBudgetItems(supabase, allowedEventIds);
 
-    const [refreshed, eventPlanSpend, planLineItems] = await Promise.all([
+    const eventPlanContext = await loadEventPlanContext(profileId);
+    const [refreshed, planLineItems] = await Promise.all([
       loadBudgetPayload(profileId),
-      getEventPlanSpendSummary(profileId),
-      getPlanVendorLineItems(profileId),
+      getPlanVendorLineItems(eventPlanContext),
     ]);
+    const eventPlanSpend = getEventPlanSpendSummary(eventPlanContext);
     return apiSuccess({ budget: refreshed, eventPlanSpend, planLineItems });
   } catch (error) {
     console.error("PUT /api/budget", error);

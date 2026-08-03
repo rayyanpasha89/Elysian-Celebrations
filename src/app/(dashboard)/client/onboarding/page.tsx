@@ -23,6 +23,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { ChevronDown, ChevronRight, Clock3, MapPin } from "lucide-react";
 import { fadeUp, staggerContainer } from "@/animations/variants";
 import { dashBtn, dashCard, dashLabel } from "@/lib/dashboard-styles";
 import {
@@ -223,7 +224,7 @@ export default function ClientOnboardingPage() {
     (async () => {
       setVenueOptionsLoading(true);
       try {
-        const res = await fetch("/api/venues?limit=8");
+        const res = await fetch("/api/venues?limit=30");
         const json = await res.json();
         if (!res.ok) throw new Error(json.error ?? "Could not load venues");
         if (!cancelled) {
@@ -362,17 +363,6 @@ export default function ClientOnboardingPage() {
 
       <form
         onSubmit={onSubmit}
-        onKeyDown={(e) => {
-          // Enter inside any field must never submit/advance — on every step,
-          // including the final one. The event is created ONLY by an explicit
-          // click on "Create event & open planner". Textareas keep newlines.
-          if (
-            e.key === "Enter" &&
-            (e.target as HTMLElement).tagName !== "TEXTAREA"
-          ) {
-            e.preventDefault();
-          }
-        }}
         className="mt-10 space-y-8"
       >
         <motion.div variants={fadeUp} className={cn(dashCard, "space-y-6")}>
@@ -738,14 +728,39 @@ function BlockVenuePicker({
   const selectedVenue = venues.find((venue) => venueMatchesValue(venue, value));
   const customValueActive = Boolean(value.trim() && !selectedVenue);
   const [showCustom, setShowCustom] = useState(customValueActive);
+  const [search, setSearch] = useState("");
   const customOpen = showCustom || customValueActive;
   const destinationLabel = selectedVenue ? venueDestinationLabel(selectedVenue) : "";
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredVenues = normalizedSearch
+    ? venues.filter((venue) =>
+        [venue.name, venue.address, venueDestinationLabel(venue)]
+          .filter(Boolean)
+          .some((field) => field!.toLowerCase().includes(normalizedSearch))
+      )
+    : venues;
+  const catalogueCoversSearch = venues.some(
+    (venue) => venue.name.trim().toLowerCase() === normalizedSearch
+  );
+  const canUseCustom =
+    !loading &&
+    ((Boolean(normalizedSearch) && !catalogueCoversSearch) || venues.length === 0);
 
   return (
     <div className="mt-3 space-y-2">
       <label htmlFor={id} className="block text-[11px] text-slate">
         Venue / area for this block
       </label>
+      {venues.length > 6 ? (
+        <input
+          type="search"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search venue, city, or area"
+          aria-label="Search venue catalogue"
+          className="w-full border border-charcoal/12 bg-ivory px-2.5 py-2 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+        />
+      ) : null}
       <select
         id={id}
         value={selectedVenue ? selectedVenue.name : customOpen ? "__custom__" : ""}
@@ -762,13 +777,28 @@ function BlockVenuePicker({
         className="w-full border border-charcoal/12 bg-ivory px-2.5 py-2 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
       >
         <option value="">Decide later</option>
-        {venues.map((venue) => (
+        {filteredVenues.map((venue) => (
           <option key={venue.id} value={venue.name}>
             {venue.name}
           </option>
         ))}
-        <option value="__custom__">Custom venue / area</option>
+        {customOpen ? <option value="__custom__">Custom venue / area</option> : null}
       </select>
+
+      {canUseCustom && !customOpen ? (
+        <button
+          type="button"
+          onClick={() => {
+            setShowCustom(true);
+            onChange(search.trim());
+          }}
+          className="font-accent text-[9px] uppercase tracking-[0.14em] text-gold-dark underline decoration-gold-primary/30 underline-offset-4"
+        >
+          {normalizedSearch
+            ? `Use “${search.trim()}” as a custom venue`
+            : "Enter a custom venue"}
+        </button>
+      ) : null}
 
       {loading ? (
         <p className="text-[10px] leading-relaxed text-slate/70">
@@ -799,7 +829,7 @@ function BlockVenuePicker({
   );
 }
 
-// Compact "what you're about to create" recap shown on the final step.
+// Compact checkpoint before the user opens the per-day accordions.
 function ReviewSummary({
   eventName,
   eventTypeLabel,
@@ -813,12 +843,6 @@ function ReviewSummary({
     (sum, day) => sum + Object.values(day.blocks).filter((b) => b.enabled).length,
     0
   );
-  const peakGuests = days.reduce((max, day) => {
-    const dayGuests = Object.values(day.blocks)
-      .filter((b) => b.enabled)
-      .reduce((s, b) => Math.max(s, b.guestCount), 0);
-    return Math.max(max, dayGuests);
-  }, 0);
   const dated = days.filter((d) => d.date).map((d) => d.date as string).sort();
   const venueCount = new Set(
     days.flatMap((day) =>
@@ -835,24 +859,26 @@ function ReviewSummary({
       : "Dates pending";
 
   const items: Array<{ label: string; value: string }> = [
-    { label: "Event", value: eventName.trim() || "Untitled event" },
     { label: "Type", value: eventTypeLabel },
-    { label: "Venues", value: venueCount ? `${venueCount} anchored` : "Per block" },
     { label: "Days", value: `${days.length}` },
-    { label: "Time blocks", value: `${enabledBlocks}` },
-    { label: "Peak guests", value: peakGuests.toLocaleString("en-IN") },
-    { label: "Estimated spend", value: "After planning" },
+    { label: "Functions", value: `${enabledBlocks}` },
+    { label: "Venues", value: venueCount ? `${venueCount} anchored` : "Per function" },
   ];
 
   return (
-    <div className="border border-gold-primary/30 bg-gold-primary/5 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className={cn(dashLabel, "text-gold-dark")}>About to create</p>
+    <div className="border border-gold-primary/30 bg-gold-primary/5 p-3.5">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div className="min-w-0">
+          <p className={cn(dashLabel, "text-gold-dark")}>Structure checkpoint</p>
+          <p className="mt-1 truncate font-display text-lg text-charcoal">
+            {eventName.trim() || "Untitled event"}
+          </p>
+        </div>
         <span className="font-accent text-[10px] uppercase tracking-[0.18em] text-slate">
           {range}
         </span>
       </div>
-      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+      <dl className="mt-3 grid grid-cols-2 gap-2 border-t border-charcoal/8 pt-3 sm:grid-cols-4">
         {items.map((item) => (
           <div key={item.label}>
             <dt className="font-accent text-[9px] uppercase tracking-[0.18em] text-slate">
@@ -864,11 +890,6 @@ function ReviewSummary({
           </div>
         ))}
       </dl>
-      <p className="mt-3 text-[11px] leading-relaxed text-slate">
-        Nothing is saved until you press{" "}
-        <span className="text-charcoal">Create event &amp; open planner</span>.
-        Toggle and rename the blocks below first.
-      </p>
     </div>
   );
 }
@@ -888,164 +909,269 @@ function BlocksStep({
     patch: Partial<LocalDay["blocks"][EventTimeBlockKey]>
   ) => void;
 }) {
+  const [openDayIndex, setOpenDayIndex] = useState(0);
+  const [openBlockKey, setOpenBlockKey] = useState<EventTimeBlockKey | null>(null);
+
+  const selectDay = (dayIndex: number) => {
+    const day = days[dayIndex];
+    if (!day) return;
+    if (openDayIndex === dayIndex) {
+      setOpenDayIndex(-1);
+      return;
+    }
+    setOpenDayIndex(dayIndex);
+    setOpenBlockKey(null);
+  };
+
   return (
-    <div className="space-y-5">
-      <div>
-        <p className={dashLabel}>Choose time blocks, venues, and needs</p>
-        <p className="mt-2 text-xs leading-relaxed text-slate">
-          Morning, afternoon, and evening are on by default. Turn off any block
-          you do not need, then rename the rest and anchor each function to its
-          own venue or area. This is where multi-day, multi-venue events stay clear.
-        </p>
-      </div>
-
-      <div className="space-y-4">
+    <div className="space-y-3">
+      <div className="border border-charcoal/10 bg-cream/25">
         {days.map((day, dayIndex) => (
-          <div key={dayIndex} className="border border-charcoal/10 bg-cream/30 p-4">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <p className="font-display text-lg text-charcoal">{day.name}</p>
-              <span className="font-accent text-[10px] uppercase tracking-[0.18em] text-gold-dark">
-                {formatDayDateLabel(day.date)}
+          <section key={dayIndex} className="border-b border-charcoal/10 last:border-b-0">
+            <button
+              type="button"
+              onClick={() => selectDay(dayIndex)}
+              aria-expanded={openDayIndex === dayIndex}
+              aria-controls={`definition-day-${dayIndex}`}
+              className={cn(
+                "flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left transition-colors sm:px-5",
+                openDayIndex === dayIndex
+                  ? "bg-gold-primary/10"
+                  : "bg-ivory/40 hover:bg-cream/65"
+              )}
+            >
+              <span className="min-w-0">
+                <span className="block font-display text-lg text-charcoal">{day.name}</span>
+                <span className="mt-0.5 block font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
+                  {formatDayDateLabel(day.date)} · {DEFAULT_BLOCK_KEYS.filter((key) => day.blocks[key].enabled).length} blocks
+                </span>
               </span>
-            </div>
+              {openDayIndex === dayIndex ? (
+                <ChevronDown className="h-4 w-4 shrink-0 text-gold-dark" />
+              ) : (
+                <ChevronRight className="h-4 w-4 shrink-0 text-slate" />
+              )}
+            </button>
 
-            <div className="mt-4 grid gap-3 lg:grid-cols-3">
-              {DEFAULT_BLOCK_KEYS.map((blockKey) => {
-                const preset = EVENT_TIME_BLOCKS.find((b) => b.key === blockKey)!;
-                const block = day.blocks[blockKey];
-                return (
-                  <div
-                    key={blockKey}
-                    className={cn(
-                      "border p-3 transition-colors",
-                      block.enabled
-                        ? "border-gold-primary/45 bg-gold-primary/8"
-                        : "border-charcoal/10 bg-ivory/70"
-                    )}
+            {openDayIndex === dayIndex ? (
+              <motion.div
+                id={`definition-day-${dayIndex}`}
+                role="region"
+                aria-label={`${day.name} time blocks`}
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                transition={{ duration: 0.18 }}
+                className="overflow-hidden"
+              >
+                <div className="border-t border-charcoal/10 bg-ivory px-4 py-4 sm:px-5">
+                  <nav
+                    aria-label="Current definition path"
+                    className="mb-3 flex flex-wrap items-center gap-2"
                   >
-                    <label className="flex items-center justify-between gap-2">
-                      <span className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate">
-                        {preset.label}
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={block.enabled}
-                        onChange={(e) =>
-                          onBlockPatch(dayIndex, blockKey, {
-                            enabled: e.target.checked,
-                          })
-                        }
-                        className="h-4 w-4 border border-charcoal/30 accent-gold-primary"
-                      />
-                    </label>
-                    {block.enabled ? (
-                      <>
-                        <input
-                          value={block.title}
-                          onChange={(e) =>
-                            onBlockPatch(dayIndex, blockKey, { title: e.target.value })
-                          }
-                          className="mt-3 w-full border-0 border-b border-charcoal/15 bg-transparent py-1.5 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
-                          placeholder={preset.label}
-                        />
-                        <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-                          <label className="block">
-                            <span className="block text-slate">Starts</span>
-                            <input
-                              type="time"
-                              value={block.startTime}
-                              onChange={(e) =>
-                                onBlockPatch(dayIndex, blockKey, {
-                                  startTime: e.target.value,
-                                })
+                    <span className="border border-gold-primary/35 bg-gold-primary/10 px-2.5 py-1 font-accent text-[9px] uppercase tracking-[0.16em] text-gold-dark">
+                      {day.name}
+                    </span>
+                    <span className="text-charcoal/35">/</span>
+                    <span className="font-accent text-[10px] uppercase tracking-[0.16em] text-charcoal">
+                      {EVENT_TIME_BLOCKS.find((entry) => entry.key === openBlockKey)?.label ?? "All time blocks"}
+                    </span>
+                  </nav>
+
+                  <div className="space-y-2">
+                    {DEFAULT_BLOCK_KEYS.map((blockKey) => {
+                      const preset = EVENT_TIME_BLOCKS.find((b) => b.key === blockKey)!;
+                      const block = day.blocks[blockKey];
+                      const expanded = openBlockKey === blockKey;
+                      return (
+                        <article
+                          key={blockKey}
+                          className={cn(
+                            "border transition-colors",
+                            expanded
+                              ? "border-gold-primary/45 bg-gold-primary/[0.06]"
+                              : "border-charcoal/10 bg-cream/20"
+                          )}
+                        >
+                          <div className="flex items-stretch">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setOpenBlockKey((current) =>
+                                  current === blockKey ? null : blockKey
+                                )
                               }
-                              className="mt-1 w-full border border-charcoal/12 bg-ivory px-2 py-1 outline-none focus:border-gold-primary"
-                            />
-                          </label>
-                          <label className="block">
-                            <span className="block text-slate">Ends</span>
-                            <input
-                              type="time"
-                              value={block.endTime}
-                              onChange={(e) =>
-                                onBlockPatch(dayIndex, blockKey, {
-                                  endTime: e.target.value,
-                                })
-                              }
-                              className="mt-1 w-full border border-charcoal/12 bg-ivory px-2 py-1 outline-none focus:border-gold-primary"
-                            />
-                          </label>
-                        </div>
-                        <label className="mt-3 block text-[11px]">
-                          <span className="block text-slate">Guests for this block</span>
-                          <input
-                            type="number"
-                            min={1}
-                            max={100000}
-                            value={block.guestCount}
-                            onChange={(e) =>
-                              onBlockPatch(dayIndex, blockKey, {
-                                guestCount: Math.max(1, Number(e.target.value) || 1),
-                              })
-                            }
-                            className="mt-1 w-full border border-charcoal/12 bg-ivory px-2 py-1 font-heading text-sm outline-none focus:border-gold-primary"
-                          />
-                        </label>
-                        <BlockVenuePicker
-                          id={`venue-${dayIndex}-${blockKey}`}
-                          venues={venues}
-                          loading={venuesLoading}
-                          value={block.venue}
-                          onChange={(value) =>
-                            onBlockPatch(dayIndex, blockKey, { venue: value })
-                          }
-                        />
-                        <div className="mt-3">
-                          <span className="block text-[11px] text-slate">
-                            What this block needs
-                          </span>
-                          <div className="mt-1.5 flex flex-wrap gap-1.5">
-                            {NEED_OPTIONS.map((need) => {
-                              const active = block.needs.includes(need.key);
-                              return (
-                                <button
-                                  key={need.key}
-                                  type="button"
-                                  onClick={() =>
-                                    onBlockPatch(dayIndex, blockKey, {
-                                      needs: active
-                                        ? block.needs.filter((n) => n !== need.key)
-                                        : [...block.needs, need.key],
-                                    })
-                                  }
-                                  className={cn(
-                                    "border px-2 py-1 font-accent text-[10px] uppercase tracking-[0.12em] transition-colors",
-                                    active
-                                      ? "border-gold-primary bg-gold-primary/15 text-charcoal"
-                                      : "border-charcoal/15 bg-ivory text-slate hover:border-gold-primary/40"
-                                  )}
-                                >
-                                  {need.label}
-                                </button>
-                              );
-                            })}
+                              aria-expanded={expanded}
+                              aria-controls={`definition-block-${dayIndex}-${blockKey}`}
+                              className="flex min-w-0 flex-1 items-center justify-between gap-3 px-3.5 py-3 text-left"
+                            >
+                              <span className="min-w-0">
+                                <span className="font-heading text-sm font-medium text-charcoal">
+                                  {block.title || preset.label}
+                                </span>
+                                <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-slate">
+                                  <span className="inline-flex items-center gap-1">
+                                    <Clock3 className="h-3 w-3 text-gold-dark" />
+                                    {block.startTime || "Time TBD"}
+                                  </span>
+                                  <span className="inline-flex min-w-0 items-center gap-1 truncate">
+                                    <MapPin className="h-3 w-3 shrink-0 text-gold-dark" />
+                                    <span className="truncate">{block.venue || "Venue TBD"}</span>
+                                  </span>
+                                </span>
+                              </span>
+                              {expanded ? (
+                                <ChevronDown className="h-4 w-4 shrink-0 text-gold-dark" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 shrink-0 text-slate" />
+                              )}
+                            </button>
+                            <label
+                              className="flex w-20 shrink-0 cursor-pointer flex-col items-center justify-center border-l border-charcoal/10 px-2 text-center"
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={block.enabled}
+                                aria-label={`${block.enabled ? "Disable" : "Enable"} ${preset.label} on ${day.name}`}
+                                onChange={(event) => {
+                                  if (event.target.checked) setOpenBlockKey(blockKey);
+                                  onBlockPatch(dayIndex, blockKey, {
+                                    enabled: event.target.checked,
+                                  });
+                                }}
+                                className="h-4 w-4 border border-charcoal/30 accent-gold-primary"
+                              />
+                              <span className="mt-1 font-accent text-[8px] uppercase tracking-[0.12em] text-slate">
+                                {block.enabled ? "On" : "Off"}
+                              </span>
+                            </label>
                           </div>
-                          <p className="mt-1.5 text-[10px] leading-relaxed text-slate/70">
-                            Only what you pick here shows up in the planner. Add more
-                            later anytime.
-                          </p>
-                        </div>
-                      </>
-                    ) : (
-                      <p className="mt-3 text-[11px] leading-relaxed text-slate/80">
-                        {preset.label} skipped on this day.
-                      </p>
-                    )}
+
+                          {expanded ? (
+                            <motion.div
+                              id={`definition-block-${dayIndex}-${blockKey}`}
+                              role="region"
+                              aria-label={`${day.name}, ${preset.label} details`}
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              transition={{ duration: 0.16 }}
+                              className="overflow-hidden border-t border-charcoal/10"
+                            >
+                              {block.enabled ? (
+                                <div className="grid gap-3 p-3.5 md:grid-cols-2">
+                                  <label className="block md:col-span-2">
+                                    <span className="font-accent text-[9px] uppercase tracking-[0.14em] text-slate">
+                                      Function name
+                                    </span>
+                                    <input
+                                      value={block.title}
+                                      onChange={(event) =>
+                                        onBlockPatch(dayIndex, blockKey, {
+                                          title: event.target.value,
+                                        })
+                                      }
+                                      className="mt-1.5 w-full border border-charcoal/12 bg-ivory px-3 py-2.5 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+                                      placeholder={preset.label}
+                                    />
+                                  </label>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <label className="block">
+                                      <span className="font-accent text-[9px] uppercase tracking-[0.14em] text-slate">Starts</span>
+                                      <input
+                                        type="time"
+                                        value={block.startTime}
+                                        onChange={(event) =>
+                                          onBlockPatch(dayIndex, blockKey, { startTime: event.target.value })
+                                        }
+                                        className="mt-1.5 w-full border border-charcoal/12 bg-ivory px-2.5 py-2 font-heading text-sm outline-none focus:border-gold-primary"
+                                      />
+                                    </label>
+                                    <label className="block">
+                                      <span className="font-accent text-[9px] uppercase tracking-[0.14em] text-slate">Ends</span>
+                                      <input
+                                        type="time"
+                                        value={block.endTime}
+                                        onChange={(event) =>
+                                          onBlockPatch(dayIndex, blockKey, { endTime: event.target.value })
+                                        }
+                                        className="mt-1.5 w-full border border-charcoal/12 bg-ivory px-2.5 py-2 font-heading text-sm outline-none focus:border-gold-primary"
+                                      />
+                                    </label>
+                                  </div>
+                                  <label className="block">
+                                    <span className="font-accent text-[9px] uppercase tracking-[0.14em] text-slate">Guests</span>
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={100000}
+                                      value={block.guestCount}
+                                      onChange={(event) =>
+                                        onBlockPatch(dayIndex, blockKey, {
+                                          guestCount: Math.max(1, Number(event.target.value) || 1),
+                                        })
+                                      }
+                                      className="mt-1.5 w-full border border-charcoal/12 bg-ivory px-3 py-2.5 font-heading text-sm outline-none focus:border-gold-primary"
+                                    />
+                                  </label>
+                                  <div className="md:col-span-2">
+                                    <BlockVenuePicker
+                                      id={`venue-${dayIndex}-${blockKey}`}
+                                      venues={venues}
+                                      loading={venuesLoading}
+                                      value={block.venue}
+                                      onChange={(value) =>
+                                        onBlockPatch(dayIndex, blockKey, { venue: value })
+                                      }
+                                    />
+                                  </div>
+                                  <div className="md:col-span-2">
+                                    <span className="font-accent text-[9px] uppercase tracking-[0.14em] text-slate">
+                                      This function needs
+                                    </span>
+                                    <div className="mt-2 flex flex-wrap gap-1.5">
+                                      {NEED_OPTIONS.map((need) => {
+                                        const active = block.needs.includes(need.key);
+                                        return (
+                                          <button
+                                            key={need.key}
+                                            type="button"
+                                            aria-pressed={active}
+                                            onClick={() =>
+                                              onBlockPatch(dayIndex, blockKey, {
+                                                needs: active
+                                                  ? block.needs.filter((entry) => entry !== need.key)
+                                                  : [...block.needs, need.key],
+                                              })
+                                            }
+                                            className={cn(
+                                              "border px-2.5 py-1.5 font-accent text-[9px] uppercase tracking-[0.12em] transition-colors",
+                                              active
+                                                ? "border-gold-primary bg-gold-primary/15 text-charcoal"
+                                                : "border-charcoal/15 bg-ivory text-slate hover:border-gold-primary/40"
+                                            )}
+                                          >
+                                            {need.label}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <p className="px-3.5 py-3 text-xs text-slate">
+                                  Turn this block on when this day includes a {preset.label.toLowerCase()} function.
+                                </p>
+                              )}
+                            </motion.div>
+                          ) : null}
+                        </article>
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </div>
-          </div>
+                </div>
+              </motion.div>
+            ) : null}
+          </section>
         ))}
       </div>
     </div>

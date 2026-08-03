@@ -7,6 +7,12 @@ import {
   apiSuccess,
 } from "@/lib/api-utils";
 import { deleteVendorServiceImage } from "@/lib/supabase/storage";
+import type { Database } from "@/types/database.types";
+
+type VendorServiceInsert =
+  Database["public"]["Tables"]["vendor_services"]["Insert"];
+type VendorServiceUpdate =
+  Database["public"]["Tables"]["vendor_services"]["Update"];
 
 type ExistingServiceItem = {
   id: string;
@@ -41,17 +47,18 @@ export async function POST(
     if (!name) return apiError("Service name is required", 400);
 
     const supabase = createAdminSupabaseClient();
+    const insert: VendorServiceInsert = {
+      vendor_profile_id: id,
+      name,
+      description:
+        typeof body.description === "string" ? body.description.trim() || null : null,
+      base_price: amount(body.basePrice) ?? 0,
+      max_price: amount(body.maxPrice),
+      unit: typeof body.unit === "string" ? body.unit.trim() || null : null,
+    };
     const { data, error } = await supabase
       .from("vendor_services")
-      .insert({
-        vendor_profile_id: id,
-        name,
-        description:
-          typeof body.description === "string" ? body.description.trim() || null : null,
-        base_price: amount(body.basePrice) ?? 0,
-        max_price: amount(body.maxPrice),
-        unit: typeof body.unit === "string" ? body.unit.trim() || null : null,
-      })
+      .insert(insert)
       .select("id, name, description, base_price, max_price, unit")
       .single();
 
@@ -92,7 +99,7 @@ export async function PATCH(
     const serviceId = typeof body.serviceId === "string" ? body.serviceId : null;
     if (!serviceId) return apiError("serviceId is required", 400);
 
-    const updates: Record<string, unknown> = {};
+    const updates: VendorServiceUpdate = {};
     if (typeof body.name === "string" && body.name.trim()) updates.name = body.name.trim();
     if (body.description !== undefined)
       updates.description =

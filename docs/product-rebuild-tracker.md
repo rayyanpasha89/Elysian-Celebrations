@@ -9,7 +9,7 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
 - Vercel handoff path: pushes to `origin/main`
 - Base pushed commit before this tracker was added: `e79873b Deepen wedding planning and event budgets`
 - Follow-up slice: bookings event context, event-task timeline integration, Supabase saved vendors
-- Local Vercel CLI state: installed but not authenticated, so deploy status must be checked in the Vercel dashboard unless credentials/token are added locally.
+- Local Vercel CLI state: authenticated and linked to the production project; pushes to `origin/main` remain the deployment handoff.
 
 ## Cloud / Supabase State
 
@@ -18,7 +18,7 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
 - Applied remote migrations:
   - `20260331000000_baseline_schema.sql`
   - `20260401000000_add_manager_role.sql`
-  - `20260401010000_add_clerk_user_sync.sql`
+  - `20260401010000_reconcile_existing_remote_schema.sql`
   - `20260412000100_add_wedding_days_and_event_planning.sql`
   - `20260512000100_deepen_event_planning.sql`
   - `20260512000200_link_budget_items_to_events.sql`
@@ -27,9 +27,15 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
   - `20260601000100_add_vendor_service_item_media.sql`
   - `20260601000200_enable_message_realtime.sql`
   - `20260604000100_event_platform_definition_layer.sql`
-- `20260604000200_add_event_requirements.sql`
-- `20260713122345_final_pricing_fee_model.sql`
-- `20260713124846_preserve_legacy_vendor_amounts.sql`
+  - `20260604000200_add_event_requirements.sql`
+  - `20260610000100_booking_admin_pricing.sql`
+  - `20260610000200_admin_managed_vendors.sql`
+  - `20260610000300_admin_ops_cockpit.sql`
+  - `20260713122345_final_pricing_fee_model.sql`
+  - `20260713124846_preserve_legacy_vendor_amounts.sql`
+  - `20260713130159_lock_public_schema_behind_server_api.sql`
+  - `20260713135700_admin_owned_offline_pricing.sql`
+  - `20260802000100_harden_booking_pricing_and_selection.sql`
 - Remote table/column checks passed for:
   - `wedding_event_menus`
   - `wedding_event_menu_items`
@@ -49,15 +55,59 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
   - `wedding_event_requirements`
   - `bookings.vendor_amount`
   - generated `bookings.service_fee`
-  - final-price validation constraints and the vendor-amount immutability trigger
+  - final-price validation constraints and admin-owned offline pricing metadata
 
 ## Shipped Recently
 
-- Replaced the active admin margin/negotiation workflow with one complete final-price contract. Vendors submit one quote, `bookings.vendor_amount` freezes with that first quote, admins set a complete `final_price`, and Supabase generates `service_fee = final_price - vendor_amount`. Published client prices cannot be empty, final prices cannot undercut the vendor amount, and the legacy negotiation table is retained read-only only for historical audit compatibility.
-- Rebuilt `/admin/pricing` around client → day → function → vendor-pick drill-down. The editor exposes the fixed vendor amount, one final client price, the automatically calculated Elysian fee, and an explicit publish/unpublish action. `/admin/revenue` now reports final value, vendor base, Elysian fee, category contribution, and client contribution with no margin/GST/negotiation language.
+- Completed the first design-audit remediation wave: removed fake zero/empty
+  dashboard states, made event creation fail-and-clean-up on dependent errors,
+  made planner refresh authoritative after every save attempt, and reordered
+  vendor replacement sync so a failed replacement cannot destroy draft picks.
+- Made readiness server-authoritative across planner, client price gating, event
+  estimates, and finalization. Finalization cards now identify and open the exact
+  day/function/step gap instead of sending users to whichever event was active.
+- Rebuilt client vendor sourcing lanes from real event requirements and selected
+  services. Catalogue failures and plan failures are now explicit retry states,
+  not "no vendors" or fabricated wedding-only recommendations.
+- Generated compile-checked Supabase database types for all 39 public tables and
+  seven enums; wired them into browser/server/admin clients and added a repeatable
+  `npm run db:types` workflow.
+- Applied generated insert/update/enum contracts across the remaining admin,
+  booking, guest, settings, timeline, vendor, Clerk-webhook, and event-plan API
+  boundaries. The type generator uses the pinned official Supabase CLI when a
+  management token is available and read-only catalogue introspection otherwise.
+- Reconciled mood-board schema drift with
+  `20260802000500_restore_mood_board_item_metadata.sql`; category and creation
+  metadata are preserved end to end, and all six live rows passed rollback-only
+  backfill validation.
+- Added and production-preflighted query-path indexes, identity-history foreign
+  key restrictions, and payment-direction validation. Active duplicate booking
+  selections are already blocked by the prior partial unique index.
+- Separated vendor profile reads from analytics writes. Profiles render first;
+  deduplicated views are recorded through `/api/vendors/[slug]/view` afterward.
+- Consolidated the budget API onto one event/readiness snapshot per request and
+  stopped GET requests from creating or presenting the unreachable legacy budget
+  canvas as a source of truth.
+- Closed core accessibility gaps in planner fields/dialogs, seating assignment,
+  mobile navigation, radial-canvas focus, timeline/mood-board destructive actions,
+  steppers, charts, topbar menus, and marketing-gallery focus management.
+- Removed the orphan drag-budget editor/store, dead UI-kit primitives, unused
+  GSAP/CVA/dnd-kit/Zustand dependencies, and all remaining navy dashboard panels.
+  Live dashboard charts now share one approved walnut/camel/sage palette.
+- Venue selection now searches up to 30 catalogue records and reveals custom
+  entry only when the search is not covered. Custom requirements clearly state
+  that pricing remains excluded until Elysian confirms and publishes it.
+- Upgraded to `tsx@4.23.4` / patched `esbuild`, normalized the lockfile, and
+  restored a zero-vulnerability full `npm audit` result.
+- Upgraded the runtime to `next@16.2.12` and pinned patched `postcss@8.5.25` plus `sharp@0.35.3`; `npm audit --omit=dev` now reports zero vulnerabilities.
+- Corrected the commercial contract to match operations: Elysian agrees pricing with vendors offline, an admin records the agreed vendor price plus one flat INR Elysian fee, and the API derives `final_price = vendor_amount + fee`. Vendors never submit or negotiate quotes in the portal, while Supabase still generates `service_fee = final_price - vendor_amount` as the accounting invariant.
+- Rebuilt `/admin/pricing` around client → day → function → vendor-pick drill-down. The editor now accepts the agreed vendor payout and flat Elysian fee, previews the derived client total, and provides explicit draft/publish/unpublish behavior. `/admin/revenue` reports final value, vendor payouts, Elysian fee, category contribution, and client contribution with no margin/GST/negotiation language.
+- Reworked Layer 1 step 5 into compact nested day/function accordions. Only one day and one Morning/Afternoon/Evening function need to be open, while a persistent context trail keeps the active `Day / function` visible and venue selection remains catalogue-first with custom fallback.
+- Simplified Layer 2 so Add Day and Add Event live only in the flowchart workspace header. Day/function duplicates were removed from the radial canvas, and the scoped editor now places date, time, and venue directly below its heading while dropping the redundant readiness and locked-estimate cards.
+- Hardened the compact planner interactions: Step 5 starts with function details collapsed, exposes accessible day/function disclosure state and a persistent `Day / function` path, Add Event follows the active map day, unsaved editor changes are protected, duplicate submit requests are gated, dialogs trap and restore keyboard focus, and radial day/function maps paginate after six nodes so the supported 14-day definition cannot collide.
 - Added multi-angle spend intelligence to `/client/budget` with a live pie/donut view and selector for function, day, category (including food), vendor, final-versus-estimate, and paid-versus-due analysis. Published final prices replace estimates only when every active pick for the function is published and the function definition is complete.
 - Hardened booking pricing privacy by projecting role-specific response shapes: clients do not receive vendor amount, fee, draft final price, or Clerk identity IDs; vendors see only their amount; managers see the published client total or vendor amount without fee data; admins receive the full commercial record.
-- Unified client estimate and final-price visibility behind one shared 10-check event-readiness contract. Cost estimates, published totals, and booking details stay sealed until the function reaches 100%; unpublished vendor quotes and sealed final totals are never serialized to the client.
+- Unified client estimate and final-price visibility behind one shared 10-check event-readiness contract. Cost estimates, published totals, and booking details stay sealed until the function reaches 100%; agreed vendor payouts, fees, and sealed final totals are never serialized to the client.
 - Locked the Supabase public schema behind the server API with migration `20260713130159_lock_public_schema_behind_server_api.sql`. RLS is enabled on all 39 public tables, `anon` and `authenticated` have zero table/sequence/function privileges, and only role-checked Next.js handlers use `service_role`.
 - Made test-role switching development-only. Production builds now ignore the test-auth bypass unconditionally, so a copied environment flag or `?testRole=admin` query cannot grant portal access outside local development.
 - Closed admin and cross-role QA defects around suspended-user authorization, manager vendor response mapping, unpublished review leakage, cross-vendor storage deletion, vendor inquiry deletion, and admin service deletion with linked-booking protection.
@@ -111,6 +161,7 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
 - `npm run lint`
 - `npx tsc --noEmit`
 - `npm run build`
+- `npm audit --omit=dev` (zero vulnerabilities after the Next/PostCSS/Sharp patch upgrade)
 - `npm run db:migrations`
 - `npm run db:query` for newly added Supabase tables and columns
 - `npm run db:push` for pending media + realtime migrations
@@ -122,12 +173,15 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
 - Remote migration synchronization through `20260713122345_final_pricing_fee_model.sql`
 - Remote migration synchronization through `20260713124846_preserve_legacy_vendor_amounts.sql`, preserving all three legacy agreed vendor amounts and their historical fee value
 - Remote migration synchronization through `20260713130159_lock_public_schema_behind_server_api.sql`
-- Remote SQL checks for generated `bookings.service_fee`, all three final-pricing constraints, the vendor-amount lock trigger, and zero negative fees
+- Remote migration synchronization through `20260713135700_admin_owned_offline_pricing.sql`
+- Remote migration synchronization through `20260802000100_harden_booking_pricing_and_selection.sql`; duplicate preflight returned zero groups, the three legacy amount mirrors were repaired, and remote checks confirm the mirror constraint plus active-selection unique index are present.
+- Remote SQL checks confirm generated `bookings.service_fee`, all three final-pricing constraints, no vendor-amount lock trigger/function, and zero invalid final prices, publications, or fee mismatches
 - Remote SQL proof: 39/39 public tables have RLS, browser roles have zero table/function grants, service role retains all 39 tables, and pricing has zero invalid finals, invalid publications, or fee mismatches
 - Direct Supabase REST proof that the publishable key receives HTTP 401 / permission denied for `bookings`
 - Live role-based API checks confirming no fee/vendor/draft-final/Clerk-ID leakage to client, vendor, or manager booking responses, and no sealed final total in `/api/budget`
-- Live browser checks for admin final-pricing drill-down/editor, admin fee intelligence, client spend selector across all six dimensions, manager vendor data, and vendor quote entry
-- Live regression of all 15 admin routes, mobile navigation, notifications, account menu, destination creation form, client booking price privacy, and vendor quote editor remount behavior
+- Live browser checks for admin final-pricing drill-down/editor, admin fee intelligence, client spend selector across all six dimensions, manager vendor data, and vendor agreed-payout visibility
+- Live regression of all 15 admin routes, mobile navigation, notifications, account menu, destination creation form, client booking price privacy, and vendor pricing-state rendering
+- Authenticated client browser checks at desktop and mobile widths for Enter-to-advance without auto-create, the 14-day Step 5 accordion, collapsed function rows, `Day / All time blocks` and `Day / Afternoon` context, Layer 2 flowchart drill-down, active-day Add Event targeting, scoped Basics editor, compact date/time/venue context, unsaved-change protection, and non-overlapping sticky save actions
 - `127.0.0.1` development hydration/HMR verification with `allowedDevOrigins`, plus zero measured overlap from the collapsed local test-role dock
 - Local dev server started at `http://localhost:3000`
 - Basic HTTP smoke check passed for `/`

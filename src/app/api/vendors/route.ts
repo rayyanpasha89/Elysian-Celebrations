@@ -74,10 +74,18 @@ export async function GET(request: NextRequest) {
       ? "category:vendor_categories!inner(name, slug)"
       : "category:vendor_categories(name, slug)";
 
+    // Columns are listed explicitly rather than `*` because this route is
+    // unauthenticated. `vendor_profiles.user_id` is the vendor's Clerk user id
+    // and must never reach the public marketplace — `/api/vendors/[slug]`
+    // strips it by hand for the same reason. Add new public columns here
+    // deliberately; do not reintroduce the wildcard.
+    const PUBLIC_VENDOR_COLUMNS =
+      "id, business_name, slug, category_id, description, short_bio, cover_image, portfolio, city, state, country, experience, is_verified, is_featured, rating, review_count, created_at, updated_at";
+
     let query = supabase
       .from("vendor_profiles")
       .select(
-        `*, ${categoryRelation}, services:vendor_services!inner(id, name, description, service_scope, base_price, max_price, unit, event_type_fit, inclusions, deliverables, add_ons, items:vendor_service_items(id, item_type, name, description, dietary_tags, image_urls, reference_url, sort_order))`,
+        `${PUBLIC_VENDOR_COLUMNS}, ${categoryRelation}, services:vendor_services!inner(id, name, description, service_scope, base_price, max_price, unit, event_type_fit, inclusions, deliverables, add_ons, items:vendor_service_items(id, item_type, name, description, dietary_tags, image_urls, reference_url, sort_order))`,
         { count: "exact" }
       )
       // Marketplace discovery is a client-facing promise: only approved

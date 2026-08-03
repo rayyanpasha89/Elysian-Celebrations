@@ -11,17 +11,23 @@ import {
   normalizeServiceItems,
 } from "@/lib/vendor-offering";
 import { deleteVendorServiceImage } from "@/lib/supabase/storage";
+import type { Database } from "@/types/database.types";
 
-type ExistingServiceItem = {
-  id: string;
-  image_urls: string[] | null;
-};
+type VendorServiceUpdate =
+  Database["public"]["Tables"]["vendor_services"]["Update"];
+type VendorServiceItemRow =
+  Database["public"]["Tables"]["vendor_service_items"]["Row"];
+type VendorServiceItemInsert =
+  Database["public"]["Tables"]["vendor_service_items"]["Insert"];
+type VendorServiceItemUpdate =
+  Database["public"]["Tables"]["vendor_service_items"]["Update"];
+type ExistingServiceItem = Pick<VendorServiceItemRow, "id" | "image_urls">;
 
 function itemPayload(
   item: ReturnType<typeof normalizeServiceItems>[number],
   vendorServiceId: string,
   fallbackSortOrder: number
-) {
+): VendorServiceItemInsert {
   return {
     vendor_service_id: vendorServiceId,
     item_type: item.itemType,
@@ -82,7 +88,7 @@ export async function PATCH(
     if (!existing) return apiError("Service not found", 404);
 
     const body = (await request.json()) as Record<string, unknown>;
-    const updates: Record<string, unknown> = {};
+    const updates: VendorServiceUpdate = {};
     if (typeof body.name === "string") updates.name = body.name.trim();
     if (typeof body.description === "string") updates.description = body.description;
     if (typeof body.serviceScope === "string")
@@ -121,7 +127,7 @@ export async function PATCH(
         return apiError("Failed to load catalogue items", 500);
       }
 
-      const existingItems = (existingItemsData ?? []) as ExistingServiceItem[];
+      const existingItems: ExistingServiceItem[] = existingItemsData ?? [];
       const existingById = new Map(existingItems.map((item) => [item.id, item]));
       const retainedIds = new Set<string>();
 
@@ -131,9 +137,10 @@ export async function PATCH(
 
         if (existingItem) {
           retainedIds.add(existingItem.id);
+          const updatePayload: VendorServiceItemUpdate = payload;
           const { error: updateItemError } = await supabase
             .from("vendor_service_items")
-            .update(payload)
+            .update(updatePayload)
             .eq("id", existingItem.id)
             .eq("vendor_service_id", id);
           if (updateItemError) {
@@ -261,7 +268,7 @@ export async function DELETE(
     }
 
     await Promise.all(
-      ((items ?? []) as ExistingServiceItem[])
+      (items ?? [])
         .flatMap((item) => item.image_urls ?? [])
         .map((url) => deleteVendorServiceImage(url, vp.id, id))
     );

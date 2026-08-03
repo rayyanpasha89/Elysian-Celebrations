@@ -39,7 +39,7 @@ const steps = [
   {
     title: "Let estimates follow the plan",
     body:
-      "Food uses guest counts, vendors use service cues, and special requests stay outside estimates until they are quoted, so budget decisions stay honest.",
+      "Food uses guest counts, vendors use service cues, and special requests stay outside estimates until Elysian confirms their final price, so budget decisions stay honest.",
     icon: Wallet,
   },
   {

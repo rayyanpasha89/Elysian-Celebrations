@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { execFileSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import process from "node:process";
 import { Client } from "pg";
@@ -25,10 +25,18 @@ function env(name: string) {
 }
 
 function runSupabase(args: string[]) {
-  execFileSync("npx", ["supabase", ...args], {
+  const result = spawnSync("npx", ["supabase", ...args], {
     stdio: "inherit",
     env: process.env,
   });
+
+  if (result.error) {
+    fail(`Unable to start the Supabase CLI: ${result.error.message}`);
+  }
+
+  if (result.status !== 0) {
+    fail("Supabase CLI command failed. Review the output above and try again.");
+  }
 }
 
 function getOptionalEnv(name: string) {

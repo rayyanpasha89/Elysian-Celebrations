@@ -9,6 +9,7 @@ import { useMessageRealtime } from "@/hooks/use-message-realtime";
 import { dashCard, dashLabel, statusBadgeBase } from "@/lib/dashboard-styles";
 import {
   formatBookingDate,
+  formatMessageTime,
   statusTone,
   type Conversation,
 } from "@/lib/messages-shared";
@@ -338,7 +339,7 @@ function ThreadPanel({
                   {message.text}
                 </p>
                 <p className="font-accent mt-2 text-[9px] uppercase tracking-[0.15em] text-slate">
-                  {message.time}
+                  {formatMessageTime(message)}
                 </p>
               </div>
             </motion.div>
@@ -385,12 +386,12 @@ function ManagerContextPanel({
       <ContextRow label="Service" value={booking.service?.name ?? null} />
       <ContextRow label="Service scope" value={booking.service?.scope ?? null} />
       <ContextRow
-        label="Wedding event"
+        label="Function"
         value={booking.weddingEvent?.name ?? null}
         secondary={booking.weddingEvent?.eventType ?? null}
       />
       <ContextRow
-        label="Wedding day"
+        label="Event day"
         value={booking.weddingDay?.name ?? null}
         secondary={formatBookingDate(booking.weddingDay?.date ?? null)}
       />

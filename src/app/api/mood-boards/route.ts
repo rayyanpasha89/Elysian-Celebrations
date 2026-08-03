@@ -6,6 +6,12 @@ import {
   apiError,
   apiSuccess,
 } from "@/lib/api-utils";
+import type { Database } from "@/types/database.types";
+
+type MoodBoardInsert = Database["public"]["Tables"]["mood_boards"]["Insert"];
+type MoodBoardItemRow = Database["public"]["Tables"]["mood_board_items"]["Row"];
+type MoodBoardItemInsert =
+  Database["public"]["Tables"]["mood_board_items"]["Insert"];
 
 export async function GET() {
   const session = await getAuthSession();
@@ -41,19 +47,14 @@ export async function GET() {
     }
 
     const boardIds = (boards ?? []).map((b) => b.id);
-    let items: {
-      id: string;
-      mood_board_id: string;
-      image_url: string;
-      caption: string | null;
-      source_url: string | null;
-      sort_order: number;
-    }[] = [];
+    let items: MoodBoardItemRow[] = [];
 
     if (boardIds.length) {
       const { data: itemRows, error: iErr } = await supabase
         .from("mood_board_items")
-        .select("id, mood_board_id, category, image_url, caption, source_url, sort_order, created_at")
+        .select(
+          "id, mood_board_id, category, image_url, caption, source_url, sort_order, created_at"
+        )
         .in("mood_board_id", boardIds)
         .order("sort_order", { ascending: true });
       if (iErr) {
@@ -92,16 +93,23 @@ export async function POST(request: NextRequest) {
       return apiError("Client profile not found", 404);
     }
 
-    const body = await request.json();
+    const body = (await request.json()) as Record<string, unknown>;
     const imageUrl =
       typeof body.imageUrl === "string" ? body.imageUrl.trim() : "";
     const caption =
       typeof body.caption === "string" ? body.caption.trim().slice(0, 280) : null;
     const sourceUrl =
       typeof body.sourceUrl === "string" ? body.sourceUrl.trim().slice(0, 500) : null;
+    const allowedCategories = new Set([
+      "Decor",
+      "Outfits",
+      "Venue",
+      "Flowers",
+      "Food",
+    ]);
     const category =
-      typeof body.category === "string" && body.category.trim()
-        ? body.category.trim().slice(0, 40)
+      typeof body.category === "string" && allowedCategories.has(body.category)
+        ? body.category
         : "Decor";
 
     if (!imageUrl) {
@@ -122,12 +130,13 @@ export async function POST(request: NextRequest) {
 
     let boardId = existingBoard?.id ?? null;
     if (!boardId) {
+      const boardInsert: MoodBoardInsert = {
+        client_profile_id: profile.id,
+        name: "Inspiration",
+      };
       const { data: insertedBoard, error: insertBoardErr } = await supabase
         .from("mood_boards")
-        .insert({
-          client_profile_id: profile.id,
-          name: "Inspiration",
-        })
+        .insert(boardInsert)
         .select("id")
         .single();
       if (insertBoardErr || !insertedBoard?.id) {
@@ -149,17 +158,21 @@ export async function POST(request: NextRequest) {
       return apiError("Failed to create mood board item", 500);
     }
 
+    const itemInsert: MoodBoardItemInsert = {
+      mood_board_id: boardId,
+      category,
+      image_url: imageUrl,
+      caption,
+      source_url: sourceUrl,
+      sort_order: (lastItem?.sort_order ?? -1) + 1,
+    };
+
     const { data: item, error } = await supabase
       .from("mood_board_items")
-      .insert({
-        mood_board_id: boardId,
-        category,
-        image_url: imageUrl,
-        caption,
-        source_url: sourceUrl,
-        sort_order: (lastItem?.sort_order ?? -1) + 1,
-      })
-      .select("id, mood_board_id, category, image_url, caption, source_url, sort_order, created_at")
+      .insert(itemInsert)
+      .select(
+        "id, mood_board_id, category, image_url, caption, source_url, sort_order, created_at"
+      )
       .single();
 
     if (error) {

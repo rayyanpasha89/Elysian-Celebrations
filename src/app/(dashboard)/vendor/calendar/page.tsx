@@ -18,8 +18,7 @@ type CalendarBookingRow = {
   id: string;
   status: string;
   event_date: string | null;
-  total_amount: number | null;
-  paid_amount: number | null;
+  vendor_amount: number | null;
   notes: string | null;
   client: Relation<{
     partner_name: string | null;
@@ -49,8 +48,7 @@ type CalendarEvent = {
   eventType: string | null;
   dayName: string | null;
   venue: string | null;
-  totalAmount: number | null;
-  paidAmount: number | null;
+  agreedPayout: number | null;
   notes: string | null;
 };
 
@@ -89,8 +87,7 @@ function monthKey(raw: string | null) {
   });
 }
 
-function formatCurrency(amount: number | null) {
-  if (!amount) return "Not quoted";
+function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
@@ -101,7 +98,7 @@ function formatCurrency(amount: number | null) {
 function coupleNameFor(row: CalendarBookingRow) {
   const client = pickOne(row.client);
   const user = client ? pickOne(client.user) : null;
-  return client?.partner_name?.trim() || user?.name?.trim() || "Couple";
+  return client?.partner_name?.trim() || user?.name?.trim() || "Client";
 }
 
 async function loadCalendar(): Promise<LoadResult> {
@@ -126,13 +123,13 @@ async function loadCalendar(): Promise<LoadResult> {
   const { data, error } = await supabase
     .from("bookings")
     .select(
-      `id, status, event_date, total_amount, paid_amount, notes,
+      `id, status, event_date, vendor_amount, notes,
        client:client_profiles(partner_name, user:users(name)),
        service:vendor_services(name),
        wedding_event:wedding_events(name, event_type, date, start_time, end_time, venue, wedding_day:wedding_days(name, date))`
     )
     .eq("vendor_profile_id", vendorProfile.id)
-    .in("status", CALENDAR_STATUSES as unknown as string[])
+    .in("status", CALENDAR_STATUSES)
     .order("event_date", { ascending: true, nullsFirst: false });
 
   if (error) {
@@ -156,8 +153,7 @@ async function loadCalendar(): Promise<LoadResult> {
       eventType: event?.event_type ?? null,
       dayName: day?.name ?? null,
       venue: event?.venue ?? null,
-      totalAmount: row.total_amount,
-      paidAmount: row.paid_amount,
+      agreedPayout: row.vendor_amount,
       notes: row.notes,
     };
   });
@@ -247,7 +243,7 @@ function CalendarList({ events }: { events: CalendarEvent[] }) {
     return (
       <StateCard
         title="No confirmed dates yet"
-        body="Inquiry and quote-stage bookings stay in your inquiries page. Once a couple confirms or pays a deposit, the event appears here automatically."
+        body="Open inquiries and legacy pricing handoffs stay in your inquiries page. Once a couple confirms or pays a deposit, the event appears here automatically."
         ctaHref="/vendor/inquiries"
         ctaLabel="Review inquiries"
         gold
@@ -336,8 +332,9 @@ function CalendarCard({ event }: { event: CalendarEvent }) {
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-charcoal/8 pt-4">
         <p className="font-heading text-sm text-slate">
-          Quote {formatCurrency(event.totalAmount)}
-          {event.paidAmount ? ` · Paid ${formatCurrency(event.paidAmount)}` : ""}
+          {event.agreedPayout === null
+            ? "Agreed payout pending Elysian"
+            : `Agreed payout ${formatCurrency(event.agreedPayout)}`}
         </p>
         <div className="flex flex-wrap gap-2">
           <Link href={`/vendor/messages?bookingId=${event.id}`} className={dashBtn}>

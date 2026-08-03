@@ -6,6 +6,12 @@ import {
   apiError,
   apiSuccess,
 } from "@/lib/api-utils";
+import type { Database } from "@/types/database.types";
+
+type UserUpdate = Database["public"]["Tables"]["users"]["Update"];
+type ClientProfileUpdate =
+  Database["public"]["Tables"]["client_profiles"]["Update"];
+type WeddingUpdate = Database["public"]["Tables"]["weddings"]["Update"];
 
 export async function GET() {
   const session = await getAuthSession();
@@ -115,9 +121,10 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (typeof body.name === "string" && body.name.trim()) {
+      const userUpdate: UserUpdate = { name: body.name.trim() };
       const { error } = await supabase
         .from("users")
-        .update({ name: body.name.trim() })
+        .update(userUpdate)
         .eq("id", session.userId);
       if (error) {
         console.error("users update:", error);
@@ -130,9 +137,10 @@ export async function PATCH(request: NextRequest) {
         typeof body.phone === "string" && body.phone.trim()
           ? body.phone.trim()
           : null;
+      const userUpdate: UserUpdate = { phone };
       const { error } = await supabase
         .from("users")
-        .update({ phone })
+        .update(userUpdate)
         .eq("id", session.userId);
       if (error) {
         console.error("users phone:", error);
@@ -161,7 +169,7 @@ export async function PATCH(request: NextRequest) {
       return apiSuccess({ ok: true });
     }
 
-    const cpUpdates: Record<string, unknown> = {};
+    const cpUpdates: ClientProfileUpdate = {};
     if (typeof body.partnerName === "string") {
       cpUpdates.partner_name = body.partnerName.trim() || null;
     }
@@ -198,7 +206,7 @@ export async function PATCH(request: NextRequest) {
       .maybeSingle();
 
     if (wedding?.id) {
-      const weddingUpdates: Record<string, unknown> = {};
+      const weddingUpdates: WeddingUpdate = {};
       if (body.weddingDate !== undefined) {
         weddingUpdates.date = body.weddingDate
           ? new Date(body.weddingDate).toISOString()

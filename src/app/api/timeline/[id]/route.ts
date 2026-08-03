@@ -6,6 +6,12 @@ import {
   getAuthSession,
   requireRole,
 } from "@/lib/api-utils";
+import type { Database } from "@/types/database.types";
+
+type TimelineItemUpdate =
+  Database["public"]["Tables"]["timeline_items"]["Update"];
+type WeddingEventTaskUpdate =
+  Database["public"]["Tables"]["wedding_event_tasks"]["Update"];
 
 async function loadTimelineItem(
   supabase: ReturnType<typeof createAdminSupabaseClient>,
@@ -148,8 +154,8 @@ export async function PATCH(
         return apiError("Forbidden", 403);
       }
 
-      const body = await request.json();
-      const updates: Record<string, unknown> = {};
+      const body = (await request.json()) as Record<string, unknown>;
+      const updates: WeddingEventTaskUpdate = {};
 
       if (typeof body.title === "string") {
         const title = body.title.trim().slice(0, 120);
@@ -211,8 +217,8 @@ export async function PATCH(
       return apiError("Forbidden", 403);
     }
 
-    const body = await request.json();
-    const updates: Record<string, unknown> = {};
+    const body = (await request.json()) as Record<string, unknown>;
+    const updates: TimelineItemUpdate = {};
 
     if (typeof body.title === "string") {
       const title = body.title.trim().slice(0, 120);

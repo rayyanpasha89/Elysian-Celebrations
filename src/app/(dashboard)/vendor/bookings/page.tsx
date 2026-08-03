@@ -25,7 +25,7 @@ type ApiBooking = {
   status: string;
   event_date: string | null;
   total_amount: number | null;
-  paid_amount: number | null;
+  pricing_state: "agreed" | "pending_agreement";
   notes: string | null;
   client: {
     partner_name?: string;
@@ -35,8 +35,6 @@ type ApiBooking = {
     name?: string;
     description?: string | null;
     service_scope?: string | null;
-    base_price?: number | null;
-    max_price?: number | null;
     unit?: string | null;
     inclusions?: string[] | null;
     deliverables?: string[] | null;
@@ -108,9 +106,22 @@ function formatDate(value: string | null) {
 
 function displayStatus(status: UiStatus) {
   if (status === "INQUIRY") return "Inquiry";
-  if (status === "QUOTE_SENT") return "Quote sent";
+  if (status === "QUOTE_SENT") return "Pricing handoff";
   if (status === "CONFIRMED") return "Confirmed";
   return "Completed";
+}
+
+function agreedPayoutFor(booking: ApiBooking) {
+  if (
+    booking.pricing_state !== "agreed" ||
+    typeof booking.total_amount !== "number" ||
+    !Number.isFinite(booking.total_amount) ||
+    booking.total_amount < 0
+  ) {
+    return null;
+  }
+
+  return booking.total_amount;
 }
 
 function itemTypeLabel(value: string) {
@@ -164,17 +175,16 @@ export default function VendorBookingsPage() {
       return {
         id: b.id,
         raw: b,
-        couple: c?.partner_name ?? "Couple",
+        couple: c?.partner_name ?? "Client",
         destination: destName ?? "—",
         eventDate: b.event_date,
         eventName: b.event_context?.name ?? "Event TBD",
-        eventDay: b.event_context?.day?.name ?? "Wedding plan",
+        eventDay: b.event_context?.day?.name ?? "Event plan",
         venue: b.event_context?.venue ?? null,
         guestCount: b.event_context?.guestCount ?? null,
         vendorLoadInTime: b.event_context?.logistics?.vendorLoadInTime ?? null,
         service: s?.name ?? "Service",
-        amount: b.total_amount ?? 0,
-        paid: b.paid_amount ?? 0,
+        agreedPayout: agreedPayoutFor(b),
         status: ui,
       };
     });
@@ -209,20 +219,13 @@ export default function VendorBookingsPage() {
   const selectedBooking =
     list.find((booking) => booking.id === selectedBookingId) ?? filtered[0] ?? null;
 
-  const updateBookingStatus = async (
-    id: string,
-    status: string,
-    totalAmount?: number
-  ) => {
+  const updateBookingStatus = async (id: string, status: string) => {
     setStatusSavingId(id);
     try {
       const res = await fetch(`/api/bookings/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status,
-          ...(totalAmount !== undefined ? { totalAmount } : {}),
-        }),
+        body: JSON.stringify({ status }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Update failed");
@@ -331,12 +334,10 @@ export default function VendorBookingsPage() {
                       {b.guestCount ?? "TBD"}
                     </p>
                     <p>
-                      <span className={dashLabel}>Amount </span>
-                      {formatCurrency(b.amount)}
-                    </p>
-                    <p>
-                      <span className={dashLabel}>Paid </span>
-                      {formatCurrency(b.paid)}
+                      <span className={dashLabel}>Agreed payout </span>
+                      {b.agreedPayout === null
+                        ? "Pending Elysian"
+                        : formatCurrency(b.agreedPayout)}
                     </p>
                     {b.vendorLoadInTime ? (
                       <p className="sm:col-span-2">
@@ -359,7 +360,7 @@ export default function VendorBookingsPage() {
                         className="font-accent border border-charcoal/15 px-4 py-3 text-[11px] uppercase tracking-[0.2em] text-charcoal"
                         onClick={() => router.push(`/vendor/messages?bookingId=${b.id}`)}
                       >
-                        Respond
+                        Reply about event
                       </button>
                     ) : null}
                   </div>
@@ -378,8 +379,8 @@ export default function VendorBookingsPage() {
                 booking={selectedBooking.raw}
                 uiStatus={selectedBooking.status}
                 savingStatus={statusSavingId === selectedBooking.id}
-                onStatusChange={(status, totalAmount) =>
-                  void updateBookingStatus(selectedBooking.id, status, totalAmount)
+                onStatusChange={(status) =>
+                  void updateBookingStatus(selectedBooking.id, status)
                 }
                 onRespond={() =>
                   router.push(`/vendor/messages?bookingId=${selectedBooking.id}`)
@@ -408,33 +409,25 @@ function VendorBookingBrief({
   booking: ApiBooking;
   uiStatus: UiStatus;
   savingStatus: boolean;
-  onStatusChange: (status: string, totalAmount?: number) => void;
+  onStatusChange: (status: string) => void;
   onRespond: () => void;
 }) {
   const serviceItems = (booking.service?.items ?? [])
     .slice()
     .sort((left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0));
-  const remaining = Math.max(
-    0,
-    (booking.total_amount ?? 0) - (booking.paid_amount ?? 0)
-  );
-  const [quoteAmount, setQuoteAmount] = useState(
-    String(booking.total_amount ?? booking.service?.base_price ?? "")
-  );
-  const parsedQuote = Number(quoteAmount);
-  const quoteIsValid = Number.isFinite(parsedQuote) && parsedQuote > 0;
+  const agreedPayout = agreedPayoutFor(booking);
 
   return (
     <div className="mt-4 space-y-5">
-      <div className="border border-charcoal/10 bg-[radial-gradient(circle_at_top_left,rgba(201,169,110,0.16),transparent_32%),linear-gradient(155deg,#111827_0%,#1f2937_55%,#0b1220_100%)] px-4 py-5 text-ivory">
+      <div className="border border-charcoal/10 bg-[radial-gradient(circle_at_top_left,rgba(201,169,110,0.16),transparent_32%),linear-gradient(155deg,var(--charcoal-brown)_0%,var(--ebony)_55%,var(--dark-walnut)_100%)] px-4 py-5 text-ivory">
         <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-ivory/60">
           {displayStatus(uiStatus)}
         </p>
         <h3 className="mt-2 font-display text-2xl text-ivory">
-          {booking.client?.partner_name ?? "Couple"}
+          {booking.client?.partner_name ?? "Client"}
         </h3>
         <p className="mt-1 text-sm text-ivory/70">
-          {booking.event_context?.day?.name ?? "Wedding plan"} ·{" "}
+          {booking.event_context?.day?.name ?? "Event plan"} ·{" "}
           {booking.event_context?.name ?? "Event TBD"}
         </p>
         <p className="mt-3 font-accent text-[10px] uppercase tracking-[0.18em] text-gold-light">
@@ -442,9 +435,18 @@ function VendorBookingBrief({
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <BriefMetric label="Total" value={formatCurrency(booking.total_amount ?? 0)} />
-        <BriefMetric label="Remaining" value={formatCurrency(remaining)} />
+      <div className="border border-gold-primary/25 bg-gold-primary/5 p-4">
+        <p className={dashLabel}>Agreed payout</p>
+        <p className="mt-2 font-display text-2xl text-charcoal">
+          {agreedPayout === null
+            ? "Pending Elysian"
+            : formatCurrency(agreedPayout)}
+        </p>
+        <p className="mt-2 text-xs leading-relaxed text-slate">
+          {agreedPayout === null
+            ? "Elysian will record your payout after pricing is agreed offline. No pricing action is required here."
+            : "Recorded by Elysian after the offline pricing handoff. This is the only booking price shown in your workspace."}
+        </p>
       </div>
 
       {booking.event_context ? (
@@ -553,69 +555,29 @@ function VendorBookingBrief({
         </div>
       ) : null}
 
-      {uiStatus === "INQUIRY" ? (
-        <label className="block border border-gold-primary/25 bg-gold-primary/5 p-4">
-          <span className={dashLabel}>Your final vendor quote</span>
-          <span className="mt-2 flex items-center border border-charcoal/15 bg-ivory px-3 focus-within:border-gold-primary">
-            <span className="font-heading text-sm text-slate">₹</span>
-            <input
-              type="number"
-              min={1}
-              value={quoteAmount}
-              onChange={(event) => setQuoteAmount(event.target.value)}
-              placeholder="Enter one complete quote"
-              className="w-full bg-transparent px-2 py-3 font-heading text-sm text-charcoal outline-none"
-            />
-          </span>
-          <span className="mt-2 block text-xs leading-relaxed text-slate">
-            Send one complete vendor amount for this service. Elysian handles the
-            separate client-facing final price.
-          </span>
-        </label>
-      ) : null}
-
-      <div className="flex flex-wrap gap-3 border-t border-charcoal/8 pt-4">
-        {uiStatus === "INQUIRY" ? (
-          <>
-            <button
-              type="button"
-              className={dashBtn}
-              disabled={savingStatus || !quoteIsValid}
-              onClick={() => onStatusChange("QUOTE_SENT", Math.round(parsedQuote))}
-            >
-              {savingStatus ? "Sending..." : "Send final quote"}
-            </button>
+      {uiStatus !== "COMPLETED" ? (
+        <div className="flex flex-wrap gap-3 border-t border-charcoal/8 pt-4">
+          {uiStatus === "INQUIRY" || uiStatus === "QUOTE_SENT" ? (
             <button
               type="button"
               className="font-accent border border-charcoal/15 px-4 py-3 text-[11px] uppercase tracking-[0.2em] text-charcoal"
               onClick={onRespond}
             >
-              Respond
+              Reply about event
             </button>
-          </>
-        ) : null}
-        {uiStatus === "CONFIRMED" ? (
-          <button
-            type="button"
-            className={dashBtn}
-            disabled={savingStatus}
-            onClick={() => onStatusChange("COMPLETED")}
-          >
-            {savingStatus ? "Saving..." : "Mark completed"}
-          </button>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function BriefMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="border border-charcoal/8 bg-cream/40 p-3">
-      <p className="font-accent text-[10px] uppercase tracking-[0.15em] text-slate">
-        {label}
-      </p>
-      <p className="mt-2 font-display text-lg text-charcoal">{value}</p>
+          ) : null}
+          {uiStatus === "CONFIRMED" ? (
+            <button
+              type="button"
+              className={dashBtn}
+              disabled={savingStatus}
+              onClick={() => onStatusChange("COMPLETED")}
+            >
+              {savingStatus ? "Saving..." : "Mark completed"}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

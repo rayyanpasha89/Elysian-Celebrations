@@ -219,6 +219,55 @@ export default function VendorProfilePage() {
         </p>
       </motion.div>
 
+      <motion.section
+        variants={fadeUp}
+        className="mt-8 overflow-hidden border border-charcoal/10 bg-ivory"
+      >
+        <div className="grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)]">
+          <div className="bg-[radial-gradient(circle_at_top_right,rgba(201,169,110,0.2),transparent_38%),linear-gradient(145deg,var(--charcoal-brown),var(--ebony),var(--dark-walnut))] p-6 text-ivory sm:p-8">
+            <p className="font-accent text-[10px] uppercase tracking-[0.22em] text-gold-light">
+              Pricing handoff
+            </p>
+            <h3 className="mt-3 font-display text-2xl text-ivory">
+              Agree pricing offline with Elysian.
+            </h3>
+            <p className="mt-3 max-w-xl font-heading text-sm leading-relaxed text-ivory/70">
+              This portal has no pricing submission or negotiation flow. Elysian
+              confirms your payout directly with you, outside the app.
+            </p>
+          </div>
+          <div className="grid gap-px bg-charcoal/10 sm:grid-cols-3">
+            {[
+              {
+                step: "01",
+                title: "Agree",
+                body: "Settle your complete vendor payout with Elysian offline.",
+              },
+              {
+                step: "02",
+                title: "Record",
+                body: "Elysian records the payout and manages its separate flat fee.",
+              },
+              {
+                step: "03",
+                title: "View",
+                body: "Your agreed payout appears after it is recorded. Until then, you will see Pending Elysian.",
+              },
+            ].map((item) => (
+              <div key={item.step} className="bg-cream/40 p-5 sm:p-6">
+                <p className="font-accent text-[9px] uppercase tracking-[0.2em] text-gold-dark">
+                  {item.step}
+                </p>
+                <p className="mt-3 font-display text-lg text-charcoal">{item.title}</p>
+                <p className="mt-2 font-heading text-xs leading-relaxed text-slate">
+                  {item.body}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </motion.section>
+
       <motion.form
         variants={fadeUp}
         onSubmit={onSubmit}

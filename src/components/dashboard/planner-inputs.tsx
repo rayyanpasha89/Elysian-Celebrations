@@ -212,6 +212,9 @@ export function PresetTagInput({
       {allowCustom ? (
         adding ? (
           <div className="flex items-center gap-2">
+            <label htmlFor={inputId} className="sr-only">
+              {placeholder}
+            </label>
             <input
               id={inputId}
               autoFocus
@@ -376,12 +379,41 @@ export function Stepper({
         <button
           type="button"
           aria-label="Decrease"
+          disabled={current <= min}
           onClick={() => onChange(clamp(current - step))}
-          className="flex w-10 items-center justify-center border-r border-charcoal/12 text-slate transition-colors hover:bg-gold-primary/10 hover:text-charcoal"
+          className="flex w-10 items-center justify-center border-r border-charcoal/12 text-slate transition-colors hover:bg-gold-primary/10 hover:text-charcoal disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Minus className="h-4 w-4" />
         </button>
-        <div className="flex min-w-[5.5rem] items-baseline justify-center gap-1 px-4 py-2">
+        <div
+          role="spinbutton"
+          tabIndex={0}
+          aria-label={suffix ? `${suffix} count` : "Number"}
+          aria-valuemin={min}
+          aria-valuemax={max}
+          aria-valuenow={current}
+          aria-valuetext={`${displayValue(current)}${suffix ? ` ${suffix}` : ""}`}
+          onKeyDown={(event) => {
+            let next: number | null = null;
+            if (event.key === "ArrowUp" || event.key === "ArrowRight") {
+              next = current + step;
+            } else if (event.key === "ArrowDown" || event.key === "ArrowLeft") {
+              next = current - step;
+            } else if (event.key === "PageUp") {
+              next = current + step * 10;
+            } else if (event.key === "PageDown") {
+              next = current - step * 10;
+            } else if (event.key === "Home") {
+              next = min;
+            } else if (event.key === "End") {
+              next = max;
+            }
+            if (next === null) return;
+            event.preventDefault();
+            onChange(clamp(next));
+          }}
+          className="flex min-w-[5.5rem] items-baseline justify-center gap-1 px-4 py-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-charcoal"
+        >
           <span className="font-display text-xl text-charcoal">
             {displayValue(current)}
           </span>
@@ -394,8 +426,9 @@ export function Stepper({
         <button
           type="button"
           aria-label="Increase"
+          disabled={current >= max}
           onClick={() => onChange(clamp(current + step))}
-          className="flex w-10 items-center justify-center border-l border-charcoal/12 text-slate transition-colors hover:bg-gold-primary/10 hover:text-charcoal"
+          className="flex w-10 items-center justify-center border-l border-charcoal/12 text-slate transition-colors hover:bg-gold-primary/10 hover:text-charcoal disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Plus className="h-4 w-4" />
         </button>
@@ -555,7 +588,7 @@ export const DECOR_PALETTES: Swatch[] = [
   { value: "blush-gold", label: "Blush & gold", colors: ["#f3d9d2", "#e8d5b0", "#c9a96e"] },
   { value: "ivory-sage", label: "Ivory & sage", colors: ["#f6f1e7", "#cdd7c2", "#9bae8f"] },
   { value: "jewel-tones", label: "Jewel tones", colors: ["#7b2d4e", "#1f5f5b", "#c9a227"] },
-  { value: "midnight-gold", label: "Midnight & gold", colors: ["#414833", "#3b3f63", "#c9a96e"] },
+  { value: "midnight-gold", label: "Forest & camel", colors: ["#414833", "#656d4a", "#a68a64"] },
   { value: "coral-sunset", label: "Coral sunset", colors: ["#f4a261", "#e76f51", "#9d4e4e"] },
   { value: "pastel-spring", label: "Pastel spring", colors: ["#fbe5e1", "#dfeae0", "#cfe0ef"] },
   { value: "terracotta", label: "Terracotta earth", colors: ["#c97b5a", "#d9b08c", "#7c5b43"] },

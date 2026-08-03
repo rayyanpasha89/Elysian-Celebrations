@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -159,13 +159,84 @@ export function Sidebar({ groups, portalName, portalHref }: SidebarProps) {
 export function MobileSidebar({ groups, portalName, portalHref }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
+  const dialogId = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
+  const closeMenu = useCallback(() => setIsOpen(false), []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const previousFocus =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const trigger = triggerRef.current;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const frame = window.requestAnimationFrame(() => {
+      const dialog = dialogRef.current;
+      const firstControl = dialog?.querySelector<HTMLElement>(
+        "button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])"
+      );
+      (firstControl ?? dialog)?.focus();
+    });
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeMenu();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const focusable = Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])"
+        )
+      ).filter((element) => !element.hasAttribute("hidden"));
+
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const activeElement = document.activeElement;
+      if (event.shiftKey && (activeElement === first || !dialog.contains(activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      window.requestAnimationFrame(() => {
+        (trigger ?? previousFocus)?.focus();
+      });
+    };
+  }, [closeMenu, isOpen]);
 
   return (
     <>
       <button
+        ref={triggerRef}
+        type="button"
         onClick={() => setIsOpen(true)}
         className="fixed left-4 top-4 z-50 flex h-10 w-10 items-center justify-center border border-charcoal/15 bg-ivory/95 text-charcoal shadow-[0_12px_32px_rgba(24,24,20,0.12)] backdrop-blur transition-colors hover:border-gold-primary lg:hidden"
         aria-label="Open menu"
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+        aria-controls={dialogId}
       >
         <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
           <path d="M0 0h16M0 6h16M0 12h16" stroke="currentColor" strokeWidth="1.5" />
@@ -179,10 +250,17 @@ export function MobileSidebar({ groups, portalName, portalHref }: SidebarProps) 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsOpen(false)}
+              onClick={closeMenu}
               className="fixed inset-0 z-50 bg-midnight/60 backdrop-blur-sm lg:hidden"
+              aria-hidden="true"
             />
             <motion.aside
+              ref={dialogRef}
+              id={dialogId}
+              role="dialog"
+              aria-modal="true"
+              aria-label={`${portalName} navigation`}
+              tabIndex={-1}
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
@@ -206,7 +284,8 @@ export function MobileSidebar({ groups, portalName, portalHref }: SidebarProps) 
                   </Link>
                 </div>
                 <button
-                  onClick={() => setIsOpen(false)}
+                  type="button"
+                  onClick={closeMenu}
                   className="flex h-9 w-9 items-center justify-center border border-ivory/10 text-ivory/55 transition-colors hover:border-gold-primary/40 hover:text-ivory"
                   aria-label="Close menu"
                 >
@@ -221,7 +300,7 @@ export function MobileSidebar({ groups, portalName, portalHref }: SidebarProps) 
                   groups={groups}
                   pathname={pathname}
                   layoutId="mobile-sidebar-active"
-                  onNavigate={() => setIsOpen(false)}
+                  onNavigate={closeMenu}
                 />
               </nav>
             </motion.aside>

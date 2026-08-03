@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ChevronDown, PieChart, WalletCards } from "lucide-react";
+import { DASHBOARD_CHART_PALETTE } from "@/lib/dashboard-styles";
 import { cn, formatCurrency } from "@/lib/utils";
 
 type SpendDimension =
@@ -39,17 +40,6 @@ type SpendRow = {
   value: number;
   color: string;
 };
-
-const PALETTE = [
-  "#582F0E",
-  "#7F4F24",
-  "#A68A64",
-  "#656D4A",
-  "#A4AC86",
-  "#936639",
-  "#414833",
-  "#B6AD90",
-];
 
 const DIMENSIONS: { value: SpendDimension; label: string }[] = [
   { value: "event", label: "Event / function" },
@@ -159,7 +149,7 @@ export function SpendIntelligence({
     );
     return collapsed.map((row, index) => ({
       ...row,
-      color: PALETTE[index % PALETTE.length],
+      color: DASHBOARD_CHART_PALETTE[index % DASHBOARD_CHART_PALETTE.length],
     }));
   }, [days, dimension, picks, projected]);
 

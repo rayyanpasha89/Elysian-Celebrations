@@ -36,6 +36,9 @@ export default function ClientMoodBoardPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showComposer, setShowComposer] = useState(false);
   const [list, setList] = useState<ItemRow[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [form, setForm] = useState({
     imageUrl: "",
     caption: "",
@@ -47,9 +50,13 @@ export default function ClientMoodBoardPage() {
     let cancelled = false;
     (async () => {
       try {
+        setLoading(true);
+        setLoadError(null);
         const res = await fetch("/api/mood-boards");
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error);
+        const json = await res.json().catch(() => null);
+        if (!res.ok) {
+          throw new Error(json?.error ?? "Your mood board could not be loaded.");
+        }
         const items = json.items ?? [];
         const mapped: ItemRow[] = items.map(
           (item: {
@@ -67,8 +74,14 @@ export default function ClientMoodBoardPage() {
           })
         );
         if (!cancelled) setList(mapped);
-      } catch {
-        if (!cancelled) setList([]);
+      } catch (error) {
+        if (!cancelled) {
+          setLoadError(
+            error instanceof Error
+              ? error.message
+              : "Your mood board could not be loaded."
+          );
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -76,7 +89,7 @@ export default function ClientMoodBoardPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
 
   const filtered = useMemo(() => {
     if (tab === "All") return list;
@@ -85,15 +98,22 @@ export default function ClientMoodBoardPage() {
 
   const remove = async (id: string) => {
     setDeletingId(id);
+    setActionError(null);
     try {
       const res = await fetch(`/api/mood-boards/items/${id}`, {
         method: "DELETE",
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error);
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(json?.error ?? "This inspiration could not be removed.");
+      }
       setList((current) => current.filter((item) => item.id !== id));
-    } catch {
-      // Keep the existing list if delete fails.
+    } catch (error) {
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : "This inspiration could not be removed."
+      );
     } finally {
       setDeletingId(null);
     }
@@ -104,6 +124,7 @@ export default function ClientMoodBoardPage() {
     if (!form.imageUrl.trim()) return;
 
     setSaving(true);
+    setActionError(null);
     try {
       const res = await fetch("/api/mood-boards", {
         method: "POST",
@@ -115,8 +136,10 @@ export default function ClientMoodBoardPage() {
           category: form.category,
         }),
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error);
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(json?.error ?? "This inspiration could not be saved.");
+      }
 
       setList((current) => [
         {
@@ -135,8 +158,12 @@ export default function ClientMoodBoardPage() {
         category: "Decor",
       });
       setShowComposer(false);
-    } catch {
-      // Keep the current form state if save fails.
+    } catch (error) {
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : "This inspiration could not be saved."
+      );
     } finally {
       setSaving(false);
     }
@@ -147,6 +174,40 @@ export default function ClientMoodBoardPage() {
       <div className="animate-pulse space-y-6">
         <div className="h-10 w-48 bg-charcoal/10" />
         <div className="h-64 border border-charcoal/8 bg-charcoal/5" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div>
+        <p className={dashLabel}>Inspiration</p>
+        <h2 className="font-display mt-2 text-3xl font-semibold text-charcoal">
+          Mood board
+        </h2>
+        <div
+          role="alert"
+          className={cn(
+            dashCard,
+            "mt-10 border-dashed border-gold-primary/45 bg-gold-primary/[0.04]"
+          )}
+        >
+          <p className={dashLabel}>Board unavailable</p>
+          <h3 className="mt-3 font-display text-2xl text-charcoal">
+            Your saved inspiration is still protected
+          </h3>
+          <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate">
+            {loadError} Nothing has been shown as an empty board, and you can retry
+            when the connection is ready.
+          </p>
+          <button
+            type="button"
+            onClick={() => setReloadKey((key) => key + 1)}
+            className={cn(dashBtn, "mt-6")}
+          >
+            Try again
+          </button>
+        </div>
       </div>
     );
   }
@@ -166,6 +227,23 @@ export default function ClientMoodBoardPage() {
           {showComposer ? "Close composer" : "Add Inspiration"}
         </button>
       </motion.div>
+
+      {actionError ? (
+        <motion.div
+          variants={fadeUp}
+          role="alert"
+          className="mt-6 flex flex-col gap-3 border border-rose/45 bg-rose/[0.07] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <p className="text-sm leading-relaxed text-charcoal">{actionError}</p>
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            className="font-accent shrink-0 text-[9px] uppercase tracking-[0.18em] text-charcoal underline decoration-charcoal/30 underline-offset-4"
+          >
+            Dismiss
+          </button>
+        </motion.div>
+      ) : null}
 
       {showComposer ? (
         <motion.form
@@ -301,7 +379,7 @@ export default function ClientMoodBoardPage() {
                     type="button"
                     onClick={() => void remove(item.id)}
                     disabled={deletingId === item.id}
-                    className="font-accent absolute right-2 top-2 border border-charcoal/30 bg-ivory/95 px-2 py-1 text-[9px] uppercase tracking-[0.15em] text-charcoal opacity-0 transition-opacity group-hover:opacity-100 hover:border-gold-primary disabled:cursor-wait disabled:opacity-100"
+                    className="font-accent absolute right-2 top-2 border border-charcoal/30 bg-ivory/95 px-2 py-1 text-[9px] uppercase tracking-[0.15em] text-charcoal opacity-100 transition-opacity hover:border-gold-primary focus-visible:opacity-100 disabled:cursor-wait disabled:opacity-100 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100"
                   >
                     {deletingId === item.id ? "Removing" : "Delete"}
                   </button>

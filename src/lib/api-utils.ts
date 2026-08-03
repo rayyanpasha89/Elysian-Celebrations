@@ -9,6 +9,23 @@ import {
   TEST_AUTH_COOKIE,
   testAuthRoleFromValue,
 } from "@/lib/test-auth";
+import type { Database } from "@/types/database.types";
+
+type DatabaseUserRole = Database["public"]["Enums"]["user_role"];
+
+const DATABASE_ROLE_BY_APP_ROLE = {
+  client: "CLIENT",
+  vendor: "VENDOR",
+  admin: "ADMIN",
+  manager: "MANAGER",
+} as const satisfies Record<UserRole, DatabaseUserRole>;
+
+const APP_ROLE_BY_DATABASE_ROLE = {
+  CLIENT: "client",
+  VENDOR: "vendor",
+  ADMIN: "admin",
+  MANAGER: "manager",
+} as const satisfies Record<DatabaseUserRole, UserRole>;
 
 export type AuthSession = {
   userId: string;
@@ -32,11 +49,9 @@ async function resolveRole(
   sessionClaims: Record<string, unknown> | undefined,
   storedRole: UserRole | null
 ): Promise<UserRole> {
-  let role = roleFromSessionClaims(sessionClaims);
-
-  if (!role) {
-    role = storedRole;
-  }
+  // Supabase is the authorization source of truth. Clerk metadata can lag after
+  // an operations role change, so claims are only a fallback for unsynced users.
+  let role = storedRole ?? roleFromSessionClaims(sessionClaims);
 
   if (!role) {
     try {
@@ -102,7 +117,10 @@ async function resolveTestAuthUserId(role: UserRole): Promise<string> {
 
   try {
     const supabase = createAdminSupabaseClient();
-    const rolesToTry = role === "manager" ? ["MANAGER", "ADMIN"] : [role.toUpperCase()];
+    const rolesToTry: readonly DatabaseUserRole[] =
+      role === "manager"
+        ? ["MANAGER", "ADMIN"]
+        : [DATABASE_ROLE_BY_APP_ROLE[role]];
 
     for (const dbRole of rolesToTry) {
       const { data } = await supabase
@@ -127,7 +145,7 @@ async function resolveTestAuthUserId(role: UserRole): Promise<string> {
 
 /**
  * Get an active authenticated Clerk session or return a 401 response.
- * Role: JWT claims → Supabase `users.role` → Clerk publicMetadata.
+ * Role: Supabase `users.role` → JWT claims → Clerk publicMetadata.
  */
 export async function getAuthSession(): Promise<AuthSession | NextResponse> {
   const session = await getOptionalAuthSession();
@@ -155,7 +173,7 @@ async function fetchUserAuthorization(
     if (!data) return { state: "missing" };
     return {
       state: "found",
-      role: normalizeRole(data.role as string),
+      role: APP_ROLE_BY_DATABASE_ROLE[data.role],
       isActive: data.is_active !== false,
     };
   } catch {

@@ -10,6 +10,10 @@ import {
   getAuthSession,
   requireRole,
 } from "@/lib/api-utils";
+import type { Database } from "@/types/database.types";
+
+type WeddingEventUpdate =
+  Database["public"]["Tables"]["wedding_events"]["Update"];
 
 function toOptionalString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -61,7 +65,7 @@ export async function PATCH(
       return apiError("Event not found", 404);
     }
 
-    const updates: Record<string, unknown> = {};
+    const updates: WeddingEventUpdate = {};
     if (body.name !== undefined) updates.name = toOptionalString(body.name) ?? "Event";
     if (body.weddingDayId !== undefined) {
       const nextWeddingDayId = toOptionalString(body.weddingDayId);

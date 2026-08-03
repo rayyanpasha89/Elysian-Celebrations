@@ -11,6 +11,7 @@ import {
   hasExplicitEventDefinition,
   mealPeriodForTimeBlock,
   normalizeDayCount as normalizeEventDayCount,
+  normalizeTimeBlockKey,
   type EventRequirementCategoryKey,
 } from "@/lib/event-platform";
 import {
@@ -19,6 +20,7 @@ import {
   apiError,
   apiSuccess,
 } from "@/lib/api-utils";
+import { eventReadinessPercent } from "@/lib/event-readiness";
 
 type WeddingEventRow = {
   id: string;
@@ -106,6 +108,8 @@ type EventBookingRow = {
   event_date: string | null;
   notes: string | null;
   total_amount: number | null;
+  final_price: number | null;
+  price_published: boolean | null;
   paid_amount: number | null;
   vendor:
     | {
@@ -363,7 +367,7 @@ export async function GET() {
         supabase
           .from("bookings")
           .select(
-            `id, wedding_event_id, status, event_date, notes, total_amount, paid_amount,
+            `id, wedding_event_id, status, event_date, notes, total_amount, final_price, price_published, paid_amount,
             vendor:vendor_profiles(id, business_name, slug, category:vendor_categories(name, slug)),
             service:vendor_services(id, name, description, service_scope, base_price, max_price, unit, event_type_fit, inclusions, deliverables, add_ons, items:vendor_service_items(id, item_type, name, description, dietary_tags, image_urls, reference_url, sort_order))`
           )
@@ -456,6 +460,40 @@ export async function GET() {
       eventsByDay.set(dayId, list);
     }
 
+    const eventReadinessById = new Map<string, number>();
+    const clientVisiblePricingEvents = new Set<string>();
+    for (const event of (events ?? []) as WeddingEventRow[]) {
+      const eventBookings = (bookingsByEvent.get(event.id) ?? []).filter(
+        (booking) => booking.status !== "CANCELLED"
+      );
+      const readiness = eventReadinessPercent({
+        ...event,
+        requirements: requirementsByEvent.get(event.id) ?? [],
+        menus: menusByEvent.get(event.id) ?? [],
+        logistics: logisticsByEvent.get(event.id) ?? null,
+        tasks: tasksByEvent.get(event.id) ?? [],
+        bookings: eventBookings.map((booking) => ({
+          status: booking.status,
+          total_amount: booking.total_amount,
+          service: booking.service
+            ? { base_price: booking.service.base_price ?? null }
+            : null,
+          })),
+      });
+      eventReadinessById.set(event.id, readiness);
+
+      if (
+        readiness >= 100 &&
+        eventBookings.length > 0 &&
+        eventBookings.every(
+          (booking) =>
+            booking.price_published === true && booking.final_price != null
+        )
+      ) {
+        clientVisiblePricingEvents.add(event.id);
+      }
+    }
+
     return apiSuccess({
       wedding,
       days: days.map((day) => ({
@@ -464,6 +502,7 @@ export async function GET() {
           .sort((left, right) => left.sort_order - right.sort_order)
           .map((event) => ({
             ...event,
+            readinessPercent: eventReadinessById.get(event.id) ?? 0,
             menus: (menusByEvent.get(event.id) ?? [])
               .sort((left, right) => left.sort_order - right.sort_order)
               .map((menu) => ({
@@ -525,14 +564,18 @@ export async function GET() {
                 notes: requirement.notes,
                 sortOrder: requirement.sort_order,
               })),
-            vendorSelections: (
-              bookingsByEvent.get(event.id) ?? []
-            ).map((booking) => ({
+            vendorSelections: (bookingsByEvent.get(event.id) ?? [])
+              .filter((booking) => booking.status !== "CANCELLED")
+              .map((booking) => ({
               id: booking.id,
               status: booking.status,
               eventDate: booking.event_date,
               notes: booking.notes,
-              totalAmount: booking.total_amount,
+              totalAmount:
+                clientVisiblePricingEvents.has(event.id) &&
+                booking.price_published === true
+                  ? booking.final_price
+                  : null,
               paidAmount: booking.paid_amount,
               vendor: booking.vendor
                 ? {
@@ -566,7 +609,7 @@ export async function GET() {
                     })),
                   }
                 : null,
-	            })),
+              })),
           })),
       })),
     });
@@ -600,28 +643,27 @@ export async function DELETE() {
       return apiError("Event plan not found", 404);
     }
 
-    const { data: weddings, error: weddingError } = await supabase
+    const { data: wedding, error: weddingError } = await supabase
       .from("weddings")
       .select("id, name")
       .eq("client_profile_id", profile.id)
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(1)
+      .maybeSingle();
 
     if (weddingError) {
       console.error("weddings:", weddingError);
       return apiError("Failed to load event plan", 500);
     }
 
-    if (!weddings || weddings.length === 0) {
+    if (!wedding) {
       return apiError("Event plan not found", 404);
     }
-
-    const weddingIds = weddings.map((wedding) => wedding.id);
 
     const { data: events, error: eventsError } = await supabase
       .from("wedding_events")
       .select("id")
-      .in("wedding_id", weddingIds);
+      .eq("wedding_id", wedding.id);
 
     if (eventsError) {
       console.error("wedding_events:", eventsError);
@@ -668,6 +710,7 @@ export async function DELETE() {
     const { error: deleteError } = await supabase
       .from("weddings")
       .delete()
+      .eq("id", wedding.id)
       .eq("client_profile_id", profile.id);
 
     if (deleteError) {
@@ -677,10 +720,7 @@ export async function DELETE() {
 
     return apiSuccess({
       ok: true,
-      deletedPlans: weddings.map((wedding) => ({
-        id: wedding.id,
-        name: wedding.name,
-      })),
+      deletedPlans: [{ id: wedding.id, name: wedding.name }],
     });
   } catch (error) {
     console.error("DELETE /api/wedding", error);
@@ -694,15 +734,16 @@ export async function POST(request: NextRequest) {
   const roleCheck = requireRole(session, "client");
   if (roleCheck) return roleCheck;
 
+  const supabase = createAdminSupabaseClient();
+  let createdWeddingId: string | null = null;
+
   try {
-    const supabase = createAdminSupabaseClient();
     const body = await request.json();
     const {
       coupleName,
       weddingDate,
       guestCount,
       destinationId,
-      budgetTotal,
       partnerName,
       dayCount,
     } = body as Record<string, unknown>;
@@ -728,11 +769,6 @@ export async function POST(request: NextRequest) {
       typeof destinationId === "string" && destinationId
         ? destinationId
         : null;
-
-    const budget =
-      typeof budgetTotal === "number" && budgetTotal > 0
-        ? Math.floor(budgetTotal)
-        : 500000;
 
     const totalDays = normalizeEventDayCount(dayCount);
     const eventDefinitionInput =
@@ -807,7 +843,7 @@ export async function POST(request: NextRequest) {
           partner_name:
             typeof partnerName === "string" ? partnerName : name,
           wedding_date: dateIso,
-          estimated_budget: budget,
+          estimated_budget: null,
           guest_count: guests,
         })
         .select("id")
@@ -820,24 +856,34 @@ export async function POST(request: NextRequest) {
 
       profileId = insertedProfile.id;
     } else {
-      await supabase
+      const { error: updateProfileError } = await supabase
         .from("client_profiles")
         .update({
           partner_name:
             typeof partnerName === "string" ? partnerName : name,
           wedding_date: dateIso,
-          estimated_budget: budget,
+          estimated_budget: null,
           ...(guests != null ? { guest_count: guests } : {}),
         })
         .eq("id", profileId);
+
+      if (updateProfileError) {
+        console.error("client_profiles update:", updateProfileError);
+        return apiError("Failed to update client profile", 500);
+      }
     }
 
-    const { data: existingWedding } = await supabase
+    const { data: existingWedding, error: existingWeddingError } = await supabase
       .from("weddings")
       .select("id")
       .eq("client_profile_id", profileId)
       .limit(1)
       .maybeSingle();
+
+    if (existingWeddingError) {
+      console.error("weddings lookup:", existingWeddingError);
+      return apiError("Failed to check existing event plans", 500);
+    }
 
     if (existingWedding) {
       return apiError("Event plan already exists", 409);
@@ -859,10 +905,15 @@ export async function POST(request: NextRequest) {
       .select("id")
       .single();
 
+    if (weddingError?.code === "23505") {
+      return apiError("Event plan already exists", 409);
+    }
+
     if (weddingError || !wedding) {
       console.error("weddings insert:", weddingError);
       return apiError("Failed to create event plan", 500);
     }
+    createdWeddingId = wedding.id;
 
     const celebrationPlan = useLayeredDefinition
       ? buildCelebrationPlanFromEventDefinition(eventDefinition).map((day) => ({
@@ -902,7 +953,11 @@ export async function POST(request: NextRequest) {
 
     if (createdDaysError || !createdDays) {
       console.error("wedding_days insert:", createdDaysError);
-      return apiError("Failed to create celebration days", 500);
+      throw new Error("Failed to create celebration days");
+    }
+
+    if (createdDays.length !== celebrationPlan.length) {
+      throw new Error("Celebration day creation was incomplete");
     }
 
     const dayIdBySortOrder = new Map<number, string>();
@@ -961,7 +1016,14 @@ export async function POST(request: NextRequest) {
 
       if (eventsInsertError) {
         console.error("wedding_events insert:", eventsInsertError);
-      } else if (createdEvents && createdEvents.length > 0) {
+        throw new Error("Failed to create event functions");
+      }
+
+      if (!createdEvents || createdEvents.length !== eventsToInsert.length) {
+        throw new Error("Event function creation was incomplete");
+      }
+
+      if (createdEvents.length > 0) {
         const menuRows = createdEvents
           .filter((event) => {
             // Only seed a food & beverage plan when this block actually wants
@@ -981,7 +1043,7 @@ export async function POST(request: NextRequest) {
               ? `${event.name} Food and beverage plan`
               : `${event.name} Menu`,
             meal_period: mealPeriodForTimeBlock(
-              event.time_block,
+              normalizeTimeBlockKey(event.time_block),
               event.start_time
             ),
             service_style: event.food_style ?? null,
@@ -997,6 +1059,7 @@ export async function POST(request: NextRequest) {
             .insert(menuRows);
           if (menuInsertError) {
             console.error("wedding_event_menus insert:", menuInsertError);
+            throw new Error("Failed to create food plans");
           }
         }
 
@@ -1013,6 +1076,7 @@ export async function POST(request: NextRequest) {
           );
         if (taskInsertError) {
           console.error("wedding_event_tasks insert:", taskInsertError);
+          throw new Error("Failed to create event tasks");
         }
 
         const requirementRows = createdEvents.flatMap((event) => {
@@ -1028,7 +1092,7 @@ export async function POST(request: NextRequest) {
 
           return buildDefaultRequirementsForEvent({
             eventName: event.name,
-            timeBlock: event.time_block,
+            timeBlock: normalizeTimeBlockKey(event.time_block),
             startTime: event.start_time,
             categories: hasExplicitNeeds ? selectedNeeds : undefined,
           }).map((requirement) => ({
@@ -1052,33 +1116,68 @@ export async function POST(request: NextRequest) {
               "wedding_event_requirements insert:",
               requirementsInsertError
             );
+            throw new Error("Failed to create event requirements");
           }
         }
       }
     }
 
-    const { error: budgetError } = await supabase.from("budgets").insert({
-      client_profile_id: profileId,
-      name: "Event Investment Plan",
-      total_budget: budget,
-    });
+    const { data: existingGuestList, error: guestListLookupError } = await supabase
+      .from("guest_lists")
+      .select("id")
+      .eq("client_profile_id", profileId)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
 
-    if (budgetError) {
-      console.error("budgets insert:", budgetError);
+    if (guestListLookupError) {
+      console.error("guest_lists lookup:", guestListLookupError);
+      throw new Error("Failed to resolve guest list");
     }
 
-    const { error: guestListError } = await supabase.from("guest_lists").insert({
-      client_profile_id: profileId,
-      name: "Main Guest List",
-    });
+    if (!existingGuestList?.id) {
+      const { data: createdGuestList, error: guestListError } = await supabase
+        .from("guest_lists")
+        .insert({
+          client_profile_id: profileId,
+          name: "Main Guest List",
+        })
+        .select("id")
+        .single();
 
-    if (guestListError) {
-      console.error("guest_lists insert:", guestListError);
+      if (guestListError || !createdGuestList) {
+        console.error("guest_lists insert:", guestListError);
+        throw new Error("Failed to create guest list");
+      }
     }
-
     return apiSuccess({ weddingId: wedding.id }, 201);
   } catch (error) {
     console.error("POST /api/wedding", error);
-    return apiError("Internal server error", 500);
+
+    // PostgREST calls are not transactional. Until this creation flow moves to
+    // a database RPC, remove every row created by this request so a retry can
+    // never hit the existing-plan guard with a half-built structure.
+    let rolledBack = true;
+    if (createdWeddingId) {
+      const { error: rollbackWeddingError } = await supabase
+        .from("weddings")
+        .delete()
+        .eq("id", createdWeddingId);
+      if (rollbackWeddingError) {
+        console.error("wedding rollback:", rollbackWeddingError);
+        rolledBack = false;
+      }
+    }
+
+    // Only claim the cleanup happened when it actually did. If the rollback
+    // delete failed the wedding row survives, and the next create attempt will
+    // hit the "Event plan already exists" guard — telling the user nothing was
+    // kept would send them into an unexplainable 409.
+    return apiError(
+      rolledBack
+        ? "Could not create the full event structure. No partial plan was kept."
+        : "Could not create the full event structure, and the incomplete plan could not be cleaned up automatically. Please contact support before trying again.",
+      500
+    );
   }
 }

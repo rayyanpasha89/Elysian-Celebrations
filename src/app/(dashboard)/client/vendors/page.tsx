@@ -17,68 +17,70 @@ const categories = [
   "Catering",
   "Music & DJ",
   "Makeup",
+  "Hospitality",
+  "Logistics",
   "Venues",
 ] as const;
 
 type Cat = (typeof categories)[number];
 
-const eventNeedFilters = [
-  {
-    id: "full-plan",
-    day: "Whole plan",
-    label: "All open vendor gaps",
-    category: "All",
-    intent: "Scan the full sourcing board before narrowing by function.",
-    support: ["Food", "Decor", "Photo", "Entertainment"],
-  },
-  {
-    id: "welcome",
-    day: "Arrival",
-    label: "Welcome dinner",
-    category: "Catering",
-    intent: "Start with menu flow, bars, dietary needs, and guest hospitality.",
-    support: ["Menu", "Live counters", "Service team"],
-  },
-  {
-    id: "daytime",
-    day: "Day events",
-    label: "Haldi and mehendi",
-    category: "Decor",
-    intent: "Find the partner who can translate mood, color, florals, and setup.",
-    support: ["Theme", "Florals", "Installations"],
-  },
-  {
-    id: "sangeet",
-    day: "Evening",
-    label: "Sangeet and cocktail",
-    category: "Music & DJ",
-    intent: "Source the energy layer: DJ, performers, sound checks, and show flow.",
-    support: ["DJ", "Performance", "Production"],
-  },
-  {
-    id: "ceremony",
-    day: "Main day",
-    label: "Ceremony coverage",
-    category: "Photography",
-    intent: "Protect the key moments with team size, edit timelines, and deliverables.",
-    support: ["Candid", "Film", "Albums"],
-  },
-  {
-    id: "looks",
-    day: "Family prep",
-    label: "Looks and styling",
-    category: "Makeup",
-    intent: "Cover bridal, groom, family, trials, and getting-ready timing.",
-    support: ["Trials", "Draping", "Touch-ups"],
-  },
-] as const satisfies ReadonlyArray<{
+type EventNeedFilter = {
   id: string;
   day: string;
   label: string;
   category: Cat;
   intent: string;
-  support: readonly string[];
-}>;
+  isGap: boolean;
+};
+
+type VendorPlanPayload = {
+  wedding: { id: string; name: string } | null;
+  days: {
+    id: string;
+    name: string;
+    events: {
+      id: string;
+      name: string;
+      requirements: {
+        id: string;
+        category: string;
+        title: string;
+        status: string;
+        vendorProfileId: string | null;
+        vendorServiceId: string | null;
+      }[];
+      vendorSelections: {
+        vendor: { categorySlug: string } | null;
+      }[];
+    }[];
+  }[];
+};
+
+const requirementCategoryFilter: Record<string, Cat> = {
+  food: "Catering",
+  decor: "Decor",
+  "photo-video": "Photography",
+  entertainment: "Music & DJ",
+  hospitality: "Hospitality",
+  logistics: "Logistics",
+  custom: "All",
+};
+
+// Slugs must match real `vendor_categories.slug` values, not the requirement
+// key. The catalogue has no "hospitality" or "logistics" category — those are
+// seeded as "planning" and "travel" (supabase/seed.sql:12,15), which is also
+// how PLANNER_VENDOR_CATEGORIES maps them in src/lib/wedding-plan.ts:96-103.
+// Using the requirement key here made both lanes match zero vendors, so their
+// gaps could never be closed.
+const requirementVendorSlug: Record<string, string | null> = {
+  food: "catering",
+  decor: "decor",
+  "photo-video": "photography",
+  entertainment: "entertainment",
+  hospitality: "planning",
+  logistics: "travel",
+  custom: null,
+};
 
 const categoryApiSlug: Record<Exclude<Cat, "All">, string | null> = {
   Photography: "photography",
@@ -86,6 +88,8 @@ const categoryApiSlug: Record<Exclude<Cat, "All">, string | null> = {
   Catering: "catering",
   "Music & DJ": "entertainment",
   Makeup: "makeup",
+  Hospitality: "planning",
+  Logistics: "travel",
   Venues: null,
 };
 
@@ -177,6 +181,68 @@ function sortReviews(reviews: VendorReviewApi[] | null | undefined) {
     );
 }
 
+function buildPlanNeedFilters(plan: VendorPlanPayload | null): EventNeedFilter[] {
+  const requirements = (plan?.days ?? []).flatMap((day) =>
+    day.events.flatMap((event) =>
+      event.requirements.map((requirement) => {
+        const expectedSlug = requirementVendorSlug[requirement.category] ?? null;
+        const hasMatchingSelection = expectedSlug
+          ? event.vendorSelections.some(
+              (selection) => selection.vendor?.categorySlug === expectedSlug
+            )
+          : false;
+        const isGap =
+          !requirement.vendorProfileId &&
+          !requirement.vendorServiceId &&
+          !hasMatchingSelection;
+
+        return {
+          id: `${event.id}:${requirement.id}`,
+          day: day.name,
+          label: `${event.name} · ${requirement.title}`,
+          category: requirementCategoryFilter[requirement.category] ?? "All",
+          intent: isGap
+            ? `This requirement is still open in ${event.name}. Compare a real partner and package for this exact function.`
+            : `${event.name} already has coverage here. Compare alternatives only if you want to refine the current choice.`,
+          isGap,
+        } satisfies EventNeedFilter;
+      })
+    )
+  );
+
+  const openCount = requirements.filter((need) => need.isGap).length;
+  const eventCount = (plan?.days ?? []).reduce(
+    (sum, day) => sum + day.events.length,
+    0
+  );
+
+  return [
+    {
+      id: "full-plan",
+      day: plan?.wedding?.name ?? "Event plan",
+      label:
+        eventCount === 0
+          ? "Create functions before sourcing"
+          : openCount > 0
+            ? `${openCount} open vendor ${openCount === 1 ? "gap" : "gaps"}`
+            : "All planned requirements covered",
+      category: "All",
+      intent:
+        eventCount === 0
+          ? "Build at least one day and function so vendor sourcing can follow the real plan."
+          : openCount > 0
+            ? "Start with the open requirements below, then compare scope, catalogue, and pricing cues."
+            : "Your current requirements have partner coverage. Keep browsing only when you want alternatives.",
+      // An empty plan is not "covered" — there is simply nothing to evaluate
+      // yet. Without this a brand-new client with zero functions is shown a
+      // green Covered badge beside "Create functions before sourcing", which
+      // is the same false-positive readiness signal the audit flagged.
+      isGap: eventCount === 0 || openCount > 0,
+    },
+    ...requirements,
+  ];
+}
+
 type VendorOfferingBlueprint = {
   promise: string;
   inclusions: string[];
@@ -207,13 +273,13 @@ const DEFAULT_OFFERING_BLUEPRINT: VendorOfferingBlueprint = {
   ],
   deliverables: [
     "Service proposal",
-    "Package or quote breakdown",
+    "Package and final-pricing breakdown",
     "Timeline coordination notes",
     "Final handover before event day",
   ],
   eventFit: ["Welcome dinner", "Haldi", "Sangeet", "Wedding", "Reception"],
   questions: [
-    "What is included in the base quote?",
+    "What is included in the base package?",
     "What changes if guest count increases?",
     "What setup time and access do you need?",
   ],
@@ -259,7 +325,7 @@ const OFFERING_BLUEPRINTS: Record<string, VendorOfferingBlueprint> = {
     ],
     eventFit: ["Mehendi", "Haldi", "Sangeet", "Pheras", "Reception"],
     questions: [
-      "Which areas are included in the quoted scope?",
+      "Which areas are included in the agreed scope?",
       "What is rented vs custom-built?",
       "How many hours are needed for setup?",
     ],
@@ -476,7 +542,13 @@ export default function ClientVendorsPage() {
   const [activeNeedId, setActiveNeedId] = useState<string>("full-plan");
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
+  const [vendorLoadError, setVendorLoadError] = useState<string | null>(null);
+  const [vendorReloadKey, setVendorReloadKey] = useState(0);
   const [vendors, setVendors] = useState<VendorCardApi[]>([]);
+  const [plan, setPlan] = useState<VendorPlanPayload | null>(null);
+  const [planLoading, setPlanLoading] = useState(true);
+  const [planError, setPlanError] = useState<string | null>(null);
+  const [planReloadKey, setPlanReloadKey] = useState(0);
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [selectedVendor, setSelectedVendor] = useState<VendorDetailApi | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -484,6 +556,35 @@ export default function ClientVendorsPage() {
   const [savedSlugs, setSavedSlugs] = useState<string[]>([]);
   const [showSavedOnly, setShowSavedOnly] = useState(false);
   const [syncingSlug, setSyncingSlug] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setPlanLoading(true);
+      setPlanError(null);
+      try {
+        const response = await fetch("/api/wedding");
+        const json = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(json?.error ?? "Failed to load event plan");
+        }
+        if (!cancelled) setPlan(json as VendorPlanPayload);
+      } catch (error) {
+        if (!cancelled) {
+          setPlan(null);
+          setPlanError(
+            error instanceof Error ? error.message : "Failed to load event plan"
+          );
+        }
+      } finally {
+        if (!cancelled) setPlanLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [planReloadKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -514,6 +615,7 @@ export default function ClientVendorsPage() {
     let cancelled = false;
     (async () => {
       setLoading(true);
+      setVendorLoadError(null);
       try {
         const params = new URLSearchParams();
         if (q.trim()) params.set("q", q.trim());
@@ -527,8 +629,13 @@ export default function ClientVendorsPage() {
         if (!cancelled) {
           setVendors((json.vendors ?? []) as VendorCardApi[]);
         }
-      } catch {
-        if (!cancelled) setVendors([]);
+      } catch (error) {
+        if (!cancelled) {
+          setVendors([]);
+          setVendorLoadError(
+            error instanceof Error ? error.message : "Failed to load vendors"
+          );
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -536,7 +643,7 @@ export default function ClientVendorsPage() {
     return () => {
       cancelled = true;
     };
-  }, [cat, q]);
+  }, [cat, q, vendorReloadKey]);
 
   useEffect(() => {
     if (!selectedSlug) {
@@ -553,7 +660,13 @@ export default function ClientVendorsPage() {
         const res = await fetch(`/api/vendors/${selectedSlug}`);
         const json = await res.json();
         if (!res.ok) throw new Error(json.error);
-        if (!cancelled) setSelectedVendor(json as VendorDetailApi);
+        if (!cancelled) {
+          setSelectedVendor(json as VendorDetailApi);
+          void fetch(`/api/vendors/${selectedSlug}/view`, {
+            method: "POST",
+            keepalive: true,
+          }).catch(() => undefined);
+        }
       } catch (error) {
         if (!cancelled) {
           setSelectedVendor(null);
@@ -570,6 +683,19 @@ export default function ClientVendorsPage() {
       cancelled = true;
     };
   }, [selectedSlug]);
+
+  const eventNeedFilters = useMemo(() => buildPlanNeedFilters(plan), [plan]);
+
+  useEffect(() => {
+    // An empty id is the deliberate "browsing by category, no lane selected"
+    // sentinel set by chooseCategory. Only fall back when a lane that used to
+    // exist has genuinely disappeared from the plan.
+    if (!activeNeedId) return;
+    if (!eventNeedFilters.some((need) => need.id === activeNeedId)) {
+      setActiveNeedId("full-plan");
+      setCat("All");
+    }
+  }, [activeNeedId, eventNeedFilters]);
 
   const filtered = useMemo(() => {
     let list = vendors;
@@ -622,7 +748,7 @@ export default function ClientVendorsPage() {
     [filtered]
   );
 
-  const chooseNeed = (need: (typeof eventNeedFilters)[number]) => {
+  const chooseNeed = (need: EventNeedFilter) => {
     setActiveNeedId(need.id);
     setCat(need.category);
     setQ("");
@@ -710,10 +836,12 @@ export default function ClientVendorsPage() {
               Current brief
             </p>
             <h3 className="mt-2 font-display text-2xl leading-tight">
-              {activeNeed?.label ?? cat}
+              {planError ? "Plan context unavailable" : activeNeed?.label ?? cat}
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-ivory/70">
-              {activeNeed?.intent ??
+              {planError
+                ? "Vendor browsing is still available, but no function is being presented as covered until the event plan reconnects."
+                : activeNeed?.intent ??
                 "Manual category filter selected. Use the function lanes below to return to plan-first sourcing."}
             </p>
             <div className="mt-5 grid grid-cols-3 gap-2 border-t border-ivory/10 pt-4">
@@ -743,32 +871,53 @@ export default function ClientVendorsPage() {
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,380px)] lg:items-end">
           <div>
             <p className={dashLabel}>Choose sourcing context</p>
-            <div className="mt-3 flex snap-x gap-2 overflow-x-auto pb-1 scrollbar-elysian">
-              {eventNeedFilters.map((need) => {
-                const active = activeNeedId === need.id;
-                return (
-                  <button
-                    key={need.id}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => chooseNeed(need)}
-                    className={cn(
-                      "shrink-0 border px-3.5 py-2.5 text-left transition-colors",
-                      active
-                        ? "border-gold-primary bg-gold-primary/10 text-gold-dark"
-                        : "border-charcoal/10 text-slate hover:border-gold-primary hover:text-charcoal"
-                    )}
-                  >
-                    <span className="block font-accent text-[9px] uppercase tracking-[0.16em]">
-                      {need.day}
-                    </span>
-                    <span className="mt-1 block font-heading text-sm">
-                      {need.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+            {planError ? (
+              <div className="mt-3 flex flex-col gap-3 border border-rose/25 bg-rose/5 p-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-charcoal">
+                  The event plan could not be loaded, so function-specific vendor
+                  coverage is temporarily hidden.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setPlanReloadKey((key) => key + 1)}
+                  className="shrink-0 font-accent text-[10px] uppercase tracking-[0.16em] text-gold-dark underline underline-offset-4"
+                >
+                  Retry plan
+                </button>
+              </div>
+            ) : planLoading ? (
+              <div className="mt-3 h-16 animate-pulse border border-charcoal/8 bg-charcoal/5" />
+            ) : (
+              <div className="mt-3 flex snap-x gap-2 overflow-x-auto pb-1 scrollbar-elysian">
+                {eventNeedFilters.map((need) => {
+                  const active = activeNeedId === need.id;
+                  return (
+                    <button
+                      key={need.id}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => chooseNeed(need)}
+                      className={cn(
+                        "shrink-0 snap-start border px-3.5 py-2.5 text-left transition-colors",
+                        active
+                          ? "border-gold-primary bg-gold-primary/10 text-gold-dark"
+                          : "border-charcoal/10 text-slate hover:border-gold-primary hover:text-charcoal"
+                      )}
+                    >
+                      <span className="flex items-center justify-between gap-4 font-accent text-[9px] uppercase tracking-[0.16em]">
+                        {need.day}
+                        <span className={need.isGap ? "text-rose" : "text-sage"}>
+                          {need.isGap ? "Open" : "Covered"}
+                        </span>
+                      </span>
+                      <span className="mt-1 block max-w-72 truncate font-heading text-sm">
+                        {need.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-charcoal/8 pt-3">
               {categories.map((c) => {
                 const active = cat === c;
@@ -841,6 +990,13 @@ export default function ClientVendorsPage() {
                 />
               ))}
             </div>
+          ) : vendorLoadError ? (
+            <VendorDiscoveryEmptyState
+              title="Vendor matches could not be loaded"
+              hint="Your shortlist and event plan are unchanged. Retry the live catalogue connection."
+              primaryLabel="Retry vendors"
+              onPrimary={() => setVendorReloadKey((key) => key + 1)}
+            />
           ) : filtered.length === 0 ? (
             <VendorDiscoveryEmptyState
               title={
@@ -1135,7 +1291,7 @@ function VendorDetailPanel({
         </span>
       </div>
 
-      <div className="border border-charcoal/10 bg-[radial-gradient(circle_at_top_left,rgba(201,169,110,0.2),transparent_34%),linear-gradient(145deg,#111827_0%,#1f2937_58%,#0b1220_100%)] p-4 text-ivory">
+      <div className="border border-charcoal/10 bg-[radial-gradient(circle_at_top_left,rgba(166,138,100,0.2),transparent_34%),linear-gradient(145deg,var(--charcoal-brown)_0%,var(--ebony)_58%,var(--dark-walnut)_100%)] p-4 text-ivory">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-gold-light">
             {offering.sources.promise === "vendor"
@@ -1257,6 +1413,10 @@ function VendorDetailPanel({
                             <img
                               src={item.image_urls[0]}
                               alt=""
+                              width={64}
+                              height={64}
+                              loading="lazy"
+                              decoding="async"
                               className="h-full w-full object-cover"
                             />
                           </div>
@@ -1293,6 +1453,10 @@ function VendorDetailPanel({
                                   <img
                                     src={url}
                                     alt=""
+                                    width={40}
+                                    height={40}
+                                    loading="lazy"
+                                    decoding="async"
                                     className="h-full w-full object-cover"
                                   />
                                 </div>
@@ -1440,8 +1604,8 @@ function VendorDetailPanel({
         ) : (
           <div className="mt-3 border border-dashed border-charcoal/12 bg-cream/30 p-4">
             <p className="text-sm text-slate">
-              Packages are not listed yet. Use the shortlist to request a full scope
-              and quote.
+              Packages are not listed yet. Shortlist this vendor so the Elysian team
+              can confirm the complete scope and final pricing with you.
             </p>
           </div>
         )}

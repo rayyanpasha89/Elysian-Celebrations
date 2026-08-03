@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { getAuthSession, requireRole, apiError, apiSuccess } from "@/lib/api-utils";
+import type { Database } from "@/types/database.types";
+
+type TestimonialUpdate =
+  Database["public"]["Tables"]["testimonials"]["Update"];
 
 export async function PATCH(
   request: NextRequest,
@@ -17,7 +21,7 @@ export async function PATCH(
     const supabase = createAdminSupabaseClient();
     const body = (await request.json()) as { isPublished?: boolean };
 
-    const updates: Record<string, unknown> = {};
+    const updates: TestimonialUpdate = {};
     if (typeof body.isPublished === "boolean") updates.is_published = body.isPublished;
 
     const { data, error } = await supabase

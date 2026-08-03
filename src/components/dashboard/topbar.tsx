@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useClerk } from "@clerk/nextjs";
@@ -124,6 +124,10 @@ export function Topbar({
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(true);
   const [notificationsError, setNotificationsError] = useState<string | null>(null);
+  const [notificationActionError, setNotificationActionError] = useState<string | null>(null);
+  const [notificationReloadKey, setNotificationReloadKey] = useState(0);
+  const notificationsTriggerRef = useRef<HTMLButtonElement>(null);
+  const accountTriggerRef = useRef<HTMLButtonElement>(null);
 
   const displayTitle = resolveDashboardTitle(pathname ?? "", title);
   const unreadCount = notifications.filter((item) => !item.isRead).length;
@@ -169,42 +173,92 @@ export function Topbar({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [notificationReloadKey]);
+
+  useEffect(() => {
+    if (!showNotifications && !showDropdown) return;
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+
+      if (showNotifications) {
+        setShowNotifications(false);
+        notificationsTriggerRef.current?.focus();
+      } else if (showDropdown) {
+        setShowDropdown(false);
+        accountTriggerRef.current?.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [showDropdown, showNotifications]);
 
   async function markNotificationRead(id: string) {
+    const previousReadState =
+      notifications.find((item) => item.id === id)?.isRead ?? false;
+    if (previousReadState) return;
+
+    setNotificationActionError(null);
     setNotifications((current) =>
       current.map((item) => (item.id === id ? { ...item, isRead: true } : item))
     );
 
     try {
-      await fetch("/api/notifications", {
+      const response = await fetch("/api/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
       });
-    } catch {
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "The notification could not be updated.");
+      }
+    } catch (error) {
       setNotifications((current) =>
         current.map((item) =>
-          item.id === id ? { ...item, isRead: false } : item
+          item.id === id ? { ...item, isRead: previousReadState } : item
         )
+      );
+      setNotificationActionError(
+        error instanceof Error
+          ? error.message
+          : "The notification could not be updated."
       );
     }
   }
 
   async function markAllNotificationsRead() {
-    const previous = notifications;
+    const previousReadStates = new Map(
+      notifications.map((item) => [item.id, item.isRead] as const)
+    );
+    setNotificationActionError(null);
     setNotifications((current) =>
       current.map((item) => ({ ...item, isRead: true }))
     );
 
     try {
-      await fetch("/api/notifications", {
+      const response = await fetch("/api/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ all: true }),
       });
-    } catch {
-      setNotifications(previous);
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Notifications could not be updated.");
+      }
+    } catch (error) {
+      setNotifications((current) =>
+        current.map((item) => ({
+          ...item,
+          isRead: previousReadStates.get(item.id) ?? item.isRead,
+        }))
+      );
+      setNotificationActionError(
+        error instanceof Error
+          ? error.message
+          : "Notifications could not be updated."
+      );
     }
   }
 
@@ -224,13 +278,20 @@ export function Topbar({
         <div className="flex items-center gap-4">
           <div className="relative">
             <button
+              ref={notificationsTriggerRef}
               type="button"
               onClick={() => {
                 setShowNotifications((current) => !current);
                 setShowDropdown(false);
               }}
               className="relative flex h-9 w-9 items-center justify-center border border-charcoal/10 text-charcoal/60 transition-colors hover:border-gold-primary hover:text-gold-primary"
-              aria-label="Notifications"
+              aria-label={
+                unreadCount > 0
+                  ? `Notifications, ${unreadCount} unread`
+                  : "Notifications"
+              }
+              aria-haspopup="dialog"
+              aria-controls="dashboard-notifications-popup"
               aria-expanded={showNotifications}
             >
               <Bell className="h-4 w-4" />
@@ -250,6 +311,9 @@ export function Topbar({
                     aria-hidden
                   />
                   <motion.div
+                    id="dashboard-notifications-popup"
+                    role="dialog"
+                    aria-label="Notifications"
                     initial={{ opacity: 0, y: -8 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -8 }}
@@ -278,6 +342,24 @@ export function Topbar({
                       ) : null}
                     </div>
 
+                    {notificationActionError ? (
+                      <div
+                        role="alert"
+                        className="flex items-start justify-between gap-3 border-b border-rose/35 bg-rose/[0.07] px-4 py-3"
+                      >
+                        <p className="text-xs leading-relaxed text-charcoal">
+                          {notificationActionError} The previous read state was restored.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setNotificationActionError(null)}
+                          className="font-accent shrink-0 text-[8px] uppercase tracking-[0.14em] text-charcoal underline decoration-charcoal/30 underline-offset-4"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    ) : null}
+
                     <div className="max-h-[380px] overflow-y-auto">
                       {notificationsLoading ? (
                         <div className="space-y-3 px-4 py-4">
@@ -286,8 +368,15 @@ export function Topbar({
                           <div className="h-12 animate-pulse bg-charcoal/5" />
                         </div>
                       ) : notificationsError ? (
-                        <div className="px-4 py-5">
+                        <div role="alert" className="px-4 py-5">
                           <p className="text-sm text-slate">{notificationsError}</p>
+                          <button
+                            type="button"
+                            onClick={() => setNotificationReloadKey((key) => key + 1)}
+                            className="font-accent mt-3 text-[9px] uppercase tracking-[0.16em] text-gold-dark underline decoration-gold-primary/35 underline-offset-4"
+                          >
+                            Try again
+                          </button>
                         </div>
                       ) : notifications.length > 0 ? (
                         <ul className="list-none divide-y divide-charcoal/8 pl-0">
@@ -321,14 +410,22 @@ export function Topbar({
 
           <div className="relative">
             <button
+              ref={accountTriggerRef}
               type="button"
               onClick={() => {
                 setShowDropdown(!showDropdown);
                 setShowNotifications(false);
               }}
               className="flex items-center gap-3 transition-opacity hover:opacity-80"
+              aria-label={`Account menu for ${userName}`}
+              aria-haspopup="menu"
+              aria-controls="dashboard-account-menu"
+              aria-expanded={showDropdown}
             >
-              <div className="flex h-9 w-9 items-center justify-center bg-midnight font-accent text-[11px] tracking-wider text-ivory">
+              <div
+                aria-hidden="true"
+                className="flex h-9 w-9 items-center justify-center bg-midnight font-accent text-[11px] tracking-wider text-ivory"
+              >
                 {initials}
               </div>
               <div className="hidden text-left md:block">
@@ -348,6 +445,9 @@ export function Topbar({
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)} aria-hidden />
                   <motion.div
+                    id="dashboard-account-menu"
+                    role="menu"
+                    aria-label="Account menu"
                     initial={{ opacity: 0, y: -8 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -8 }}
@@ -364,6 +464,7 @@ export function Topbar({
                       <div className="my-1 h-px bg-charcoal/8" />
                       <button
                         type="button"
+                        role="menuitem"
                         onClick={() => {
                           setShowDropdown(false);
                           if (testAuthEnabled) {
@@ -462,6 +563,7 @@ function DropdownItem({
   return (
     <Link
       href={href}
+      role="menuitem"
       className={cn(
         "flex items-center gap-2.5 px-4 py-2 font-accent text-[11px] uppercase tracking-[0.15em] transition-colors",
         danger

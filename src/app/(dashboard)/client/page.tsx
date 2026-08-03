@@ -50,7 +50,6 @@ type GuestRow = {
 };
 type BookingStage = "selected" | "booked" | "confirmed";
 type BudgetPayload = {
-  budget: { totalBudget: number; categories: { items: { estimatedCost: number; quantity: number }[] }[] } | null;
   eventPlanSpend: { totalEstimated: number; eventCount: number } | null;
   planLineItems: { stage: BookingStage; estimatedCost: number }[];
 };
@@ -101,44 +100,84 @@ export default function ClientCommandCenter() {
   const [guests, setGuests] = useState<GuestRow[]>([]);
   const [budget, setBudget] = useState<BudgetPayload | null>(null);
   const [schedule, setSchedule] = useState<SchedulePayload["schedule"]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [failedSources, setFailedSources] = useState<string[]>([]);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const safeJson = async (url: string) => {
-        try {
-          const r = await fetch(url);
-          if (!r.ok) return null;
-          return await r.json();
-        } catch {
-          return null;
+      setLoading(true);
+      setLoadError(null);
+      setFailedSources([]);
+
+      const getJson = async (url: string) => {
+        const response = await fetch(url);
+        const json = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(json?.error ?? `Failed to load ${url}`);
         }
+        return json;
       };
-      const [d, g, b, t] = await Promise.all([
-        safeJson("/api/dashboard/client"),
-        safeJson("/api/guests"),
-        safeJson("/api/budget"),
-        safeJson("/api/timeline"),
+
+      const [dashboardResult, guestsResult, budgetResult, timelineResult] =
+        await Promise.allSettled([
+          getJson("/api/dashboard/client"),
+          getJson("/api/guests"),
+          getJson("/api/budget"),
+          getJson("/api/timeline"),
       ]);
+
       if (cancelled) return;
-      setDash(d);
-      setGuests((g?.guests ?? []) as GuestRow[]);
-      setBudget(
-        b
-          ? {
-              budget: b.budget ?? null,
-              eventPlanSpend: b.eventPlanSpend ?? null,
-              planLineItems: b.planLineItems ?? [],
-            }
-          : null
-      );
-      setSchedule((t?.schedule ?? []) as SchedulePayload["schedule"]);
+
+      if (dashboardResult.status === "rejected") {
+        setDash(null);
+        setLoadError(
+          dashboardResult.reason instanceof Error
+            ? dashboardResult.reason.message
+            : "Could not load your command center"
+        );
+        setLoading(false);
+        return;
+      }
+
+      const failures: string[] = [];
+      setDash(dashboardResult.value as DashboardPayload);
+
+      if (guestsResult.status === "fulfilled") {
+        setGuests((guestsResult.value?.guests ?? []) as GuestRow[]);
+      } else {
+        failures.push("guests");
+        setGuests([]);
+      }
+
+      if (budgetResult.status === "fulfilled") {
+        const value = budgetResult.value;
+        setBudget({
+          eventPlanSpend: value?.eventPlanSpend ?? null,
+          planLineItems: value?.planLineItems ?? [],
+        });
+      } else {
+        failures.push("cost estimate");
+        setBudget(null);
+      }
+
+      if (timelineResult.status === "fulfilled") {
+        setSchedule(
+          (timelineResult.value?.schedule ?? []) as SchedulePayload["schedule"]
+        );
+      } else {
+        failures.push("event schedule");
+        setSchedule([]);
+      }
+
+      setFailedSources(failures);
       setLoading(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
 
   useEffect(() => {
     if (loading || !dash) return;
@@ -151,13 +190,10 @@ export default function ClientCommandCenter() {
     const pending = guests.filter((g) => g.rsvp_status === "PENDING").length;
     const heads = (rows: GuestRow[]) => rows.reduce((s, g) => s + 1 + (g.plus_one ? 1 : 0), 0);
 
-    const estimated =
-      budget?.budget?.categories?.reduce(
-        (s, c) => s + c.items.reduce((cs, i) => cs + i.estimatedCost * i.quantity, 0),
-        0
-      ) ?? 0;
-
     const picks = budget?.planLineItems ?? [];
+    const estimated =
+      budget?.eventPlanSpend?.totalEstimated ??
+      (budget ? picks.reduce((sum, pick) => sum + pick.estimatedCost, 0) : null);
     const bookings = {
       total: picks.length,
       selected: picks.filter((p) => p.stage === "selected").length,
@@ -207,7 +243,7 @@ export default function ClientCommandCenter() {
       cta: string;
     }[] = [];
     if (!dash) return a;
-    if (agg.plan.events === 0) {
+    if (!failedSources.includes("event schedule") && agg.plan.events === 0) {
       a.push({
         id: "no-events",
         severity: "high",
@@ -227,7 +263,11 @@ export default function ClientCommandCenter() {
         cta: "Chase RSVPs",
       });
     }
-    if (agg.bookings.confirmed === 0 && agg.plan.events > 0) {
+    if (
+      !failedSources.includes("cost estimate") &&
+      agg.bookings.confirmed === 0 &&
+      agg.plan.events > 0
+    ) {
       a.push({
         id: "vendors",
         severity: "medium",
@@ -243,16 +283,6 @@ export default function ClientCommandCenter() {
         cta: "Open vendors",
       });
     }
-    if (agg.budget.estimated === 0 && agg.plan.events > 0) {
-      a.push({
-        id: "estimate-empty",
-        severity: "info",
-        title: "Costs not estimated yet",
-        detail: "Import your vendor picks or add line items to build your cost estimate.",
-        href: "/client/budget",
-        cta: "Open cost estimate",
-      });
-    }
     const nextDays = agg.nextFn?.date ? daysTo(agg.nextFn.date) : null;
     if (nextDays != null && nextDays >= 0 && nextDays <= 21) {
       a.push({
@@ -266,13 +296,34 @@ export default function ClientCommandCenter() {
     }
     const order = { high: 0, medium: 1, info: 2 };
     return a.sort((x, y) => order[x.severity] - order[y.severity]);
-  }, [dash, agg]);
+  }, [dash, agg, failedSources]);
 
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
         <p className={dashLabel}>Loading your command center...</p>
       </div>
+    );
+  }
+  if (loadError) {
+    return (
+      <section className="border border-rose/25 bg-rose/5 p-6 md:p-8">
+        <p className={dashLabel}>Command center unavailable</p>
+        <h1 className="mt-2 font-display text-3xl text-charcoal">
+          Your planning data could not be loaded.
+        </h1>
+        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate">
+          Nothing has been reset. Try the connection again to restore the live
+          dashboard.
+        </p>
+        <button
+          type="button"
+          onClick={() => setReloadKey((key) => key + 1)}
+          className="mt-5 border border-charcoal bg-charcoal px-5 py-3 font-accent text-[11px] uppercase tracking-[0.2em] text-ivory transition-colors hover:bg-ebony"
+        >
+          Retry dashboard
+        </button>
+      </section>
     );
   }
   if (!dash || dash.needsOnboarding || dash.needsProfile) {
@@ -294,6 +345,21 @@ export default function ClientCommandCenter() {
       animate="visible"
       className="space-y-5"
     >
+      {failedSources.length > 0 ? (
+        <div className="flex flex-col gap-3 border border-gold-primary/30 bg-gold-primary/8 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-charcoal">
+            Some live sections could not load: {failedSources.join(", ")}. Their
+            cards are marked unavailable rather than shown as zero.
+          </p>
+          <button
+            type="button"
+            onClick={() => setReloadKey((key) => key + 1)}
+            className="shrink-0 font-accent text-[10px] uppercase tracking-[0.18em] text-gold-dark underline underline-offset-4"
+          >
+            Retry sections
+          </button>
+        </div>
+      ) : null}
       {/* Hero */}
       <motion.section
         variants={fadeUp}
@@ -320,7 +386,9 @@ export default function ClientCommandCenter() {
               ) : null}
               <span className="inline-flex items-center gap-1.5">
                 <Sparkles className="h-3.5 w-3.5 text-gold-primary" />
-                {agg.plan.events} functions · {agg.plan.days} days
+                {failedSources.includes("event schedule")
+                  ? "Plan size temporarily unavailable"
+                  : `${agg.plan.events} functions · ${agg.plan.days} days`}
               </span>
             </p>
           </div>
@@ -379,39 +447,86 @@ export default function ClientCommandCenter() {
           href="/client/wedding"
           icon={ListChecks}
           label="Event plan"
-          value={`${agg.plan.events}`}
-          unit="functions"
-          footer={`Across ${agg.plan.days} ${agg.plan.days === 1 ? "day" : "days"}`}
+          value={
+            failedSources.includes("event schedule")
+              ? "—"
+              : `${agg.plan.events}`
+          }
+          unit={
+            failedSources.includes("event schedule")
+              ? "temporarily unavailable"
+              : "functions"
+          }
+          footer={
+            failedSources.includes("event schedule")
+              ? "Retry to restore the plan summary"
+              : `Across ${agg.plan.days} ${agg.plan.days === 1 ? "day" : "days"}`
+          }
         />
         <ModuleCard
           href="/client/budget"
           icon={Wallet}
           label="Cost estimate"
-          value={formatLakh(agg.budget.estimated)}
-          unit="estimated"
+          value={
+            agg.budget.estimated == null
+              ? "—"
+              : formatLakh(agg.budget.estimated)
+          }
+          unit={agg.budget.estimated == null ? "temporarily unavailable" : "estimated"}
           footer={
-            agg.bookings.total > 0
+            failedSources.includes("cost estimate")
+              ? "Retry to restore live pricing"
+              : agg.bookings.total > 0
               ? `${agg.bookings.total} vendor ${agg.bookings.total === 1 ? "pick" : "picks"}`
-              : "Add picks to estimate"
+              : "Pricing appears as the plan takes shape"
           }
         />
         <ModuleCard
           href="/client/guests"
           icon={Users}
           label="Guests"
-          value={`${agg.guests.confirmedHeads}`}
-          unit={`of ${agg.guests.invitedHeads} heads`}
-          footer={`${agg.guests.confirmed} confirmed · ${agg.guests.pending} pending`}
-          tone={agg.guests.pending > 0 ? "warn" : "good"}
-          bar={{ pct: agg.guests.respondedPct }}
+          value={failedSources.includes("guests") ? "—" : `${agg.guests.confirmedHeads}`}
+          unit={
+            failedSources.includes("guests")
+              ? "temporarily unavailable"
+              : `of ${agg.guests.invitedHeads} heads`
+          }
+          footer={
+            failedSources.includes("guests")
+              ? "Retry to restore the guest list"
+              : `${agg.guests.confirmed} confirmed · ${agg.guests.pending} pending`
+          }
+          tone={
+            failedSources.includes("guests")
+              ? undefined
+              : agg.guests.pending > 0
+                ? "warn"
+                : "good"
+          }
+          bar={
+            failedSources.includes("guests")
+              ? undefined
+              : { pct: agg.guests.respondedPct }
+          }
         />
         <ModuleCard
           href="/client/timeline"
           icon={CalendarClock}
           label="Next up"
-          value={agg.nextFn?.name ?? "—"}
-          unit={agg.nextFn?.dayName ?? "Run of show"}
+          value={
+            failedSources.includes("event schedule")
+              ? "—"
+              : agg.nextFn?.name ?? "—"
+          }
+          unit={
+            failedSources.includes("event schedule")
+              ? "temporarily unavailable"
+              : agg.nextFn?.dayName ?? "Run of show"
+          }
           footer={(() => {
+            if (failedSources.includes("event schedule")) {
+              return "Retry to restore the schedule";
+            }
             const d = daysTo(agg.nextFn?.date ?? null);
             if (d == null) return "Open run of show";
             if (d <= 0) return "Happening now";

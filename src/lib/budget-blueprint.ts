@@ -15,7 +15,7 @@ export const BUDGET_ITEM_DRAG_MIME = "application/x-elysian-budget-item";
 export const BUDGET_CATEGORY_BLUEPRINTS: BudgetBlueprintCategory[] = [
   {
     name: "Venue & Hospitality",
-    color: "#C9A96E",
+    color: DASHBOARD_CHART_PALETTE[2],
     recommendedShare: 0.28,
     items: [
       { name: "Wedding Venue", estimatedCost: 500000 },
@@ -28,7 +28,7 @@ export const BUDGET_CATEGORY_BLUEPRINTS: BudgetBlueprintCategory[] = [
   },
   {
     name: "Decor & Design",
-    color: "#D4A0A0",
+    color: DASHBOARD_CHART_PALETTE[1],
     recommendedShare: 0.18,
     items: [
       { name: "Mandap Decoration", estimatedCost: 200000 },
@@ -41,7 +41,7 @@ export const BUDGET_CATEGORY_BLUEPRINTS: BudgetBlueprintCategory[] = [
   },
   {
     name: "Catering",
-    color: "#9CAF88",
+    color: DASHBOARD_CHART_PALETTE[4],
     recommendedShare: 0.18,
     items: [
       { name: "Wedding Dinner", estimatedCost: 300000 },
@@ -54,7 +54,7 @@ export const BUDGET_CATEGORY_BLUEPRINTS: BudgetBlueprintCategory[] = [
   },
   {
     name: "Photography & Video",
-    color: "#A4AC86",
+    color: DASHBOARD_CHART_PALETTE[3],
     recommendedShare: 0.12,
     items: [
       { name: "Wedding Photography", estimatedCost: 200000 },
@@ -66,7 +66,7 @@ export const BUDGET_CATEGORY_BLUEPRINTS: BudgetBlueprintCategory[] = [
   },
   {
     name: "Makeup & Styling",
-    color: "#C4956A",
+    color: DASHBOARD_CHART_PALETTE[5],
     recommendedShare: 0.07,
     items: [
       { name: "Bridal Makeup", estimatedCost: 80000 },
@@ -77,7 +77,7 @@ export const BUDGET_CATEGORY_BLUEPRINTS: BudgetBlueprintCategory[] = [
   },
   {
     name: "Entertainment",
-    color: "#D4A843",
+    color: DASHBOARD_CHART_PALETTE[0],
     recommendedShare: 0.07,
     items: [
       { name: "DJ / Sound System", estimatedCost: 80000 },
@@ -89,7 +89,7 @@ export const BUDGET_CATEGORY_BLUEPRINTS: BudgetBlueprintCategory[] = [
   },
   {
     name: "Travel & Logistics",
-    color: "#656D4A",
+    color: DASHBOARD_CHART_PALETTE[6],
     recommendedShare: 0.06,
     items: [
       { name: "Guest Transport", estimatedCost: 100000 },
@@ -100,7 +100,7 @@ export const BUDGET_CATEGORY_BLUEPRINTS: BudgetBlueprintCategory[] = [
   },
   {
     name: "Miscellaneous",
-    color: "#656D4A",
+    color: DASHBOARD_CHART_PALETTE[7],
     recommendedShare: 0.04,
     items: [
       { name: "Wedding Invitations", estimatedCost: 40000 },
@@ -116,7 +116,7 @@ export function budgetColorForCategory(name: string) {
   return (
     BUDGET_CATEGORY_BLUEPRINTS.find(
       (category) => category.name.toLowerCase() === name.toLowerCase()
-    )?.color ?? "#656D4A"
+    )?.color ?? DASHBOARD_CHART_COLORS.olive
   );
 }
 
@@ -128,3 +128,7 @@ export function recommendedAllocation(name: string, totalBudget: number) {
 
   return Math.round(totalBudget * share);
 }
+import {
+  DASHBOARD_CHART_COLORS,
+  DASHBOARD_CHART_PALETTE,
+} from "@/lib/dashboard-styles";

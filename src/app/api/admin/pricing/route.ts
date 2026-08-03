@@ -12,6 +12,9 @@ import {
   eventReadinessPercent,
   type EventReadinessRow,
 } from "@/lib/event-readiness";
+import type { Database } from "@/types/database.types";
+
+type BookingUpdate = Database["public"]["Tables"]["bookings"]["Update"];
 
 function firstRel<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null;
@@ -22,11 +25,11 @@ type RawBooking = {
   id: string;
   wedding_event_id: string | null;
   status: string | null;
-  total_amount: number | null;
   vendor_amount: number | null;
   final_price: number | null;
   service_fee: number | null;
   price_published: boolean | null;
+  updated_at: string;
   vendor:
     | { business_name: string | null; category: { name: string | null } | { name: string | null }[] | null }
     | { business_name: string | null; category: { name: string | null } | { name: string | null }[] | null }[]
@@ -111,7 +114,7 @@ export async function GET() {
       const { data: bookings, error: bookingsError } = await supabase
         .from("bookings")
         .select(
-          `id, wedding_event_id, status, total_amount, vendor_amount, final_price, service_fee, price_published,
+          `id, wedding_event_id, status, vendor_amount, final_price, service_fee, price_published, updated_at,
            vendor:vendor_profiles(business_name, category:vendor_categories(name)),
            service:vendor_services(name, base_price)`
         )
@@ -166,17 +169,17 @@ export async function GET() {
             const service = firstRel(b.service);
             const category = firstRel(vendor?.category ?? null);
             const finalPrice = b.final_price ?? null;
-            const listedPrice = b.vendor_amount ?? null;
+            const vendorPrice = b.vendor_amount ?? null;
             const fee =
               b.service_fee ??
-              (finalPrice != null && listedPrice != null
-                ? finalPrice - listedPrice
+              (finalPrice != null && vendorPrice != null
+                ? finalPrice - vendorPrice
                 : null);
             bookingCount += 1;
             if (finalPrice != null) {
               pricedCount += 1;
               finalTotal += finalPrice;
-              if (listedPrice != null) vendorTotal += listedPrice;
+              if (vendorPrice != null) vendorTotal += vendorPrice;
               if (fee != null) feeTotal += fee;
             }
             return {
@@ -185,11 +188,11 @@ export async function GET() {
               vendorName: vendor?.business_name ?? "Vendor",
               serviceName: service?.name ?? null,
               categoryName: category?.name ?? "Other",
-              listedPrice,
-              totalAmount: b.total_amount ?? null,
+              vendorPrice,
               finalPrice,
               pricePublished: Boolean(b.price_published),
               fee,
+              updatedAt: b.updated_at,
             };
           });
           const readiness = eventReadinessPercent(e);
@@ -241,31 +244,68 @@ export async function GET() {
 export async function PATCH(request: NextRequest) {
   const session = await getAuthSession();
   if (session instanceof NextResponse) return session;
-  // Setting the client-facing final price is admin-only.
+  // Commercial pricing is recorded by Elysian operations after an offline
+  // agreement. Vendors never write prices through the application.
   const roleCheck = requireRole(session, "admin");
   if (roleCheck) return roleCheck;
 
   try {
     const body = (await request.json()) as {
       bookingId?: unknown;
-      finalPrice?: unknown;
+      vendorPrice?: unknown;
+      fee?: unknown;
       pricePublished?: unknown;
+      updatedAt?: unknown;
     };
     const bookingId = typeof body.bookingId === "string" ? body.bookingId : null;
     if (!bookingId) return apiError("bookingId is required", 400);
+    const updatedAt =
+      typeof body.updatedAt === "string" && !Number.isNaN(Date.parse(body.updatedAt))
+        ? body.updatedAt
+        : null;
+    if (!updatedAt) return apiError("updatedAt revision is required", 400);
 
-    const toAmount = (v: unknown) =>
-      v === null || v === ""
-        ? null
-        : typeof v === "number" && Number.isFinite(v)
-          ? Math.max(0, Math.round(v))
-          : undefined;
+    const toAmount = (value: unknown) => {
+      if (value === null || value === "") return null;
+      if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+        return undefined;
+      }
+      const amount = Math.round(value);
+      return Number.isSafeInteger(amount) && amount <= 2_147_483_647
+        ? amount
+        : undefined;
+    };
 
-    const updates: Record<string, unknown> = {};
-    if (body.finalPrice !== undefined) {
-      const v = toAmount(body.finalPrice);
-      if (v === undefined) return apiError("Invalid final price", 400);
-      updates.final_price = v;
+    const updates: BookingUpdate = {};
+    const hasPricingInput =
+      body.vendorPrice !== undefined || body.fee !== undefined;
+    if (hasPricingInput) {
+      if (body.vendorPrice === undefined || body.fee === undefined) {
+        return apiError("Vendor price and Elysian fee must be saved together", 400);
+      }
+
+      const vendorPrice = toAmount(body.vendorPrice);
+      const fee = toAmount(body.fee);
+      if (vendorPrice === undefined) return apiError("Invalid vendor price", 400);
+      if (fee === undefined) return apiError("Invalid Elysian fee", 400);
+
+      if ((vendorPrice == null) !== (fee == null)) {
+        return apiError("Clear both amounts or provide both amounts", 400);
+      }
+      if (vendorPrice != null && vendorPrice <= 0) {
+        return apiError("Vendor price must be greater than zero", 400);
+      }
+
+      const finalPrice =
+        vendorPrice != null && fee != null ? vendorPrice + fee : null;
+      if (finalPrice != null && finalPrice > 2_147_483_647) {
+        return apiError("Combined price is too large", 400);
+      }
+
+      updates.vendor_amount = vendorPrice;
+      updates.total_amount = vendorPrice;
+      updates.final_price = finalPrice;
+      if (finalPrice == null) updates.price_published = false;
     }
     if (body.pricePublished !== undefined) {
       if (typeof body.pricePublished !== "boolean") {
@@ -280,7 +320,7 @@ export async function PATCH(request: NextRequest) {
     const supabase = createAdminSupabaseClient();
     const { data: current, error: currentErr } = await supabase
       .from("bookings")
-      .select("id, vendor_amount, final_price, price_published")
+      .select("id, vendor_amount, final_price, price_published, updated_at")
       .eq("id", bookingId)
       .maybeSingle();
     if (currentErr) {
@@ -288,22 +328,23 @@ export async function PATCH(request: NextRequest) {
       return apiError("Failed to load pricing", 500);
     }
     if (!current) return apiError("Booking not found", 404);
+    if (current.updated_at !== updatedAt) {
+      return apiError(
+        "Pricing changed in another session. Refresh before saving again.",
+        409
+      );
+    }
 
-    const listedPrice = current.vendor_amount ?? null;
+    const nextVendorPrice = Object.hasOwn(updates, "vendor_amount")
+      ? (updates.vendor_amount ?? null)
+      : current.vendor_amount;
     const nextFinalPrice =
       Object.hasOwn(updates, "final_price")
-        ? (updates.final_price as number | null)
+        ? (updates.final_price ?? null)
         : current.final_price;
 
-    if (
-      nextFinalPrice != null &&
-      listedPrice != null &&
-      nextFinalPrice < listedPrice
-    ) {
-      return apiError("Final price cannot be lower than the vendor price", 400);
-    }
-    if (nextFinalPrice != null && listedPrice == null) {
-      return apiError("A vendor amount is required before setting the final price", 400);
+    if ((nextVendorPrice == null) !== (nextFinalPrice == null)) {
+      return apiError("Pricing must include both vendor and client amounts", 400);
     }
     if (updates.price_published === true && nextFinalPrice == null) {
       return apiError("Set a final price before publishing", 400);
@@ -316,31 +357,45 @@ export async function PATCH(request: NextRequest) {
       .from("bookings")
       .update(updates)
       .eq("id", bookingId)
-      .select("id, vendor_amount, final_price, service_fee, price_published")
-      .single();
+      .eq("updated_at", updatedAt)
+      .select(
+        "id, vendor_amount, final_price, service_fee, price_published, updated_at"
+      )
+      .maybeSingle();
 
     if (error) {
       console.error("PATCH /api/admin/pricing update:", error);
       return apiError("Failed to update pricing", 500);
     }
+    if (!data) {
+      return apiError(
+        "Pricing changed in another session. Refresh before saving again.",
+        409
+      );
+    }
 
-    const updatedListedPrice = data.vendor_amount ?? null;
+    const updatedVendorPrice = data.vendor_amount ?? null;
     const fee =
       data.service_fee ??
-      (data.final_price != null && updatedListedPrice != null
-        ? data.final_price - updatedListedPrice
+      (data.final_price != null && updatedVendorPrice != null
+        ? data.final_price - updatedVendorPrice
         : null);
 
     await recordAudit({
       actorUserId: session.userId,
-      action: body.pricePublished !== undefined ? "PRICE_PUBLISH" : "PRICE_SET",
+      action:
+        body.pricePublished === true
+          ? "PRICE_PUBLISH"
+          : body.pricePublished === false
+            ? "PRICE_UNPUBLISH"
+            : "PRICE_SET",
       entityType: "booking",
       entityId: bookingId,
-      summary: `vendor ₹${updatedListedPrice ?? "—"} · fee ₹${fee ?? "—"} · final ₹${data.final_price ?? "—"}${
+      summary: `agreed vendor ₹${updatedVendorPrice ?? "—"} · fee ₹${fee ?? "—"} · client final ₹${data.final_price ?? "—"}${
         data.price_published ? " · published" : ""
       }`,
       meta: {
-        listedPrice: updatedListedPrice,
+        vendorPrice: updatedVendorPrice,
         fee,
         finalPrice: data.final_price ?? null,
         published: Boolean(data.price_published),
@@ -350,10 +405,11 @@ export async function PATCH(request: NextRequest) {
     return apiSuccess({
       booking: {
         id: data.id,
-        listedPrice: updatedListedPrice,
+        vendorPrice: updatedVendorPrice,
         finalPrice: data.final_price ?? null,
         pricePublished: Boolean(data.price_published),
         fee,
+        updatedAt: data.updated_at,
       },
     });
   } catch (e) {

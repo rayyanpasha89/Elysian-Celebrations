@@ -74,7 +74,7 @@ export function SectionEyebrow({
         size === "lg"
           ? "text-[11px] tracking-[0.3em]"
           : "text-[10px] tracking-[0.22em]",
-        tone === "light" ? "text-gold-light" : "text-gold-primary",
+        tone === "light" ? "text-gold-light" : "text-gold-dark",
         className
       )}
     >

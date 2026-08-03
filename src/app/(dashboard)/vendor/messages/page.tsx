@@ -174,6 +174,7 @@ export default function VendorMessagesPage() {
         from: "vendor" | "client";
         text: string;
         time: string;
+        createdAt: string;
       };
 
       setConversations((list) => {
@@ -195,6 +196,7 @@ export default function VendorMessagesPage() {
                     from: message.from,
                     text: message.text,
                     time: message.time,
+                    createdAt: message.createdAt,
                   },
                 ],
               }
@@ -448,12 +450,12 @@ function ContextPanel({ conversation }: { conversation: Conversation | null }) {
       <ContextRow label="Service" value={booking.service?.name ?? null} />
       <ContextRow label="Service scope" value={booking.service?.scope ?? null} />
       <ContextRow
-        label="Wedding event"
+        label="Function"
         value={booking.weddingEvent?.name ?? null}
         secondary={booking.weddingEvent?.eventType ?? null}
       />
       <ContextRow
-        label="Wedding day"
+        label="Event day"
         value={booking.weddingDay?.name ?? null}
         secondary={formatBookingDate(booking.weddingDay?.date ?? null)}
       />

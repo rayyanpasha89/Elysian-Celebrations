@@ -7,10 +7,36 @@ import {
   apiSuccess,
 } from "@/lib/api-utils";
 import {
+  GUEST_FIELD_LIMITS,
   getClientProfileId,
   getGuestListIdsForClient,
   guestListBelongsToClient,
 } from "@/lib/guest-access";
+import type { Database } from "@/types/database.types";
+
+type GuestSide = Database["public"]["Enums"]["guest_side"];
+type RsvpStatus = Database["public"]["Enums"]["rsvp_status"];
+type GuestInsert = Database["public"]["Tables"]["guests"]["Insert"];
+type GuestListInsert = Database["public"]["Tables"]["guest_lists"]["Insert"];
+
+function parseGuestSide(value: unknown): GuestSide | null {
+  if (value === "BRIDE" || value === "GROOM" || value === "COUPLE" || value === "MUTUAL") {
+    return value;
+  }
+  return null;
+}
+
+function parseRsvpStatus(value: unknown): RsvpStatus | null {
+  if (
+    value === "PENDING" ||
+    value === "CONFIRMED" ||
+    value === "DECLINED" ||
+    value === "MAYBE"
+  ) {
+    return value;
+  }
+  return null;
+}
 
 export async function GET(request: NextRequest) {
   const session = await getAuthSession();
@@ -23,8 +49,13 @@ export async function GET(request: NextRequest) {
     const supabase = createAdminSupabaseClient();
     const { searchParams } = request.nextUrl;
     const listId = searchParams.get("listId");
-    const side = searchParams.get("side");
-    const rsvp = searchParams.get("rsvp");
+    const sideParam = searchParams.get("side");
+    const rsvpParam = searchParams.get("rsvp");
+    const side = sideParam ? parseGuestSide(sideParam) : null;
+    const rsvp = rsvpParam ? parseRsvpStatus(rsvpParam) : null;
+
+    if (sideParam && !side) return apiError("Invalid guest side", 400);
+    if (rsvpParam && !rsvp) return apiError("Invalid RSVP status", 400);
 
     if (session.role === "client") {
       const profileId = await getClientProfileId(supabase, session.userId);
@@ -117,12 +148,46 @@ export async function POST(request: NextRequest) {
 
   try {
     const supabase = createAdminSupabaseClient();
-    const body = await request.json();
-    const { guestListId, name, email, phone, side, mealPref, plusOne, notes } =
-      body;
+    const body = (await request.json()) as Record<string, unknown>;
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    const email = typeof body.email === "string" ? body.email.trim() : "";
+    const phone = typeof body.phone === "string" ? body.phone.trim() : "";
+    const mealPref =
+      typeof body.mealPref === "string" ? body.mealPref.trim() : "";
+    const notes = typeof body.notes === "string" ? body.notes.trim() : "";
+    const side = body.side === undefined ? "COUPLE" : parseGuestSide(body.side);
+
+    if (!side) return apiError("Invalid guest side", 400);
+    if (body.plusOne !== undefined && typeof body.plusOne !== "boolean") {
+      return apiError("Invalid plus-one value", 400);
+    }
+
+    let guestListId: string | undefined;
+    if (body.guestListId !== undefined && body.guestListId !== null && body.guestListId !== "") {
+      if (typeof body.guestListId !== "string") {
+        return apiError("Invalid guest list", 400);
+      }
+      guestListId = body.guestListId;
+    }
 
     if (!name) {
       return apiError("Guest name is required");
+    }
+
+    // The underlying columns are unbounded `text`; reject oversized input here
+    // so one client cannot write arbitrarily large rows. Mirrors the ceilings
+    // enforced by PATCH /api/guests/[id].
+    const lengthChecks: [string, string, number][] = [
+      ["name", name, GUEST_FIELD_LIMITS.name],
+      ["email", email, GUEST_FIELD_LIMITS.email],
+      ["phone", phone, GUEST_FIELD_LIMITS.phone],
+      ["meal preference", mealPref, GUEST_FIELD_LIMITS.meal_pref],
+      ["notes", notes, GUEST_FIELD_LIMITS.notes],
+    ];
+    for (const [label, value, limit] of lengthChecks) {
+      if (value.length > limit) {
+        return apiError(`${label} is too long (max ${limit} characters)`, 400);
+      }
     }
 
     const profileId = await getClientProfileId(supabase, session.userId);
@@ -159,9 +224,10 @@ export async function POST(request: NextRequest) {
       if (existingList?.id) {
         targetListId = existingList.id;
       } else {
+        const guestListInsert: GuestListInsert = { client_profile_id: profileId };
         const { data: newList, error: insertErr } = await supabase
           .from("guest_lists")
-          .insert({ client_profile_id: profileId })
+          .insert(guestListInsert)
           .select("id")
           .single();
         if (insertErr || !newList?.id) {
@@ -176,18 +242,20 @@ export async function POST(request: NextRequest) {
       return apiError("Could not resolve guest list", 500);
     }
 
+    const guestInsert: GuestInsert = {
+      guest_list_id: targetListId,
+      name,
+      email: email || null,
+      phone: phone || null,
+      side,
+      meal_pref: mealPref || null,
+      plus_one: body.plusOne === true,
+      notes: notes || null,
+    };
+
     const { data: guest, error } = await supabase
       .from("guests")
-      .insert({
-        guest_list_id: targetListId,
-        name,
-        email: email || null,
-        phone: phone || null,
-        side: side || "COUPLE",
-        meal_pref: mealPref || null,
-        plus_one: plusOne || false,
-        notes: notes || null,
-      })
+      .insert(guestInsert)
       .select()
       .single();
 

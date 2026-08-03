@@ -6,15 +6,31 @@ import {
   apiError,
   apiSuccess,
 } from "@/lib/api-utils";
-import { getClientProfileId } from "@/lib/guest-access";
+import { GUEST_FIELD_LIMITS, getClientProfileId } from "@/lib/guest-access";
+import type { Database } from "@/types/database.types";
 
-const GUEST_SIDES = new Set<string>(["BRIDE", "GROOM", "COUPLE", "MUTUAL"]);
-const RSVP_STATUSES = new Set<string>([
-  "PENDING",
-  "CONFIRMED",
-  "DECLINED",
-  "MAYBE",
-]);
+type GuestSide = Database["public"]["Enums"]["guest_side"];
+type RsvpStatus = Database["public"]["Enums"]["rsvp_status"];
+type GuestUpdate = Database["public"]["Tables"]["guests"]["Update"];
+
+function parseGuestSide(value: unknown): GuestSide | null {
+  if (value === "BRIDE" || value === "GROOM" || value === "COUPLE" || value === "MUTUAL") {
+    return value;
+  }
+  return null;
+}
+
+function parseRsvpStatus(value: unknown): RsvpStatus | null {
+  if (
+    value === "PENDING" ||
+    value === "CONFIRMED" ||
+    value === "DECLINED" ||
+    value === "MAYBE"
+  ) {
+    return value;
+  }
+  return null;
+}
 
 export async function PATCH(
   request: NextRequest,
@@ -29,7 +45,7 @@ export async function PATCH(
   try {
     const { id } = await params;
     const supabase = createAdminSupabaseClient();
-    const body = await request.json();
+    const body = (await request.json()) as Record<string, unknown>;
 
     const { data: guestRow, error: loadErr } = await supabase
       .from("guests")
@@ -58,38 +74,57 @@ export async function PATCH(
       }
     }
 
-    const allowedFields = [
-      "name",
-      "email",
-      "phone",
-      "side",
-      "rsvp_status",
-      "meal_pref",
-      "plus_one",
-      "table_number",
-      "notes",
-    ] as const;
+    const data: GuestUpdate = {};
+    if (body.name !== undefined) {
+      if (typeof body.name !== "string") return apiError("Invalid guest name", 400);
+      const name = body.name.trim();
+      if (!name) return apiError("Guest name cannot be empty", 400);
+      if (name.length > GUEST_FIELD_LIMITS.name) {
+        return apiError("Guest name is too long", 400);
+      }
+      data.name = name;
+    }
 
-    const data: Record<string, unknown> = {};
-    for (const field of allowedFields) {
-      if (body[field] === undefined) continue;
-      if (field === "side") {
-        const v = body[field];
-        if (typeof v !== "string" || !GUEST_SIDES.has(v)) {
-          return apiError("Invalid guest side", 400);
-        }
-        data[field] = v;
-        continue;
+    const nullableStringFields = ["email", "phone", "meal_pref", "notes"] as const;
+    for (const field of nullableStringFields) {
+      const value = body[field];
+      if (value === undefined) continue;
+      if (value !== null && typeof value !== "string") {
+        return apiError(`Invalid ${field.replace("_", " ")}`, 400);
       }
-      if (field === "rsvp_status") {
-        const v = body[field];
-        if (typeof v !== "string" || !RSVP_STATUSES.has(v)) {
-          return apiError("Invalid RSVP status", 400);
-        }
-        data[field] = v;
-        continue;
+      if (value !== null && value.length > GUEST_FIELD_LIMITS[field]) {
+        return apiError(`${field.replace("_", " ")} is too long`, 400);
       }
-      data[field] = body[field];
+      data[field] = value;
+    }
+
+    if (body.side !== undefined) {
+      const side = parseGuestSide(body.side);
+      if (!side) return apiError("Invalid guest side", 400);
+      data.side = side;
+    }
+
+    if (body.rsvp_status !== undefined) {
+      const rsvpStatus = parseRsvpStatus(body.rsvp_status);
+      if (!rsvpStatus) return apiError("Invalid RSVP status", 400);
+      data.rsvp_status = rsvpStatus;
+    }
+
+    if (body.plus_one !== undefined) {
+      if (typeof body.plus_one !== "boolean") {
+        return apiError("Invalid plus-one value", 400);
+      }
+      data.plus_one = body.plus_one;
+    }
+
+    if (body.table_number !== undefined) {
+      if (
+        body.table_number !== null &&
+        (typeof body.table_number !== "number" || !Number.isFinite(body.table_number))
+      ) {
+        return apiError("Invalid table number", 400);
+      }
+      data.table_number = body.table_number;
     }
 
     const { data: updated, error } = await supabase

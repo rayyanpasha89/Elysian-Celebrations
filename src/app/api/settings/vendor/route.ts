@@ -6,6 +6,11 @@ import {
   apiError,
   apiSuccess,
 } from "@/lib/api-utils";
+import type { Database } from "@/types/database.types";
+
+type UserUpdate = Database["public"]["Tables"]["users"]["Update"];
+type VendorProfileUpdate =
+  Database["public"]["Tables"]["vendor_profiles"]["Update"];
 
 export async function GET() {
   const session = await getAuthSession();
@@ -78,9 +83,10 @@ export async function PATCH(request: NextRequest) {
         typeof body.phone === "string" && body.phone.trim()
           ? body.phone.trim()
           : null;
+      const userUpdate: UserUpdate = { phone };
       const { error } = await supabase
         .from("users")
-        .update({ phone })
+        .update(userUpdate)
         .eq("id", session.userId);
       if (error) {
         console.error("users phone:", error);
@@ -101,7 +107,7 @@ export async function PATCH(request: NextRequest) {
       return apiError("Vendor profile not found", 404);
     }
 
-    const vpUpdates: Record<string, unknown> = {};
+    const vpUpdates: VendorProfileUpdate = {};
     if (typeof body.businessName === "string" && body.businessName.trim()) {
       vpUpdates.business_name = body.businessName.trim();
     }

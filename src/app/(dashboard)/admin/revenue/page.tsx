@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { DASHBOARD_CHART_PALETTE } from "@/lib/dashboard-styles";
 import { cn, formatCurrency } from "@/lib/utils";
 
 type Booking = {
   id: string;
   categoryName: string;
   vendorName: string;
-  listedPrice: number | null;
+  vendorPrice: number | null;
   finalPrice: number | null;
   fee: number | null;
   pricePublished: boolean;
@@ -30,16 +31,6 @@ type AdminClient = {
 };
 
 const dashLabel = "font-accent text-[10px] uppercase tracking-[0.2em] text-slate";
-const CATEGORY_COLORS = [
-  "#C9A96E",
-  "#D4A0A0",
-  "#A4AC86",
-  "#9CAF88",
-  "#656D4A",
-  "#D4A843",
-  "#C4956A",
-];
-
 function lakh(value: number) {
   if (Math.abs(value) >= 10000000) return `₹${(value / 10000000).toFixed(2)}Cr`;
   return `₹${(value / 100000).toFixed(1)}L`;
@@ -99,11 +90,11 @@ export default function AdminRevenuePage() {
 
             if (booking.finalPrice != null) {
               finalTotal += booking.finalPrice;
-              vendorTotal += booking.listedPrice ?? 0;
+              vendorTotal += booking.vendorPrice ?? 0;
               feeTotal += booking.fee ?? 0;
               priced += 1;
               category.finalTotal += booking.finalPrice;
-              category.vendorTotal += booking.listedPrice ?? 0;
+              category.vendorTotal += booking.vendorPrice ?? 0;
               category.feeTotal += booking.fee ?? 0;
             }
             byCategory.set(booking.categoryName, category);
@@ -116,7 +107,8 @@ export default function AdminRevenuePage() {
       .map(([name, values], index) => ({
         name,
         ...values,
-        color: CATEGORY_COLORS[index % CATEGORY_COLORS.length],
+        color:
+          DASHBOARD_CHART_PALETTE[index % DASHBOARD_CHART_PALETTE.length],
       }))
       .sort((left, right) => right.feeTotal - left.feeTotal);
 

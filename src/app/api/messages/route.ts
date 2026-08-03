@@ -254,6 +254,7 @@ function buildConversation(
       from: m.from,
       text: m.text,
       time: m.time,
+      createdAt: m.createdAt,
     })),
   };
 }

@@ -266,7 +266,7 @@ export function Navbar() {
                       Budget layer
                     </p>
                     <p className="mt-2 font-heading text-sm text-ivory/74">
-                      Targets, quotes, actuals, and payables in one place.
+                      Estimates, final prices, payments, and balances in one place.
                     </p>
                   </div>
                 </div>

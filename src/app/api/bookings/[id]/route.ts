@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { getAuthSession, apiError, apiSuccess } from "@/lib/api-utils";
+import type { Database } from "@/types/database.types";
+
+type BookingStatus = Database["public"]["Enums"]["booking_status"];
+type BookingUpdate = Database["public"]["Tables"]["bookings"]["Update"];
 
 type BookingUserRelation =
   | { user_id?: string | null }
@@ -15,26 +19,39 @@ function relationUserId(relation: BookingUserRelation) {
   return relation?.user_id ?? null;
 }
 
-const BOOKING_STATUSES = new Set([
+const WRITABLE_BOOKING_STATUS_VALUES = [
   "INQUIRY",
-  "QUOTE_SENT",
   "CONFIRMED",
   "DEPOSIT_PAID",
   "COMPLETED",
   "CANCELLED",
-]);
+] as const satisfies readonly BookingStatus[];
 
-// The vendor portal intentionally exposes only these two progression actions.
-// Keep the API aligned with that UI so a crafted request cannot skip payment,
-// confirmation, or operations review.
-const VENDOR_STATUS_TRANSITIONS: Record<string, readonly string[]> = {
-  INQUIRY: ["QUOTE_SENT"],
+type WritableBookingStatus = (typeof WRITABLE_BOOKING_STATUS_VALUES)[number];
+
+const WRITABLE_BOOKING_STATUSES: ReadonlySet<string> = new Set(
+  WRITABLE_BOOKING_STATUS_VALUES
+);
+
+// Vendors can only close work that operations has already confirmed. Pricing is
+// agreed offline and recorded through the admin pricing route.
+const VENDOR_STATUS_TRANSITIONS: Partial<
+  Record<BookingStatus, readonly BookingStatus[]>
+> = {
   CONFIRMED: ["COMPLETED"],
   DEPOSIT_PAID: ["COMPLETED"],
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isWritableBookingStatus(value: unknown): value is WritableBookingStatus {
+  return typeof value === "string" && WRITABLE_BOOKING_STATUSES.has(value);
+}
+
 function normalizeMoney(value: unknown) {
-  if (value === null) return null;
+  if (value === null) return undefined;
   const amount = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(amount) || amount < 0) return undefined;
   return Math.floor(amount);
@@ -50,7 +67,11 @@ export async function PATCH(
   try {
     const { id } = await params;
     const supabase = createAdminSupabaseClient();
-    const body = await request.json();
+    const rawBody: unknown = await request.json();
+    if (!isRecord(rawBody)) {
+      return apiError("Invalid booking update", 400);
+    }
+    const body = rawBody;
 
     const { data: booking, error: loadErr } = await supabase
       .from("bookings")
@@ -78,31 +99,19 @@ export async function PATCH(
       return apiError("Not authorized to update this booking", 403);
     }
 
-    // The vendor's first quote is the only write path for total_amount. Admins
-    // set the separate final client price through /api/admin/pricing; allowing
-    // operations to rewrite the quote here would reintroduce negotiation.
     const isOperationsRole = session.role === "admin" || session.role === "manager";
-    const vendorSendingQuote =
-      session.role === "vendor" &&
-      booking.status === "INQUIRY" &&
-      body.status === "QUOTE_SENT";
-    if (body.totalAmount !== undefined && !vendorSendingQuote) {
-      return apiError("Only the vendor can submit the initial fixed quote", 403);
+    if (body.totalAmount !== undefined) {
+      return apiError(
+        "Pricing is recorded by Elysian operations after offline confirmation",
+        403
+      );
     }
     if (body.paidAmount !== undefined && !isOperationsRole) {
       return apiError("Only the operations team can update payments", 403);
     }
-    if (
-      vendorSendingQuote &&
-      body.totalAmount === undefined &&
-      booking.vendor_amount == null
-    ) {
-      return apiError("Add a quote amount before marking the quote as sent", 400);
-    }
-
-    const allowedFields: Record<string, unknown> = {};
+    const allowedFields: BookingUpdate = {};
     if (body.status !== undefined) {
-      if (typeof body.status !== "string" || !BOOKING_STATUSES.has(body.status)) {
+      if (!isWritableBookingStatus(body.status)) {
         return apiError("Invalid booking status", 400);
       }
       if (!isOperationsRole) {
@@ -120,24 +129,6 @@ export async function PATCH(
       }
       allowedFields.status = body.status;
     }
-    if (body.totalAmount !== undefined) {
-      const totalAmount = normalizeMoney(body.totalAmount);
-      if (totalAmount === undefined) return apiError("Invalid total amount", 400);
-      if (vendorSendingQuote && (totalAmount == null || totalAmount <= 0)) {
-        return apiError("Quote amount must be greater than zero", 400);
-      }
-      if (
-        vendorSendingQuote &&
-        booking.vendor_amount != null &&
-        totalAmount !== booking.vendor_amount
-      ) {
-        return apiError("The vendor quote is already locked for this booking", 409);
-      }
-      allowedFields.total_amount = totalAmount;
-      if (vendorSendingQuote && booking.vendor_amount == null) {
-        allowedFields.vendor_amount = totalAmount;
-      }
-    }
     if (body.paidAmount !== undefined) {
       const paidAmount = normalizeMoney(body.paidAmount);
       if (paidAmount === undefined) return apiError("Invalid paid amount", 400);
@@ -153,21 +144,31 @@ export async function PATCH(
       return apiError("Nothing to update", 400);
     }
 
-    const { data: updated, error } = await supabase
+    let updateQuery = supabase
       .from("bookings")
       .update(allowedFields)
-      .eq("id", id)
+      .eq("id", id);
+    if (body.status !== undefined) {
+      updateQuery = updateQuery.eq("status", booking.status);
+    }
+
+    const { data: updated, error } = await updateQuery
       .select(
-        "id, client_profile_id, vendor_profile_id, vendor_service_id, wedding_event_id, status, event_date, total_amount, vendor_amount, paid_amount, notes, created_at, updated_at"
+        "id, status, paid_amount, notes, updated_at"
       )
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error("Booking update error:", error);
       return apiError("Failed to update booking", 500);
     }
     if (!updated) {
-      return apiError("Booking not found", 404);
+      return apiError(
+        body.status !== undefined
+          ? "Booking changed while you were editing. Refresh and try again."
+          : "Booking not found",
+        body.status !== undefined ? 409 : 404
+      );
     }
 
     return apiSuccess(updated);

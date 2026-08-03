@@ -93,17 +93,30 @@ export default function ClientBookingsPage() {
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [notesDraft, setNotesDraft] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [noteError, setNoteError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
+        setLoading(true);
+        setLoadError(null);
         const res = await fetch("/api/bookings");
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error);
+        const json = await res.json().catch(() => null);
+        if (!res.ok) {
+          throw new Error(json?.error ?? "Your bookings could not be loaded.");
+        }
         if (!cancelled) setRows((json.bookings ?? []) as BookingRow[]);
-      } catch {
-        if (!cancelled) setRows([]);
+      } catch (error) {
+        if (!cancelled) {
+          setLoadError(
+            error instanceof Error
+              ? error.message
+              : "Your bookings could not be loaded."
+          );
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -111,7 +124,7 @@ export default function ClientBookingsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
 
   const list = useMemo(() => {
     return rows.map((booking) => {
@@ -143,6 +156,7 @@ export default function ClientBookingsPage() {
 
   useEffect(() => {
     setNotesDraft(selectedBooking?.notes ?? "");
+    setNoteError(null);
   }, [selectedBooking?.id, selectedBooking?.notes]);
 
   const saveNotes = async (event: FormEvent<HTMLFormElement>) => {
@@ -150,22 +164,29 @@ export default function ClientBookingsPage() {
     if (!selectedBooking) return;
 
     setSavingNotes(true);
+    setNoteError(null);
     try {
       const res = await fetch(`/api/bookings/${selectedBooking.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notes: notesDraft }),
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error);
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(json?.error ?? "This booking note could not be saved.");
+      }
 
       setRows((current) =>
         current.map((row) =>
           row.id === selectedBooking.id ? { ...row, notes: notesDraft } : row
         )
       );
-    } catch {
-      // Keep the page honest without a loud UX penalty if this fails.
+    } catch (error) {
+      setNoteError(
+        error instanceof Error
+          ? error.message
+          : "This booking note could not be saved."
+      );
     } finally {
       setSavingNotes(false);
     }
@@ -178,6 +199,40 @@ export default function ClientBookingsPage() {
         <div className="grid min-h-[420px] gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="h-72 border border-charcoal/8 bg-charcoal/5" />
           <div className="h-72 border border-charcoal/8 bg-charcoal/5" />
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div>
+        <p className={dashLabel}>Reservations</p>
+        <h2 className="font-display mt-2 text-3xl font-semibold text-charcoal">
+          Bookings
+        </h2>
+        <div
+          role="alert"
+          className={cn(
+            dashCard,
+            "mt-10 border-dashed border-gold-primary/45 bg-gold-primary/[0.04]"
+          )}
+        >
+          <p className={dashLabel}>Bookings unavailable</p>
+          <h3 className="mt-3 font-display text-2xl text-charcoal">
+            We could not load your booking records
+          </h3>
+          <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate">
+            {loadError} The page has not treated the request as an empty booking
+            list.
+          </p>
+          <button
+            type="button"
+            onClick={() => setReloadKey((key) => key + 1)}
+            className={cn(dashBtn, "mt-6")}
+          >
+            Try again
+          </button>
         </div>
       </div>
     );
@@ -304,7 +359,7 @@ export default function ClientBookingsPage() {
             <p className={dashLabel}>Booking details</p>
             {selectedBooking ? (
               <div className="mt-4 space-y-5">
-                <div className="border border-charcoal/10 bg-[radial-gradient(circle_at_top_left,rgba(201,169,110,0.16),transparent_32%),linear-gradient(155deg,#111827_0%,#1f2937_55%,#0b1220_100%)] px-4 py-5 text-ivory">
+                <div className="border border-charcoal/10 bg-[radial-gradient(circle_at_top_left,rgba(166,138,100,0.18),transparent_32%),linear-gradient(155deg,var(--charcoal-brown)_0%,var(--ebony)_55%,var(--dark-walnut)_100%)] px-4 py-5 text-ivory">
                   <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-ivory/60">
                     {selectedBooking.status}
                   </p>
@@ -408,6 +463,8 @@ export default function ClientBookingsPage() {
                       value={notesDraft}
                       onChange={(event) => setNotesDraft(event.target.value)}
                       placeholder="Capture timing, guest count, vendor instructions, or follow-up details."
+                      aria-describedby={noteError ? "booking-note-save-error" : undefined}
+                      aria-invalid={noteError ? true : undefined}
                       className="min-h-[140px] w-full border border-charcoal/12 bg-transparent px-3 py-3 text-sm text-charcoal outline-none transition-colors focus:border-gold-primary"
                     />
                     <button
@@ -422,6 +479,15 @@ export default function ClientBookingsPage() {
                     >
                       {savingNotes ? "Saving..." : "Save note"}
                     </button>
+                    {noteError ? (
+                      <p
+                        id="booking-note-save-error"
+                        role="alert"
+                        className="border border-rose/45 bg-rose/[0.07] px-3 py-2 text-sm leading-relaxed text-charcoal"
+                      >
+                        {noteError} Your draft is still here; try saving again.
+                      </p>
+                    ) : null}
                   </form>
                 </div>
 

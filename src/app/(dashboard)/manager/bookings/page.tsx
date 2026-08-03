@@ -307,7 +307,7 @@ export default function ManagerBookingsPage() {
                     </p>
                     <p>
                       <span className={dashLabel}>Day </span>
-                      {booking.event_context?.day?.name ?? "Wedding plan"}
+                      {booking.event_context?.day?.name ?? "Event plan"}
                     </p>
                     <p>
                       <span className={dashLabel}>Date </span>
@@ -405,7 +405,7 @@ function ManagerBookingBrief({
 
   return (
     <div className="mt-4 space-y-5">
-      <div className="border border-charcoal/10 bg-[radial-gradient(circle_at_top_left,rgba(201,169,110,0.16),transparent_32%),linear-gradient(155deg,#111827_0%,#1f2937_55%,#0b1220_100%)] px-4 py-5 text-ivory">
+      <div className="border border-charcoal/10 bg-[radial-gradient(circle_at_top_left,rgba(166,138,100,0.18),transparent_32%),linear-gradient(155deg,var(--charcoal-brown)_0%,var(--ebony)_55%,var(--dark-walnut)_100%)] px-4 py-5 text-ivory">
         <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-ivory/60">
           {displayStatus(booking.ui)}
         </p>
@@ -416,7 +416,7 @@ function ManagerBookingBrief({
           {booking.vendorName} · {booking.serviceName}
         </p>
         <p className="mt-3 font-accent text-[10px] uppercase tracking-[0.18em] text-gold-light">
-          {booking.event_context?.day?.name ?? "Wedding plan"} ·{" "}
+          {booking.event_context?.day?.name ?? "Event plan"} ·{" "}
           {booking.event_context?.name ?? "Event TBD"}
         </p>
       </div>

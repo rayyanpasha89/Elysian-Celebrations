@@ -779,8 +779,8 @@ function PrepPanel({
                 <button
                   type="button"
                   onClick={() => onDelete(item.id)}
-                  aria-label="Delete"
-                  className="opacity-0 transition-opacity group-hover:opacity-100"
+                  aria-label={`Delete ${item.title}`}
+                  className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose"
                 >
                   <Trash2 className="h-3 w-3 text-slate hover:text-rose" />
                 </button>
