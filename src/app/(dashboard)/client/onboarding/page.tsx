@@ -19,7 +19,7 @@
  * Layer 2 requirements from the needs selected here.
  */
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -41,6 +41,34 @@ import {
   type EventTimeBlockKey,
 } from "@/lib/event-platform";
 import { cn } from "@/lib/utils";
+import { usePrefersReducedMotion } from "@/hooks/use-media-query";
+
+/**
+ * Bring an element into view after a step or accordion change. Reduced-motion
+ * users get an instant jump rather than a smooth scroll, per the project rule
+ * that motion preferences must never cost them the state change itself.
+ */
+function scrollIntoViewSafely(
+  element: HTMLElement | null,
+  prefersReducedMotion: boolean,
+  block: ScrollLogicalPosition = "start"
+) {
+  if (!element) return;
+  // "instant" rather than "auto": per CSSOM, "auto" defers to the element's
+  // computed scroll-behavior, and globals.css sets `html { scroll-behavior:
+  // smooth }`. That media query already excludes reduced-motion users today,
+  // but being explicit here means this stays correct if the stylesheet changes.
+  const behavior: ScrollBehavior = prefersReducedMotion ? "instant" : "smooth";
+  // setTimeout rather than requestAnimationFrame: rAF callbacks do not fire
+  // while the tab is hidden, which would silently drop the scroll if the user
+  // switches away mid-interaction and comes back. A macrotask still lands
+  // after React has committed the new DOM, which is all this needs — the
+  // element we scroll to is a header whose own position is stable, so we do
+  // not have to wait out the expand animation beneath it.
+  window.setTimeout(() => {
+    element.scrollIntoView({ behavior, block });
+  }, 0);
+}
 
 // Needs a couple can pick per time block. "custom" is intentionally excluded —
 // custom needs are added later inside the planner, not during definition.
@@ -187,6 +215,8 @@ function toEventDefinitionDay(day: LocalDay): EventDefinitionDay {
 export default function ClientOnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState<Step>(0);
+  const headerRef = useRef<HTMLElement | null>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
   const [saving, setSaving] = useState(false);
 
   // Step 1
@@ -276,6 +306,19 @@ export default function ClientOnboardingPage() {
 
   const back = () => setStep((s) => (s > 0 ? ((s - 1) as Step) : s));
 
+  // Each step is a fresh page of work, so land at the top of it instead of
+  // inheriting the previous step's scroll offset — otherwise advancing from a
+  // short step to a long one drops the user mid-form. Skipped on first mount
+  // so arriving at /client/onboarding does not yank the viewport.
+  const hasMountedRef = useRef(false);
+  useEffect(() => {
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
+    scrollIntoViewSafely(headerRef.current, prefersReducedMotion);
+  }, [step, prefersReducedMotion]);
+
   // Form submission NEVER creates the event. An accidental submit (e.g. Enter
   // in a field) at most advances a step. Creation happens only through the
   // explicit Create button's onClick → createEvent(). This makes "auto-create"
@@ -340,7 +383,11 @@ export default function ClientOnboardingPage() {
       animate="visible"
       className="mx-auto max-w-2xl"
     >
-      <motion.header variants={fadeUp} className="border-b border-charcoal/8 pb-8">
+      <motion.header
+        ref={headerRef}
+        variants={fadeUp}
+        className="scroll-mt-24 border-b border-charcoal/8 pb-8"
+      >
         <p className={dashLabel}>Layer 1 · Definition</p>
         <h1 className="font-display mt-2 text-3xl font-semibold text-charcoal">
           Define your event
@@ -911,6 +958,8 @@ function BlocksStep({
 }) {
   const [openDayIndex, setOpenDayIndex] = useState(0);
   const [openBlockKey, setOpenBlockKey] = useState<EventTimeBlockKey | null>(null);
+  const dayRefs = useRef<(HTMLElement | null)[]>([]);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   const selectDay = (dayIndex: number) => {
     const day = days[dayIndex];
@@ -921,13 +970,23 @@ function BlocksStep({
     }
     setOpenDayIndex(dayIndex);
     setOpenBlockKey(null);
+    // Opening a day reveals its time blocks below the fold — bring the day's
+    // own header to the top of the viewport so the newly expanded content is
+    // visible without the user scrolling to find it.
+    scrollIntoViewSafely(dayRefs.current[dayIndex], prefersReducedMotion);
   };
 
   return (
     <div className="space-y-3">
       <div className="border border-charcoal/10 bg-cream/25">
         {days.map((day, dayIndex) => (
-          <section key={dayIndex} className="border-b border-charcoal/10 last:border-b-0">
+          <section
+            key={dayIndex}
+            ref={(el) => {
+              dayRefs.current[dayIndex] = el;
+            }}
+            className="scroll-mt-24 border-b border-charcoal/10 last:border-b-0"
+          >
             <button
               type="button"
               onClick={() => selectDay(dayIndex)}
