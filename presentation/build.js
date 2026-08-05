@@ -237,9 +237,8 @@ async function main() {
       });
     });
     s.addNotes(
-      "(~10s) Good morning. I'm Rayyan Pasha, Year 3, Digital Transformation at Atria. " +
-      "I intern as Founder's Desk Associate at TIPS Founder's Desk, and today I'm presenting " +
-      "Elysian Celebrations — the platform I've been building there."
+      "[~13s]  Good morning. I'm Rayyan Pasha, third year, Digital Transformation at Atria. " +
+      "I intern at TIPS Founder's Desk, and today I'm showing you what I built there — Elysian Celebrations."
     );
   }
 
@@ -298,10 +297,11 @@ async function main() {
       fontFace: SANS, fontSize: 12, color: BONE, valign: "middle", lineSpacingMultiple: 1.04,
     });
     s.addNotes(
-      "(~30s) My role spans six areas — strategy support, digitising operations, venture building, " +
-      "EdTech and chatbot prototypes, hospitality and events, and research. Across those I've delivered " +
-      "SOPs, dashboards, trackers, chatbot prototypes and business decks. Area C — Elysian — is where " +
-      "most of my build work went, so that's what I'll focus on today."
+      "[~29s]  My role is Founder's Desk Associate, reporting to Padmini Raghavendra, the Director. " +
+      "The mandate covers six areas — strategy support, digitising operations, venture building, EdTech and " +
+      "chatbot prototypes, hospitality and events, and research. Across those I've delivered SOPs, dashboards, " +
+      "trackers, chatbot prototypes and business decks. But area C — Elysian — is where most of my build work " +
+      "went. So that's what I'll focus on today."
     );
   }
 
@@ -337,9 +337,10 @@ async function main() {
       fontFace: SANS, fontSize: 12, italic: true, color: INK, valign: "middle",
     });
     s.addNotes(
-      "(~25s) A multi-day Indian celebration means twenty-plus functions across five days. " +
-      "Today that's run across six disconnected tools, with the client acting as the integration layer. " +
-      "Three problems: nothing is connected, everything is free text, and nobody can see readiness."
+      "[~24s]  Here's the problem. Planning a five-day celebration means twenty-plus functions. Right now " +
+      "that runs on spreadsheets, WhatsApp and memory. Nothing is connected — change the guest count and the " +
+      "menu quietly goes stale. Everything is typed by hand, so no system can price it or book it. And nobody " +
+      "can answer a simple question: are we ready for Day Three?"
     );
   }
 
@@ -400,10 +401,11 @@ async function main() {
       fontFace: SANS, fontSize: 11, italic: true, color: OLIVE,
     });
     s.addNotes(
-      "(~35s) Elysian answers that in three layers. Define shapes the event. Map is the core — a visual " +
-      "flow map where you drill from the event down to one step of one function, so the editor that opens " +
-      "is small enough to finish. Finalize proves readiness. It's 61,000 lines of TypeScript, 62 routes, " +
-      "59 API endpoints, 27 tables, and four role-based portals over one shared spine."
+      "[~33s]  Elysian answers that in three layers. DEFINE shapes the event — type, days, time blocks. " +
+      "MAP is the core. It's a visual flow map where you drill from the event down to one day, one function, " +
+      "one step — so the form that finally opens is small enough to actually finish. FINALIZE proves readiness. " +
+      "It's sixty-one thousand lines of TypeScript, sixty-two routes, fifty-nine API endpoints, twenty-seven " +
+      "database tables, and four separate portals — client, vendor, manager and admin."
     );
   }
 
@@ -444,10 +446,16 @@ async function main() {
       fontFace: SANS, fontSize: 12, italic: true, color: KHAKI,
     });
     s.addNotes(
-      "(~50s) DEMO — keep to three beats and do not wander. 1) The flow map: drill hub → day → function → step. " +
-      "2) Open a need and select a vendor catalogue row. 3) Show the readiness gate holding the client price back. " +
-      "Then close the tab and return to this deck. If the site or wifi fails, say so once and move on — " +
-      "the next slide covers the stack anyway."
+      "[~50s]  DEMO — site already open, already logged in, tab on the flow map.  \n\n" +
+      "SAY: Let me show you the real thing.  \n" +
+      "(1) FLOW MAP — This is the flow map. I start at the event, open a day, then a function — and notice the " +
+      "editor only opens once I pick a step.  \n" +
+      "(2) CATALOGUE — Vendors are selected from a real catalogue, inside the need they belong to. Never typed. " +
+      "That's what makes them priceable and bookable.  \n" +
+      "(3) READINESS — And this is the readiness gate: the client's final price only appears once the function " +
+      "is genuinely complete.  \n\n" +
+      "SAY: Let me come back to the deck.  \n" +
+      "IF IT FAILS: say 'Looks like the connection's not cooperating — let me carry on', once, and move on. Do not debug."
     );
   }
 
@@ -481,10 +489,10 @@ async function main() {
       });
     });
     s.addNotes(
-      "(~25s) The stack is deliberately production-grade. Next.js 16 and React 19 on the front. " +
-      "Supabase Postgres behind it, with 27 tables and 25 reviewed migrations — every schema change " +
-      "in version control, none typed into a dashboard. Clerk for auth, with row-level security on " +
-      "and ownership re-checked server-side. Shipped continuously through Vercel."
+      "[~21s]  The stack is deliberately production-grade. Next.js sixteen and React nineteen on the front end. " +
+      "Supabase Postgres behind it, with twenty-seven tables and twenty-five migrations — every schema change is " +
+      "in version control, none of it typed into a dashboard. Clerk handles authentication. And it ships " +
+      "continuously through Vercel."
     );
   }
 
@@ -547,11 +555,12 @@ async function main() {
       cy += 1.24;
     });
     s.addNotes(
-      "(~35s) Skills first: I went from writing features to owning a system — data modelling, " +
-      "authorisation design, security auditing, and directing AI tools without losing the architecture. " +
-      "The hardest challenge was readiness being computed twice with different rules, where one copy " +
-      "decided whether a client could see a price. I collapsed it to one server-side contract. " +
-      "The lesson: duplicated logic near money is a security bug, not untidiness."
+      "[~35s]  What I gained: I went from writing features to owning a system — data modelling, authorisation " +
+      "design, and auditing my own code.  \n\n" +
+      "The hardest challenge was this. Readiness was being calculated twice — once in the browser, once on the " +
+      "server — with different rules. And one of those copies decided whether a client could see a price. " +
+      "I collapsed it into a single server-side contract. The lesson stuck with me: duplicated logic near money " +
+      "isn't untidy — it's a security bug."
     );
   }
 
@@ -611,11 +620,11 @@ async function main() {
       fy += 0.84;
     });
     s.addNotes(
-      "(~35s) My programme is Digital Transformation, and this internship was that, literally. " +
-      "Process mapping became the flow map. Data modelling became 27 tables with rules enforced in SQL. " +
-      "Data-driven decision making became readiness scoring. Looking forward — I'm still with TIPS " +
-      "through December 2026. The next wave is architecture rather than features: transaction boundaries, " +
-      "splitting the money ledger, and extending Elysian beyond events into hospitality, education and real estate."
+      "[~29s]  My programme is Digital Transformation, and this internship was exactly that. Process mapping " +
+      "became the flow map. Database modelling became twenty-seven tables with the business rules enforced in SQL. " +
+      "Data-driven decision making became readiness scoring instead of guesswork.  \n\n" +
+      "And I'm not finished. I'm with TIPS through December twenty twenty-six. Next is architecture rather than " +
+      "features — and extending Elysian beyond events into hospitality, education and real estate."
     );
   }
 
@@ -654,7 +663,9 @@ async function main() {
         fontFace: SANS, fontSize: 11, bold: true, color: BONE, valign: "middle",
       });
     });
-    s.addNotes("(~10s) Thank you — happy to take questions.");
+    s.addNotes(
+      "[~9s]  That's Elysian — built over the last year, and still being built. Thank you. I'm happy to take questions."
+    );
   }
 
   const file = path.join(OUT, "Elysian-Internship-Presentation.pptx");
