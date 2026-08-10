@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer } from "@/animations/variants";
+import { DashboardLoadError } from "@/components/dashboard/dashboard-load-error";
 import { ListEmptyState } from "@/components/dashboard/list-empty-state";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { dashBtn, dashLabel, statusBadgeBase } from "@/lib/dashboard-styles";
@@ -29,38 +30,46 @@ type VendorApiRow = {
   isFeatured: boolean;
 };
 
+async function fetchVendors() {
+  const res = await fetch("/api/admin/vendors");
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error);
+  if (!Array.isArray(json.vendors)) throw new Error("Invalid vendor response");
+
+  return (json.vendors as VendorApiRow[]).map((vendor) => ({
+    id: vendor.id,
+    name: vendor.businessName ?? "—",
+    category: vendor.categoryName ?? "—",
+    city: vendor.city ?? "—",
+    rating: vendor.rating ?? 0,
+    isVerified: vendor.isVerified,
+    isFeatured: vendor.isFeatured,
+  }));
+}
+
 export default function ManagerVendorsPage() {
   const [loading, setLoading] = useState(true);
   const [vendors, setVendors] = useState<VendorRow[]>([]);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [q, setQ] = useState("");
-
-  const load = async () => {
-    const res = await fetch("/api/admin/vendors");
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.error);
-    const raw = (json.vendors ?? []) as VendorApiRow[];
-    setVendors(
-      raw.map((v) => ({
-        id: v.id,
-        name: v.businessName ?? "—",
-        category: v.categoryName ?? "—",
-        city: v.city ?? "—",
-        rating: v.rating ?? 0,
-        isVerified: v.isVerified,
-        isFeatured: v.isFeatured,
-      }))
-    );
-  };
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try { await load(); }
-      catch { if (!cancelled) setVendors([]); }
+      try {
+        setLoading(true);
+        setLoadError(false);
+        const nextVendors = await fetchVendors();
+        if (!cancelled) setVendors(nextVendors);
+      }
+      catch {
+        if (!cancelled) setLoadError(true);
+      }
       finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [reloadKey]);
 
   const toggleVerify = async (id: string, isVerified: boolean) => {
     try {
@@ -70,7 +79,7 @@ export default function ManagerVendorsPage() {
         body: JSON.stringify({ isVerified }),
       });
       if (!res.ok) throw new Error("Failed");
-      await load();
+      setVendors(await fetchVendors());
       toast.success(isVerified ? "Vendor verified" : "Verification revoked");
     } catch {
       toast.error("Update failed");
@@ -97,6 +106,19 @@ export default function ManagerVendorsPage() {
         <div className="h-10 w-48 bg-charcoal/10" />
         <div className="h-64 border border-charcoal/8 bg-charcoal/5" />
       </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <DashboardLoadError
+        eyebrow="Directory"
+        pageTitle="Vendors"
+        label="Vendor directory unavailable"
+        title="We could not load the vendor directory"
+        description="Vendor records, verification totals, and actions have not been replaced with an empty list. Retry to restore the live directory."
+        onRetry={() => setReloadKey((key) => key + 1)}
+      />
     );
   }
 

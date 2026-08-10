@@ -3,6 +3,27 @@
 _Date: 2026-08-03. Written by Claude after independently verifying the 2026-08-02
 remediation wave. Supersedes the June 5 handoff (that work is shipped)._
 
+## 2026-08-10 status note
+
+This handoff is retained as the corrective review that drove the next hardening
+wave; its scorecard and source references describe the 2026-08-03 tree, not the
+current completion state. Use the dated status blocks in
+`docs/design-audit-2026-08-02.md` and `docs/security-audit-2026-08-02.md` as the
+current reconciliation.
+
+Since this handoff, the working tree has added server-rendered role guards to all
+four portal layouts, made Supabase the role authority, added CSP/security headers,
+unified event readiness, removed the dead legacy budget PUT/blueprint, and made
+load failures honest on the six specifically remediated dashboard pages. It also
+contains database-backed API limits and tokenized vendor-media quota code. Remote
+migration history confirms `20260810181932_add_api_rate_limits.sql`,
+`20260810194000_lock_update_trigger_search_path.sql`, and
+`20260810201500_tokenize_vendor_media_reservations.sql` are applied. Each upload
+reserves one exact token, stale cleanup cannot release a newer upload, and the
+per-request media cap is 4 MB to stay below Vercel's 4.5 MB function-body limit.
+Messaging intentionally uses visibility-aware API polling rather than direct
+Supabase Realtime.
+
 Claude has been running as a **read-only reviewer** on this repo — auditing, not building.
 The one exception is the small fix pass in §1, which Rayyan asked for explicitly. Everything
 else is yours.

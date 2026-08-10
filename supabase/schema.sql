@@ -538,6 +538,25 @@ create table contact_inquiries (
   created_at timestamptz not null default now()
 );
 
+-- ─── API abuse protection ───────────────────────────────────
+
+create table api_rate_limits (
+  key_hash text primary key,
+  bucket_started_at timestamptz not null,
+  request_count integer not null default 0 check (request_count >= 0),
+  updated_at timestamptz not null default now()
+);
+
+grant select, insert, update, delete on table api_rate_limits to service_role;
+
+create table vendor_media_quota_reservations (
+  reservation_id uuid primary key,
+  vendor_profile_id uuid not null references vendor_profiles(id) on delete cascade,
+  reserved_bytes bigint not null check (reserved_bytes > 0),
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now()
+);
+
 -- ─── Indexes ─────────────────────────────────────────────────
 
 create index idx_vendor_profiles_category on vendor_profiles(category_id);
@@ -587,16 +606,22 @@ create index idx_notifications_user on notifications(user_id);
 create index idx_mood_board_items_board on mood_board_items(mood_board_id);
 create index idx_blog_posts_slug on blog_posts(slug);
 create index idx_destinations_slug on destinations(slug);
+create index api_rate_limits_updated_at_idx on api_rate_limits(updated_at);
+create index vendor_media_quota_reservations_vendor_idx
+  on vendor_media_quota_reservations(vendor_profile_id, expires_at);
 
 -- ─── Updated-at trigger ──────────────────────────────────────
 
 create or replace function update_updated_at()
-returns trigger as $$
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
 begin
-  new.updated_at = now();
+  new.updated_at = pg_catalog.now();
   return new;
 end;
-$$ language plpgsql;
+$$;
 
 create trigger tr_users_updated before update on users for each row execute function update_updated_at();
 create trigger tr_client_profiles_updated before update on client_profiles for each row execute function update_updated_at();
@@ -610,6 +635,201 @@ create trigger tr_message_thread_reads_updated before update on message_thread_r
 create trigger tr_guest_lists_updated before update on guest_lists for each row execute function update_updated_at();
 create trigger tr_mood_boards_updated before update on mood_boards for each row execute function update_updated_at();
 create trigger tr_blog_posts_updated before update on blog_posts for each row execute function update_updated_at();
+
+create or replace function consume_api_rate_limit(
+  p_key_hash text,
+  p_limit integer,
+  p_window_seconds integer
+)
+returns table (
+  allowed boolean,
+  remaining integer,
+  reset_at timestamptz
+)
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_now timestamptz := clock_timestamp();
+  v_bucket_started_at timestamptz;
+  v_request_count integer;
+begin
+  if p_key_hash is null or length(p_key_hash) < 32 or length(p_key_hash) > 128 then
+    raise exception 'Invalid rate-limit key';
+  end if;
+  if p_limit < 1 or p_limit > 10000 then
+    raise exception 'Invalid rate-limit ceiling';
+  end if;
+  if p_window_seconds < 1 or p_window_seconds > 86400 then
+    raise exception 'Invalid rate-limit window';
+  end if;
+
+  insert into public.api_rate_limits as limits (
+    key_hash,
+    bucket_started_at,
+    request_count,
+    updated_at
+  )
+  values (p_key_hash, v_now, 1, v_now)
+  on conflict (key_hash) do update
+  set
+    bucket_started_at = case
+      when limits.bucket_started_at <= v_now - make_interval(secs => p_window_seconds)
+        then v_now
+      else limits.bucket_started_at
+    end,
+    request_count = case
+      when limits.bucket_started_at <= v_now - make_interval(secs => p_window_seconds)
+        then 1
+      else least(limits.request_count + 1, p_limit + 1)
+    end,
+    updated_at = v_now
+  returning bucket_started_at, request_count
+  into v_bucket_started_at, v_request_count;
+
+  allowed := v_request_count <= p_limit;
+  remaining := greatest(p_limit - v_request_count, 0);
+  reset_at := v_bucket_started_at + make_interval(secs => p_window_seconds);
+
+  if random() < 0.01 then
+    delete from public.api_rate_limits
+    where key_hash in (
+      select stale.key_hash
+      from public.api_rate_limits as stale
+      where stale.updated_at < v_now - interval '2 days'
+      order by stale.updated_at asc
+      limit 100
+    );
+  end if;
+
+  return next;
+end;
+$$;
+
+revoke execute on function consume_api_rate_limit(text, integer, integer)
+  from public, anon, authenticated;
+grant execute on function consume_api_rate_limit(text, integer, integer)
+  to service_role;
+
+create or replace function reserve_vendor_media_bytes(
+  p_vendor_profile_id uuid,
+  p_reservation_id uuid,
+  p_bytes bigint,
+  p_quota_bytes bigint
+)
+returns table (
+  allowed boolean,
+  used_bytes bigint,
+  reserved_bytes bigint,
+  remaining_bytes bigint
+)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_now timestamptz := clock_timestamp();
+  v_used_bytes bigint := 0;
+  v_reserved_bytes bigint := 0;
+begin
+  if p_reservation_id is null then
+    raise exception 'Invalid media reservation id';
+  end if;
+  if p_bytes < 1 or p_bytes > 4194304 then
+    raise exception 'Invalid media reservation size';
+  end if;
+  if p_quota_bytes < p_bytes or p_quota_bytes > 1073741824 then
+    raise exception 'Invalid media quota';
+  end if;
+
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(p_vendor_profile_id::text, 0)
+  );
+
+  delete from public.vendor_media_quota_reservations as reservations
+  where reservations.vendor_profile_id = p_vendor_profile_id
+    and reservations.expires_at <= v_now;
+
+  select coalesce(sum(
+    case
+      when (objects.metadata ->> 'size') ~ '^[0-9]+$'
+        then (objects.metadata ->> 'size')::bigint
+      else 0
+    end
+  ), 0)
+  into v_used_bytes
+  from storage.objects as objects
+  where objects.bucket_id = 'vendor-media'
+    and (
+      objects.name like 'profiles/' || p_vendor_profile_id::text || '/%'
+      or objects.name like 'service-items/' || p_vendor_profile_id::text || '/%'
+    );
+
+  select coalesce(sum(reservations.reserved_bytes), 0)
+  into v_reserved_bytes
+  from public.vendor_media_quota_reservations as reservations
+  where reservations.vendor_profile_id = p_vendor_profile_id
+    and reservations.expires_at > v_now;
+
+  allowed := v_used_bytes + v_reserved_bytes + p_bytes <= p_quota_bytes;
+  if allowed then
+    insert into public.vendor_media_quota_reservations (
+      reservation_id,
+      vendor_profile_id,
+      reserved_bytes,
+      expires_at
+    ) values (
+      p_reservation_id,
+      p_vendor_profile_id,
+      p_bytes,
+      v_now + interval '15 minutes'
+    );
+    v_reserved_bytes := v_reserved_bytes + p_bytes;
+  end if;
+
+  used_bytes := v_used_bytes;
+  reserved_bytes := v_reserved_bytes;
+  remaining_bytes := greatest(
+    p_quota_bytes - v_used_bytes - v_reserved_bytes,
+    0
+  );
+  return next;
+end;
+$$;
+
+create or replace function release_vendor_media_bytes(
+  p_vendor_profile_id uuid,
+  p_reservation_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if p_reservation_id is null then
+    raise exception 'Invalid media reservation id';
+  end if;
+
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(p_vendor_profile_id::text, 0)
+  );
+
+  delete from public.vendor_media_quota_reservations as reservations
+  where reservations.reservation_id = p_reservation_id
+    and reservations.vendor_profile_id = p_vendor_profile_id;
+end;
+$$;
+
+revoke execute on function reserve_vendor_media_bytes(uuid, uuid, bigint, bigint)
+  from public, anon, authenticated;
+revoke execute on function release_vendor_media_bytes(uuid, uuid)
+  from public, anon, authenticated;
+grant execute on function reserve_vendor_media_bytes(uuid, uuid, bigint, bigint)
+  to service_role;
+grant execute on function release_vendor_media_bytes(uuid, uuid)
+  to service_role;
 
 -- Clerk owns application authentication. Browser clients never query the
 -- public schema directly; role-checked Next.js handlers use service_role.

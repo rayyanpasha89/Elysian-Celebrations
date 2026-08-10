@@ -14,7 +14,8 @@ import { createAdminSupabaseClient } from "@/lib/supabase/server";
  */
 export const VENDOR_MEDIA_BUCKET = "vendor-media";
 
-const MAX_BYTES = 8 * 1024 * 1024; // 8 MB
+const MAX_BYTES = 4 * 1024 * 1024; // Leaves multipart overhead below Vercel's 4.5 MB request cap.
+export const VENDOR_MEDIA_QUOTA_BYTES = 100 * 1024 * 1024; // 100 MB per vendor
 const ALLOWED_MIME_PREFIXES = ["image/jpeg", "image/png", "image/webp"];
 
 let bucketEnsuredAt = 0;
@@ -65,9 +66,58 @@ export type StoredImage = {
 };
 
 export type UploadError = {
-  code: "invalid-type" | "too-large" | "no-file" | "upload-failed";
+  code:
+    | "invalid-type"
+    | "too-large"
+    | "quota-exceeded"
+    | "no-file"
+    | "upload-failed";
   message: string;
 };
+
+async function reserveVendorMediaBytes(
+  vendorProfileId: string,
+  bytes: number
+): Promise<
+  | { status: "reserved"; reservationId: string }
+  | { status: "quota-exceeded" }
+  | { status: "unavailable" }
+> {
+  const reservationId = crypto.randomUUID();
+  const supabase = createAdminSupabaseClient();
+  const { data, error } = await supabase.rpc("reserve_vendor_media_bytes", {
+    p_bytes: bytes,
+    p_quota_bytes: VENDOR_MEDIA_QUOTA_BYTES,
+    p_reservation_id: reservationId,
+    p_vendor_profile_id: vendorProfileId,
+  });
+  if (error) {
+    console.error("vendor-media quota reservation failed:", error);
+    return { status: "unavailable" };
+  }
+
+  const result = data?.[0];
+  if (!result) return { status: "unavailable" };
+  return result.allowed
+    ? { status: "reserved", reservationId }
+    : { status: "quota-exceeded" };
+}
+
+async function releaseVendorMediaBytes(
+  vendorProfileId: string,
+  reservationId: string
+) {
+  const supabase = createAdminSupabaseClient();
+  const { error } = await supabase.rpc("release_vendor_media_bytes", {
+    p_reservation_id: reservationId,
+    p_vendor_profile_id: vendorProfileId,
+  });
+  if (error) {
+    // Reservations expire automatically. A failed release can temporarily
+    // block uploads, but it can never let the quota be exceeded.
+    console.error("vendor-media quota release failed:", error);
+  }
+}
 
 function extensionFor(mime: string): string {
   switch (mime) {
@@ -85,9 +135,11 @@ function extensionFor(mime: string): string {
 async function uploadVendorImage({
   file,
   pathPrefix,
+  vendorProfileId,
 }: {
   file: File | Blob;
   pathPrefix: string;
+  vendorProfileId: string;
 }): Promise<{ ok: true; data: StoredImage } | { ok: false; error: UploadError }> {
   if (!file) {
     return { ok: false, error: { code: "no-file", message: "No file received" } };
@@ -123,46 +175,67 @@ async function uploadVendorImage({
     };
   }
 
-  const ext = extensionFor(mime);
-  // Crypto.randomUUID is available on Node 18+ which Next 15 ships against.
-  const filename = `${crypto.randomUUID()}.${ext}`;
-  const path = `${pathPrefix}/${filename}`;
-
-  const supabase = createAdminSupabaseClient();
-  const buffer = Buffer.from(await (file as Blob).arrayBuffer());
-
-  const { error: uploadErr } = await supabase.storage
-    .from(VENDOR_MEDIA_BUCKET)
-    .upload(path, buffer, {
-      contentType: mime,
-      cacheControl: "31536000",
-      upsert: false,
-    });
-
-  if (uploadErr) {
-    console.error("vendor-media upload failed:", uploadErr);
+  const reservation = await reserveVendorMediaBytes(vendorProfileId, file.size);
+  if (reservation.status === "unavailable") {
     return {
       ok: false,
       error: {
         code: "upload-failed",
-        message: uploadErr.message || "Upload failed",
+        message: "Could not verify your media storage allowance",
+      },
+    };
+  }
+  if (reservation.status === "quota-exceeded") {
+    return {
+      ok: false,
+      error: {
+        code: "quota-exceeded",
+        message: "Vendor media storage is limited to 100 MB",
       },
     };
   }
 
-  const { data } = supabase.storage
-    .from(VENDOR_MEDIA_BUCKET)
-    .getPublicUrl(path);
+  try {
+    const ext = extensionFor(mime);
+    const filename = `${crypto.randomUUID()}.${ext}`;
+    const path = `${pathPrefix}/${filename}`;
+    const supabase = createAdminSupabaseClient();
+    const buffer = Buffer.from(await (file as Blob).arrayBuffer());
+    const { error: uploadErr } = await supabase.storage
+      .from(VENDOR_MEDIA_BUCKET)
+      .upload(path, buffer, {
+        contentType: mime,
+        cacheControl: "31536000",
+        upsert: false,
+      });
 
-  return {
-    ok: true,
-    data: {
-      url: data.publicUrl,
-      path,
-      contentType: mime,
-      size: file.size,
-    },
-  };
+    if (uploadErr) {
+      console.error("vendor-media upload failed:", uploadErr);
+      return {
+        ok: false,
+        error: {
+          code: "upload-failed",
+          message: uploadErr.message || "Upload failed",
+        },
+      };
+    }
+
+    const { data } = supabase.storage
+      .from(VENDOR_MEDIA_BUCKET)
+      .getPublicUrl(path);
+
+    return {
+      ok: true,
+      data: {
+        url: data.publicUrl,
+        path,
+        contentType: mime,
+        size: file.size,
+      },
+    };
+  } finally {
+    await releaseVendorMediaBytes(vendorProfileId, reservation.reservationId);
+  }
 }
 
 /**
@@ -181,6 +254,7 @@ export async function uploadVendorServiceImage({
   return uploadVendorImage({
     file,
     pathPrefix: `service-items/${vendorProfileId}/${vendorServiceId}`,
+    vendorProfileId,
   });
 }
 
@@ -199,6 +273,7 @@ export async function uploadVendorProfileImage({
   return uploadVendorImage({
     file,
     pathPrefix: `profiles/${vendorProfileId}`,
+    vendorProfileId,
   });
 }
 

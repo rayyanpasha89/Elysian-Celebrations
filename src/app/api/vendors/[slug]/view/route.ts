@@ -1,13 +1,22 @@
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { apiError, apiSuccess, getOptionalAuthSession } from "@/lib/api-utils";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
     const { slug } = await params;
     const session = await getOptionalAuthSession();
+    const limited = await enforceRateLimit(request, {
+      scope: "vendor-profile-view",
+      limit: 90,
+      windowSeconds: 60,
+      identity: session?.userId,
+    });
+    if (limited) return limited;
+
     const supabase = createAdminSupabaseClient();
 
     const { data: vendor, error: vendorError } = await supabase
@@ -24,10 +33,8 @@ export async function POST(
     // Deduplicate per viewer per hour. Anonymous callers have no identity to
     // key on, so they collapse into one null-viewer bucket per vendor. That
     // under-counts logged-out traffic, but this is an unauthenticated POST
-    // endpoint with no rate limiting in front of it — without a window here,
-    // anyone can inflate any vendor's view count without bound, and that
-    // number is surfaced to vendors in /vendor/analytics. A bounded counter is
-    // worth more than an unattributable one.
+    // The API limiter bounds request volume; this window separately prevents
+    // ordinary repeat visits from inflating the vendor-facing analytics count.
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const recentQuery = supabase
       .from("vendor_profile_views")

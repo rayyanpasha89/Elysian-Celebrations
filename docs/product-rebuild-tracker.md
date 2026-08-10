@@ -36,6 +36,14 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
   - `20260713130159_lock_public_schema_behind_server_api.sql`
   - `20260713135700_admin_owned_offline_pricing.sql`
   - `20260802000100_harden_booking_pricing_and_selection.sql`
+  - `20260802000200_add_query_path_indexes.sql`
+  - `20260802000300_preserve_identity_history.sql`
+  - `20260802000400_validate_payment_direction.sql`
+  - `20260802000500_restore_mood_board_item_metadata.sql`
+  - `20260803000100_complete_query_path_indexes.sql`
+  - `20260810181932_add_api_rate_limits.sql`
+  - `20260810194000_lock_update_trigger_search_path.sql`
+  - `20260810201500_tokenize_vendor_media_reservations.sql`
 - Remote table/column checks passed for:
   - `wedding_event_menus`
   - `wedding_event_menu_items`
@@ -57,15 +65,44 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
   - generated `bookings.service_fee`
   - final-price validation constraints and admin-owned offline pricing metadata
 
+## Current Working-Tree Hardening (2026-08-10)
+
+These items are present in the current source tree. They are not, by themselves,
+claims that the changes are committed, deployed, or active in the remote database:
+
+- All four portal layouts perform server-side role checks before rendering.
+  Supabase role/active state is authoritative, and Clerk identity updates cannot
+  restore stale role metadata. Replayed create events preserve existing role and
+  activation state, and auth outages remain distinguishable from sign-out.
+- CSP and application security headers cover every route, including frame denial,
+  nosniff, referrer/permissions policies, COOP, production HSTS, and Clerk's
+  required challenge/protection origins.
+- Database-backed API limits and atomic 100 MB vendor-media quota reservations
+  are implemented and applied remotely. Upload requests are capped at 4 MB and
+  use exact reservation tokens. Rollback-only verification covers the rate
+  boundary, grants, RLS isolation, expiration cleanup, and token-safe release.
+- `evaluateEventReadiness()` is the canonical planner/pricing contract across
+  wedding hydration, budget, bookings, and admin pricing, with focused contract
+  tests for the formerly divergent cases. The admin aggregate averages those
+  canonical event percentages and reports complete events separately.
+- The dead legacy `PUT /api/budget` writer and blueprint helper are removed;
+  `/api/budget` retains only its live plan-derived read model.
+- Retryable load failures are explicit on manager clients, vendors, destinations,
+  and bookings; vendor bookings; and client messages. Other dashboard pages are
+  not implicitly covered.
+- Vendor catalogue images are HTTPS-only and restricted to Unsplash or the public
+  Supabase `vendor-media` path. Reference links remain HTTPS-only.
+- Messages intentionally use visibility-aware API polling; direct Supabase
+  Realtime remains deferred pending a Clerk-to-Supabase JWT bridge.
+
 ## Shipped Recently
 
-- Completed the first design-audit remediation wave: removed fake zero/empty
-  dashboard states, made event creation fail-and-clean-up on dependent errors,
-  made planner refresh authoritative after every save attempt, and reordered
-  vendor replacement sync so a failed replacement cannot destroy draft picks.
-- Made readiness server-authoritative across planner, client price gating, event
-  estimates, and finalization. Finalization cards now identify and open the exact
-  day/function/step gap instead of sending users to whichever event was active.
+- Completed the first design-audit remediation wave: made event creation
+  fail-and-clean-up on dependent errors, made planner refresh authoritative after
+  every save attempt, and reordered vendor replacement sync so a failed
+  replacement cannot destroy draft picks.
+- Finalization cards identify and open the exact day/function/step gap instead of
+  sending users to whichever event was active.
 - Rebuilt client vendor sourcing lanes from real event requirements and selected
   services. Catalogue failures and plan failures are now explicit retry states,
   not "no vendors" or fabricated wedding-only recommendations.
@@ -117,7 +154,12 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
 - Updated `/api/wedding` to accept either the old onboarding payload or a new layered `eventDefinition.days[].timeBlocks[]` payload. Old wedding onboarding still creates the classic starter plan; new event-definition payloads create real day/time-block events with stable event IDs that budgets, bookings, menus, vendors, logistics, and tasks can keep using.
 - Updated `/api/wedding/events` and `/api/wedding/events/[id]` so individual events can store and return `time_block` plus a sanitized `requirement_payload`, giving the frontend a safe backend path for Layer 2 customization without another route rewrite.
 - Added structured Layer 2 requirement persistence through migration `20260604000200_add_event_requirements.sql`. Each event block can now own `wedding_event_requirements` rows with category, title, status, priority, linked vendor/service, sanitized JSON payload, notes, and sort order. `/api/wedding/events/[id]/requirements` supports client-owned GET and id-preserving PUT sync, and `/api/wedding` now hydrates requirements alongside menus, logistics, tasks, bookings, and vendor selections.
-- Added vendor catalogue media: new `vendor_service_items.image_urls text[]` and `reference_url text` columns (migration `20260601000100_add_vendor_service_item_media.sql`), with the vendor offering normalizer enforcing http/https-only URLs, a six-image cap, and per-URL length caps. Vendor editor now supports both Supabase Storage uploads and pasted public URLs per catalogue row, plus remove controls. Client vendor previews and the Event Editor's `ServiceOfferingPreview` render thumbnails + optional moodboard links with graceful text-only fallback.
+- Added vendor catalogue media through `vendor_service_items.image_urls text[]`
+  and `reference_url text` (migration
+  `20260601000100_add_vendor_service_item_media.sql`), with a six-image cap,
+  per-URL length caps, Supabase Storage uploads, remove controls, client/Event
+  Editor thumbnails, optional reference links, and text-only fallbacks. The
+  current working-tree section records the later HTTPS/trusted-host hardening.
 - Retained the `messages` realtime publication migration for future JWT-bridged sessions, but removed unsafe direct-browser subscriptions after the public schema lockdown. Client, vendor, and manager inboxes currently use visibility-aware eight-second refreshes through `/api/messages`, preserving server-side role projection and privacy checks until Clerk-to-Supabase JWT bridging is introduced.
 - Added real vendor profile-view tracking through the existing `vendor_profile_views` table. Vendor detail API records non-owner profile views, `/api/dashboard/vendor` and `/api/vendor/analytics` surface monthly view counts, and analytics no longer hard-code profile views to `0`.
 - Closed dashboard dead-route gaps with real pages for `/vendor/portfolio`, `/vendor/reviews`, `/vendor/inquiries`, `/vendor/calendar`, and `/manager/weddings`.

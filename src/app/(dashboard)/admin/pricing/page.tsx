@@ -9,6 +9,7 @@ import {
   type CanvasDay,
   type FlowStatus,
 } from "@/components/dashboard/event-flow";
+import type { EventReadinessGap } from "@/lib/event-readiness";
 import { cn, formatCurrency } from "@/lib/utils";
 
 // ─── API shapes ─────────────────────────────────────────────────────────────
@@ -34,6 +35,7 @@ type AdminEvent = {
   startTime: string | null;
   endTime: string | null;
   readiness: number;
+  readinessGaps: EventReadinessGap[];
   bookings: Booking[];
 };
 type AdminDay = { id: string; name: string; date: string | null; events: AdminEvent[] };
@@ -129,7 +131,10 @@ export default function AdminPricingPage() {
               : priced < ev.bookings.length
                 ? `${ev.bookings.length - priced} to price`
                 : `${lakh(fee)} fee`,
-          meta: `${ev.bookings.length} picks`,
+          meta:
+            ev.readiness < 100 && ev.readinessGaps[0]
+              ? `${ev.bookings.length} picks · ${ev.readinessGaps[0].label} open`
+              : `${ev.bookings.length} picks`,
           status: pricingHealth(ev.bookings.length, priced),
           readiness:
             ev.bookings.length > 0 ? Math.round((priced / ev.bookings.length) * 100) : 0,

@@ -32,6 +32,12 @@ export type AuthSession = {
   role: UserRole;
 };
 
+export type AuthSessionState =
+  | { state: "authenticated"; session: AuthSession }
+  | { state: "unauthenticated" }
+  | { state: "inactive" }
+  | { state: "unavailable" };
+
 type StoredUserAuthorization = {
   role: UserRole | null;
   isActive: boolean;
@@ -67,31 +73,39 @@ async function resolveRole(
 }
 
 export async function getOptionalAuthSession(): Promise<AuthSession | null> {
+  const result = await getAuthSessionState();
+  return result.state === "authenticated" ? result.session : null;
+}
+
+export async function getAuthSessionState(): Promise<AuthSessionState> {
   const testSession = await getTestAuthSession();
   if (testSession) {
-    return testSession;
+    return { state: "authenticated", session: testSession };
   }
 
   const { userId, sessionClaims } = await auth();
   if (!userId) {
-    return null;
+    return { state: "unauthenticated" };
   }
 
   const storedUser = await fetchUserAuthorization(userId);
   if (storedUser.state === "error") {
-    return null;
+    return { state: "unavailable" };
   }
   if (storedUser.state === "found" && !storedUser.isActive) {
-    return null;
+    return { state: "inactive" };
   }
 
   return {
-    userId,
-    role: await resolveRole(
+    state: "authenticated",
+    session: {
       userId,
-      sessionClaims as Record<string, unknown> | undefined,
-      storedUser.state === "found" ? storedUser.role : null
-    ),
+      role: await resolveRole(
+        userId,
+        sessionClaims as Record<string, unknown> | undefined,
+        storedUser.state === "found" ? storedUser.role : null
+      ),
+    },
   };
 }
 
@@ -144,16 +158,25 @@ async function resolveTestAuthUserId(role: UserRole): Promise<string> {
 }
 
 /**
- * Get an active authenticated Clerk session or return a 401 response.
+ * Get an active authenticated Clerk session or a precise auth failure response.
  * Role: Supabase `users.role` → JWT claims → Clerk publicMetadata.
  */
 export async function getAuthSession(): Promise<AuthSession | NextResponse> {
-  const session = await getOptionalAuthSession();
-  if (!session) {
+  const result = await getAuthSessionState();
+  if (result.state === "unauthenticated") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (result.state === "inactive") {
+    return NextResponse.json({ error: "Account is inactive" }, { status: 403 });
+  }
+  if (result.state === "unavailable") {
+    return NextResponse.json(
+      { error: "Authorization service is temporarily unavailable" },
+      { status: 503 }
+    );
+  }
 
-  return session;
+  return result.session;
 }
 
 async function fetchUserAuthorization(

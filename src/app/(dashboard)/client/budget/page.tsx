@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { AnimatedCounter } from "@/components/shared/animated-counter";
 import { SpendIntelligence } from "@/components/dashboard/budget/spend-intelligence";
+import type { EventReadinessGap } from "@/lib/event-readiness";
 import { cn, formatCurrency } from "@/lib/utils";
 
 const dashLabel = "font-accent text-[10px] uppercase tracking-[0.2em] text-slate";
@@ -26,6 +27,7 @@ type EventPlanEvent = {
   startTime: string | null;
   estimatedSpend: number;
   readinessPercent: number;
+  readinessGaps: EventReadinessGap[];
 };
 type EventPlanDay = {
   id: string;
@@ -65,6 +67,7 @@ type FnRow = {
   state: FnState;
   display: number;
   readinessPercent: number;
+  readinessGaps: EventReadinessGap[];
 };
 type DaySection = {
   id: string;
@@ -169,6 +172,7 @@ export default function CostEstimationPage() {
             state,
             display,
             readinessPercent: ev.readinessPercent,
+            readinessGaps: ev.readinessGaps ?? [],
           };
         });
         return {
@@ -475,9 +479,23 @@ function FunctionRow({ fn, open, onToggle }: { fn: FnRow; open: boolean; onToggl
                   Elysian has locked your final price. Finish this function to 100% to reveal it.
                 </div>
               ) : fn.state === "planning" ? (
-                <div className="flex items-center gap-2 border border-charcoal/12 bg-cream/35 px-3 py-2 text-xs text-charcoal">
-                  <Lock className="h-4 w-4 text-slate" />
-                  Finish this function to 100% to unlock its estimate. It is currently {fn.readinessPercent}% ready.
+                <div className="border border-charcoal/12 bg-cream/35 px-3 py-2 text-xs text-charcoal">
+                  <div className="flex items-center gap-2">
+                    <Lock className="h-4 w-4 text-slate" />
+                    <span>
+                      Finish this function to unlock its estimate. It is currently {fn.readinessPercent}% ready.
+                    </span>
+                  </div>
+                  {fn.readinessGaps.length > 0 ? (
+                    <ul className="mt-2 grid gap-1 border-t border-charcoal/10 pt-2 sm:grid-cols-2">
+                      {fn.readinessGaps.map((gap) => (
+                        <li key={gap.key} className="text-slate">
+                          <span className="text-charcoal">{gap.label}:</span>{" "}
+                          {gap.detail}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                 </div>
               ) : (
                 <p className="text-xs leading-relaxed text-slate">

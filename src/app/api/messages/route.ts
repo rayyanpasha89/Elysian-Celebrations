@@ -6,6 +6,7 @@ import {
   apiError,
   apiSuccess,
 } from "@/lib/api-utils";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 function relTime(iso: string): string {
   const d = new Date(iso);
@@ -589,6 +590,13 @@ export async function POST(request: Request) {
   if (session instanceof NextResponse) return session;
   const roleCheck = requireRole(session, "client", "vendor");
   if (roleCheck) return roleCheck;
+  const limited = await enforceRateLimit(request, {
+    scope: "message-send",
+    limit: 30,
+    windowSeconds: 60,
+    identity: session.userId,
+  });
+  if (limited) return limited;
 
   try {
     const body = (await request.json()) as {

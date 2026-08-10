@@ -11,7 +11,7 @@ export type Database = {
   public: {
     Tables: {
       "admin_audit_log": {
-        Row: 
+        Row:
         {
           "id": string
           "actor_user_id": string | null
@@ -22,7 +22,7 @@ export type Database = {
           "meta": Json | null
           "created_at": string
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "actor_user_id"?: string | null
@@ -33,7 +33,7 @@ export type Database = {
           "meta"?: Json | null
           "created_at"?: string
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "actor_user_id"?: string | null
@@ -47,8 +47,33 @@ export type Database = {
         Relationships: [
         ]
       }
+      "api_rate_limits": {
+        Row:
+        {
+          "key_hash": string
+          "bucket_started_at": string
+          "request_count": number
+          "updated_at": string
+        }
+        Insert:
+        {
+          "key_hash": string
+          "bucket_started_at": string
+          "request_count"?: number
+          "updated_at"?: string
+        }
+        Update:
+        {
+          "key_hash"?: string
+          "bucket_started_at"?: string
+          "request_count"?: number
+          "updated_at"?: string
+        }
+        Relationships: [
+        ]
+      }
       "blog_posts": {
-        Row: 
+        Row:
         {
           "id": string
           "title": string
@@ -63,7 +88,7 @@ export type Database = {
           "created_at": string
           "updated_at": string
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "title": string
@@ -78,7 +103,7 @@ export type Database = {
           "created_at"?: string
           "updated_at"?: string
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "title"?: string
@@ -97,7 +122,7 @@ export type Database = {
         ]
       }
       "bookings": {
-        Row: 
+        Row:
         {
           "id": string
           "client_profile_id": string
@@ -117,7 +142,7 @@ export type Database = {
           "vendor_amount": number | null
           "service_fee": number | null
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "client_profile_id": string
@@ -137,7 +162,7 @@ export type Database = {
           "vendor_amount"?: number | null
           "service_fee"?: never
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "client_profile_id"?: string
@@ -189,7 +214,7 @@ export type Database = {
         ]
       }
       "budget_categories": {
-        Row: 
+        Row:
         {
           "id": string
           "budget_id": string
@@ -197,7 +222,7 @@ export type Database = {
           "allocated": number
           "sort_order": number
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "budget_id": string
@@ -205,7 +230,7 @@ export type Database = {
           "allocated"?: number
           "sort_order"?: number
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "budget_id"?: string
@@ -224,7 +249,7 @@ export type Database = {
         ]
       }
       "budget_items": {
-        Row: 
+        Row:
         {
           "id": string
           "budget_category_id": string
@@ -237,7 +262,7 @@ export type Database = {
           "sort_order": number
           "wedding_event_id": string | null
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "budget_category_id": string
@@ -250,7 +275,7 @@ export type Database = {
           "sort_order"?: number
           "wedding_event_id"?: string | null
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "budget_category_id"?: string
@@ -281,7 +306,7 @@ export type Database = {
         ]
       }
       "budgets": {
-        Row: 
+        Row:
         {
           "id": string
           "client_profile_id": string
@@ -290,7 +315,7 @@ export type Database = {
           "created_at": string
           "updated_at": string
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "client_profile_id": string
@@ -299,7 +324,7 @@ export type Database = {
           "created_at"?: string
           "updated_at"?: string
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "client_profile_id"?: string
@@ -319,7 +344,7 @@ export type Database = {
         ]
       }
       "client_profiles": {
-        Row: 
+        Row:
         {
           "id": string
           "user_id": string
@@ -331,7 +356,7 @@ export type Database = {
           "created_at": string
           "updated_at": string
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "user_id": string
@@ -343,7 +368,7 @@ export type Database = {
           "created_at"?: string
           "updated_at"?: string
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "user_id"?: string
@@ -366,7 +391,7 @@ export type Database = {
         ]
       }
       "contact_inquiries": {
-        Row: 
+        Row:
         {
           "id": string
           "client_profile_id": string | null
@@ -380,7 +405,7 @@ export type Database = {
           "status": Database["public"]["Enums"]["inquiry_status"]
           "created_at": string
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "client_profile_id"?: string | null
@@ -394,7 +419,7 @@ export type Database = {
           "status"?: Database["public"]["Enums"]["inquiry_status"]
           "created_at"?: string
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "client_profile_id"?: string | null
@@ -419,7 +444,7 @@ export type Database = {
         ]
       }
       "destinations": {
-        Row: 
+        Row:
         {
           "id": string
           "name": string
@@ -436,7 +461,7 @@ export type Database = {
           "created_at": string
           "updated_at": string
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "name": string
@@ -453,7 +478,7 @@ export type Database = {
           "created_at"?: string
           "updated_at"?: string
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "name"?: string
@@ -474,7 +499,7 @@ export type Database = {
         ]
       }
       "guest_lists": {
-        Row: 
+        Row:
         {
           "id": string
           "client_profile_id": string
@@ -482,7 +507,7 @@ export type Database = {
           "created_at": string
           "updated_at": string
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "client_profile_id": string
@@ -490,7 +515,7 @@ export type Database = {
           "created_at"?: string
           "updated_at"?: string
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "client_profile_id"?: string
@@ -509,7 +534,7 @@ export type Database = {
         ]
       }
       "guests": {
-        Row: 
+        Row:
         {
           "id": string
           "guest_list_id": string
@@ -523,7 +548,7 @@ export type Database = {
           "table_number": number | null
           "notes": string | null
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "guest_list_id": string
@@ -537,7 +562,7 @@ export type Database = {
           "table_number"?: number | null
           "notes"?: string | null
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "guest_list_id"?: string
@@ -562,7 +587,7 @@ export type Database = {
         ]
       }
       "message_thread_reads": {
-        Row: 
+        Row:
         {
           "id": string
           "booking_id": string
@@ -571,7 +596,7 @@ export type Database = {
           "created_at": string
           "updated_at": string
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "booking_id": string
@@ -580,7 +605,7 @@ export type Database = {
           "created_at"?: string
           "updated_at"?: string
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "booking_id"?: string
@@ -607,7 +632,7 @@ export type Database = {
         ]
       }
       "messages": {
-        Row: 
+        Row:
         {
           "id": string
           "sender_id": string
@@ -616,7 +641,7 @@ export type Database = {
           "is_read": boolean
           "created_at": string
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "sender_id": string
@@ -625,7 +650,7 @@ export type Database = {
           "is_read"?: boolean
           "created_at"?: string
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "sender_id"?: string
@@ -652,37 +677,37 @@ export type Database = {
         ]
       }
       "mood_board_items": {
-        Row: 
+        Row:
         {
           "id": string
           "mood_board_id": string
-          "category": string
           "image_url": string
           "caption": string | null
           "source_url": string | null
           "sort_order": number
+          "category": string
           "created_at": string
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "mood_board_id": string
-          "category"?: string
           "image_url": string
           "caption"?: string | null
           "source_url"?: string | null
           "sort_order"?: number
+          "category"?: string
           "created_at"?: string
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "mood_board_id"?: string
-          "category"?: string
           "image_url"?: string
           "caption"?: string | null
           "source_url"?: string | null
           "sort_order"?: number
+          "category"?: string
           "created_at"?: string
         }
         Relationships: [
@@ -696,7 +721,7 @@ export type Database = {
         ]
       }
       "mood_boards": {
-        Row: 
+        Row:
         {
           "id": string
           "client_profile_id": string
@@ -704,7 +729,7 @@ export type Database = {
           "created_at": string
           "updated_at": string
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "client_profile_id": string
@@ -712,7 +737,7 @@ export type Database = {
           "created_at"?: string
           "updated_at"?: string
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "client_profile_id"?: string
@@ -731,7 +756,7 @@ export type Database = {
         ]
       }
       "negotiation_entries": {
-        Row: 
+        Row:
         {
           "id": string
           "booking_id": string
@@ -741,7 +766,7 @@ export type Database = {
           "created_by": string | null
           "created_at": string
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "booking_id": string
@@ -751,7 +776,7 @@ export type Database = {
           "created_by"?: string | null
           "created_at"?: string
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "booking_id"?: string
@@ -772,7 +797,7 @@ export type Database = {
         ]
       }
       "notifications": {
-        Row: 
+        Row:
         {
           "id": string
           "user_id": string
@@ -783,7 +808,7 @@ export type Database = {
           "is_read": boolean
           "created_at": string
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "user_id": string
@@ -794,7 +819,7 @@ export type Database = {
           "is_read"?: boolean
           "created_at"?: string
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "user_id"?: string
@@ -816,7 +841,7 @@ export type Database = {
         ]
       }
       "package_tiers": {
-        Row: 
+        Row:
         {
           "id": string
           "name": string
@@ -828,7 +853,7 @@ export type Database = {
           "sort_order": number
           "is_active": boolean
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "name": string
@@ -840,7 +865,7 @@ export type Database = {
           "sort_order"?: number
           "is_active"?: boolean
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "name"?: string
@@ -856,7 +881,7 @@ export type Database = {
         ]
       }
       "payments": {
-        Row: 
+        Row:
         {
           "id": string
           "kind": string
@@ -873,7 +898,7 @@ export type Database = {
           "sort_order": number
           "created_at": string
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "kind": string
@@ -890,7 +915,7 @@ export type Database = {
           "sort_order"?: number
           "created_at"?: string
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "kind"?: string
@@ -939,7 +964,7 @@ export type Database = {
         ]
       }
       "reviews": {
-        Row: 
+        Row:
         {
           "id": string
           "client_profile_id": string
@@ -950,7 +975,7 @@ export type Database = {
           "is_published": boolean
           "created_at": string
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "client_profile_id": string
@@ -961,7 +986,7 @@ export type Database = {
           "is_published"?: boolean
           "created_at"?: string
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "client_profile_id"?: string
@@ -990,21 +1015,21 @@ export type Database = {
         ]
       }
       "saved_vendors": {
-        Row: 
+        Row:
         {
           "id": string
           "client_profile_id": string
           "vendor_profile_id": string
           "created_at": string
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "client_profile_id": string
           "vendor_profile_id": string
           "created_at"?: string
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "client_profile_id"?: string
@@ -1029,7 +1054,7 @@ export type Database = {
         ]
       }
       "testimonials": {
-        Row: 
+        Row:
         {
           "id": string
           "couple_name": string
@@ -1039,7 +1064,7 @@ export type Database = {
           "is_published": boolean
           "sort_order": number
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "couple_name": string
@@ -1049,7 +1074,7 @@ export type Database = {
           "is_published"?: boolean
           "sort_order"?: number
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "couple_name"?: string
@@ -1063,7 +1088,7 @@ export type Database = {
         ]
       }
       "timeline_items": {
-        Row: 
+        Row:
         {
           "id": string
           "wedding_id": string
@@ -1074,7 +1099,7 @@ export type Database = {
           "sort_order": number
           "created_at": string
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "wedding_id": string
@@ -1085,7 +1110,7 @@ export type Database = {
           "sort_order"?: number
           "created_at"?: string
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "wedding_id"?: string
@@ -1107,7 +1132,7 @@ export type Database = {
         ]
       }
       "users": {
-        Row: 
+        Row:
         {
           "id": string
           "email": string
@@ -1119,7 +1144,7 @@ export type Database = {
           "created_at": string
           "updated_at": string
         }
-        Insert: 
+        Insert:
         {
           "id": string
           "email": string
@@ -1131,7 +1156,7 @@ export type Database = {
           "created_at"?: string
           "updated_at"?: string
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "email"?: string
@@ -1147,7 +1172,7 @@ export type Database = {
         ]
       }
       "vendor_categories": {
-        Row: 
+        Row:
         {
           "id": string
           "name": string
@@ -1155,7 +1180,7 @@ export type Database = {
           "description": string | null
           "sort_order": number
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "name": string
@@ -1163,7 +1188,7 @@ export type Database = {
           "description"?: string | null
           "sort_order"?: number
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "name"?: string
@@ -1175,17 +1200,17 @@ export type Database = {
         ]
       }
       "vendor_destinations": {
-        Row: 
+        Row:
         {
           "vendor_profile_id": string
           "destination_id": string
         }
-        Insert: 
+        Insert:
         {
           "vendor_profile_id": string
           "destination_id": string
         }
-        Update: 
+        Update:
         {
           "vendor_profile_id"?: string
           "destination_id"?: string
@@ -1207,22 +1232,57 @@ export type Database = {
           },
         ]
       }
+      "vendor_media_quota_reservations": {
+        Row:
+        {
+          "reservation_id": string
+          "vendor_profile_id": string
+          "reserved_bytes": number
+          "expires_at": string
+          "created_at": string
+        }
+        Insert:
+        {
+          "reservation_id": string
+          "vendor_profile_id": string
+          "reserved_bytes": number
+          "expires_at": string
+          "created_at"?: string
+        }
+        Update:
+        {
+          "reservation_id"?: string
+          "vendor_profile_id"?: string
+          "reserved_bytes"?: number
+          "expires_at"?: string
+          "created_at"?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_media_quota_reservations_vendor_profile_id_fkey"
+            columns: ["vendor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       "vendor_profile_views": {
-        Row: 
+        Row:
         {
           "id": string
           "vendor_profile_id": string
           "viewer_user_id": string | null
           "created_at": string
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "vendor_profile_id": string
           "viewer_user_id"?: string | null
           "created_at"?: string
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "vendor_profile_id"?: string
@@ -1247,7 +1307,7 @@ export type Database = {
         ]
       }
       "vendor_profiles": {
-        Row: 
+        Row:
         {
           "id": string
           "user_id": string | null
@@ -1269,7 +1329,7 @@ export type Database = {
           "created_at": string
           "updated_at": string
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "user_id"?: string | null
@@ -1291,7 +1351,7 @@ export type Database = {
           "created_at"?: string
           "updated_at"?: string
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "user_id"?: string | null
@@ -1331,7 +1391,7 @@ export type Database = {
         ]
       }
       "vendor_service_items": {
-        Row: 
+        Row:
         {
           "id": string
           "vendor_service_id": string
@@ -1344,7 +1404,7 @@ export type Database = {
           "image_urls": string[]
           "reference_url": string | null
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "vendor_service_id": string
@@ -1357,7 +1417,7 @@ export type Database = {
           "image_urls"?: string[]
           "reference_url"?: string | null
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "vendor_service_id"?: string
@@ -1381,7 +1441,7 @@ export type Database = {
         ]
       }
       "vendor_services": {
-        Row: 
+        Row:
         {
           "id": string
           "vendor_profile_id": string
@@ -1397,7 +1457,7 @@ export type Database = {
           "deliverables": string[]
           "add_ons": string[]
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "vendor_profile_id": string
@@ -1413,7 +1473,7 @@ export type Database = {
           "deliverables"?: string[]
           "add_ons"?: string[]
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "vendor_profile_id"?: string
@@ -1440,7 +1500,7 @@ export type Database = {
         ]
       }
       "venues": {
-        Row: 
+        Row:
         {
           "id": string
           "destination_id": string
@@ -1455,7 +1515,7 @@ export type Database = {
           "amenities": string[] | null
           "is_active": boolean
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "destination_id": string
@@ -1470,7 +1530,7 @@ export type Database = {
           "amenities"?: string[] | null
           "is_active"?: boolean
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "destination_id"?: string
@@ -1496,7 +1556,7 @@ export type Database = {
         ]
       }
       "wedding_days": {
-        Row: 
+        Row:
         {
           "id": string
           "wedding_id": string
@@ -1506,7 +1566,7 @@ export type Database = {
           "sort_order": number
           "created_at": string
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "wedding_id": string
@@ -1516,7 +1576,7 @@ export type Database = {
           "sort_order"?: number
           "created_at"?: string
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "wedding_id"?: string
@@ -1537,7 +1597,7 @@ export type Database = {
         ]
       }
       "wedding_event_logistics": {
-        Row: 
+        Row:
         {
           "id": string
           "wedding_event_id": string
@@ -1551,7 +1611,7 @@ export type Database = {
           "created_at": string
           "updated_at": string
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "wedding_event_id": string
@@ -1565,7 +1625,7 @@ export type Database = {
           "created_at"?: string
           "updated_at"?: string
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "wedding_event_id"?: string
@@ -1590,7 +1650,7 @@ export type Database = {
         ]
       }
       "wedding_event_menu_items": {
-        Row: 
+        Row:
         {
           "id": string
           "menu_id": string
@@ -1601,7 +1661,7 @@ export type Database = {
           "sort_order": number
           "created_at": string
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "menu_id": string
@@ -1612,7 +1672,7 @@ export type Database = {
           "sort_order"?: number
           "created_at"?: string
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "menu_id"?: string
@@ -1634,7 +1694,7 @@ export type Database = {
         ]
       }
       "wedding_event_menus": {
-        Row: 
+        Row:
         {
           "id": string
           "wedding_event_id": string
@@ -1646,7 +1706,7 @@ export type Database = {
           "created_at": string
           "updated_at": string
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "wedding_event_id": string
@@ -1658,7 +1718,7 @@ export type Database = {
           "created_at"?: string
           "updated_at"?: string
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "wedding_event_id"?: string
@@ -1681,7 +1741,7 @@ export type Database = {
         ]
       }
       "wedding_event_requirements": {
-        Row: 
+        Row:
         {
           "id": string
           "wedding_event_id": string
@@ -1697,7 +1757,7 @@ export type Database = {
           "created_at": string
           "updated_at": string
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "wedding_event_id": string
@@ -1713,7 +1773,7 @@ export type Database = {
           "created_at"?: string
           "updated_at"?: string
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "wedding_event_id"?: string
@@ -1754,7 +1814,7 @@ export type Database = {
         ]
       }
       "wedding_event_tasks": {
-        Row: 
+        Row:
         {
           "id": string
           "wedding_event_id": string
@@ -1765,7 +1825,7 @@ export type Database = {
           "sort_order": number
           "created_at": string
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "wedding_event_id": string
@@ -1776,7 +1836,7 @@ export type Database = {
           "sort_order"?: number
           "created_at"?: string
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "wedding_event_id"?: string
@@ -1798,7 +1858,7 @@ export type Database = {
         ]
       }
       "wedding_events": {
-        Row: 
+        Row:
         {
           "id": string
           "wedding_id": string
@@ -1823,7 +1883,7 @@ export type Database = {
           "time_block": string | null
           "requirement_payload": Json
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "wedding_id": string
@@ -1848,7 +1908,7 @@ export type Database = {
           "time_block"?: string | null
           "requirement_payload"?: Json
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "wedding_id"?: string
@@ -1891,7 +1951,7 @@ export type Database = {
         ]
       }
       "weddings": {
-        Row: 
+        Row:
         {
           "id": string
           "client_profile_id": string
@@ -1907,7 +1967,7 @@ export type Database = {
           "event_platform_version": number
           "definition_payload": Json
         }
-        Insert: 
+        Insert:
         {
           "id"?: string
           "client_profile_id": string
@@ -1923,7 +1983,7 @@ export type Database = {
           "event_platform_version"?: number
           "definition_payload"?: Json
         }
-        Update: 
+        Update:
         {
           "id"?: string
           "client_profile_id"?: string
@@ -1965,7 +2025,41 @@ export type Database = {
       }
     }
     Views: { [_ in never]: never }
-    Functions: { [_ in never]: never }
+    Functions: {
+      "consume_api_rate_limit": {
+        Args: {
+          "p_key_hash": string
+          "p_limit": number
+          "p_window_seconds": number
+        }
+        Returns: {
+          "allowed": boolean
+          "remaining": number
+          "reset_at": string
+        }[]
+      }
+      "release_vendor_media_bytes": {
+        Args: {
+          "p_vendor_profile_id": string
+          "p_reservation_id": string
+        }
+        Returns: undefined
+      }
+      "reserve_vendor_media_bytes": {
+        Args: {
+          "p_vendor_profile_id": string
+          "p_reservation_id": string
+          "p_bytes": number
+          "p_quota_bytes": number
+        }
+        Returns: {
+          "allowed": boolean
+          "used_bytes": number
+          "reserved_bytes": number
+          "remaining_bytes": number
+        }[]
+      }
+    }
     Enums: {
       "booking_status": "INQUIRY" | "QUOTE_SENT" | "CONFIRMED" | "DEPOSIT_PAID" | "COMPLETED" | "CANCELLED"
       "guest_side": "BRIDE" | "GROOM" | "COUPLE" | "MUTUAL"

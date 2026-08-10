@@ -1,10 +1,6 @@
-"use client";
-
-import { useUser } from "@clerk/nextjs";
-import { Sidebar, MobileSidebar, type NavGroup } from "@/components/dashboard/sidebar";
-import { Topbar } from "@/components/dashboard/topbar";
-import { PortalRoleGuard } from "@/components/dashboard/portal-role-guard";
-import { dashboardRoleLabel } from "@/lib/role-utils";
+import type { NavGroup } from "@/components/dashboard/sidebar";
+import { PortalShell } from "@/components/dashboard/portal-shell";
+import { requirePortalPageRole } from "@/lib/portal-auth";
 
 const navGroups: NavGroup[] = [
   {
@@ -39,33 +35,22 @@ const navGroups: NavGroup[] = [
   },
 ];
 
-export default function ClientLayout({
+export default async function ClientLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { user } = useUser();
+  const session = await requirePortalPageRole("/client", "client");
 
   return (
-    <>
-      <PortalRoleGuard />
-      <Sidebar
-        groups={navGroups}
-        portalName="Client Portal"
-        portalHref="/client"
-      />
-      <MobileSidebar
-        groups={navGroups}
-        portalName="Client Portal"
-        portalHref="/client"
-      />
-      <div className="lg:pl-64">
-        <Topbar
-          userName={user?.fullName ?? "Client"}
-          userRole={dashboardRoleLabel(user?.publicMetadata?.role, "Client")}
-        />
-        <main className="px-6 py-8 lg:px-8">{children}</main>
-      </div>
-    </>
+    <PortalShell
+      groups={navGroups}
+      portalName="Client Portal"
+      portalHref="/client"
+      fallbackName="Client"
+      role={session.role}
+    >
+      {children}
+    </PortalShell>
   );
 }

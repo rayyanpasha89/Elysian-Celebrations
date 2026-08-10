@@ -51,6 +51,13 @@ export async function GET(request: NextRequest) {
     const listId = searchParams.get("listId");
     const sideParam = searchParams.get("side");
     const rsvpParam = searchParams.get("rsvp");
+    const pageParam = Number(searchParams.get("page") ?? "1");
+    const limitParam = Number(searchParams.get("limit") ?? "100");
+    const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1;
+    const limit =
+      Number.isInteger(limitParam) && limitParam > 0
+        ? Math.min(limitParam, 200)
+        : 100;
     const side = sideParam ? parseGuestSide(sideParam) : null;
     const rsvp = rsvpParam ? parseRsvpStatus(rsvpParam) : null;
 
@@ -114,12 +121,16 @@ export async function GET(request: NextRequest) {
     }
 
     // admin
-    let query = supabase.from("guests").select("*").order("name");
+    let query = supabase
+      .from("guests")
+      .select("*", { count: "exact" })
+      .order("name")
+      .range((page - 1) * limit, page * limit - 1);
     if (listId) query = query.eq("guest_list_id", listId);
     if (side) query = query.eq("side", side);
     if (rsvp) query = query.eq("rsvp_status", rsvp);
 
-    const { data: guests, error } = await query;
+    const { data: guests, error, count } = await query;
     if (error) {
       console.error("Guests list error:", error);
       return apiError("Failed to fetch guests", 500);
@@ -132,7 +143,16 @@ export async function GET(request: NextRequest) {
       pending: list.filter((g) => g.rsvp_status === "PENDING").length,
       declined: list.filter((g) => g.rsvp_status === "DECLINED").length,
     };
-    return apiSuccess({ guests: list, counts });
+    return apiSuccess({
+      guests: list,
+      counts,
+      pagination: {
+        page,
+        limit,
+        total: count ?? 0,
+        pages: Math.ceil((count ?? 0) / limit),
+      },
+    });
   } catch (error) {
     console.error("Guests list error:", error);
     return apiError("Internal server error", 500);

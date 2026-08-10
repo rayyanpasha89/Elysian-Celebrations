@@ -11,53 +11,65 @@ Companion to `docs/security-audit-2026-08-02.md` — **no security findings are 
 
 ## Remediation status
 
-The audit below is preserved as the original point-in-time evidence. The
-2026-08-02 remediation wave has since closed the release-critical findings:
+### 2026-08-10 reconciliation
 
-- Client/admin/dashboard fetch failures no longer render authoritative zero or
-  empty states; primary surfaces now expose retryable errors and preserve data.
-- Event-plan creation is fatal on dependent insert failure and performs a
-  compensating cleanup, while editor saves always refetch authoritative server
-  state and create replacement vendor selections before deleting drafts.
-- Readiness and price visibility now come from one server-side contract. The
-  client planner no longer keeps a divergent readiness calculation.
-- Vendor discovery reads real day/function requirement rows instead of a
-  wedding-only lane constant, and finalization gaps carry exact event targets.
-- Supabase `Database` types are generated from the linked schema and wired into
-  server/browser clients. Query-path indexes, identity-history constraints, and
-  payment-direction validation have been preflighted against production data.
-- Every dynamic API insert/update payload now uses the generated table or enum
-  contract. The type workflow prefers the pinned official Supabase CLI when a
-  management token is present and has a read-only catalogue fallback for local
-  environments without Docker.
-- Clerk deletion now soft-deactivates identities before restricted foreign keys
-  are applied; account updates cannot reactivate an admin-suspended identity.
-- Duplicate active booking selection is prevented by a partial unique index.
-  Existing duplicate budget/guest containers were not destructively merged.
-- Core dashboard accessibility gaps are closed: form labels, touch/keyboard
-  seating assignment, dialog focus management, mobile-sidebar semantics,
-  canvas focus restoration/live announcements, keyboard-visible destructive
-  controls, steppers, charts, contrast, and topbar menu naming/escape behavior.
-- Marketing/runtime performance work moved global progress out of dashboards,
-  dynamically loads below-fold sections, removes unused font weights, idles the
-  custom cursor, shortens the splash, and avoids state updates on pointer move.
-- The dead drag-budget UI/store, unused UI-kit primitives, GSAP, CVA, dnd-kit,
-  and Zustand were removed. Live charts now share the approved earth palette.
-- Venue pickers load/search the catalogue and only reveal custom entry when a
-  search is not covered. Special requests explicitly disclose manual pricing.
-- The live mood-board schema drift was closed with a migration that restores
-  item category and creation metadata; all six existing items passed a
-  rollback-only backfill preflight.
+The detailed findings below are preserved as point-in-time evidence from
+2026-08-02. This dated reconciliation supersedes the earlier broad completion
+summary; it does not rewrite the original audit or imply that every dashboard
+page has since been reviewed.
 
-The following are intentionally **not marked complete** because they require a
-separate data/product migration rather than a safe tactical patch: a true SQL
-transaction/RPC for the full event save, normalized `venue_id` on functions,
-separate client-receipt and vendor-payout ledgers, cleanup/ownership policy for
-legacy duplicate budget and guest containers, scoped message pagination, and a
-server-component decomposition of the 6k-line planner. These are the next
-architecture wave, not hidden release claims.
+Verified in the current working tree:
 
-**Independently re-verified after synthesis** (all held): `PUT /api/budget` has zero callers; `client/vendors/page.tsx` has zero `/api/wedding` references; onboarding returns 201 after swallowed insert errors; `users.id` cascade reaches `bookings`/`messages` contrary to the webhook's own comment; `gsap`, `@gsap/react`, and `class-variance-authority` have zero imports repo-wide.
+- Event-plan creation now treats dependent insert failures as fatal and attempts
+  compensating cleanup. Editor saves refetch authoritative server state, and
+  replacement vendor selections are created before obsolete drafts are removed.
+- One canonical `evaluateEventReadiness()` contract now supplies readiness
+  percentage, ready state, and exact gaps to the planner and the wedding, budget,
+  booking, and admin-pricing APIs. The former client/server readiness divergence
+  described in S4 is no longer the active implementation.
+- Client vendor discovery derives lanes from real day/function requirements, and
+  finalization gaps retain event targets instead of collapsing to aggregate-only
+  counts.
+- Generated Supabase `Database` types are wired into the browser, server, and
+  admin clients. The catalogue fallback now renders RPC signatures and avoids
+  concurrent queries on a single `pg` client. Remote migration history is
+  verified through `20260810201500`, including exact per-upload quota tokens.
+- The unreachable legacy `PUT /api/budget` writer and its blueprint helper have
+  been removed. `/api/budget` is now a read path for plan-derived spend
+  intelligence, so S2's dead writer and double-writer risk are closed in source.
+- Retryable, non-empty failure states now cover the specifically remediated
+  pages: manager clients, vendors, destinations, and bookings; vendor bookings;
+  and client messages. No claim is made here about unreviewed dashboard pages.
+- Venue selection remains catalogue-first with a custom fallback, and custom
+  requirements disclose that pricing requires manual confirmation.
+- The prior accessibility and interaction fixes remain present across the
+  planner, seating, dialogs, navigation, charts, timeline, and mood-board
+  surfaces that were explicitly changed. This is not a blanket WCAG audit of
+  every portal page.
+- The drag-budget editor/store and its unused dependencies remain removed, and
+  active charts use the approved earth palette.
+
+Security-related remediation, including server-rendered portal role guards,
+Supabase role authority, CSP/security headers, API abuse controls, media URL
+validation, and messaging transport, is tracked in the companion security audit.
+The database-backed rate-limit/media-quota migration, deterministic trigger
+search-path follow-up, and tokenized reservation follow-up are remotely applied
+and pass the rollback-only abuse test. Media requests are capped at 4 MB so the
+application rejects them before Vercel's 4.5 MB function-body limit.
+
+Still open or only partially addressed:
+
+- The full event create/save path still lacks a single SQL transaction/RPC.
+- `wedding_events.venue_id`, separate client-receipt and vendor-payout ledgers,
+  singleton ownership/uniqueness for budgets and guest lists, scoped message
+  pagination, and decomposition of the large client planner remain architecture
+  work.
+- Marketing code-splitting, font payload, contrast, and rendering-performance
+  outcomes must be measured independently. Earlier claims that all below-fold
+  sections were dynamically deferred, that removing weight declarations reduced
+  font bytes, or that contrast was broadly closed were too strong.
+- Dashboard resilience coverage is incremental; the six pages listed above are
+  not evidence that all portal fetch paths have honest failure states.
 
 ---
 

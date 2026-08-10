@@ -22,7 +22,12 @@ function normalizeImageUrl(value: unknown): string | null {
 
   try {
     const url = new URL(value);
-    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;
+    if (url.protocol !== "https:") return null;
+    const isSeedImage = url.hostname === "images.unsplash.com";
+    const isVendorMedia =
+      url.hostname.endsWith(".supabase.co") &&
+      url.pathname.startsWith("/storage/v1/object/public/vendor-media/");
+    return isSeedImage || isVendorMedia ? url.toString() : null;
   } catch {
     return null;
   }

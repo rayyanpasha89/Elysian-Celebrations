@@ -7,8 +7,9 @@ import {
   requireRole,
 } from "@/lib/api-utils";
 import { uploadVendorProfileImage } from "@/lib/supabase/storage";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
-const MAX_REQUEST_BYTES = 9 * 1024 * 1024;
+const MAX_REQUEST_BYTES = 4_400_000;
 
 /** Uploads one vendor-owned cover or portfolio image. */
 export async function POST(request: NextRequest) {
@@ -16,6 +17,13 @@ export async function POST(request: NextRequest) {
   if (session instanceof NextResponse) return session;
   const roleCheck = requireRole(session, "vendor");
   if (roleCheck) return roleCheck;
+  const limited = await enforceRateLimit(request, {
+    scope: "vendor-media-upload",
+    limit: 12,
+    windowSeconds: 10 * 60,
+    identity: session.userId,
+  });
+  if (limited) return limited;
 
   const contentLength = request.headers.get("content-length");
   if (contentLength && Number(contentLength) > MAX_REQUEST_BYTES) {
@@ -47,7 +55,8 @@ export async function POST(request: NextRequest) {
       const status =
         result.error.code === "invalid-type"
           ? 415
-          : result.error.code === "too-large"
+          : result.error.code === "too-large" ||
+              result.error.code === "quota-exceeded"
             ? 413
             : result.error.code === "no-file"
               ? 400

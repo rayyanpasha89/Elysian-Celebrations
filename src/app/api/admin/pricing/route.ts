@@ -9,7 +9,7 @@ import {
 import { recordAudit } from "@/lib/admin-audit";
 import {
   EVENT_READINESS_SELECT,
-  eventReadinessPercent,
+  evaluateEventReadiness,
   type EventReadinessRow,
 } from "@/lib/event-readiness";
 import type { Database } from "@/types/database.types";
@@ -159,6 +159,7 @@ export async function GET() {
       let pricedCount = 0;
       let eventCount = 0;
       let eventsReady = 0;
+      let readinessTotal = 0;
 
       const dayList = wedding ? (daysByWedding.get(wedding.id) ?? []) : [];
       const days = dayList.map((d) => {
@@ -195,9 +196,10 @@ export async function GET() {
               updatedAt: b.updated_at,
             };
           });
-          const readiness = eventReadinessPercent(e);
+          const readiness = evaluateEventReadiness(e);
           eventCount += 1;
-          if (readiness >= 100) eventsReady += 1;
+          readinessTotal += readiness.percent;
+          if (readiness.ready) eventsReady += 1;
           return {
             id: e.id,
             name: e.name,
@@ -206,7 +208,8 @@ export async function GET() {
             guestCount: e.guest_count,
             startTime: e.start_time,
             endTime: e.end_time,
-            readiness,
+            readiness: readiness.percent,
+            readinessGaps: readiness.gaps,
             bookings: mappedBookings,
           };
         });
@@ -226,7 +229,7 @@ export async function GET() {
           pricedCount,
         },
         readiness: {
-          percent: eventCount > 0 ? Math.round((eventsReady / eventCount) * 100) : 0,
+          percent: eventCount > 0 ? Math.round(readinessTotal / eventCount) : 0,
           eventCount,
           eventsReady,
         },

@@ -1106,7 +1106,7 @@ function ItemMediaEditor({
             ) : null}
           </p>
           <p className="mt-1 text-[10px] text-slate/60">
-            JPEG · PNG · WebP, up to 8 MB each
+            JPEG · PNG · WebP, up to 4 MB each
           </p>
           <input
             ref={fileInputRef}

@@ -32,6 +32,25 @@ type ForeignKeyRow = {
   is_one_to_one: boolean;
 };
 
+type RoutineParameterRow = {
+  specific_name: string;
+  routine_name: string;
+  return_data_type: string;
+  return_udt_name: string;
+  parameter_name: string | null;
+  parameter_mode: "IN" | "OUT" | "INOUT" | null;
+  data_type: string | null;
+  udt_name: string | null;
+  ordinal_position: number | null;
+};
+
+type RoutineDefinition = {
+  name: string;
+  returnDataType: string;
+  returnUdtName: string;
+  parameters: RoutineParameterRow[];
+};
+
 function requiredEnv(name: string) {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`Missing required environment variable: ${name}`);
@@ -111,6 +130,18 @@ function columnType(column: ColumnRow, enumNames: Set<string>) {
   return scalarType(column.udt_name, enumNames);
 }
 
+function routineValueType(
+  dataType: string | null,
+  udtName: string | null,
+  enumNames: Set<string>,
+) {
+  if (!udtName) return "unknown";
+  if (dataType === "ARRAY" || udtName.startsWith("_")) {
+    return `${scalarType(udtName.replace(/^_/, ""), enumNames)}[]`;
+  }
+  return scalarType(udtName, enumNames);
+}
+
 function renderShape(
   columns: ColumnRow[],
   enumNames: Set<string>,
@@ -163,8 +194,10 @@ async function generateFromCatalog() {
 
   await client.connect();
   try {
-    const [columnResult, enumResult, foreignKeyResult] = await Promise.all([
-      client.query<ColumnRow>(`
+    // A pg Client executes one query at a time. Keep these sequential so type
+    // generation remains compatible with pg@9 instead of relying on its old
+    // implicit query queue.
+    const columnResult = await client.query<ColumnRow>(`
         select c.table_name, t.table_type, c.column_name, c.is_nullable,
           c.data_type, c.udt_name, c.column_default, c.is_identity,
           c.is_generated
@@ -174,16 +207,16 @@ async function generateFromCatalog() {
         where c.table_schema = 'public'
           and t.table_type in ('BASE TABLE', 'VIEW')
         order by c.table_name, c.ordinal_position
-      `),
-      client.query<EnumRow>(`
+      `);
+    const enumResult = await client.query<EnumRow>(`
         select typ.typname as enum_name, en.enumlabel as enum_value
         from pg_type typ
         join pg_enum en on en.enumtypid = typ.oid
         join pg_namespace ns on ns.oid = typ.typnamespace
         where ns.nspname = 'public'
         order by typ.typname, en.enumsortorder
-      `),
-      client.query<ForeignKeyRow>(`
+      `);
+    const foreignKeyResult = await client.query<ForeignKeyRow>(`
         select tc.constraint_name, tc.table_name, kcu.column_name,
           ccu.table_name as foreign_table_name,
           ccu.column_name as foreign_column_name,
@@ -210,8 +243,22 @@ async function generateFromCatalog() {
         where tc.constraint_schema = 'public'
           and tc.constraint_type = 'FOREIGN KEY'
         order by tc.table_name, tc.constraint_name, kcu.ordinal_position
-      `),
-    ]);
+      `);
+    const routineResult = await client.query<RoutineParameterRow>(`
+        select r.specific_name, r.routine_name,
+          r.data_type as return_data_type,
+          r.type_udt_name as return_udt_name,
+          p.parameter_name, p.parameter_mode, p.data_type, p.udt_name,
+          p.ordinal_position
+        from information_schema.routines r
+        left join information_schema.parameters p
+          on p.specific_schema = r.specific_schema
+          and p.specific_name = r.specific_name
+        where r.specific_schema = 'public'
+          and r.routine_type = 'FUNCTION'
+          and r.data_type <> 'trigger'
+        order by r.routine_name, r.specific_name, p.ordinal_position
+      `);
 
     const enums = new Map<string, string[]>();
     for (const row of enumResult.rows) {
@@ -235,6 +282,28 @@ async function generateFromCatalog() {
       const rows = relationships.get(relationship.table_name) ?? [];
       rows.push(relationship);
       relationships.set(relationship.table_name, rows);
+    }
+
+    const routinesBySpecificName = new Map<string, RoutineDefinition>();
+    for (const row of routineResult.rows) {
+      const routine = routinesBySpecificName.get(row.specific_name) ?? {
+        name: row.routine_name,
+        returnDataType: row.return_data_type,
+        returnUdtName: row.return_udt_name,
+        parameters: [],
+      };
+      if (row.parameter_name) routine.parameters.push(row);
+      routinesBySpecificName.set(row.specific_name, routine);
+    }
+
+    const routines = new Map<string, RoutineDefinition>();
+    for (const routine of routinesBySpecificName.values()) {
+      if (routines.has(routine.name)) {
+        throw new Error(
+          `Catalog fallback cannot safely render overloaded function ${routine.name}; use the official Supabase CLI generator`,
+        );
+      }
+      routines.set(routine.name, routine);
     }
 
     const output = [
@@ -285,7 +354,50 @@ async function generateFromCatalog() {
       }
       output.push("    }");
     }
-    output.push("    Functions: { [_ in never]: never }", "    Enums: {");
+    if (routines.size === 0) {
+      output.push("    Functions: { [_ in never]: never }");
+    } else {
+      output.push("    Functions: {");
+      for (const routine of routines.values()) {
+        const inputs = routine.parameters.filter(
+          (parameter) =>
+            parameter.parameter_mode === "IN" ||
+            parameter.parameter_mode === "INOUT",
+        );
+        const outputs = routine.parameters.filter(
+          (parameter) =>
+            parameter.parameter_mode === "OUT" ||
+            parameter.parameter_mode === "INOUT",
+        );
+
+        output.push(`      ${propertyName(routine.name)}: {`, "        Args: {");
+        for (const parameter of inputs) {
+          output.push(
+            `          ${propertyName(parameter.parameter_name!)}: ${routineValueType(parameter.data_type, parameter.udt_name, enumNames)}`,
+          );
+        }
+        output.push("        }");
+
+        if (outputs.length > 0) {
+          output.push("        Returns: {");
+          for (const parameter of outputs) {
+            output.push(
+              `          ${propertyName(parameter.parameter_name!)}: ${routineValueType(parameter.data_type, parameter.udt_name, enumNames)}`,
+            );
+          }
+          output.push("        }[]");
+        } else if (routine.returnDataType === "void") {
+          output.push("        Returns: undefined");
+        } else {
+          output.push(
+            `        Returns: ${routineValueType(routine.returnDataType, routine.returnUdtName, enumNames)}`,
+          );
+        }
+        output.push("      }");
+      }
+      output.push("    }");
+    }
+    output.push("    Enums: {");
     for (const [enumName, values] of enums) {
       output.push(
         `      ${propertyName(enumName)}: ${values.map(propertyName).join(" | ")}`,
@@ -301,7 +413,7 @@ async function generateFromCatalog() {
 
     writeTypes(output.join("\n"));
     console.log(
-      `Generated ${outputPath} from PostgreSQL catalog (${tables.size} tables, ${enums.size} enums)`,
+      `Generated ${outputPath} from PostgreSQL catalog (${tables.size} tables, ${routines.size} functions, ${enums.size} enums)`,
     );
   } finally {
     await client.end();

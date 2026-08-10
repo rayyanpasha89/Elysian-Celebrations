@@ -3,9 +3,7 @@ import type { NextFetchEvent, NextRequest } from "next/server";
 import {
   portalPathForRole,
   portalMismatchRedirectPath,
-  roleFromSessionClaims,
 } from "@/lib/role-utils";
-import type { UserRole } from "@/lib/auth-types";
 import {
   isTestAuthEnabled,
   TEST_AUTH_COOKIE,
@@ -43,7 +41,7 @@ async function clerkHandler(req: NextRequest, event: NextFetchEvent) {
       return;
     }
     if (isProtectedRoute(request)) {
-      const { userId, sessionClaims } = await auth();
+      const { userId } = await auth();
       if (!userId) {
         const signInUrl = new URL("/login", request.url);
         signInUrl.searchParams.set(
@@ -51,18 +49,6 @@ async function clerkHandler(req: NextRequest, event: NextFetchEvent) {
           `${request.nextUrl.pathname}${request.nextUrl.search}`
         );
         return NextResponse.redirect(signInUrl);
-      }
-      const role = roleFromSessionClaims(
-        sessionClaims as Record<string, unknown> | undefined
-      );
-      if (role) {
-        const nextPath = portalMismatchRedirectPath(
-          request.nextUrl.pathname,
-          role as UserRole
-        );
-        if (nextPath) {
-          return NextResponse.redirect(new URL(nextPath, request.url));
-        }
       }
     }
   })(req, event);
@@ -135,6 +121,7 @@ export default async function proxy(
 export const config = {
   matcher: [
     "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    "/(client|vendor|admin|manager)(.*)",
     "/(api|trpc)(.*)",
   ],
 };

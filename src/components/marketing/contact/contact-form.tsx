@@ -11,18 +11,21 @@ import { destinations } from "@/data/destinations";
 import { cn } from "@/lib/utils";
 
 const contactSchema = z.object({
-  name: z.string().min(2, "Please enter your name"),
-  email: z.string().email("Enter a valid email"),
-  phone: z.string().min(10, "Enter a valid phone number"),
+  name: z.string().min(2, "Please enter your name").max(120),
+  email: z.string().email("Enter a valid email").max(254),
+  phone: z.string().min(10, "Enter a valid phone number").max(40),
   weddingDate: z.string().min(1, "Choose a date"),
   guestCount: z
     .string()
     .min(1, "Enter guest count")
     .refine((s) => /^\d+$/.test(s), "Numbers only")
     .transform((s) => parseInt(s, 10))
-    .pipe(z.number().min(1, "At least 1 guest")),
-  destination: z.string().min(1, "Select a destination"),
-  message: z.string().min(10, "Tell us more (at least 10 characters)"),
+    .pipe(z.number().min(1, "At least 1 guest").max(100_000)),
+  destination: z.string().min(1, "Select a destination").max(120),
+  message: z
+    .string()
+    .min(10, "Tell us more (at least 10 characters)")
+    .max(4_000, "Please keep the brief under 4,000 characters"),
 });
 
 type FormInput = z.input<typeof contactSchema>;
@@ -191,6 +194,7 @@ export function ContactForm() {
             id="contact-name"
             type="text"
             autoComplete="name"
+            maxLength={120}
             placeholder=" "
             className={cn(fieldClass)}
             {...register("name")}
@@ -210,6 +214,7 @@ export function ContactForm() {
             id="contact-email"
             type="email"
             autoComplete="email"
+            maxLength={254}
             placeholder=" "
             className={cn(fieldClass)}
             {...register("email")}
@@ -231,6 +236,7 @@ export function ContactForm() {
             id="contact-phone"
             type="tel"
             autoComplete="tel"
+            maxLength={40}
             placeholder=" "
             className={cn(fieldClass)}
             {...register("phone")}
@@ -277,6 +283,7 @@ export function ContactForm() {
             id="contact-guest-count"
             type="text"
             inputMode="numeric"
+            maxLength={6}
             placeholder=" "
             className={cn(fieldClass)}
             {...register("guestCount")}
@@ -336,6 +343,7 @@ export function ContactForm() {
         <textarea
           id="contact-message"
           rows={4}
+          maxLength={4_000}
           placeholder=" "
           className={cn(fieldClass, "min-h-[140px] resize-y pt-7")}
           {...register("message")}

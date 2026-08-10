@@ -89,17 +89,15 @@ export async function PATCH(
       return apiError("Booking not found", 404);
     }
 
-    const isOwner =
-      relationUserId(booking.client) === session.userId ||
-      relationUserId(booking.vendor) === session.userId ||
-      session.role === "admin" ||
-      session.role === "manager";
+    const isClientOwner = relationUserId(booking.client) === session.userId;
+    const isVendorOwner = relationUserId(booking.vendor) === session.userId;
+    const isOperationsRole = session.role === "admin" || session.role === "manager";
+    const isOwner = isClientOwner || isVendorOwner || isOperationsRole;
 
     if (!isOwner) {
       return apiError("Not authorized to update this booking", 403);
     }
 
-    const isOperationsRole = session.role === "admin" || session.role === "manager";
     if (body.totalAmount !== undefined) {
       return apiError(
         "Pricing is recorded by Elysian operations after offline confirmation",
@@ -135,6 +133,9 @@ export async function PATCH(
       allowedFields.paid_amount = paidAmount;
     }
     if (body.notes !== undefined) {
+      if (!isClientOwner && !isOperationsRole) {
+        return apiError("Only the client or operations team can update the inquiry brief", 403);
+      }
       allowedFields.notes =
         typeof body.notes === "string" && body.notes.trim()
           ? body.notes.trim().slice(0, 1200)

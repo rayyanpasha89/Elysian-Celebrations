@@ -460,6 +460,12 @@ npm run seed
 
 Migrations live in `supabase/migrations/`. Schema reference lives in `supabase/schema.sql`. Seed data lives in `supabase/seed.sql` and `scripts/supabase-seed.ts`.
 
+Remote migration history was verified on 2026-08-10 through
+`20260810201500_tokenize_vendor_media_reservations.sql`. This includes the
+database-backed API limits introduced by
+`20260810181932_add_api_rate_limits.sql`, the locked trigger search path, and
+exact per-upload media reservation tokens that cannot collide during cleanup.
+
 If remote data was manually changed, do not blindly push baseline migrations. Inspect migration state first.
 
 ## Design System Memory
@@ -513,7 +519,7 @@ Planner input direction: chips, pickers, swatches, steppers, dropdowns. Avoid ra
 
 ## Current Implementation State
 
-As of this memory update:
+As of the 2026-08-10 memory update:
 
 - `main` is the deployment branch and pushes to it trigger the linked Vercel production project.
 - Recent local verification for the app has used `npm run lint`, `npx tsc --noEmit --pretty false`, and `npm run build`.
@@ -533,8 +539,44 @@ As of this memory update:
 - The client budget page is read-only spend intelligence tied to event-plan and
   vendor selections. It supports function, day, category, vendor, pricing-state,
   and paid/due views. The old drag-budget UI/store is removed.
-- Vendor catalogue media support exists through Supabase Storage helper and `vendor_service_items.image_urls`.
+- The unreachable legacy `PUT /api/budget` writer and its blueprint helper are
+  removed. `/api/budget` now exposes only the live plan-derived read model.
+- Vendor catalogue media support exists through the Supabase Storage helper and
+  `vendor_service_items.image_urls`. Accepted image URLs are HTTPS-only and
+  restricted to Unsplash or the public Supabase `vendor-media` path; reference
+  links are HTTPS-only.
 - Commercial pricing is admin-owned: `/admin/pricing` records the agreed vendor payout and flat Elysian fee, derives the client final, and controls publication. Client APIs gate published finals behind 100% function readiness and never serialize vendor payout or fee data.
+- `src/lib/event-readiness.ts` is the canonical readiness contract. Planner
+  hydration, budget, bookings, wedding APIs, and admin pricing consume the same
+  percentage/ready/gap result; focused readiness tests cover the formerly
+  divergent food and logistics cases.
+- Client, vendor, manager, and admin layouts enforce role access before rendering
+  through server-only `requirePortalPageRole()`. Supabase `users.role` and
+  `users.is_active` are authoritative; Clerk claims are only an unsynced-user
+  fallback, and identity-update webhooks do not restore stale role metadata.
+- CSP and security headers are configured application-wide, including frame
+  denial, nosniff, referrer/permissions policy, COOP, and production HSTS.
+- Database-backed fixed-window limits and an atomic 100 MB per-vendor media quota
+  are implemented and their migrations are applied remotely. Media requests are
+  capped at 4 MB for Vercel's function-body limit, and each in-flight upload owns
+  an exact reservation token. The live rollback verification covers rate
+  boundaries, grants, RLS isolation, expiration cleanup, and token-safe release.
+- Portal auth distinguishes signed-out, inactive, and temporarily unavailable
+  identity states. Signed-out users go to Clerk, inactive users receive the
+  branded 403 surface, and a database outage is retryable rather than being
+  misreported as a logout.
+- The Clerk webhook is replay-safe for existing users: `user.created` and
+  `user.updated` can refresh identity fields but cannot reactivate an account or
+  overwrite the Supabase-owned role.
+- The admin pricing summary averages the same canonical per-function readiness
+  percentages used by clients while retaining a separate ready-event count.
+- Manager clients, vendors, destinations, and bookings; vendor bookings; and
+  client messages have explicit retryable load failures instead of presenting an
+  outage as an empty dataset. This is selected-page coverage, not a claim that
+  every dashboard fetch path has been audited.
+- Messaging intentionally uses visibility-aware eight-second refreshes through
+  the role-checked `/api/messages` boundary. Direct Supabase Realtime remains
+  deferred until Clerk-to-Supabase JWT bridging is available.
 - Supabase browser/server factories use generated `Database` types, and dynamic
   API write payloads are compile-checked against table insert/update contracts.
   `npm run db:types` prefers the pinned official CLI when a management token is
@@ -580,6 +622,8 @@ Standard checks:
 ```bash
 npm run lint
 npx tsc --noEmit --pretty false
+npm run test:readiness
+npm run test:abuse-controls
 npm run build
 ```
 
@@ -618,7 +662,9 @@ Deployment:
 - Client-side code can only use public/publishable keys.
 - Server-only routes can use Supabase secret/service role keys.
 - Treat uploaded media URLs as public unless the storage bucket is changed to private.
-- Validate user-provided URLs. Existing vendor offering normalizer only accepts http/https URLs and caps counts/lengths.
+- Validate user-provided URLs. Vendor catalogue images must be HTTPS and use an
+  approved image host (Unsplash or the public Supabase `vendor-media` path);
+  reference links must be HTTPS. Keep count and length caps in place.
 - Be careful with destructive data cleanup. Ask before deleting remote Supabase data.
 - Do not use `git reset --hard`, `git checkout --`, force-push, or destructive SQL unless explicitly asked and confirmed.
 

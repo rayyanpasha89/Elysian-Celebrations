@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { fadeUp, staggerContainer } from "@/animations/variants";
+import { DashboardLoadError } from "@/components/dashboard/dashboard-load-error";
 import { ListEmptyState } from "@/components/dashboard/list-empty-state";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { dashLabel } from "@/lib/dashboard-styles";
@@ -21,24 +22,29 @@ type ClientRow = {
 export default function ManagerClientsPage() {
   const [loading, setLoading] = useState(true);
   const [clients, setClients] = useState<ClientRow[]>([]);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [q, setQ] = useState("");
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
+        setLoading(true);
+        setLoadError(false);
         const res = await fetch("/api/admin/clients");
         const json = await res.json();
         if (!res.ok) throw new Error(json.error);
-        if (!cancelled) setClients(json.clients ?? []);
+        if (!Array.isArray(json.clients)) throw new Error("Invalid client response");
+        if (!cancelled) setClients(json.clients);
       } catch {
-        if (!cancelled) setClients([]);
+        if (!cancelled) setLoadError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [reloadKey]);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -60,6 +66,19 @@ export default function ManagerClientsPage() {
         <div className="h-10 w-48 bg-charcoal/10" />
         <div className="h-64 border border-charcoal/8 bg-charcoal/5" />
       </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <DashboardLoadError
+        eyebrow="Directory"
+        pageTitle="Clients"
+        label="Client directory unavailable"
+        title="We could not load the client directory"
+        description="Client records and totals have not been replaced with an empty list. Retry when the connection is ready."
+        onRetry={() => setReloadKey((key) => key + 1)}
+      />
     );
   }
 

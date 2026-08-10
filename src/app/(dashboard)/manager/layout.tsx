@@ -1,10 +1,6 @@
-"use client";
-
-import { useUser } from "@clerk/nextjs";
-import { Sidebar, MobileSidebar, type NavGroup } from "@/components/dashboard/sidebar";
-import { PortalRoleGuard } from "@/components/dashboard/portal-role-guard";
-import { Topbar } from "@/components/dashboard/topbar";
-import { dashboardRoleLabel } from "@/lib/role-utils";
+import type { NavGroup } from "@/components/dashboard/sidebar";
+import { PortalShell } from "@/components/dashboard/portal-shell";
+import { requirePortalPageRole } from "@/lib/portal-auth";
 
 const navGroups: NavGroup[] = [
   {
@@ -38,33 +34,22 @@ const navGroups: NavGroup[] = [
   },
 ];
 
-export default function ManagerLayout({
+export default async function ManagerLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { user } = useUser();
+  const session = await requirePortalPageRole("/manager", "manager", "admin");
 
   return (
-    <>
-      <PortalRoleGuard />
-      <Sidebar
-        groups={navGroups}
-        portalName="Manager Portal"
-        portalHref="/manager"
-      />
-      <MobileSidebar
-        groups={navGroups}
-        portalName="Manager Portal"
-        portalHref="/manager"
-      />
-      <div className="lg:pl-64">
-        <Topbar
-          userName={user?.fullName ?? "Manager"}
-          userRole={dashboardRoleLabel(user?.publicMetadata?.role, "Manager")}
-        />
-        <main className="px-6 py-8 lg:px-8">{children}</main>
-      </div>
-    </>
+    <PortalShell
+      groups={navGroups}
+      portalName="Manager Portal"
+      portalHref="/manager"
+      fallbackName="Manager"
+      role={session.role}
+    >
+      {children}
+    </PortalShell>
   );
 }

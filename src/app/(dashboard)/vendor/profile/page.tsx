@@ -321,7 +321,7 @@ export default function VendorProfilePage() {
             />
             <p className={cn(dashLabel, "mt-4")}>Studio cover</p>
             <p className="mt-2 font-heading text-xs leading-relaxed text-slate">
-              JPEG, PNG, or WebP up to 8 MB. Save your profile once before uploading.
+              JPEG, PNG, or WebP up to 4 MB. Save your profile once before uploading.
             </p>
           </div>
 

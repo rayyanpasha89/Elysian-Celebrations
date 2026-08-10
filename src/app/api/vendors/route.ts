@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { apiError, apiSuccess } from "@/lib/api-utils";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 /** PostgREST `ilike` wildcards — strip so user input cannot broaden the match. */
 function sanitizeSearchQuery(raw: string): string {
@@ -8,6 +9,13 @@ function sanitizeSearchQuery(raw: string): string {
 }
 
 export async function GET(request: NextRequest) {
+  const limited = await enforceRateLimit(request, {
+    scope: "vendor-catalogue-read",
+    limit: 120,
+    windowSeconds: 60,
+  });
+  if (limited) return limited;
+
   try {
     const supabase = createAdminSupabaseClient();
     const { searchParams } = request.nextUrl;

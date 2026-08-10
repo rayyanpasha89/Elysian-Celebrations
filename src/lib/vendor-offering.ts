@@ -19,14 +19,25 @@ export type VendorServiceItemInput = {
 const MAX_IMAGES_PER_ITEM = 6;
 const URL_MAX_LENGTH = 1024;
 
-function isSafeUrl(raw: string): boolean {
+function isSafeHttpsUrl(raw: string): boolean {
   if (raw.length > URL_MAX_LENGTH) return false;
   try {
     const url = new URL(raw);
-    return url.protocol === "https:" || url.protocol === "http:";
+    return url.protocol === "https:";
   } catch {
     return false;
   }
+}
+
+function isAllowedImageUrl(raw: string): boolean {
+  if (!isSafeHttpsUrl(raw)) return false;
+  const url = new URL(raw);
+  if (url.hostname === "images.unsplash.com") return true;
+
+  return (
+    url.hostname.endsWith(".supabase.co") &&
+    url.pathname.startsWith("/storage/v1/object/public/vendor-media/")
+  );
 }
 
 function toUrlArray(raw: unknown, max = MAX_IMAGES_PER_ITEM): string[] {
@@ -36,7 +47,7 @@ function toUrlArray(raw: unknown, max = MAX_IMAGES_PER_ITEM): string[] {
   for (const entry of raw) {
     if (typeof entry !== "string") continue;
     const trimmed = entry.trim();
-    if (!trimmed || !isSafeUrl(trimmed)) continue;
+    if (!trimmed || !isAllowedImageUrl(trimmed)) continue;
     if (seen.has(trimmed)) continue;
     seen.add(trimmed);
     out.push(trimmed);
@@ -114,7 +125,9 @@ export function normalizeServiceItems(raw: unknown): VendorServiceItemInput[] {
     const referenceUrlRaw =
       typeof entry.referenceUrl === "string" ? entry.referenceUrl.trim() : "";
     const referenceUrl =
-      referenceUrlRaw && isSafeUrl(referenceUrlRaw) ? referenceUrlRaw : null;
+      referenceUrlRaw && isSafeHttpsUrl(referenceUrlRaw)
+        ? referenceUrlRaw
+        : null;
     const sortOrderRaw = Number(entry.sortOrder);
     const sortOrder = Number.isFinite(sortOrderRaw)
       ? Math.max(0, Math.min(9999, Math.floor(sortOrderRaw)))

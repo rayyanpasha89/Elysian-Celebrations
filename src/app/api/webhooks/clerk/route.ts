@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     emailAddresses[0]?.email_address ??
     null;
 
-  const role = normalizeRole(userData.public_metadata?.role) ?? "client";
+  const requestedRole = normalizeRole(userData.public_metadata?.role) ?? "client";
   const displayName =
     [userData.first_name, userData.last_name].filter(Boolean).join(" ").trim() ||
     primaryEmail?.split("@")[0] ||
@@ -105,26 +105,105 @@ export async function POST(request: NextRequest) {
         return new Response("Primary email is required", { status: 400 });
       }
 
-      // Upsert user record
-      const userRecord: UserInsert = {
-        id: userData.id,
+      const identityRecord = {
         email: primaryEmail,
         name: displayName,
-        role: DATABASE_ROLE_BY_APP_ROLE[role],
         avatar: userData.image_url ?? null,
-        ...(event.type === "user.created" ? { is_active: true } : {}),
-      };
-      const { error: userErr } = await supabase
-        .from("users")
-        .upsert(userRecord, { onConflict: "id" });
+      } satisfies UserUpdate;
+      let databaseRole: DatabaseUserRole;
 
-      if (userErr) {
-        console.error("User upsert error:", userErr);
-        return new Response("User upsert failed", { status: 500 });
+      if (event.type === "user.created") {
+        const { data: existingUser, error: existingUserError } = await supabase
+          .from("users")
+          .select("role")
+          .eq("id", userData.id)
+          .maybeSingle();
+        if (existingUserError) {
+          console.error("User replay lookup error:", existingUserError);
+          return new Response("User create failed", { status: 500 });
+        }
+
+        if (existingUser) {
+          // Clerk retries delivery. A replay must never restore an older role or
+          // reactivate an account that operations has since suspended.
+          const { data: replayedUser, error: replayError } = await supabase
+            .from("users")
+            .update(identityRecord)
+            .eq("id", userData.id)
+            .select("role")
+            .single();
+          if (replayError) {
+            console.error("User create replay error:", replayError);
+            return new Response("User create failed", { status: 500 });
+          }
+          databaseRole = replayedUser.role;
+        } else {
+          const userRecord: UserInsert = {
+            id: userData.id,
+            ...identityRecord,
+            role: DATABASE_ROLE_BY_APP_ROLE[requestedRole],
+            is_active: true,
+          };
+          const { data: createdUser, error: userErr } = await supabase
+            .from("users")
+            .insert(userRecord)
+            .select("role")
+            .single();
+          if (userErr) {
+            console.error("User create error:", userErr);
+            return new Response("User create failed", { status: 500 });
+          }
+          databaseRole = createdUser.role;
+        }
+      } else {
+        // Supabase is the authorization source of truth. Clerk identity events
+        // may update names, emails, and avatars, but never restore a stale role.
+        const { data: updatedUser, error: updateErr } = await supabase
+          .from("users")
+          .update(identityRecord)
+          .eq("id", userData.id)
+          .select("role")
+          .maybeSingle();
+        if (updateErr) {
+          console.error("User identity update error:", updateErr);
+          return new Response("User update failed", { status: 500 });
+        }
+
+        if (updatedUser) {
+          databaseRole = updatedUser.role;
+        } else {
+          const recoveryRecord: UserInsert = {
+            id: userData.id,
+            ...identityRecord,
+            role: DATABASE_ROLE_BY_APP_ROLE[requestedRole],
+          };
+          const { data: recoveredUser, error: recoveryErr } = await supabase
+            .from("users")
+            .insert(recoveryRecord)
+            .select("role")
+            .single();
+          if (recoveryErr) {
+            console.error("User recovery error:", recoveryErr);
+            return new Response("User recovery failed", { status: 500 });
+          }
+          databaseRole = recoveredUser.role;
+        }
       }
 
-      // Auto-create profile if it doesn't exist
-      if (role === "client") {
+      const effectiveRole =
+        databaseRole === "VENDOR"
+          ? "vendor"
+          : databaseRole === "ADMIN"
+            ? "admin"
+            : databaseRole === "MANAGER"
+              ? "manager"
+              : "client";
+
+      /*
+       * Profile creation follows the stored role, not possibly stale Clerk
+       * metadata. Historical profiles are retained if operations changes a role.
+       */
+      if (effectiveRole === "client") {
         const { data: existing, error: profileLookupError } = await supabase
           .from("client_profiles")
           .select("id")
@@ -143,7 +222,7 @@ export async function POST(request: NextRequest) {
             throw new Error(`Failed to create client profile for ${userData.id}`);
           }
         }
-      } else if (role === "vendor") {
+      } else if (effectiveRole === "vendor") {
         const { data: existing, error: profileLookupError } = await supabase
           .from("vendor_profiles")
           .select("id")

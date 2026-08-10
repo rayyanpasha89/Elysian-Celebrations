@@ -12,13 +12,74 @@ The consequence: **there is no second line of defence.** A single missing `.eq("
 
 ## Resolution snapshot
 
-This report was written while the 2026-08-02 hardening slice was still changing. Treat the original findings below as audit evidence and use this status block as the current source of truth:
+### 2026-08-10 reconciliation
 
-- **H1 resolved:** booking PATCH responses now select only safe operational fields and never return vendor payout or legacy amount data.
-- **H2 resolved:** the app now uses `next@16.2.12` with patched `postcss@8.5.25` and `sharp@0.35.3`; `npm audit --omit=dev` reports zero vulnerabilities.
-- **H4 role-authority path resolved:** Supabase role state is authoritative and Clerk metadata is synchronized afterward, so stale Clerk claims cannot preserve elevated API access. Explicit Clerk session revocation on suspension remains follow-up work.
-- **Booking race hardening shipped to Supabase:** stale pricing/status writes return conflicts, legacy amount drift is constrained away, and duplicate active event/vendor/service selections are blocked by migration `20260802000100_harden_booking_pricing_and_selection.sql`.
-- **H3 remains open:** dashboard layouts still need a server-rendered role check as defence in depth, even though API ownership checks and the patched Next runtime protect data access.
+This report was written while the 2026-08-02 hardening slice was changing. The
+findings below remain the original audit evidence; this dated block records the
+current working-tree status without claiming deployment or remote database state
+that has not been independently verified in this documentation pass.
+
+- **H1 resolved in source:** booking responses use role-safe projections, and a
+  vendor can no longer overwrite the client's inquiry notes.
+- **H2 resolved in source:** the dependency tree uses patched Next.js, PostCSS,
+  Sharp, and nanoid versions. The repository's prior verification recorded a
+  clean production dependency audit; this docs-only pass did not rerun it.
+- **H3 resolved in source:** all four portal layouts are async Server Components
+  that call `requirePortalPageRole()` before rendering their shells. Manager
+  access intentionally also permits admins. The client guard remains a secondary
+  navigation safeguard, not the authorization boundary.
+- **H4 role authority resolved in source:** Supabase `users.role` and
+  `users.is_active` are authoritative for API sessions and server-rendered portal
+  guards. Clerk `user.updated` webhooks update identity fields but cannot restore
+  stale Clerk role metadata. A replayed `user.created` event also preserves the
+  existing role and active state. Signed-out, inactive, and temporarily
+  unavailable auth states now produce redirect, 403, and retryable-error behavior
+  respectively. Explicit Clerk session revocation on suspension remains a
+  defence-in-depth and sign-out UX follow-up.
+- **M1 resolved and remotely applied:** contact,
+  messages, vendor-profile views, vendor and venue catalogue reads, and vendor
+  media uploads call a database-backed atomic rate-limit RPC. Media uploads also
+  reserve bytes atomically against a 100 MB per-vendor quota while counting
+  persisted storage objects. Each request is capped at 4 MB and owns an exact
+  reservation token, so an expired upload cannot release bytes reserved by a
+  newer upload. Remote history confirms migrations
+  `20260810181932_add_api_rate_limits.sql` and
+  `20260810201500_tokenize_vendor_media_reservations.sql`; the live rollback test
+  verifies rate boundaries, grants, RLS isolation, expiration cleanup, and
+  token-safe release behavior.
+- **M2 resolved in source:** `next.config.ts` applies CSP, `frame-ancestors
+  'none'`, `X-Frame-Options: DENY`, nosniff, referrer and permissions policies,
+  COOP, and production HSTS across application paths. The allowlist includes
+  Clerk's Cloudflare challenge and `protect.clerk.com` origins required for its
+  bot-protection flow.
+- **M3 resolved in source:** the public vendor list uses an explicit public
+  projection rather than returning Clerk owner IDs.
+- **M4 resolved by removal:** the unreachable legacy `PUT /api/budget` writer and
+  its blueprint/helper path have been deleted; only the live read endpoint
+  remains.
+- **M5 resolved for the audited fields:** guest create/update paths enforce the
+  shared type and length limits introduced by the hardening wave.
+- **L1 resolved locally:** the ignored `.env.vercel.production` export is absent
+  from the working tree. This says nothing about whether credentials ever shared
+  elsewhere require rotation.
+- **L2 resolved in source:** vendor catalogue media accepts HTTPS only; image
+  hosts are restricted to Unsplash or the public Supabase `vendor-media` path,
+  while reference links remain HTTPS-only.
+- **L3 resolved in source:** vendor owners cannot mutate client booking notes.
+- **L4 intentionally uses API polling:** `useMessageRealtime` is deliberately a
+  visibility-aware eight-second refresh through `/api/messages`. Direct Supabase
+  Realtime remains deferred until Clerk-to-Supabase JWT bridging can preserve the
+  role-checked server boundary.
+- **L5 resolved in source:** the proxy matcher includes explicit client, vendor,
+  admin, and manager prefixes in addition to the general asset-aware matcher.
+- **L6 resolved in source:** the admin guest branch is paginated and capped at
+  200 rows per page.
+
+Booking race and pricing-integrity hardening from
+`20260802000100_harden_booking_pricing_and_selection.sql` remains part of the
+known applied baseline. The security advisor reports no warning- or error-level
+findings after `20260810201500_tokenize_vendor_media_reservations.sql`; its remaining
+no-policy notices are informational for intentionally server-only tables.
 
 ---
 

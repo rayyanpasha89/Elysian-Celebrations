@@ -8,7 +8,7 @@ import {
 } from "@/lib/api-utils";
 import {
   EVENT_READINESS_SELECT,
-  eventReadinessPercent,
+  evaluateEventReadiness,
   type EventReadinessRow,
 } from "@/lib/event-readiness";
 import type { Database } from "@/types/database.types";
@@ -338,7 +338,7 @@ export async function GET(request: NextRequest) {
         } else {
           const readyEventIds = new Set(
             ((readinessRows ?? []) as unknown as EventReadinessRow[])
-              .filter((event) => eventReadinessPercent(event) >= 100)
+              .filter((event) => evaluateEventReadiness(event).ready)
               .map((event) => event.id)
           );
           const stateByEvent = new Map<

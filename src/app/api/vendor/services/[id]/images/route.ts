@@ -7,10 +7,10 @@ import {
   requireRole,
 } from "@/lib/api-utils";
 import { uploadVendorServiceImage } from "@/lib/supabase/storage";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
-// 8 MB safety cap (mirrors the helper). Keep here too so a giant body never
-// even makes it into memory if the route receives a stream above the limit.
-const MAX_REQUEST_BYTES = 9 * 1024 * 1024;
+// Keep enough multipart headroom below Vercel's 4.5 MB function request cap.
+const MAX_REQUEST_BYTES = 4_400_000;
 
 export async function POST(
   request: NextRequest,
@@ -20,6 +20,13 @@ export async function POST(
   if (session instanceof NextResponse) return session;
   const roleCheck = requireRole(session, "vendor");
   if (roleCheck) return roleCheck;
+  const limited = await enforceRateLimit(request, {
+    scope: "vendor-media-upload",
+    limit: 12,
+    windowSeconds: 10 * 60,
+    identity: session.userId,
+  });
+  if (limited) return limited;
 
   const { id: vendorServiceId } = await ctx.params;
   if (!vendorServiceId) return apiError("Invalid service id", 400);
@@ -71,7 +78,8 @@ export async function POST(
       const status =
         result.error.code === "invalid-type"
           ? 415
-          : result.error.code === "too-large"
+          : result.error.code === "too-large" ||
+              result.error.code === "quota-exceeded"
             ? 413
             : result.error.code === "no-file"
               ? 400

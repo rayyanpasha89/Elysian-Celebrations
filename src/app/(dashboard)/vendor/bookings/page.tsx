@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer, staggerItem } from "@/animations/variants";
+import { DashboardLoadError } from "@/components/dashboard/dashboard-load-error";
 import { ListEmptyState } from "@/components/dashboard/list-empty-state";
 import { dashBtn, dashCard, dashLabel, statusBadgeBase } from "@/lib/dashboard-styles";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -130,6 +131,14 @@ function itemTypeLabel(value: string) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+async function fetchBookings() {
+  const res = await fetch("/api/bookings");
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error);
+  if (!Array.isArray(json.bookings)) throw new Error("Invalid booking response");
+  return json.bookings as ApiBooking[];
+}
+
 export default function VendorBookingsPage() {
   const searchParams = useSearchParams();
   const requestedBookingId = searchParams.get("bookingId");
@@ -138,25 +147,24 @@ export default function VendorBookingsPage() {
   const [rows, setRows] = useState<ApiBooking[]>([]);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [statusSavingId, setStatusSavingId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const router = useRouter();
 
   const loadBookings = async () => {
-    const res = await fetch("/api/bookings");
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.error);
-    setRows(json.bookings ?? []);
+    setRows(await fetchBookings());
   };
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/bookings");
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error);
-        if (!cancelled) setRows(json.bookings ?? []);
+        setLoading(true);
+        setLoadError(false);
+        const bookings = await fetchBookings();
+        if (!cancelled) setRows(bookings);
       } catch {
-        if (!cancelled) setRows([]);
+        if (!cancelled) setLoadError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -164,7 +172,7 @@ export default function VendorBookingsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
 
   const list = useMemo(() => {
     return rows.map((b) => {
@@ -246,6 +254,19 @@ export default function VendorBookingsPage() {
         <div className="h-10 w-48 bg-charcoal/10" />
         <div className="h-32 border border-charcoal/8 bg-charcoal/5" />
       </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <DashboardLoadError
+        eyebrow="Pipeline"
+        pageTitle="Bookings"
+        label="Booking pipeline unavailable"
+        title="We could not load your booking pipeline"
+        description="Inquiries and confirmed bookings have not been replaced with an empty list. Retry to restore the live pipeline."
+        onRetry={() => setReloadKey((key) => key + 1)}
+      />
     );
   }
 

@@ -41,7 +41,7 @@ export function portalPathForRole(role: UserRole): string {
 export function dashboardRoleLabel(role: unknown, fallback: string): string {
   if (typeof role !== "string") return fallback;
   const r = role.toLowerCase();
-  if (r === "client") return "Couple";
+  if (r === "client") return "Client";
   if (r === "vendor") return "Vendor";
   if (r === "admin") return "Admin";
   if (r === "manager") return "Manager";

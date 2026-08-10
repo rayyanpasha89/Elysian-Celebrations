@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer } from "@/animations/variants";
+import { DashboardLoadError } from "@/components/dashboard/dashboard-load-error";
 import { MessageThread } from "@/components/dashboard/message-thread";
 import { useMessageRealtime } from "@/hooks/use-message-realtime";
 import { dashCard, dashLabel, statusBadgeBase } from "@/lib/dashboard-styles";
@@ -18,6 +19,19 @@ import {
 } from "@/lib/messages-shared";
 import { cn } from "@/lib/utils";
 
+type MessageResponse = {
+  conversations: Conversation[];
+  needsOnboarding?: boolean;
+};
+
+async function fetchConversations() {
+  const res = await fetch("/api/messages");
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error);
+  if (!Array.isArray(json.conversations)) throw new Error("Invalid message response");
+  return json as MessageResponse;
+}
+
 export default function ClientMessagesPage() {
   const searchParams = useSearchParams();
   const bookingIdParam = searchParams.get("bookingId");
@@ -28,14 +42,14 @@ export default function ClientMessagesPage() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const messagesScrollRef = useRef<HTMLDivElement | null>(null);
 
   async function refreshConversations() {
     try {
-      const res = await fetch("/api/messages");
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error);
-      const list = (json.conversations ?? []) as Conversation[];
+      const json = await fetchConversations();
+      const list = json.conversations;
       setConversations(list);
       setNeedsOnboarding(Boolean(json.needsOnboarding));
       setActive((currentActive) => {
@@ -56,10 +70,10 @@ export default function ClientMessagesPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/messages");
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error);
-        const list = (json.conversations ?? []) as Conversation[];
+        setLoading(true);
+        setLoadError(false);
+        const json = await fetchConversations();
+        const list = json.conversations;
         if (!cancelled) {
           setConversations(list);
           setNeedsOnboarding(Boolean(json.needsOnboarding));
@@ -70,10 +84,7 @@ export default function ClientMessagesPage() {
           setActive(initial);
         }
       } catch {
-        if (!cancelled) {
-          setConversations([]);
-          setActive(null);
-        }
+        if (!cancelled) setLoadError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -81,7 +92,7 @@ export default function ClientMessagesPage() {
     return () => {
       cancelled = true;
     };
-  }, [bookingIdParam]);
+  }, [bookingIdParam, reloadKey]);
 
   useEffect(() => {
     if (bookingIdParam) setActive(bookingIdParam);
@@ -89,7 +100,7 @@ export default function ClientMessagesPage() {
 
   useMessageRealtime({
     conversations,
-    enabled: !loading && conversations.length > 0,
+    enabled: !loading && !loadError && conversations.length > 0,
     onRefresh: refreshConversations,
   });
 
@@ -225,6 +236,19 @@ export default function ClientMessagesPage() {
           <div className="border border-charcoal/8 bg-charcoal/5" />
         </div>
       </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <DashboardLoadError
+        eyebrow="Inbox"
+        pageTitle="Messages"
+        label="Conversations unavailable"
+        title="We could not load your conversations"
+        description="Booking threads have not been presented as an empty inbox. Retry to reconnect to your live conversations."
+        onRetry={() => setReloadKey((key) => key + 1)}
+      />
     );
   }
 

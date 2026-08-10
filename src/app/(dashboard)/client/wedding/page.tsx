@@ -64,6 +64,10 @@ import {
   type EventRequirementCategoryKey,
   type EventTimeBlockKey,
 } from "@/lib/event-platform";
+import type {
+  EventReadinessCheckKey,
+  EventReadinessGap,
+} from "@/lib/event-readiness";
 import { cn, formatCurrency } from "@/lib/utils";
 
 type Destination = {
@@ -188,6 +192,7 @@ type WeddingEvent = {
   requirement_payload?: Record<string, unknown> | null;
   sort_order: number;
   readinessPercent: number;
+  readinessGaps: EventReadinessGap[];
   menus: EventMenu[];
   logistics: EventLogistics | null;
   tasks: EventTask[];
@@ -909,8 +914,21 @@ function findEventDay(days: WeddingDay[], eventId: string | null) {
   return null;
 }
 
-function eventReadinessPercent(event: WeddingEvent) {
-  return Math.min(100, Math.max(0, event.readinessPercent ?? 0));
+function hasReadinessGap(
+  event: WeddingEvent,
+  key: EventReadinessCheckKey
+) {
+  return event.readinessGaps.some((gap) => gap.key === key);
+}
+
+function readinessGapDetail(
+  event: WeddingEvent,
+  keys: readonly EventReadinessCheckKey[]
+) {
+  return event.readinessGaps
+    .filter((gap) => keys.includes(gap.key))
+    .map((gap) => gap.detail)
+    .join(" ");
 }
 
 function summarizeDayPlan(day: WeddingDay, venueOptions: VenueOption[]) {
@@ -926,7 +944,7 @@ function summarizeDayPlan(day: WeddingDay, venueOptions: VenueOption[]) {
     eventCount > 0
       ? Math.round(
           day.events.reduce(
-            (sum, event) => sum + eventReadinessPercent(event),
+            (sum, event) => sum + event.readinessPercent,
             0
           ) / eventCount
         )
@@ -1936,7 +1954,7 @@ export default function ClientWeddingPage() {
               .slice()
               .sort((left, right) => left.sort_order - right.sort_order)
               .map((event) => {
-                const readiness = eventReadinessPercent(event);
+                const readiness = event.readinessPercent;
                 const resolvedVenue = findVenueByValue(venueOptions, event.venue);
                 const venueLabel = resolvedVenue?.name ?? event.venue?.trim() ?? "";
                 return {
@@ -2141,11 +2159,16 @@ export default function ClientWeddingPage() {
     if (events.length === 0) return 0;
     return Math.round(
       events.reduce(
-        (sum, event) => sum + eventReadinessPercent(event),
+        (sum, event) => sum + event.readinessPercent,
         0
       ) / events.length
     );
   }, [days]);
+
+  const openReadinessGaps = useMemo(
+    () => days.flatMap((day) => day.events.flatMap((event) => event.readinessGaps)),
+    [days]
+  );
 
   const detailSpendEstimate = useMemo(() => {
     if (!selectedEvent || !detailDraft) return null;
@@ -3143,7 +3166,13 @@ export default function ClientWeddingPage() {
             {gatedSpendEstimateLabel(estimatedSpend, overallReadiness)}
           </p>
           <p className="mt-1 truncate text-[11px] text-slate">
-            {totalSelections} vendor selection{totalSelections === 1 ? "" : "s"}
+            {overallReadiness >= 100
+              ? `${totalSelections} vendor selection${totalSelections === 1 ? "" : "s"}`
+              : `${openReadinessGaps.length} open check${openReadinessGaps.length === 1 ? "" : "s"}${
+                  openReadinessGaps[0]
+                    ? ` · next: ${openReadinessGaps[0].label.toLowerCase()}`
+                    : ""
+                }`}
           </p>
         </div>
       </div>
@@ -5889,7 +5918,7 @@ function computeFinalizationChecks(
     (event) => event.requirements ?? []
   );
   const eventsMissingRequirements = allEvents.filter(
-    (event) => (event.requirements ?? []).length === 0
+    (event) => hasReadinessGap(event, "requirements")
   ).length;
   const unresolvedRequirements = allRequirements.filter(
     (requirement) =>
@@ -5904,20 +5933,19 @@ function computeFinalizationChecks(
   const missingVendors = allEvents.filter((event) =>
     Boolean(firstMissingVendorCategory(event))
   ).length;
-  const missingFoodMenus = allEvents.filter((event) => {
-    const needsFood = (event.requirements ?? []).some(
-      (requirement) => requirement.category === "food"
-    );
-    return needsFood && event.menus.length === 0;
-  }).length;
+  const missingFoodMenus = allEvents.filter((event) =>
+    hasReadinessGap(event, "food")
+  ).length;
   const missingLogistics = allEvents.filter(
-    (event) => !hasLogisticsDetails(event.logistics)
+    (event) => hasReadinessGap(event, "logistics")
   ).length;
   const spendEstimates = allEvents.map((event) =>
     estimateEventSpend(event, venueOptions)
   );
-  const missingBudget = spendEstimates.filter(
-    (estimate) => estimate.max <= 0
+  const missingBudget = allEvents.filter(
+    (event, index) =>
+      hasReadinessGap(event, "pricing") ||
+      (spendEstimates[index]?.max ?? 0) <= 0
   ).length;
   const pricingGaps = spendEstimates.reduce(
     (sum, estimate) => sum + estimate.missingCount,
@@ -5925,9 +5953,11 @@ function computeFinalizationChecks(
   );
   const totalSpendEstimate = combineSpendEstimates(spendEstimates);
   const missingGuestCount = allEvents.filter(
-    (event) => !event.guest_count || event.guest_count <= 0
+    (event) => hasReadinessGap(event, "guests")
   ).length;
-  const missingTasks = allEvents.filter((event) => event.tasks.length === 0).length;
+  const missingTasks = allEvents.filter((event) =>
+    hasReadinessGap(event, "tasks")
+  ).length;
 
   const buildTargets = (
     predicate: (event: WeddingEvent) => boolean,
@@ -5946,19 +5976,14 @@ function computeFinalizationChecks(
 
   const definitionTargets = buildTargets(
     (event) =>
-      !event.name.trim() ||
-      !event.date ||
-      !event.start_time ||
-      !event.end_time ||
-      !event.venue?.trim(),
-    (event) => {
-      const gaps = [
-        !event.date ? "date" : null,
-        !event.start_time || !event.end_time ? "time" : null,
-        !event.venue?.trim() ? "venue" : null,
-      ].filter(Boolean);
-      return `${gaps.join(", ") || "basic details"} needed`;
-    }
+      event.readinessGaps.some((gap) =>
+        (["name", "schedule", "venue"] as EventReadinessCheckKey[]).includes(
+          gap.key
+        )
+      ),
+    (event) =>
+      readinessGapDetail(event, ["name", "schedule", "venue"]) ||
+      "Review the function details."
   );
   const requirementTargets = buildTargets(
     (event) => {
@@ -5966,22 +5991,15 @@ function computeFinalizationChecks(
         (requirement) =>
           requirement.status !== "CONFIRMED" && requirement.status !== "DONE"
       );
-      const needsFood = event.requirements.some(
-        (requirement) => requirement.category === "food"
-      );
       return (
-        event.requirements.length === 0 ||
+        hasReadinessGap(event, "requirements") ||
         unresolved ||
-        (needsFood && event.menus.length === 0)
+        hasReadinessGap(event, "food")
       );
     },
     (event) => {
-      if (event.requirements.length === 0) return "requirements missing";
-      const needsFood = event.requirements.some(
-        (requirement) => requirement.category === "food"
-      );
-      if (needsFood && event.menus.length === 0) return "food plan missing";
-      return "needs unresolved";
+      const sharedDetail = readinessGapDetail(event, ["requirements", "food"]);
+      return sharedDetail || "Confirm the unresolved requirement cards.";
     }
   );
   const vendorTargets = buildTargets(
@@ -5994,12 +6012,12 @@ function computeFinalizationChecks(
   const budgetTargets = buildTargets(
     (event) => {
       const estimate = estimateEventSpend(event, venueOptions);
-      return estimate.max <= 0 || estimate.missingCount > 0;
+      return hasReadinessGap(event, "pricing") || estimate.missingCount > 0;
     },
     (event) => {
       const estimate = estimateEventSpend(event, venueOptions);
-      return estimate.max <= 0
-        ? "pricing inputs missing"
+      return hasReadinessGap(event, "pricing")
+        ? readinessGapDetail(event, ["pricing"])
         : `${estimate.missingCount} price gap(s)`;
     }
   );
@@ -6009,17 +6027,20 @@ function computeFinalizationChecks(
         (requirement) =>
           requirement.category === "hospitality" && requirement.status === "DRAFT"
       );
-      return !event.guest_count || event.guest_count <= 0 || hospitalityDraft;
+      return hasReadinessGap(event, "guests") || hospitalityDraft;
     },
     (event) =>
-      !event.guest_count || event.guest_count <= 0
-        ? "guest count needed"
+      hasReadinessGap(event, "guests")
+        ? readinessGapDetail(event, ["guests"])
         : "hospitality still in draft"
   );
   const runOfShowTargets = buildTargets(
-    (event) => event.tasks.length === 0 || !hasLogisticsDetails(event.logistics),
     (event) =>
-      event.tasks.length === 0 ? "tasks missing" : "logistics details missing"
+      hasReadinessGap(event, "tasks") ||
+      hasReadinessGap(event, "logistics"),
+    (event) =>
+      readinessGapDetail(event, ["tasks", "logistics"]) ||
+      "Review the run of show."
   );
 
   return EVENT_FINALIZATION_CHECKLIST.map((entry): CheckResult => {
@@ -6185,7 +6206,7 @@ function FinalizationLayer({
   days: WeddingDay[];
   venueOptions: VenueOption[];
   weddingDate: string | null;
-  onResolveCheck: (checkKey: string) => void;
+  onResolveCheck: (checkKey: string, eventId?: string) => void;
 }) {
   const checks = useMemo(
     () => computeFinalizationChecks(days, venueOptions, weddingDate),

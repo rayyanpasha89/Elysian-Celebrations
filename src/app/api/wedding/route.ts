@@ -20,7 +20,10 @@ import {
   apiError,
   apiSuccess,
 } from "@/lib/api-utils";
-import { eventReadinessPercent } from "@/lib/event-readiness";
+import {
+  evaluateEventReadiness,
+  type EventReadinessResult,
+} from "@/lib/event-readiness";
 
 type WeddingEventRow = {
   id: string;
@@ -460,13 +463,13 @@ export async function GET() {
       eventsByDay.set(dayId, list);
     }
 
-    const eventReadinessById = new Map<string, number>();
+    const eventReadinessById = new Map<string, EventReadinessResult>();
     const clientVisiblePricingEvents = new Set<string>();
     for (const event of (events ?? []) as WeddingEventRow[]) {
       const eventBookings = (bookingsByEvent.get(event.id) ?? []).filter(
         (booking) => booking.status !== "CANCELLED"
       );
-      const readiness = eventReadinessPercent({
+      const readiness = evaluateEventReadiness({
         ...event,
         requirements: requirementsByEvent.get(event.id) ?? [],
         menus: menusByEvent.get(event.id) ?? [],
@@ -483,7 +486,7 @@ export async function GET() {
       eventReadinessById.set(event.id, readiness);
 
       if (
-        readiness >= 100 &&
+        readiness.ready &&
         eventBookings.length > 0 &&
         eventBookings.every(
           (booking) =>
@@ -502,7 +505,8 @@ export async function GET() {
           .sort((left, right) => left.sort_order - right.sort_order)
           .map((event) => ({
             ...event,
-            readinessPercent: eventReadinessById.get(event.id) ?? 0,
+            readinessPercent: eventReadinessById.get(event.id)?.percent ?? 0,
+            readinessGaps: eventReadinessById.get(event.id)?.gaps ?? [],
             menus: (menusByEvent.get(event.id) ?? [])
               .sort((left, right) => left.sort_order - right.sort_order)
               .map((menu) => ({

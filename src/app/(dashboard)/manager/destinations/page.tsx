@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { fadeUp, staggerContainer, staggerItem } from "@/animations/variants";
+import { DashboardLoadError } from "@/components/dashboard/dashboard-load-error";
 import { dashCard, dashLabel } from "@/lib/dashboard-styles";
 
 type Destination = {
@@ -16,23 +17,28 @@ type Destination = {
 export default function ManagerDestinationsPage() {
   const [loading, setLoading] = useState(true);
   const [destinations, setDestinations] = useState<Destination[]>([]);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
+        setLoading(true);
+        setLoadError(false);
         const res = await fetch("/api/destinations");
         const json = await res.json();
         if (!res.ok) throw new Error(json.error);
-        if (!cancelled) setDestinations(json.destinations ?? []);
+        if (!Array.isArray(json.destinations)) throw new Error("Invalid destination response");
+        if (!cancelled) setDestinations(json.destinations);
       } catch {
-        if (!cancelled) setDestinations([]);
+        if (!cancelled) setLoadError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [reloadKey]);
 
   if (loading) {
     return (
@@ -40,6 +46,19 @@ export default function ManagerDestinationsPage() {
         <div className="h-10 w-48 bg-charcoal/10" />
         <div className="h-64 border border-charcoal/8 bg-charcoal/5" />
       </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <DashboardLoadError
+        eyebrow="Reference"
+        pageTitle="Destinations"
+        label="Destination catalogue unavailable"
+        title="We could not load the destination catalogue"
+        description="The current destination list has not been presented as empty. Retry to restore the live catalogue."
+        onRetry={() => setReloadKey((key) => key + 1)}
+      />
     );
   }
 
