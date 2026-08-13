@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "sonner";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { fontVariables } from "@/lib/fonts";
 import { TestAuthSwitcher } from "@/components/testing/test-auth-switcher";
 import { isTestAuthEnabled } from "@/lib/test-auth";
@@ -54,6 +55,7 @@ export default function RootLayout({
         {children}
         {testAuthEnabled ? <TestAuthSwitcher /> : null}
         <Toaster position="bottom-right" richColors toastOptions={{ className: "font-sans" }} />
+        <SpeedInsights />
       </body>
     </html>
   );
