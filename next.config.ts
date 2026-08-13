@@ -3,11 +3,11 @@ import type { NextConfig } from "next";
 const isDevelopment = process.env.NODE_ENV !== "production";
 const contentSecurityPolicy = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""} https://*.clerk.accounts.dev https://*.clerk.com https://challenges.cloudflare.com https://*.protect.clerk.com https://vercel.live https://*.vercel.live`,
+  `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""} https://*.clerk.accounts.dev https://*.clerk.com https://challenges.cloudflare.com https://*.protect.clerk.com https://vercel.live https://*.vercel.live https://va.vercel-scripts.com`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co https://img.clerk.com https://*.clerk.com",
   "font-src 'self' data:",
-  `connect-src 'self'${isDevelopment ? " http://localhost:* ws://localhost:*" : ""} https://api.clerk.com https://*.clerk.accounts.dev https://*.clerk.com https://*.protect.clerk.com https://*.supabase.co wss://*.supabase.co https://vercel.live https://*.vercel.live`,
+  `connect-src 'self'${isDevelopment ? " http://localhost:* ws://localhost:*" : ""} https://api.clerk.com https://*.clerk.accounts.dev https://*.clerk.com https://*.protect.clerk.com https://*.supabase.co wss://*.supabase.co https://vercel.live https://*.vercel.live https://va.vercel-scripts.com`,
   "worker-src 'self' blob:",
   "frame-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://challenges.cloudflare.com https://*.protect.clerk.com https://vercel.live https://*.vercel.live",
   "media-src 'self' blob: https://*.supabase.co",
