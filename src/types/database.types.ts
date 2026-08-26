@@ -2038,6 +2038,14 @@ export type Database = {
           "reset_at": string
         }[]
       }
+      "create_event_plan": {
+        Args: {
+          "p_client_profile_id": string
+          "p_wedding": Json
+          "p_days": Json
+        }
+        Returns: string
+      }
       "release_vendor_media_bytes": {
         Args: {
           "p_vendor_profile_id": string
