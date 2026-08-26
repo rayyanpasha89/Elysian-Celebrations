@@ -45,6 +45,17 @@ where not exists (
   select 1 from users where id = 'seed-vendor-coastline-catering'
 );
 
+-- vendor_categories is populated only by supabase/seed.sql, which runs after
+-- migrations. The vendor rows below resolve category_id with a subquery, so on
+-- a database built from migrations alone -- a Supabase preview branch, a fresh
+-- environment, a restore -- that subquery returned null and this migration
+-- aborted on the not-null constraint. Seed the one category these rows need so
+-- the migration stands on its own; the insert is idempotent, so a database that
+-- already has it is unaffected.
+insert into vendor_categories (name, slug, sort_order)
+values ('Catering', 'catering', 2)
+on conflict (slug) do nothing;
+
 insert into vendor_profiles (
   user_id,
   business_name,
