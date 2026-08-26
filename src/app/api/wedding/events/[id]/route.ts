@@ -10,6 +10,7 @@ import {
   getAuthSession,
   requireRole,
 } from "@/lib/api-utils";
+import { toOptionalVenueId, venueRuleMessage } from "@/lib/venue-selection";
 import type { Database } from "@/types/database.types";
 
 type WeddingEventUpdate =
@@ -104,6 +105,7 @@ export async function PATCH(
     if (body.startTime !== undefined) updates.start_time = toOptionalString(body.startTime);
     if (body.endTime !== undefined) updates.end_time = toOptionalString(body.endTime);
     if (body.venue !== undefined) updates.venue = toOptionalString(body.venue);
+    if (body.venueId !== undefined) updates.venue_id = toOptionalVenueId(body.venueId);
     if (body.guestCount !== undefined) updates.guest_count = toOptionalInt(body.guestCount);
     if (body.estimatedBudget !== undefined) {
       updates.estimated_budget = toOptionalInt(body.estimatedBudget);
@@ -133,11 +135,13 @@ export async function PATCH(
       .update(updates)
       .eq("id", id)
       .select(
-        "id, wedding_day_id, name, event_type, time_block, date, start_time, end_time, venue, guest_count, estimated_budget, food_style, food_preferences, menu_notes, decor_style, decor_notes, attire_notes, notes, requirement_payload, sort_order"
+        "id, wedding_day_id, name, event_type, time_block, date, start_time, end_time, venue, venue_id, guest_count, estimated_budget, food_style, food_preferences, menu_notes, decor_style, decor_notes, attire_notes, notes, requirement_payload, sort_order"
       )
       .single();
 
     if (error || !updatedEvent) {
+      const venueMessage = venueRuleMessage(error);
+      if (venueMessage) return apiError(venueMessage, 422);
       console.error("wedding_events update:", error);
       return apiError("Failed to update event", 500);
     }

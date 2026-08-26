@@ -12,6 +12,7 @@ import {
   getAuthSession,
   requireRole,
 } from "@/lib/api-utils";
+import { toOptionalVenueId, venueRuleMessage } from "@/lib/venue-selection";
 
 function toOptionalString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -103,6 +104,7 @@ export async function POST(request: NextRequest) {
         start_time: toOptionalString(body.startTime),
         end_time: toOptionalString(body.endTime),
         venue: toOptionalString(body.venue),
+        venue_id: toOptionalVenueId(body.venueId),
         guest_count: toOptionalInt(body.guestCount),
         estimated_budget: toOptionalInt(body.estimatedBudget),
         food_style: toOptionalString(body.foodStyle),
@@ -116,11 +118,13 @@ export async function POST(request: NextRequest) {
         sort_order: nextSortOrder,
       })
       .select(
-        "id, wedding_day_id, name, event_type, time_block, date, start_time, end_time, venue, guest_count, estimated_budget, food_style, food_preferences, menu_notes, decor_style, decor_notes, attire_notes, notes, requirement_payload, sort_order"
+        "id, wedding_day_id, name, event_type, time_block, date, start_time, end_time, venue, venue_id, guest_count, estimated_budget, food_style, food_preferences, menu_notes, decor_style, decor_notes, attire_notes, notes, requirement_payload, sort_order"
       )
       .single();
 
     if (error) {
+      const venueMessage = venueRuleMessage(error);
+      if (venueMessage) return apiError(venueMessage, 422);
       console.error("wedding_events insert:", error);
       return apiError("Failed to create event", 500);
     }

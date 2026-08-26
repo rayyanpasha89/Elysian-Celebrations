@@ -1865,6 +1865,7 @@ export type Database = {
           "name": string
           "date": string | null
           "venue": string | null
+          "venue_id": string | null
           "notes": string | null
           "sort_order": number
           "created_at": string
@@ -1890,6 +1891,7 @@ export type Database = {
           "name": string
           "date"?: string | null
           "venue"?: string | null
+          "venue_id"?: string | null
           "notes"?: string | null
           "sort_order"?: number
           "created_at"?: string
@@ -1915,6 +1917,7 @@ export type Database = {
           "name"?: string
           "date"?: string | null
           "venue"?: string | null
+          "venue_id"?: string | null
           "notes"?: string | null
           "sort_order"?: number
           "created_at"?: string
