@@ -1,7 +1,7 @@
+import { resolveSiteUrl } from "@/lib/site-url";
 import type { MetadataRoute } from "next";
 
-const base =
-  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "https://elysiancelebrations.com";
+const base = resolveSiteUrl();
 
 export default function robots(): MetadataRoute.Robots {
   return {

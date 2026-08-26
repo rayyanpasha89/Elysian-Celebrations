@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { resolveSiteUrl } from "@/lib/site-url";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "sonner";
 import { fontVariables } from "@/lib/fonts";
@@ -11,9 +12,7 @@ const siteDescription =
   "Discover, design, and operate destination events with curated venues, trusted vendors, and a planning board that connects every day, function, and service.";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "https://elysiancelebrations.com",
-  ),
+  metadataBase: new URL(resolveSiteUrl()),
   title: {
     default: siteTitle,
     template: "%s | Elysian Celebrations",
