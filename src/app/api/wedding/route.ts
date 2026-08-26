@@ -318,7 +318,7 @@ export async function GET() {
     const { data: initialEvents, error: eventsError } = await supabase
       .from("wedding_events")
       .select(
-        "id, wedding_day_id, name, event_type, time_block, date, start_time, end_time, venue, guest_count, estimated_budget, food_style, food_preferences, menu_notes, decor_style, decor_notes, attire_notes, notes, requirement_payload, sort_order"
+        "id, wedding_day_id, name, event_type, time_block, date, start_time, end_time, venue, venue_id, guest_count, estimated_budget, food_style, food_preferences, menu_notes, decor_style, decor_notes, attire_notes, notes, requirement_payload, sort_order"
       )
       .eq("wedding_id", wedding.id)
       .order("sort_order", { ascending: true });
@@ -341,7 +341,7 @@ export async function GET() {
     const { data: events, error: refreshedEventsError } = await supabase
       .from("wedding_events")
       .select(
-        "id, wedding_day_id, name, event_type, time_block, date, start_time, end_time, venue, guest_count, estimated_budget, food_style, food_preferences, menu_notes, decor_style, decor_notes, attire_notes, notes, requirement_payload, sort_order"
+        "id, wedding_day_id, name, event_type, time_block, date, start_time, end_time, venue, venue_id, guest_count, estimated_budget, food_style, food_preferences, menu_notes, decor_style, decor_notes, attire_notes, notes, requirement_payload, sort_order"
       )
       .eq("wedding_id", wedding.id)
       .order("sort_order", { ascending: true });
