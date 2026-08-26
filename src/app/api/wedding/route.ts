@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { clerkClient } from "@clerk/nextjs/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
+import type { Json } from "@/types/database.types";
 import { ensureWeddingDays } from "@/lib/wedding-plan.server";
 import { buildDefaultCelebrationPlan } from "@/lib/wedding-plan";
 import {
@@ -739,7 +740,6 @@ export async function POST(request: NextRequest) {
   if (roleCheck) return roleCheck;
 
   const supabase = createAdminSupabaseClient();
-  let createdWeddingId: string | null = null;
 
   try {
     const body = await request.json();
@@ -893,32 +893,6 @@ export async function POST(request: NextRequest) {
       return apiError("Event plan already exists", 409);
     }
 
-    const { data: wedding, error: weddingError } = await supabase
-      .from("weddings")
-      .insert({
-        client_profile_id: profileId,
-        name,
-        date: dateIso,
-        event_type: eventDefinition.eventType,
-        custom_event_type: eventDefinition.customEventType,
-        event_platform_version: eventDefinition.version,
-        definition_payload: eventDefinition,
-        destination_id: destId,
-        status: "PLANNING",
-      })
-      .select("id")
-      .single();
-
-    if (weddingError?.code === "23505") {
-      return apiError("Event plan already exists", 409);
-    }
-
-    if (weddingError || !wedding) {
-      console.error("weddings insert:", weddingError);
-      return apiError("Failed to create event plan", 500);
-    }
-    createdWeddingId = wedding.id;
-
     const celebrationPlan = useLayeredDefinition
       ? buildCelebrationPlanFromEventDefinition(eventDefinition).map((day) => ({
           ...day,
@@ -942,245 +916,138 @@ export async function POST(request: NextRequest) {
           })),
         }));
 
-    const { data: createdDays, error: createdDaysError } = await supabase
-      .from("wedding_days")
-      .insert(
-        celebrationPlan.map((day) => ({
-          wedding_id: wedding.id,
-          name: day.name,
-          date: day.date,
-          notes: day.notes,
-          sort_order: day.sortOrder,
-        }))
-      )
-      .select("id, sort_order");
-
-    if (createdDaysError || !createdDays) {
-      console.error("wedding_days insert:", createdDaysError);
-      throw new Error("Failed to create celebration days");
-    }
-
-    if (createdDays.length !== celebrationPlan.length) {
-      throw new Error("Celebration day creation was incomplete");
-    }
-
-    const dayIdBySortOrder = new Map<number, string>();
-    for (const day of createdDays) {
-      dayIdBySortOrder.set(day.sort_order, day.id);
-    }
-
-    // Map each planned event to the needs the client picked for it during the
-    // layered definition. Key is `${dayId}:${eventSortOrder}` so it survives the
-    // round-trip through the insert. Blocks with no explicit selection are absent
-    // here and fall back to the full default requirement set.
-    const requirementCategoriesByKey = new Map<
-      string,
-      EventRequirementCategoryKey[]
-    >();
-    for (const day of celebrationPlan) {
-      const dayId = dayIdBySortOrder.get(day.sortOrder);
-      if (!dayId) continue;
-      for (const event of day.events) {
-        const categories = (
+    // Every child row is nested inside its parent so the whole structure is
+    // written by one transactional RPC. Previously this was a chain of separate
+    // PostgREST inserts, which are not transactional: a failure part-way through
+    // left orphaned rows that had to be cleaned up afterwards by hand.
+    const daysPayload = celebrationPlan.map((day) => ({
+      name: day.name,
+      date: day.date,
+      notes: day.notes,
+      sort_order: day.sortOrder,
+      events: day.events.map((event) => {
+        const explicitCategories = (
           event as { requirementCategories?: EventRequirementCategoryKey[] }
         ).requirementCategories;
-        if (Array.isArray(categories)) {
-          requirementCategoriesByKey.set(`${dayId}:${event.sortOrder}`, categories);
-        }
-      }
-    }
+        const hasExplicitNeeds = Array.isArray(explicitCategories);
+        const selectedNeeds = explicitCategories ?? [];
+        const timeBlock = normalizeTimeBlockKey(event.timeBlock);
 
-    const eventsToInsert = celebrationPlan.flatMap((day) =>
-      day.events.map((event) => ({
-        wedding_id: wedding.id,
-        wedding_day_id: dayIdBySortOrder.get(day.sortOrder) ?? null,
-        name: event.name,
-        event_type: event.eventType,
-        time_block: event.timeBlock,
-        date: day.date,
-        start_time: event.startTime,
-        end_time: event.endTime,
-        venue: event.venue ?? null,
-        // Per-block guest count from the layered definition; falls back to the
-        // event-level guest estimate when a block didn't set its own.
-        guest_count:
-          (event as { guestCount?: number | null }).guestCount ?? guests ?? null,
-        food_style: event.foodStyle,
-        decor_style: event.decorStyle,
-        notes: event.notes,
-        sort_order: event.sortOrder,
-      }))
-    );
+        // Only seed a food & beverage plan when this block actually wants food.
+        // For the layered definition we honor the client's pick; for legacy
+        // plans we keep the old "has a food style" behavior.
+        const wantsFood = useLayeredDefinition
+          ? hasExplicitNeeds
+            ? selectedNeeds.includes("food")
+            : true
+          : Boolean(event.foodStyle);
 
-    if (eventsToInsert.length > 0) {
-      const { data: createdEvents, error: eventsInsertError } = await supabase
-        .from("wedding_events")
-        .insert(eventsToInsert)
-        .select("id, wedding_day_id, name, event_type, time_block, start_time, end_time, food_style, menu_notes, sort_order");
+        // A layered definition with an empty selection means the client wants no
+        // services for this block, so seed nothing and keep the planner clean.
+        const requirements =
+          hasExplicitNeeds && selectedNeeds.length === 0
+            ? []
+            : buildDefaultRequirementsForEvent({
+                eventName: event.name,
+                timeBlock,
+                startTime: event.startTime,
+                categories: hasExplicitNeeds ? selectedNeeds : undefined,
+              }).map((requirement) => ({
+                category: requirement.category,
+                title: requirement.title,
+                status: requirement.status,
+                priority: requirement.priority,
+                payload: requirement.payload,
+                notes: requirement.notes,
+                sort_order: requirement.sortOrder,
+              }));
 
-      if (eventsInsertError) {
-        console.error("wedding_events insert:", eventsInsertError);
-        throw new Error("Failed to create event functions");
-      }
-
-      if (!createdEvents || createdEvents.length !== eventsToInsert.length) {
-        throw new Error("Event function creation was incomplete");
-      }
-
-      if (createdEvents.length > 0) {
-        const menuRows = createdEvents
-          .filter((event) => {
-            // Only seed a food & beverage plan when this block actually wants
-            // food. For the layered definition we honor the client's pick; for
-            // legacy plans we keep the old "has a food style" behavior.
-            if (useLayeredDefinition) {
-              const categories = requirementCategoriesByKey.get(
-                `${event.wedding_day_id}:${event.sort_order}`
-              );
-              return categories ? categories.includes("food") : true;
-            }
-            return Boolean(event.food_style);
-          })
-          .map((event) => ({
-            wedding_event_id: event.id,
-            name: useLayeredDefinition
-              ? `${event.name} Food and beverage plan`
-              : `${event.name} Menu`,
-            meal_period: mealPeriodForTimeBlock(
-              normalizeTimeBlockKey(event.time_block),
-              event.start_time
-            ),
-            service_style: event.food_style ?? null,
-            notes:
-              event.menu_notes ??
-              "Use this starter menu to define drinks, pre-meal stations, mains, post-meal stations, live counters, and custom food requirements.",
-            sort_order: 0,
-          }));
-
-        if (menuRows.length > 0) {
-          const { error: menuInsertError } = await supabase
-            .from("wedding_event_menus")
-            .insert(menuRows);
-          if (menuInsertError) {
-            console.error("wedding_event_menus insert:", menuInsertError);
-            throw new Error("Failed to create food plans");
-          }
-        }
-
-        const { error: taskInsertError } = await supabase
-          .from("wedding_event_tasks")
-          .insert(
-            createdEvents.map((event) => ({
-              wedding_event_id: event.id,
+        return {
+          name: event.name,
+          event_type: event.eventType,
+          time_block: event.timeBlock,
+          date: day.date,
+          start_time: event.startTime,
+          end_time: event.endTime,
+          venue: event.venue ?? null,
+          // Per-block guest count from the layered definition; falls back to the
+          // event-level guest estimate when a block didn't set its own.
+          guest_count:
+            (event as { guestCount?: number | null }).guestCount ?? guests ?? null,
+          food_style: event.foodStyle,
+          decor_style: event.decorStyle,
+          notes: event.notes,
+          sort_order: event.sortOrder,
+          menu: wantsFood
+            ? {
+                name: useLayeredDefinition
+                  ? `${event.name} Food and beverage plan`
+                  : `${event.name} Menu`,
+                meal_period: mealPeriodForTimeBlock(timeBlock, event.startTime),
+                service_style: event.foodStyle ?? null,
+                notes:
+                  "Use this starter menu to define drinks, pre-meal stations, mains, post-meal stations, live counters, and custom food requirements.",
+                sort_order: 0,
+              }
+            : null,
+          tasks: [
+            {
               title: "Confirm final run of show",
               owner: "Planner",
               status: "OPEN",
               sort_order: 0,
-            }))
-          );
-        if (taskInsertError) {
-          console.error("wedding_event_tasks insert:", taskInsertError);
-          throw new Error("Failed to create event tasks");
-        }
+            },
+          ],
+          requirements,
+        };
+      }),
+    }));
 
-        const requirementRows = createdEvents.flatMap((event) => {
-          const key = `${event.wedding_day_id}:${event.sort_order}`;
-          const hasExplicitNeeds = requirementCategoriesByKey.has(key);
-          const selectedNeeds = requirementCategoriesByKey.get(key) ?? [];
+    const { data: createdWeddingIdFromRpc, error: createPlanError } =
+      await supabase.rpc("create_event_plan", {
+        p_client_profile_id: profileId,
+        p_wedding: {
+          name,
+          date: dateIso,
+          event_type: eventDefinition.eventType,
+          custom_event_type: eventDefinition.customEventType,
+          event_platform_version: eventDefinition.version,
+          definition_payload: eventDefinition,
+          destination_id: destId,
+          status: "PLANNING",
+        } as unknown as Json,
+        p_days: daysPayload as unknown as Json,
+      });
 
-          // Layered definition with an empty selection means the client wants no
-          // services for this block — seed nothing so the planner stays clean.
-          if (hasExplicitNeeds && selectedNeeds.length === 0) {
-            return [];
-          }
-
-          return buildDefaultRequirementsForEvent({
-            eventName: event.name,
-            timeBlock: normalizeTimeBlockKey(event.time_block),
-            startTime: event.start_time,
-            categories: hasExplicitNeeds ? selectedNeeds : undefined,
-          }).map((requirement) => ({
-            wedding_event_id: event.id,
-            category: requirement.category,
-            title: requirement.title,
-            status: requirement.status,
-            priority: requirement.priority,
-            payload: requirement.payload,
-            notes: requirement.notes,
-            sort_order: requirement.sortOrder,
-          }));
-        });
-
-        if (requirementRows.length > 0) {
-          const { error: requirementsInsertError } = await supabase
-            .from("wedding_event_requirements")
-            .insert(requirementRows);
-          if (requirementsInsertError) {
-            console.error(
-              "wedding_event_requirements insert:",
-              requirementsInsertError
-            );
-            throw new Error("Failed to create event requirements");
-          }
-        }
+    if (createPlanError) {
+      // The function raises a unique violation when a plan already exists for
+      // this profile, and takes an advisory lock first so two concurrent
+      // requests cannot both pass the check.
+      if (createPlanError.code === "23505") {
+        return apiError("Event plan already exists", 409);
       }
+      console.error("create_event_plan:", createPlanError);
+      // Nothing to clean up: the function is one transaction, so a failure here
+      // means no part of the plan was written.
+      return apiError(
+        "Could not create the full event structure. No partial plan was kept.",
+        500
+      );
     }
 
-    const { data: existingGuestList, error: guestListLookupError } = await supabase
-      .from("guest_lists")
-      .select("id")
-      .eq("client_profile_id", profileId)
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
-    if (guestListLookupError) {
-      console.error("guest_lists lookup:", guestListLookupError);
-      throw new Error("Failed to resolve guest list");
+    if (!createdWeddingIdFromRpc) {
+      console.error("create_event_plan returned no id");
+      return apiError("Failed to create event plan", 500);
     }
 
-    if (!existingGuestList?.id) {
-      const { data: createdGuestList, error: guestListError } = await supabase
-        .from("guest_lists")
-        .insert({
-          client_profile_id: profileId,
-          name: "Main Guest List",
-        })
-        .select("id")
-        .single();
-
-      if (guestListError || !createdGuestList) {
-        console.error("guest_lists insert:", guestListError);
-        throw new Error("Failed to create guest list");
-      }
-    }
-    return apiSuccess({ weddingId: wedding.id }, 201);
+    return apiSuccess({ weddingId: createdWeddingIdFromRpc }, 201);
   } catch (error) {
     console.error("POST /api/wedding", error);
 
-    // PostgREST calls are not transactional. Until this creation flow moves to
-    // a database RPC, remove every row created by this request so a retry can
-    // never hit the existing-plan guard with a half-built structure.
-    let rolledBack = true;
-    if (createdWeddingId) {
-      const { error: rollbackWeddingError } = await supabase
-        .from("weddings")
-        .delete()
-        .eq("id", createdWeddingId);
-      if (rollbackWeddingError) {
-        console.error("wedding rollback:", rollbackWeddingError);
-        rolledBack = false;
-      }
-    }
-
-    // Only claim the cleanup happened when it actually did. If the rollback
-    // delete failed the wedding row survives, and the next create attempt will
-    // hit the "Event plan already exists" guard — telling the user nothing was
-    // kept would send them into an unexplainable 409.
+    // create_event_plan writes the entire structure inside one transaction, so
+    // there is never a partial plan left behind to compensate for.
     return apiError(
-      rolledBack
-        ? "Could not create the full event structure. No partial plan was kept."
-        : "Could not create the full event structure, and the incomplete plan could not be cleaned up automatically. Please contact support before trying again.",
+      "Could not create the full event structure. No partial plan was kept.",
       500
     );
   }
