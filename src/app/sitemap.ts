@@ -1,9 +1,9 @@
+import { resolveSiteUrl } from "@/lib/site-url";
 import type { MetadataRoute } from "next";
 import { blogPosts } from "@/data/blog";
 import { destinations } from "@/data/destinations";
 
-const base =
-  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "https://elysiancelebrations.com";
+const base = resolveSiteUrl();
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const staticRoutes: MetadataRoute.Sitemap = [
