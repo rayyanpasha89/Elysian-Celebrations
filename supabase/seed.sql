@@ -13,7 +13,8 @@ insert into vendor_categories (name, slug, sort_order) values
   ('Mehendi Artist', 'mehendi', 6),
   ('Invitations & Stationery', 'invitations', 7),
   ('Jewellery & Accessories', 'jewellery', 8),
-  ('Travel & Logistics', 'travel', 9);
+  ('Travel & Logistics', 'travel', 9)
+on conflict (slug) do nothing;
 
 -- ─── Destinations ────────────────────────────────────────────
 

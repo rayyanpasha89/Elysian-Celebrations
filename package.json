@@ -16,7 +16,8 @@
     "db:pull": "tsx --tsconfig tsconfig.json scripts/supabase-remote.ts pull",
     "db:migrations": "tsx --tsconfig tsconfig.json scripts/supabase-remote.ts list",
     "db:query": "tsx --tsconfig tsconfig.json scripts/supabase-remote.ts query",
-    "db:types": "tsx --tsconfig tsconfig.json scripts/generate-supabase-types.ts"
+    "db:types": "tsx --tsconfig tsconfig.json scripts/generate-supabase-types.ts",
+    "test:event-plan": "tsx --tsconfig tsconfig.json scripts/verify-event-plan-transaction.ts"
   },
   "overrides": {
     "nanoid": "3.3.17",
