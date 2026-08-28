@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
-import { getAuthSession, apiError, apiSuccess } from "@/lib/api-utils";
+import { isPaymentKind, isPaymentMethod } from "@/lib/payment-ledger";
 import type { Database } from "@/types/database.types";
+import { getAuthSession, apiError, apiSuccess } from "@/lib/api-utils";
 
 type BookingStatus = Database["public"]["Enums"]["booking_status"];
 type BookingUpdate = Database["public"]["Tables"]["bookings"]["Update"];
+type PaymentInsert = Database["public"]["Tables"]["payments"]["Insert"];
 
 type BookingUserRelation =
   | { user_id?: string | null }
@@ -76,7 +78,7 @@ export async function PATCH(
     const { data: booking, error: loadErr } = await supabase
       .from("bookings")
       .select(
-        "id, status, total_amount, vendor_amount, paid_amount, notes, client:client_profiles(user_id), vendor:vendor_profiles(user_id)"
+        "id, status, total_amount, vendor_amount, paid_amount, notes, client_profile_id, vendor_profile_id, client:client_profiles(user_id), vendor:vendor_profiles(user_id)"
       )
       .eq("id", id)
       .maybeSingle();
@@ -107,6 +109,9 @@ export async function PATCH(
     if (body.paidAmount !== undefined && !isOperationsRole) {
       return apiError("Only the operations team can update payments", 403);
     }
+    if (body.payment !== undefined && !isOperationsRole) {
+      return apiError("Only the operations team can record payments", 403);
+    }
     const allowedFields: BookingUpdate = {};
     if (body.status !== undefined) {
       if (!isWritableBookingStatus(body.status)) {
@@ -132,6 +137,48 @@ export async function PATCH(
       if (paidAmount === undefined) return apiError("Invalid paid amount", 400);
       allowedFields.paid_amount = paidAmount;
     }
+
+    // A payment is recorded in the ledger with an explicit direction. The legacy
+    // paid_amount field above cannot express one: client surfaces read it as
+    // collection progress and vendor surfaces read it as payout progress, so a
+    // single number is always wrong for one of them.
+    let ledgerEntry: PaymentInsert | null = null;
+    if (body.payment !== undefined) {
+      const payment = body.payment as Record<string, unknown> | null;
+      if (!payment || typeof payment !== "object") {
+        return apiError("Invalid payment", 400);
+      }
+      if (!isPaymentKind(payment.kind)) {
+        return apiError(
+          "Payment kind must be CLIENT_IN (received from the client) or VENDOR_OUT (paid to the vendor)",
+          400
+        );
+      }
+      const amount = normalizeMoney(payment.amount);
+      if (amount === undefined || amount <= 0) {
+        return apiError("Payment amount must be a positive number", 400);
+      }
+      if (payment.method !== undefined && payment.method !== null && !isPaymentMethod(payment.method)) {
+        return apiError("Payment method must be UPI, BANK, CASH or CARD", 400);
+      }
+
+      const settled = payment.isPaid !== false;
+      ledgerEntry = {
+        kind: payment.kind,
+        amount,
+        booking_id: id,
+        client_profile_id: booking.client_profile_id,
+        vendor_profile_id:
+          payment.kind === "VENDOR_OUT" ? booking.vendor_profile_id : null,
+        label:
+          typeof payment.label === "string" && payment.label.trim()
+            ? payment.label.trim().slice(0, 200)
+            : null,
+        method: isPaymentMethod(payment.method) ? payment.method : null,
+        is_paid: settled,
+        paid_at: settled ? new Date().toISOString() : null,
+      };
+    }
     if (body.notes !== undefined) {
       if (!isClientOwner && !isOperationsRole) {
         return apiError("Only the client or operations team can update the inquiry brief", 403);
@@ -143,6 +190,31 @@ export async function PATCH(
     }
     if (Object.keys(allowedFields).length === 0) {
       return apiError("Nothing to update", 400);
+    }
+
+    if (ledgerEntry) {
+      const { error: ledgerError } = await supabase
+        .from("payments")
+        .insert(ledgerEntry);
+      if (ledgerError) {
+        console.error("Payment ledger insert error:", ledgerError);
+        return apiError("Failed to record the payment", 500);
+      }
+    }
+
+    // A request may carry only a payment, in which case the booking row itself
+    // has nothing to change.
+    if (Object.keys(allowedFields).length === 0) {
+      const { data: unchanged, error: reloadError } = await supabase
+        .from("bookings")
+        .select("id, status, paid_amount, notes, updated_at")
+        .eq("id", id)
+        .maybeSingle();
+      if (reloadError || !unchanged) {
+        console.error("Booking reload error:", reloadError);
+        return apiError("Failed to load booking", 500);
+      }
+      return apiSuccess(unchanged);
     }
 
     let updateQuery = supabase
