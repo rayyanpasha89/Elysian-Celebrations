@@ -97,7 +97,7 @@ begin
     loop
       insert into public.wedding_events (
         wedding_id, wedding_day_id, name, event_type, time_block, date,
-        start_time, end_time, venue, guest_count, food_style, decor_style,
+        start_time, end_time, venue, venue_id, guest_count, food_style, decor_style,
         notes, sort_order
       )
       values (
@@ -110,6 +110,7 @@ begin
         v_event ->> 'start_time',
         v_event ->> 'end_time',
         v_event ->> 'venue',
+        (v_event ->> 'venue_id')::uuid,
         (v_event ->> 'guest_count')::integer,
         v_event ->> 'food_style',
         v_event ->> 'decor_style',

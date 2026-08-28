@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import { Client } from "pg";
 
 const MIGRATION_PATH =
-  "supabase/migrations/20260825120000_transactional_event_plan_creation.sql";
+  "supabase/migrations/20260826041000_transactional_event_plan_creation.sql";
 
 function databaseClient() {
   const connectionString = process.env.SUPABASE_DB_URL;
@@ -38,7 +38,7 @@ function weddingPayload(name: string) {
   };
 }
 
-function daysPayload() {
+function daysPayload(venueId: string | null = null) {
   return [
     {
       name: "Day 1",
@@ -54,6 +54,7 @@ function daysPayload() {
           start_time: "10:00",
           end_time: "12:00",
           venue: "Garden Lawn",
+          venue_id: venueId,
           guest_count: 120,
           food_style: "BUFFET",
           decor_style: null,
@@ -94,6 +95,24 @@ async function main() {
     assert.ok(
       rowCount && rowCount > 0,
       `create_event_plan is missing. Apply ${MIGRATION_PATH} first.`
+    );
+
+    const privileges = await client.query(
+      `select
+         has_function_privilege('anon', 'public.create_event_plan(uuid,jsonb,jsonb)', 'execute') as anon,
+         has_function_privilege('authenticated', 'public.create_event_plan(uuid,jsonb,jsonb)', 'execute') as authenticated,
+         has_function_privilege('service_role', 'public.create_event_plan(uuid,jsonb,jsonb)', 'execute') as service_role`
+    );
+    assert.equal(privileges.rows[0].anon, false, "anon must not execute the RPC");
+    assert.equal(
+      privileges.rows[0].authenticated,
+      false,
+      "authenticated clients must not execute the RPC directly"
+    );
+    assert.equal(
+      privileges.rows[0].service_role,
+      true,
+      "the server-side service role must execute the RPC"
     );
 
     await client.query(
@@ -184,12 +203,16 @@ async function main() {
     }
 
     // 4 — retrying after a rolled-back attempt must succeed, not hit the guard.
+    const venue = await client.query(
+      "select id from venues where is_active and capacity >= 120 limit 1"
+    );
+    assert.ok(venue.rowCount, "seed data must provide an active venue for RPC verification");
     const retry = await client.query(
       "select create_event_plan($1, $2::jsonb, $3::jsonb) as id",
       [
         rollbackProfile,
         JSON.stringify(weddingPayload("Retry")),
-        JSON.stringify(daysPayload()),
+        JSON.stringify(daysPayload(venue.rows[0].id)),
       ]
     );
     assert.ok(retry.rows[0].id, "a retry after rollback must succeed");
@@ -202,7 +225,8 @@ async function main() {
          (select count(*)::int from wedding_event_menus m join wedding_events e on e.id = m.wedding_event_id join weddings w on w.id = e.wedding_id where w.client_profile_id = $1) as menus,
          (select count(*)::int from wedding_event_tasks t join wedding_events e on e.id = t.wedding_event_id join weddings w on w.id = e.wedding_id where w.client_profile_id = $1) as tasks,
          (select count(*)::int from wedding_event_requirements r join wedding_events e on e.id = r.wedding_event_id join weddings w on w.id = e.wedding_id where w.client_profile_id = $1) as requirements,
-         (select count(*)::int from guest_lists where client_profile_id = $1) as guest_lists`,
+         (select count(*)::int from guest_lists where client_profile_id = $1) as guest_lists,
+         (select venue_id from wedding_events e join weddings w on w.id = e.wedding_id where w.client_profile_id = $1 limit 1) as venue_id`,
       [rollbackProfile]
     );
     const row = counts.rows[0];
@@ -212,6 +236,11 @@ async function main() {
     assert.equal(row.tasks, 1, "one task expected");
     assert.equal(row.requirements, 2, "two requirements expected");
     assert.equal(row.guest_lists, 1, "a guest list must be created in the same transaction");
+    assert.equal(
+      row.venue_id,
+      venue.rows[0].id,
+      "the catalogue venue id must survive transactional creation"
+    );
 
     console.log("Event plan transaction: 5 focused cases passed.");
   } finally {

@@ -912,6 +912,7 @@ export async function POST(request: NextRequest) {
             endTime: null,
             timeBlock: null,
             venue: null,
+            venueId: null,
             notes: null,
           })),
         }));
@@ -970,6 +971,7 @@ export async function POST(request: NextRequest) {
           start_time: event.startTime,
           end_time: event.endTime,
           venue: event.venue ?? null,
+          venue_id: event.venueId,
           // Per-block guest count from the layered definition; falls back to the
           // event-level guest estimate when a block didn't set its own.
           guest_count:

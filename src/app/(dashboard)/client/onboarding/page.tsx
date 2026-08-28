@@ -104,6 +104,7 @@ type LocalDay = {
       startTime: string;
       endTime: string;
       venue: string;
+      venueId: string | null;
       guestCount: number;
       needs: EventRequirementCategoryKey[];
     }
@@ -159,6 +160,7 @@ function createEmptyDay(
           startTime: block.defaultStartTime,
           endTime: block.defaultEndTime,
           venue: "",
+          venueId: null,
           guestCount: DEFAULT_GUESTS,
           needs: [...DEFAULT_NEEDS],
         };
@@ -203,6 +205,7 @@ function toEventDefinitionDay(day: LocalDay): EventDefinitionDay {
           startTime: local.startTime || null,
           endTime: local.endTime || null,
           venue: local.venue || null,
+          venueId: local.venueId,
           guestCount: local.guestCount || null,
           requirementCategories: local.needs,
           notes: null,
@@ -764,15 +767,19 @@ function BlockVenuePicker({
   venues,
   loading,
   value,
+  venueId,
   onChange,
 }: {
   id: string;
   venues: VenueOption[];
   loading: boolean;
   value: string;
-  onChange: (value: string) => void;
+  venueId: string | null;
+  onChange: (selection: { venue: string; venueId: string | null }) => void;
 }) {
-  const selectedVenue = venues.find((venue) => venueMatchesValue(venue, value));
+  const selectedVenue =
+    venues.find((venue) => venue.id === venueId) ??
+    venues.find((venue) => venueMatchesValue(venue, value));
   const customValueActive = Boolean(value.trim() && !selectedVenue);
   const [showCustom, setShowCustom] = useState(customValueActive);
   const [search, setSearch] = useState("");
@@ -810,22 +817,26 @@ function BlockVenuePicker({
       ) : null}
       <select
         id={id}
-        value={selectedVenue ? selectedVenue.name : customOpen ? "__custom__" : ""}
+        value={selectedVenue ? selectedVenue.id : customOpen ? "__custom__" : ""}
         onChange={(event) => {
           const nextValue = event.target.value;
           if (nextValue === "__custom__") {
             setShowCustom(true);
-            if (selectedVenue) onChange("");
+            if (selectedVenue) onChange({ venue: "", venueId: null });
             return;
           }
           setShowCustom(false);
-          onChange(nextValue);
+          const nextVenue = venues.find((venue) => venue.id === nextValue);
+          onChange({
+            venue: nextVenue?.name ?? "",
+            venueId: nextVenue?.id ?? null,
+          });
         }}
         className="w-full border border-charcoal/12 bg-ivory px-2.5 py-2 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
       >
         <option value="">Decide later</option>
         {filteredVenues.map((venue) => (
-          <option key={venue.id} value={venue.name}>
+          <option key={venue.id} value={venue.id}>
             {venue.name}
           </option>
         ))}
@@ -837,7 +848,7 @@ function BlockVenuePicker({
           type="button"
           onClick={() => {
             setShowCustom(true);
-            onChange(search.trim());
+            onChange({ venue: search.trim(), venueId: null });
           }}
           className="font-accent text-[9px] uppercase tracking-[0.14em] text-gold-dark underline decoration-gold-primary/30 underline-offset-4"
         >
@@ -857,7 +868,9 @@ function BlockVenuePicker({
         <input
           type="text"
           value={selectedVenue ? "" : value}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={(event) =>
+            onChange({ venue: event.target.value, venueId: null })
+          }
           placeholder="Custom venue, lawn, ballroom, beach, terrace..."
           className="w-full border border-charcoal/15 bg-transparent px-3 py-2 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
         />
@@ -1178,8 +1191,9 @@ function BlocksStep({
                                       venues={venues}
                                       loading={venuesLoading}
                                       value={block.venue}
-                                      onChange={(value) =>
-                                        onBlockPatch(dayIndex, blockKey, { venue: value })
+                                      venueId={block.venueId}
+                                      onChange={(selection) =>
+                                        onBlockPatch(dayIndex, blockKey, selection)
                                       }
                                     />
                                   </div>

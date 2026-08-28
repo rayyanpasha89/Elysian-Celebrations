@@ -4,7 +4,14 @@ import { readFileSync } from "node:fs";
 import process from "node:process";
 import { Client } from "pg";
 
-type Command = "link" | "push" | "push:seed" | "pull" | "list" | "query";
+type Command =
+  | "link"
+  | "push:dry-run"
+  | "push"
+  | "push:seed"
+  | "pull"
+  | "list"
+  | "query";
 type QueryResultSummary = {
   rows?: Record<string, unknown>[];
   command?: string;
@@ -138,6 +145,7 @@ function usage() {
   console.log(`
 Usage:
   npm run db:link
+  npm run db:push:dry-run
   npm run db:push
   npm run db:push:seed
   npm run db:pull -- baseline_name
@@ -153,6 +161,22 @@ async function main() {
   switch (command) {
     case "link":
       ensureLinkedProject();
+      return;
+    case "push:dry-run":
+      if (hasAccessToken()) {
+        ensureLinkedProject();
+        runSupabase([
+          "db",
+          "push",
+          "--dry-run",
+          "--linked",
+          "--password",
+          env("SUPABASE_DB_PASSWORD"),
+        ]);
+        return;
+      }
+
+      runSupabase(["db", "push", "--dry-run", ...getDbUrlArgs()]);
       return;
     case "push":
       if (hasAccessToken()) {

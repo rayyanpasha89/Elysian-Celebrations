@@ -11,6 +11,7 @@
     "test:readiness": "tsx --tsconfig tsconfig.json scripts/verify-event-readiness.ts",
     "seed": "tsx --tsconfig tsconfig.json scripts/supabase-seed.ts",
     "db:link": "tsx --tsconfig tsconfig.json scripts/supabase-remote.ts link",
+    "db:push:dry-run": "tsx --tsconfig tsconfig.json scripts/supabase-remote.ts push:dry-run",
     "db:push": "tsx --tsconfig tsconfig.json scripts/supabase-remote.ts push",
     "db:push:seed": "tsx --tsconfig tsconfig.json scripts/supabase-remote.ts push:seed",
     "db:pull": "tsx --tsconfig tsconfig.json scripts/supabase-remote.ts pull",

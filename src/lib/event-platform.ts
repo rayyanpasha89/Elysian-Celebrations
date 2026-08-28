@@ -212,6 +212,8 @@ export type EventDefinitionTimeBlock = {
   endTime: string | null;
   /** Venue, ballroom, lawn, beach, or custom area for this specific block. */
   venue: string | null;
+  /** Catalogue venue backing `venue`; null when the client entered a custom area. */
+  venueId: string | null;
   /** Expected guests for this specific block. Null = inherit from event scale. */
   guestCount: number | null;
   requirementCategories: EventRequirementCategoryKey[];
@@ -260,6 +262,7 @@ export type EventDefinitionPlanDay = {
     endTime: string | null;
     timeBlock: EventTimeBlockKey | null;
     venue: string | null;
+    venueId: string | null;
     guestCount: number | null;
     requirementCategories: EventRequirementCategoryKey[];
     notes: string | null;
@@ -297,6 +300,15 @@ function toOptionalString(value: unknown, maxLength = MAX_STRING_LENGTH) {
   return typeof value === "string" && value.trim()
     ? clampString(value, maxLength)
     : null;
+}
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function toOptionalUuid(value: unknown) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return UUID_PATTERN.test(trimmed) ? trimmed : null;
 }
 
 export function normalizeDayCount(value: unknown) {
@@ -598,6 +610,7 @@ export function buildDefaultRequirementsForEvent({
     startTime,
     endTime: null,
     venue: null,
+    venueId: null,
     guestCount: null,
     requirementCategories: categories ?? [],
     notes: null,
@@ -657,6 +670,7 @@ function normalizeDefinitionTimeBlock(
     startTime: toOptionalString(block.startTime, 20) ?? slot.defaultStartTime,
     endTime: toOptionalString(block.endTime, 20) ?? slot.defaultEndTime,
     venue: toOptionalString(block.venue ?? block.venueName ?? block.location, 180),
+    venueId: toOptionalUuid(block.venueId ?? block.venue_id),
     guestCount: normalizeGuestCount(block.guestCount ?? block.guests),
     requirementCategories: normalizeRequirementCategories(
       block.requirementCategories ?? block.requirements
@@ -775,6 +789,7 @@ export function buildCelebrationPlanFromEventDefinition(
         endTime: block.endTime,
         timeBlock: block.slot,
         venue: block.venue ?? definition.primaryVenue,
+        venueId: block.venueId,
         guestCount: block.guestCount,
         requirementCategories: block.requirementCategories,
         notes: block.notes,
