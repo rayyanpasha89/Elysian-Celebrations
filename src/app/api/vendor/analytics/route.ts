@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
+import { totalsByBooking, type PaymentTotals } from "@/lib/payment-ledger";
 import {
   apiError,
   apiSuccess,
@@ -21,13 +22,12 @@ function currentVendorAmount(booking: {
 }
 
 function paidTowardVendorAmount(
-  booking: {
-    paid_amount?: number | null;
-    vendor_amount?: number | null;
-  },
-  amount = currentVendorAmount(booking)
+  bookingId: string,
+  payouts: Map<string, PaymentTotals>,
+  amount: number
 ) {
-  return Math.min(amount, Math.max(0, booking.paid_amount ?? 0));
+  const settled = payouts.get(bookingId)?.vendorPaid ?? 0;
+  return Math.min(amount, Math.max(0, settled));
 }
 
 function startOfWeek(date: Date) {
@@ -92,13 +92,18 @@ export async function GET() {
     );
     const currentWeekStart = startOfWeek(now);
 
-    const [bookingsResult, profileViewsResult] = await Promise.all([
+    const [bookingsResult, payoutsResult, profileViewsResult] = await Promise.all([
       supabase
         .from("bookings")
         .select(
-          "status, vendor_amount, paid_amount, created_at"
+          "id, status, vendor_amount, paid_amount, created_at"
         )
         .eq("vendor_profile_id", vendorProfile.id),
+      supabase
+        .from("payments")
+        .select("booking_id, kind, amount, is_paid")
+        .eq("vendor_profile_id", vendorProfile.id)
+        .eq("kind", "VENDOR_OUT"),
       supabase
         .from("vendor_profile_views")
         .select("id", { count: "exact", head: true })
@@ -108,6 +113,7 @@ export async function GET() {
 
     const failedQuery = [
       { name: "bookings", error: bookingsResult.error },
+      { name: "payouts", error: payoutsResult.error },
       { name: "profile views", error: profileViewsResult.error },
     ].find((result) => result.error);
 
@@ -121,6 +127,10 @@ export async function GET() {
 
     const bookings = bookingsResult.data;
     const profileViewsCount = profileViewsResult.count;
+    // Payout progress comes from the ledger, where a VENDOR_OUT row means money
+    // actually paid to this vendor. bookings.paid_amount cannot be used: it is a
+    // single figure that client surfaces read as collection progress.
+    const payoutsByBooking = totalsByBooking(payoutsResult.data ?? []);
 
     const weeklyInquiryVolume = Array.from({ length: 6 }, (_, index) => {
       const start = new Date(currentWeekStart);
@@ -146,7 +156,7 @@ export async function GET() {
       bookingsByStatus[booking.status] =
         (bookingsByStatus[booking.status] ?? 0) + 1;
       const amount = currentVendorAmount(booking);
-      const paidAmount = paidTowardVendorAmount(booking, amount);
+      const paidAmount = paidTowardVendorAmount(booking.id, payoutsByBooking, amount);
 
       if (PAID_TO_DATE_STATUSES.has(booking.status)) {
         paidToDate += paidAmount;
