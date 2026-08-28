@@ -12,6 +12,11 @@ import {
   evaluateEventReadiness,
   type EventReadinessRow,
 } from "@/lib/event-readiness";
+import {
+  bookingPaymentSummary,
+  totalsFromPayments,
+  type PaymentLedgerRow,
+} from "@/lib/payment-ledger";
 import type { Database } from "@/types/database.types";
 
 type BookingUpdate = Database["public"]["Tables"]["bookings"]["Update"];
@@ -30,6 +35,7 @@ type RawBooking = {
   service_fee: number | null;
   price_published: boolean | null;
   updated_at: string;
+  payments?: PaymentLedgerRow[] | null;
   vendor:
     | { business_name: string | null; category: { name: string | null } | { name: string | null }[] | null }
     | { business_name: string | null; category: { name: string | null } | { name: string | null }[] | null }[]
@@ -115,6 +121,7 @@ export async function GET() {
         .from("bookings")
         .select(
           `id, wedding_event_id, status, vendor_amount, final_price, service_fee, price_published, updated_at,
+           payments(booking_id, kind, amount, is_paid, voided_at),
            vendor:vendor_profiles(business_name, category:vendor_categories(name)),
            service:vendor_services(name, base_price)`
         )
@@ -155,6 +162,8 @@ export async function GET() {
       let finalTotal = 0;
       let vendorTotal = 0;
       let feeTotal = 0;
+      let clientCollected = 0;
+      let vendorPaid = 0;
       let bookingCount = 0;
       let pricedCount = 0;
       let eventCount = 0;
@@ -176,6 +185,11 @@ export async function GET() {
               (finalPrice != null && vendorPrice != null
                 ? finalPrice - vendorPrice
                 : null);
+            const paymentSummary = bookingPaymentSummary({
+              rows: b.payments ?? [],
+              finalPrice,
+              vendorAmount: vendorPrice,
+            });
             bookingCount += 1;
             if (finalPrice != null) {
               pricedCount += 1;
@@ -183,6 +197,8 @@ export async function GET() {
               if (vendorPrice != null) vendorTotal += vendorPrice;
               if (fee != null) feeTotal += fee;
             }
+            clientCollected += paymentSummary.clientPaid;
+            vendorPaid += paymentSummary.vendorPaid;
             return {
               id: b.id,
               status: b.status ?? "INQUIRY",
@@ -193,6 +209,7 @@ export async function GET() {
               finalPrice,
               pricePublished: Boolean(b.price_published),
               fee,
+              paymentSummary,
               updatedAt: b.updated_at,
             };
           });
@@ -225,6 +242,8 @@ export async function GET() {
           finalTotal,
           vendorTotal,
           feeTotal,
+          clientCollected,
+          vendorPaid,
           bookingCount,
           pricedCount,
         },
@@ -354,6 +373,46 @@ export async function PATCH(request: NextRequest) {
     }
     if (nextFinalPrice == null && current.price_published) {
       updates.price_published = false;
+    }
+
+    const { data: paymentRows, error: paymentRowsError } = await supabase
+      .from("payments")
+      .select("kind, amount, is_paid, voided_at")
+      .eq("booking_id", bookingId)
+      .is("voided_at", null);
+    if (paymentRowsError) {
+      console.error("PATCH /api/admin/pricing payments:", paymentRowsError);
+      return apiError("Failed to validate payment history", 500);
+    }
+    const paymentTotals = totalsFromPayments(paymentRows ?? []);
+    const clientRecorded =
+      paymentTotals.clientPaid + paymentTotals.clientScheduled;
+    const vendorRecorded =
+      paymentTotals.vendorPaid + paymentTotals.vendorScheduled;
+
+    if (nextFinalPrice == null && clientRecorded > 0) {
+      return apiError(
+        "Void the recorded client receipts before clearing the final price",
+        409
+      );
+    }
+    if (nextVendorPrice == null && vendorRecorded > 0) {
+      return apiError(
+        "Void the recorded vendor payouts before clearing the vendor price",
+        409
+      );
+    }
+    if (nextFinalPrice != null && nextFinalPrice < clientRecorded) {
+      return apiError(
+        `Final price cannot be lower than the ${clientRecorded.toLocaleString("en-IN")} already received or scheduled`,
+        409
+      );
+    }
+    if (nextVendorPrice != null && nextVendorPrice < vendorRecorded) {
+      return apiError(
+        `Vendor price cannot be lower than the ${vendorRecorded.toLocaleString("en-IN")} already paid or scheduled`,
+        409
+      );
     }
 
     const { data, error } = await supabase

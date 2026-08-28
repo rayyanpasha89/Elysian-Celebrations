@@ -13,6 +13,10 @@ import {
   type EventReadinessResult,
   type EventReadinessRow,
 } from "@/lib/event-readiness";
+import {
+  totalsFromPayments,
+  type PaymentLedgerRow,
+} from "@/lib/payment-ledger";
 
 async function getClientProfileId(userId: string) {
   const supabase = createAdminSupabaseClient();
@@ -275,6 +279,7 @@ type RawBudgetBookingRow = {
   final_price: number | null;
   price_published: boolean | null;
   paid_amount: number | null;
+  payments?: PaymentLedgerRow[] | null;
   status: string | null;
   vendor:
     | {
@@ -324,6 +329,7 @@ async function getPlanVendorLineItems(
     .from("bookings")
     .select(
       `id, wedding_event_id, total_amount, final_price, price_published, paid_amount, status,
+       payments(booking_id, kind, amount, is_paid, voided_at),
        vendor:vendor_profiles(business_name, category:vendor_categories(slug)),
        service:vendor_services(name, base_price)`
     )
@@ -396,7 +402,7 @@ async function getPlanVendorLineItems(
       estimatedCost: visibleCost,
       displayCost: visibleCost,
       costState: finalPriceVisible ? "final" : "estimate",
-      paidAmount: Math.max(0, Math.round(row.paid_amount ?? 0)),
+      paidAmount: totalsFromPayments(row.payments ?? []).clientPaid,
       status: row.status ?? "INQUIRY",
       stage: bookingStage(row.status),
     });

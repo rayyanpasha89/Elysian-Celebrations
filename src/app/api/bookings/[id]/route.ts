@@ -50,13 +50,6 @@ function isWritableBookingStatus(value: unknown): value is WritableBookingStatus
   return typeof value === "string" && WRITABLE_BOOKING_STATUSES.has(value);
 }
 
-function normalizeMoney(value: unknown) {
-  if (value === null) return undefined;
-  const amount = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(amount) || amount < 0) return undefined;
-  return Math.floor(amount);
-}
-
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -76,7 +69,7 @@ export async function PATCH(
     const { data: booking, error: loadErr } = await supabase
       .from("bookings")
       .select(
-        "id, status, total_amount, vendor_amount, paid_amount, notes, client:client_profiles(user_id), vendor:vendor_profiles(user_id)"
+        "id, status, notes, client:client_profiles(user_id), vendor:vendor_profiles(user_id)"
       )
       .eq("id", id)
       .maybeSingle();
@@ -104,8 +97,11 @@ export async function PATCH(
         403
       );
     }
-    if (body.paidAmount !== undefined && !isOperationsRole) {
-      return apiError("Only the operations team can update payments", 403);
+    if (body.paidAmount !== undefined) {
+      return apiError(
+        "Use the client-receipt or vendor-payout ledger to record money movement",
+        400
+      );
     }
     const allowedFields: BookingUpdate = {};
     if (body.status !== undefined) {
@@ -126,11 +122,6 @@ export async function PATCH(
         }
       }
       allowedFields.status = body.status;
-    }
-    if (body.paidAmount !== undefined) {
-      const paidAmount = normalizeMoney(body.paidAmount);
-      if (paidAmount === undefined) return apiError("Invalid paid amount", 400);
-      allowedFields.paid_amount = paidAmount;
     }
     if (body.notes !== undefined) {
       if (!isClientOwner && !isOperationsRole) {
@@ -155,7 +146,7 @@ export async function PATCH(
 
     const { data: updated, error } = await updateQuery
       .select(
-        "id, status, paid_amount, notes, updated_at"
+        "id, status, notes, updated_at"
       )
       .maybeSingle();
 

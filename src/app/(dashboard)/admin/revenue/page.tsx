@@ -13,6 +13,14 @@ type Booking = {
   finalPrice: number | null;
   fee: number | null;
   pricePublished: boolean;
+  paymentSummary?: {
+    clientPaid: number;
+    clientScheduled: number;
+    vendorPaid: number;
+    vendorScheduled: number;
+    clientDue: number | null;
+    vendorDue: number | null;
+  };
 };
 type AdminEvent = { id: string; name: string; bookings: Booking[] };
 type AdminDay = { id: string; name: string; events: AdminEvent[] };
@@ -24,6 +32,8 @@ type AdminClient = {
     finalTotal: number;
     vendorTotal: number;
     feeTotal: number;
+    clientCollected: number;
+    vendorPaid: number;
     bookingCount: number;
     pricedCount: number;
   };
@@ -65,9 +75,10 @@ export default function AdminRevenuePage() {
     let finalTotal = 0;
     let vendorTotal = 0;
     let feeTotal = 0;
+    let clientCollected = 0;
+    let vendorPaid = 0;
     let bookings = 0;
     let priced = 0;
-    let published = 0;
     const byCategory = new Map<
       string,
       { finalTotal: number; vendorTotal: number; feeTotal: number; count: number }
@@ -78,7 +89,8 @@ export default function AdminRevenuePage() {
         for (const event of day.events) {
           for (const booking of event.bookings) {
             bookings += 1;
-            if (booking.pricePublished) published += 1;
+            clientCollected += booking.paymentSummary?.clientPaid ?? 0;
+            vendorPaid += booking.paymentSummary?.vendorPaid ?? 0;
 
             const category = byCategory.get(booking.categoryName) ?? {
               finalTotal: 0,
@@ -126,9 +138,10 @@ export default function AdminRevenuePage() {
       finalTotal,
       vendorTotal,
       feeTotal,
+      clientCollected,
+      vendorPaid,
       bookings,
       priced,
-      published,
       categories,
       clientRows,
     };
@@ -166,11 +179,13 @@ export default function AdminRevenuePage() {
               </span>
             </span>
           </div>
-          <div className="mt-6 grid grid-cols-2 gap-px overflow-hidden border border-ivory/10 bg-ivory/10 sm:grid-cols-4">
+          <div className="mt-6 grid grid-cols-2 gap-px overflow-hidden border border-ivory/10 bg-ivory/10 sm:grid-cols-3 lg:grid-cols-6">
             <DarkFig label="Final value" value={lakh(data.finalTotal)} />
             <DarkFig label="Vendor base" value={lakh(data.vendorTotal)} />
+            <DarkFig label="Fee" value={lakh(data.feeTotal)} />
+            <DarkFig label="Client received" value={lakh(data.clientCollected)} />
+            <DarkFig label="Vendor paid" value={lakh(data.vendorPaid)} />
             <DarkFig label="Picks priced" value={`${data.priced}/${data.bookings}`} />
-            <DarkFig label="Published" value={String(data.published)} />
           </div>
         </div>
       </section>

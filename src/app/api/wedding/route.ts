@@ -25,6 +25,10 @@ import {
   evaluateEventReadiness,
   type EventReadinessResult,
 } from "@/lib/event-readiness";
+import {
+  totalsFromPayments,
+  type PaymentLedgerRow,
+} from "@/lib/payment-ledger";
 
 type WeddingEventRow = {
   id: string;
@@ -115,6 +119,7 @@ type EventBookingRow = {
   final_price: number | null;
   price_published: boolean | null;
   paid_amount: number | null;
+  payments?: PaymentLedgerRow[] | null;
   vendor:
     | {
         id: string;
@@ -372,6 +377,7 @@ export async function GET() {
           .from("bookings")
           .select(
             `id, wedding_event_id, status, event_date, notes, total_amount, final_price, price_published, paid_amount,
+            payments(booking_id, kind, amount, is_paid, voided_at),
             vendor:vendor_profiles(id, business_name, slug, category:vendor_categories(name, slug)),
             service:vendor_services(id, name, description, service_scope, base_price, max_price, unit, event_type_fit, inclusions, deliverables, add_ons, items:vendor_service_items(id, item_type, name, description, dietary_tags, image_urls, reference_url, sort_order))`
           )
@@ -581,7 +587,7 @@ export async function GET() {
                 booking.price_published === true
                   ? booking.final_price
                   : null,
-              paidAmount: booking.paid_amount,
+              paidAmount: totalsFromPayments(booking.payments ?? []).clientPaid,
               vendor: booking.vendor
                 ? {
                     id: booking.vendor.id,

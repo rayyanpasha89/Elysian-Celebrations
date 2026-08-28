@@ -27,6 +27,13 @@ type ApiBooking = {
   event_date: string | null;
   total_amount: number | null;
   pricing_state: "agreed" | "pending_agreement";
+  payment_summary?: {
+    paid: number;
+    scheduled: number;
+    target: number | null;
+    due: number | null;
+    direction: "VENDOR_OUT";
+  };
   notes: string | null;
   client: {
     partner_name?: string;
@@ -360,6 +367,10 @@ export default function VendorBookingsPage() {
                         ? "Pending Elysian"
                         : formatCurrency(b.agreedPayout)}
                     </p>
+                    <p>
+                      <span className={dashLabel}>Paid by Elysian </span>
+                      {formatCurrency(b.raw.payment_summary?.paid ?? 0)}
+                    </p>
                     {b.vendorLoadInTime ? (
                       <p className="sm:col-span-2">
                         <span className={dashLabel}>Vendor load-in </span>
@@ -468,6 +479,30 @@ function VendorBookingBrief({
             ? "Elysian will record your payout after pricing is agreed offline. No pricing action is required here."
             : "Recorded by Elysian after the offline pricing handoff. This is the only booking price shown in your workspace."}
         </p>
+        {agreedPayout != null ? (
+          <div className="mt-4 grid grid-cols-2 gap-2 border-t border-gold-primary/20 pt-3">
+            <div>
+              <p className={dashLabel}>Paid by Elysian</p>
+              <p className="mt-1 font-display text-lg text-charcoal">
+                {formatCurrency(booking.payment_summary?.paid ?? 0)}
+              </p>
+            </div>
+            <div>
+              <p className={dashLabel}>Remaining payout</p>
+              <p className="mt-1 font-display text-lg text-charcoal">
+                {formatCurrency(
+                  booking.payment_summary?.due ?? agreedPayout
+                )}
+              </p>
+            </div>
+            {(booking.payment_summary?.scheduled ?? 0) > 0 ? (
+              <p className="col-span-2 text-xs text-gold-dark">
+                {formatCurrency(booking.payment_summary?.scheduled ?? 0)} is scheduled
+                and will count after settlement.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {booking.event_context ? (

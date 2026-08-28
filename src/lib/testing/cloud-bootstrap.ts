@@ -975,6 +975,7 @@ const BOOKING_FIXTURES = [
     status: "CONFIRMED",
     totalAmount: 360000,
     paidAmount: 120000,
+    vendorPaidAmount: 0,
     notes: "Need one sunrise couple session the morning after the wedding.",
   },
   {
@@ -986,6 +987,7 @@ const BOOKING_FIXTURES = [
     status: "INQUIRY",
     totalAmount: 325000,
     paidAmount: 0,
+    vendorPaidAmount: 0,
     notes: "Family wants a richer stage look and lounge corners for elderly guests.",
   },
   {
@@ -997,6 +999,7 @@ const BOOKING_FIXTURES = [
     status: "DEPOSIT_PAID",
     totalAmount: 920000,
     paidAmount: 280000,
+    vendorPaidAmount: 150000,
     notes: "Need Jain menu options and breakfast hampers for room drops.",
   },
   {
@@ -1008,6 +1011,7 @@ const BOOKING_FIXTURES = [
     status: "INQUIRY",
     totalAmount: 125000,
     paidAmount: 0,
+    vendorPaidAmount: 0,
     notes: "Couple wants a lighter set that can move from afrobeats into classic Bollywood.",
   },
   {
@@ -1019,6 +1023,7 @@ const BOOKING_FIXTURES = [
     status: "CONFIRMED",
     totalAmount: 98000,
     paidAmount: 30000,
+    vendorPaidAmount: 0,
     notes: "Need humidity-friendly finish and a touch-up artist on standby.",
   },
   {
@@ -1030,6 +1035,7 @@ const BOOKING_FIXTURES = [
     status: "COMPLETED",
     totalAmount: 420000,
     paidAmount: 420000,
+    vendorPaidAmount: 420000,
     notes: "Planning retainer closed after final reconciliation.",
   },
 ] as const;
@@ -1396,6 +1402,10 @@ async function resetFixtureData(
 
     const bookingIds = (bookingRows ?? []).map((row) => row.id as string);
     if (bookingIds.length > 0) {
+      await ensureSuccess(
+        "Clearing booking payments",
+        supabase.from("payments").delete().in("booking_id", bookingIds)
+      );
       await ensureSuccess(
         "Clearing booking messages",
         supabase.from("messages").delete().in("booking_id", bookingIds)
@@ -1991,6 +2001,54 @@ async function seedBookings(
     }
 
     bookingIds.set(fixture.key, (booking as BookingRecord).id);
+
+    if (fixture.paidAmount > 0) {
+      const { error: clientPaymentError } = await supabase.rpc(
+        "record_booking_payment",
+        {
+          p_booking_id: (booking as BookingRecord).id,
+          p_kind: "CLIENT_IN",
+          p_amount: fixture.paidAmount,
+          p_label: "Fixture client receipt",
+          p_due_date: null as unknown as string,
+          p_is_paid: true,
+          p_paid_at: new Date().toISOString(),
+          p_method: "BANK",
+          p_reference: `fixture-${fixture.key}-client`,
+          p_notes: "Deterministic cloud-test payment fixture.",
+          p_actor_user_id: "cloud-bootstrap",
+        }
+      );
+      if (clientPaymentError) {
+        throw new Error(
+          `Creating client payment ${fixture.key}: ${clientPaymentError.message}`
+        );
+      }
+    }
+
+    if (fixture.vendorPaidAmount > 0) {
+      const { error: vendorPaymentError } = await supabase.rpc(
+        "record_booking_payment",
+        {
+          p_booking_id: (booking as BookingRecord).id,
+          p_kind: "VENDOR_OUT",
+          p_amount: fixture.vendorPaidAmount,
+          p_label: "Fixture vendor payout",
+          p_due_date: null as unknown as string,
+          p_is_paid: true,
+          p_paid_at: new Date().toISOString(),
+          p_method: "BANK",
+          p_reference: `fixture-${fixture.key}-vendor`,
+          p_notes: "Deterministic cloud-test payout fixture.",
+          p_actor_user_id: "cloud-bootstrap",
+        }
+      );
+      if (vendorPaymentError) {
+        throw new Error(
+          `Creating vendor payout ${fixture.key}: ${vendorPaymentError.message}`
+        );
+      }
+    }
   }
 
   return bookingIds;

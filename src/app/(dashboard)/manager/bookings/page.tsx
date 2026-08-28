@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer, staggerItem } from "@/animations/variants";
 import { DashboardLoadError } from "@/components/dashboard/dashboard-load-error";
+import { BookingPaymentLedger } from "@/components/dashboard/booking-payment-ledger";
 import { ListEmptyState } from "@/components/dashboard/list-empty-state";
 import { dashBtn, dashCard, dashLabel, statusBadgeBase } from "@/lib/dashboard-styles";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -17,7 +18,20 @@ type BookingRow = {
   status: string;
   event_date: string | null;
   total_amount: number | null;
+  vendor_amount?: number | null;
+  final_price?: number | null;
+  service_fee?: number | null;
   paid_amount: number | null;
+  payment_summary?: {
+    clientPaid: number;
+    clientScheduled: number;
+    vendorPaid: number;
+    vendorScheduled: number;
+    clientTarget: number | null;
+    clientDue: number | null;
+    vendorTarget: number | null;
+    vendorDue: number | null;
+  };
   notes: string | null;
   client: { partner_name?: string } | null;
   vendor: { business_name?: string } | null;
@@ -210,15 +224,16 @@ export default function ManagerBookingsPage() {
       confirmed: list.filter((booking) => booking.ui === "CONFIRMED").length,
       revenue: list.reduce(
         (sum, booking) =>
-          booking.ui === "CANCELLED" ? sum : sum + (booking.total_amount ?? 0),
+          booking.ui === "CANCELLED"
+            ? sum
+            : sum + (booking.final_price ?? booking.total_amount ?? 0),
         0
       ),
       due: list.reduce(
         (sum, booking) =>
           booking.ui === "CANCELLED"
             ? sum
-            : sum +
-              Math.max(0, (booking.total_amount ?? 0) - (booking.paid_amount ?? 0)),
+            : sum + (booking.payment_summary?.clientDue ?? 0),
         0
       ),
     }),
@@ -339,7 +354,9 @@ export default function ManagerBookingsPage() {
                     </p>
                     <p>
                       <span className={dashLabel}>Amount </span>
-                      {formatCurrency(booking.total_amount ?? 0)}
+                      {formatCurrency(
+                        booking.final_price ?? booking.total_amount ?? 0
+                      )}
                     </p>
                     <p>
                       <span className={dashLabel}>Venue </span>
@@ -391,6 +408,7 @@ export default function ManagerBookingsPage() {
                 onStatusChange={(status) =>
                   void updateBooking(selectedBooking.id, status)
                 }
+                onLedgerChanged={() => void loadBookings()}
               />
             ) : (
               <ListEmptyState
@@ -409,6 +427,7 @@ function ManagerBookingBrief({
   booking,
   savingStatus,
   onStatusChange,
+  onLedgerChanged,
 }: {
   booking: BookingRow & {
     clientName: string;
@@ -418,14 +437,15 @@ function ManagerBookingBrief({
   };
   savingStatus: boolean;
   onStatusChange: (status: string) => void;
+  onLedgerChanged: () => void;
 }) {
   const serviceItems = (booking.service?.items ?? [])
     .slice()
     .sort((left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0));
-  const remaining = Math.max(
-    0,
-    (booking.total_amount ?? 0) - (booking.paid_amount ?? 0)
-  );
+  const clientTotal = booking.final_price ?? booking.total_amount ?? 0;
+  const clientPaid = booking.payment_summary?.clientPaid ?? booking.paid_amount ?? 0;
+  const clientDue =
+    booking.payment_summary?.clientDue ?? Math.max(0, clientTotal - clientPaid);
 
   return (
     <div className="mt-4 space-y-5">
@@ -446,14 +466,19 @@ function ManagerBookingBrief({
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <ManagerMetric label="Total" value={formatCurrency(booking.total_amount ?? 0)} />
-        <ManagerMetric label="Paid" value={formatCurrency(booking.paid_amount ?? 0)} />
-        <ManagerMetric label="Due" value={formatCurrency(remaining)} />
+        <ManagerMetric label="Client total" value={formatCurrency(clientTotal)} />
+        <ManagerMetric label="Client received" value={formatCurrency(clientPaid)} />
+        <ManagerMetric label="Client due" value={formatCurrency(clientDue)} />
         <ManagerMetric
-          label="Event estimate"
-          value={formatCurrency(booking.event_context?.estimatedBudget ?? 0)}
+          label="Vendor paid"
+          value={formatCurrency(booking.payment_summary?.vendorPaid ?? 0)}
         />
       </div>
+
+      <BookingPaymentLedger
+        bookingId={booking.id}
+        onLedgerChanged={onLedgerChanged}
+      />
 
       {booking.event_context ? (
         <div className="border border-charcoal/8 bg-cream/40 p-4">

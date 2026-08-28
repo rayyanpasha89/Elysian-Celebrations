@@ -897,6 +897,13 @@ export type Database = {
           "method": string | null
           "sort_order": number
           "created_at": string
+          "reference": string | null
+          "notes": string | null
+          "created_by": string | null
+          "updated_at": string
+          "voided_at": string | null
+          "voided_by": string | null
+          "void_reason": string | null
         }
         Insert:
         {
@@ -907,13 +914,20 @@ export type Database = {
           "wedding_id"?: string | null
           "booking_id"?: string | null
           "label"?: string | null
-          "amount"?: number
+          "amount": number
           "due_date"?: string | null
           "is_paid"?: boolean
           "paid_at"?: string | null
           "method"?: string | null
           "sort_order"?: number
           "created_at"?: string
+          "reference"?: string | null
+          "notes"?: string | null
+          "created_by"?: string | null
+          "updated_at"?: string
+          "voided_at"?: string | null
+          "voided_by"?: string | null
+          "void_reason"?: string | null
         }
         Update:
         {
@@ -931,6 +945,13 @@ export type Database = {
           "method"?: string | null
           "sort_order"?: number
           "created_at"?: string
+          "reference"?: string | null
+          "notes"?: string | null
+          "created_by"?: string | null
+          "updated_at"?: string
+          "voided_at"?: string | null
+          "voided_by"?: string | null
+          "void_reason"?: string | null
         }
         Relationships: [
           {
@@ -1865,7 +1886,6 @@ export type Database = {
           "name": string
           "date": string | null
           "venue": string | null
-          "venue_id": string | null
           "notes": string | null
           "sort_order": number
           "created_at": string
@@ -1883,6 +1903,7 @@ export type Database = {
           "attire_notes": string | null
           "time_block": string | null
           "requirement_payload": Json
+          "venue_id": string | null
         }
         Insert:
         {
@@ -1891,7 +1912,6 @@ export type Database = {
           "name": string
           "date"?: string | null
           "venue"?: string | null
-          "venue_id"?: string | null
           "notes"?: string | null
           "sort_order"?: number
           "created_at"?: string
@@ -1909,6 +1929,7 @@ export type Database = {
           "attire_notes"?: string | null
           "time_block"?: string | null
           "requirement_payload"?: Json
+          "venue_id"?: string | null
         }
         Update:
         {
@@ -1917,7 +1938,6 @@ export type Database = {
           "name"?: string
           "date"?: string | null
           "venue"?: string | null
-          "venue_id"?: string | null
           "notes"?: string | null
           "sort_order"?: number
           "created_at"?: string
@@ -1935,8 +1955,16 @@ export type Database = {
           "attire_notes"?: string | null
           "time_block"?: string | null
           "requirement_payload"?: Json
+          "venue_id"?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "wedding_events_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "wedding_events_wedding_day_id_fkey"
             columns: ["wedding_day_id"]
@@ -2049,6 +2077,22 @@ export type Database = {
         }
         Returns: string
       }
+      "record_booking_payment": {
+        Args: {
+          "p_booking_id": string
+          "p_kind": string
+          "p_amount": number
+          "p_label": string
+          "p_due_date": string
+          "p_is_paid": boolean
+          "p_paid_at": string
+          "p_method": string
+          "p_reference": string
+          "p_notes": string
+          "p_actor_user_id": string
+        }
+        Returns: string
+      }
       "release_vendor_media_bytes": {
         Args: {
           "p_vendor_profile_id": string
@@ -2069,6 +2113,26 @@ export type Database = {
           "reserved_bytes": number
           "remaining_bytes": number
         }[]
+      }
+      "settle_booking_payment": {
+        Args: {
+          "p_booking_id": string
+          "p_payment_id": string
+          "p_method": string
+          "p_paid_at": string
+          "p_reference": string
+          "p_actor_user_id": string
+        }
+        Returns: string
+      }
+      "void_booking_payment": {
+        Args: {
+          "p_booking_id": string
+          "p_payment_id": string
+          "p_reason": string
+          "p_actor_user_id": string
+        }
+        Returns: string
       }
     }
     Enums: {

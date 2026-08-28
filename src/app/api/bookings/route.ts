@@ -11,6 +11,11 @@ import {
   evaluateEventReadiness,
   type EventReadinessRow,
 } from "@/lib/event-readiness";
+import {
+  bookingPaymentSummary,
+  visiblePaymentRows,
+  type PaymentLedgerRow,
+} from "@/lib/payment-ledger";
 import type { Database } from "@/types/database.types";
 
 type BookingStatus = Database["public"]["Enums"]["booking_status"];
@@ -30,7 +35,7 @@ function isBookingStatus(value: string): value is BookingStatus {
   return BOOKING_STATUSES.has(value);
 }
 
-const BOOKING_SELECT = `id, client_profile_id, vendor_profile_id, vendor_service_id, wedding_event_id, status, event_date, total_amount, vendor_amount, final_price, price_published, service_fee, paid_amount, notes, created_at, updated_at, client:client_profiles(id, partner_name, weddings(destination:destinations(name))), vendor:vendor_profiles(business_name, slug), service:vendor_services(id, name, description, service_scope, base_price, max_price, unit, event_type_fit, inclusions, deliverables, add_ons, items:vendor_service_items(id, item_type, name, description, dietary_tags, image_urls, reference_url, sort_order)), event:wedding_events(id, name, event_type, date, start_time, end_time, venue, guest_count, estimated_budget, food_style, menu_notes, decor_style, decor_notes, attire_notes, notes, wedding_day:wedding_days(id, name, date, notes), logistics:wedding_event_logistics(guest_arrival_time, vendor_load_in_time, family_call_time, transport_notes, rooming_notes, weather_plan, ceremony_notes), menus:wedding_event_menus(id, name, meal_period, service_style, notes, sort_order, items:wedding_event_menu_items(id, name, course, dietary_tags, notes, sort_order)))`;
+const BOOKING_SELECT = `id, client_profile_id, vendor_profile_id, vendor_service_id, wedding_event_id, status, event_date, total_amount, vendor_amount, final_price, price_published, service_fee, paid_amount, notes, created_at, updated_at, payments(id, booking_id, kind, label, amount, due_date, is_paid, paid_at, method, reference, notes, voided_at, void_reason, created_at), client:client_profiles(id, partner_name, weddings(destination:destinations(name))), vendor:vendor_profiles(business_name, slug), service:vendor_services(id, name, description, service_scope, base_price, max_price, unit, event_type_fit, inclusions, deliverables, add_ons, items:vendor_service_items(id, item_type, name, description, dietary_tags, image_urls, reference_url, sort_order)), event:wedding_events(id, name, event_type, date, start_time, end_time, venue, guest_count, estimated_budget, food_style, menu_notes, decor_style, decor_notes, attire_notes, notes, wedding_day:wedding_days(id, name, date, notes), logistics:wedding_event_logistics(guest_arrival_time, vendor_load_in_time, family_call_time, transport_notes, rooming_notes, weather_plan, ceremony_notes), menus:wedding_event_menus(id, name, meal_period, service_style, notes, sort_order, items:wedding_event_menu_items(id, name, course, dietary_tags, notes, sort_order)))`;
 
 type Relation<T> = T | T[] | null | undefined;
 
@@ -100,6 +105,8 @@ type BookingRow = {
   final_price?: number | null;
   price_published?: boolean | null;
   service_fee?: number | null;
+  paid_amount?: number | null;
+  payments?: PaymentLedgerRow[] | null;
   event?: Relation<BookingEventRow>;
 };
 
@@ -203,6 +210,13 @@ function withRoleSafePricing<T extends BookingRow>(
     clientFinalPriceVisible &&
     booking.price_published === true &&
     booking.final_price != null;
+  const paymentRows = booking.payments ?? [];
+  const paymentSummary = bookingPaymentSummary({
+    rows: paymentRows,
+    finalPrice:
+      role === "client" && !finalVisibleToClient ? null : booking.final_price,
+    vendorAmount: role === "client" ? null : booking.vendor_amount,
+  });
 
   const safe = { ...enriched } as Record<string, unknown>;
   safe.client = stripRelationUserId(safe.client);
@@ -212,23 +226,45 @@ function withRoleSafePricing<T extends BookingRow>(
   delete safe.final_price;
   delete safe.price_published;
   delete safe.service_fee;
+  delete safe.paid_amount;
+  delete safe.payments;
   delete safe.event;
+
+  safe.payments = visiblePaymentRows(paymentRows, role);
 
   if (role === "client") {
     safe.total_amount = finalVisibleToClient
       ? booking.final_price
       : null;
     safe.pricing_state = finalVisibleToClient ? "final" : "pending";
+    safe.paid_amount = paymentSummary.clientPaid;
+    safe.payment_summary = {
+      paid: paymentSummary.clientPaid,
+      scheduled: paymentSummary.clientScheduled,
+      target: finalVisibleToClient ? paymentSummary.clientTarget : null,
+      due: finalVisibleToClient ? paymentSummary.clientDue : null,
+      direction: "CLIENT_IN",
+    };
   } else if (role === "vendor") {
     safe.total_amount = booking.vendor_amount ?? null;
     safe.pricing_state =
       booking.vendor_amount != null ? "agreed" : "pending_agreement";
+    safe.paid_amount = paymentSummary.vendorPaid;
+    safe.payment_summary = {
+      paid: paymentSummary.vendorPaid,
+      scheduled: paymentSummary.vendorScheduled,
+      target: paymentSummary.vendorTarget,
+      due: paymentSummary.vendorDue,
+      direction: "VENDOR_OUT",
+    };
   } else if (role === "admin") {
     safe.vendor_amount = booking.vendor_amount ?? null;
     safe.final_price = booking.final_price ?? null;
     safe.price_published = Boolean(booking.price_published);
     safe.service_fee = booking.service_fee ?? null;
     safe.pricing_state = booking.price_published ? "published" : "draft";
+    safe.paid_amount = paymentSummary.clientPaid;
+    safe.payment_summary = paymentSummary;
   } else {
     const publishedFinal =
       booking.price_published && booking.final_price != null
@@ -241,6 +277,11 @@ function withRoleSafePricing<T extends BookingRow>(
         : booking.vendor_amount != null
           ? "agreed"
           : "pending_agreement";
+    safe.vendor_amount = booking.vendor_amount ?? null;
+    safe.final_price = booking.final_price ?? null;
+    safe.service_fee = booking.service_fee ?? null;
+    safe.paid_amount = paymentSummary.clientPaid;
+    safe.payment_summary = paymentSummary;
   }
 
   return safe;

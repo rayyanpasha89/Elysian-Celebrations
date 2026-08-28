@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import { ArrowLeft, BadgeIndianRupee, IndianRupee } from "lucide-react";
+import { BookingPaymentLedger } from "@/components/dashboard/booking-payment-ledger";
 import {
   CelebrationCanvas,
   type CanvasDay,
@@ -723,6 +724,12 @@ function PricingEditor({
               </button>
             )}
           </div>
+
+          <BookingPaymentLedger
+            key={booking.updatedAt}
+            bookingId={booking.id}
+            className="mt-6"
+          />
         </div>
       </motion.div>
     </motion.div>

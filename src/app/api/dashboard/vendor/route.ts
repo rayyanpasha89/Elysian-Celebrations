@@ -6,6 +6,7 @@ import {
   apiError,
   apiSuccess,
 } from "@/lib/api-utils";
+import { totalsByBooking, type PaymentTotals } from "@/lib/payment-ledger";
 
 const ACTIVE_BOOKING_STATUSES = ["CONFIRMED", "DEPOSIT_PAID"] as const;
 const ACTIVE_BOOKING_STATUS_SET = new Set<string>(ACTIVE_BOOKING_STATUSES);
@@ -37,14 +38,11 @@ function currentVendorAmount(booking: {
 }
 
 function paidTowardVendorAmount(
-  booking: {
-    paid_amount?: number | null;
-    vendor_amount?: number | null;
-    total_amount?: number | null;
-  },
-  amount = currentVendorAmount(booking)
+  bookingId: string,
+  payouts: Map<string, PaymentTotals>,
+  amount: number
 ) {
-  return Math.min(amount, Math.max(0, booking.paid_amount ?? 0));
+  return Math.min(amount, payouts.get(bookingId)?.vendorPaid ?? 0);
 }
 
 function eventLocation(event: WeddingEventRelation | null) {
@@ -111,6 +109,7 @@ export async function GET() {
       pendingInquiriesResult,
       activeBookingsResult,
       bookingAmountsResult,
+      payoutRowsResult,
       reviewsResult,
       inquiryRowsResult,
       upcomingResult,
@@ -132,8 +131,13 @@ export async function GET() {
         .in("status", [...ACTIVE_BOOKING_STATUSES]),
       supabase
         .from("bookings")
-        .select("status, total_amount, vendor_amount, paid_amount")
+        .select("id, status, total_amount, vendor_amount")
         .eq("vendor_profile_id", vp.id),
+      supabase
+        .from("payments")
+        .select("booking_id, kind, amount, is_paid, voided_at")
+        .eq("vendor_profile_id", vp.id)
+        .eq("kind", "VENDOR_OUT"),
       supabase
         .from("reviews")
         .select("rating")
@@ -171,6 +175,7 @@ export async function GET() {
       { name: "pending inquiries", error: pendingInquiriesResult.error },
       { name: "active bookings", error: activeBookingsResult.error },
       { name: "booking amounts", error: bookingAmountsResult.error },
+      { name: "vendor payouts", error: payoutRowsResult.error },
       { name: "reviews", error: reviewsResult.error },
       { name: "inquiry list", error: inquiryRowsResult.error },
       { name: "upcoming events", error: upcomingResult.error },
@@ -192,13 +197,18 @@ export async function GET() {
     const inquiryRows = inquiryRowsResult.data;
     const upcoming = upcomingResult.data;
     const profileViewsCount = profileViewsResult.count;
+    const payoutsByBooking = totalsByBooking(payoutRowsResult.data ?? []);
 
     let paidToDate = 0;
     let outstandingAmount = 0;
 
     for (const booking of bookingAmountsResult.data ?? []) {
       const amount = currentVendorAmount(booking);
-      const paidAmount = paidTowardVendorAmount(booking, amount);
+      const paidAmount = paidTowardVendorAmount(
+        booking.id,
+        payoutsByBooking,
+        amount
+      );
 
       if (PAID_TO_DATE_STATUSES.has(booking.status)) {
         paidToDate += paidAmount;

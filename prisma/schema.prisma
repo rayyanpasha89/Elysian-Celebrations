@@ -103,6 +103,7 @@ model ClientProfile {
   savedVendors SavedVendor[]
   inquiries    ContactInquiry[]
   moodBoards   MoodBoard[]
+  payments     Payment[]
 
   @@map("client_profiles")
 }
@@ -128,6 +129,7 @@ model Wedding {
   days          WeddingDay[]
   events        WeddingEvent[]
   timeline      TimelineItem[]
+  payments      Payment[]
 
   @@map("weddings")
 }
@@ -310,6 +312,7 @@ model VendorProfile {
   destinations      VendorDestination[]
   profileViews      VendorProfileView[]
   eventRequirements WeddingEventRequirement[]
+  payments          Payment[]
 
   @@map("vendor_profiles")
 }
@@ -511,8 +514,40 @@ model Booking {
   weddingEvent  WeddingEvent?       @relation(fields: [weddingEventId], references: [id])
   messages      Message[]
   threadReads   MessageThreadRead[]
+  payments      Payment[]
 
   @@map("bookings")
+}
+
+model Payment {
+  id                String   @id @default(uuid())
+  kind              String
+  clientProfileId   String?  @map("client_profile_id")
+  vendorProfileId   String?  @map("vendor_profile_id")
+  weddingId         String?  @map("wedding_id")
+  bookingId         String?  @map("booking_id")
+  label             String?
+  amount            Int
+  dueDate           DateTime? @db.Date @map("due_date")
+  isPaid            Boolean  @default(false) @map("is_paid")
+  paidAt            DateTime? @map("paid_at")
+  method            String?
+  reference         String?
+  notes             String?
+  sortOrder         Int      @default(0) @map("sort_order")
+  createdBy         String?  @map("created_by")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  voidedAt          DateTime? @map("voided_at")
+  voidedBy          String?  @map("voided_by")
+  voidReason        String?  @map("void_reason")
+
+  clientProfile ClientProfile? @relation(fields: [clientProfileId], references: [id], onDelete: Cascade)
+  vendorProfile VendorProfile? @relation(fields: [vendorProfileId], references: [id], onDelete: SetNull)
+  wedding       Wedding?       @relation(fields: [weddingId], references: [id], onDelete: Cascade)
+  booking       Booking?       @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  @@map("payments")
 }
 
 enum BookingStatus {

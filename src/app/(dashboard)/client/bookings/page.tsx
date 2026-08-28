@@ -23,6 +23,13 @@ type BookingRow = {
   total_amount: number | null;
   pricing_state: "final" | "pending";
   paid_amount: number | null;
+  payment_summary?: {
+    paid: number;
+    scheduled: number;
+    target: number | null;
+    due: number | null;
+    direction: "CLIENT_IN";
+  };
   notes: string | null;
   vendor: { business_name?: string; slug?: string } | null;
   service: { name?: string } | null;
@@ -74,6 +81,10 @@ function clientPrice(booking: BookingRow) {
   return booking.pricing_state === "final" && booking.total_amount != null
     ? formatCurrency(booking.total_amount)
     : "Pending final price";
+}
+
+function clientPaid(booking: BookingRow) {
+  return booking.payment_summary?.paid ?? booking.paid_amount ?? 0;
 }
 
 function formatDate(value: string | null) {
@@ -331,7 +342,7 @@ export default function ClientBookingsPage() {
                     </p>
                     <p>
                       <span className={dashLabel}>Paid </span>
-                      {formatCurrency(booking.paid_amount ?? 0)}
+                      {formatCurrency(clientPaid(booking))}
                     </p>
                     <p className="sm:col-span-2">
                       <span className={dashLabel}>Notes </span>
@@ -380,23 +391,34 @@ export default function ClientBookingsPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <DetailMetric label="Event date" value={formatDate(selectedBooking.event_date)} />
                   <DetailMetric label="Total" value={clientPrice(selectedBooking)} />
-                  <DetailMetric label="Paid" value={formatCurrency(selectedBooking.paid_amount ?? 0)} />
+                  <DetailMetric
+                    label="Received"
+                    value={formatCurrency(clientPaid(selectedBooking))}
+                  />
                   <DetailMetric
                     label="Remaining"
                     value={
                       selectedBooking.pricing_state === "final" &&
                       selectedBooking.total_amount != null
                         ? formatCurrency(
-                            Math.max(
-                              0,
-                              selectedBooking.total_amount -
-                                (selectedBooking.paid_amount ?? 0)
-                            )
+                            selectedBooking.payment_summary?.due ??
+                              Math.max(
+                                0,
+                                selectedBooking.total_amount -
+                                  clientPaid(selectedBooking)
+                              )
                           )
                         : "Calculated after pricing"
                     }
                   />
                 </div>
+
+                {(selectedBooking.payment_summary?.scheduled ?? 0) > 0 ? (
+                  <p className="border border-gold-primary/25 bg-gold-primary/8 px-3 py-2 text-xs leading-relaxed text-gold-dark">
+                    {formatCurrency(selectedBooking.payment_summary?.scheduled ?? 0)} is
+                    scheduled but not marked received yet.
+                  </p>
+                ) : null}
 
                 {selectedBooking.event_context ? (
                   <div className="border border-charcoal/8 bg-cream/40 p-4">

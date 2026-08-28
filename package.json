@@ -19,7 +19,8 @@
     "db:query": "tsx --tsconfig tsconfig.json scripts/supabase-remote.ts query",
     "db:types": "tsx --tsconfig tsconfig.json scripts/generate-supabase-types.ts",
     "test:event-plan": "tsx --tsconfig tsconfig.json scripts/verify-event-plan-transaction.ts",
-    "test:venue": "tsx --tsconfig tsconfig.json scripts/verify-venue-rules.ts"
+    "test:venue": "tsx --tsconfig tsconfig.json scripts/verify-venue-rules.ts",
+    "test:payments": "tsx --tsconfig tsconfig.json scripts/verify-payment-ledger.ts"
   },
   "overrides": {
     "nanoid": "3.3.18",
