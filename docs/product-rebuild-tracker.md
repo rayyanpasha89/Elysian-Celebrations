@@ -4,12 +4,14 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
 
 ## Deployment Handoff
 
-- Current source branch: `main`
+- Current verified source branch: `codex/production-readiness`
 - Primary GitHub remote: `origin` -> `rayyanpasha89/Elysian-Celebrations`
-- Vercel handoff path: pushes to `origin/main`
+- Vercel handoff path: merge/push to `origin/main` only after explicit launch approval
 - Base pushed commit before this tracker was added: `e79873b Deepen wedding planning and event budgets`
 - Follow-up slice: bookings event context, event-task timeline integration, Supabase saved vendors
-- Local Vercel CLI state: authenticated and linked to the production project; pushes to `origin/main` remain the deployment handoff.
+- Local Vercel CLI state: authenticated and linked to the production project.
+  The current branch is intentionally not deployed; do not run a production
+  deployment or merge it into `main` without fresh explicit approval.
 
 ## Cloud / Supabase State
 
@@ -44,6 +46,11 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
   - `20260810181932_add_api_rate_limits.sql`
   - `20260810194000_lock_update_trigger_search_path.sql`
   - `20260810201500_tokenize_vendor_media_reservations.sql`
+  - `20260826040000_normalize_event_venue.sql`
+  - `20260826041000_transactional_event_plan_creation.sql`
+  - `20260826050000_activate_payment_ledger.sql`
+  - `20260826051000_allow_server_payment_maintenance.sql`
+  - `20260829061409_complete_vendor_operations_settings.sql`
 - Remote table/column checks passed for:
   - `wedding_event_menus`
   - `wedding_event_menu_items`
@@ -97,6 +104,19 @@ claims that the changes are committed, deployed, or active in the remote databas
 
 ## Shipped Recently
 
+- Closed the first production-readiness backend sequence: whole-plan creation is
+  transactional, catalogue venues persist as validated `venue_id` references,
+  and client receipts are separated from vendor payouts through directional
+  payment-ledger rows and maintenance RPCs.
+- Completed vendor operations settings with persisted tax ID and inquiry
+  availability. Paused vendors are excluded from discovery and booking, while
+  public vendor APIs explicitly exclude tax and internal user fields.
+- Corrected concluded/upcoming dashboard states, no-review and loading states,
+  event-platform terminology, manager/vendor summaries, and INR package pricing.
+- Replaced artificial route transitions with honest loading/error boundaries and
+  reduced mobile vendor-discovery height through an accessible detail sheet.
+- Added `docs/production-readiness-2026-08-29.md` as the exact local/cloud test
+  record and deployment gate for this branch.
 - Completed the first design-audit remediation wave: made event creation
   fail-and-clean-up on dependent errors, made planner refresh authoritative after
   every save attempt, and reordered vendor replacement sync so a failed
@@ -205,6 +225,10 @@ claims that the changes are committed, deployed, or active in the remote databas
 - `npm run build`
 - `npm audit --omit=dev` (zero vulnerabilities after the Next/PostCSS/Sharp patch upgrade)
 - `npm run db:migrations`
+- `npm run db:push:dry-run` (remote up to date through `20260829061409`)
+- `npm run test:event-plan` (5 focused cases)
+- `npm run test:venue` (6 focused cases)
+- `npm run test:payments` (8 focused cases with full rollback)
 - `npm run db:query` for newly added Supabase tables and columns
 - `npm run db:push` for pending media + realtime migrations
 - `npm run db:push` for `20260604000100_event_platform_definition_layer.sql`
@@ -234,15 +258,21 @@ claims that the changes are committed, deployed, or active in the remote databas
 
 ## Current Rebuild Order
 
-1. Replace Clerk development credentials with live production keys before public launch.
-2. Add Clerk-to-Supabase JWT bridging before restoring direct Supabase Realtime subscriptions.
-3. Add automated authenticated browser regression for pricing, booking, vendor, admin, and budget flows.
-4. Expand one-event budget links into split allocations only when a real planning case requires it.
-5. Add true drag ordering for vendor catalogue media and rows.
+1. Replace Clerk development credentials with live production keys and repeat the
+   authenticated smoke matrix before public launch.
+2. Add automated authenticated browser regression for pricing, booking, vendor,
+   admin, planner, and payment flows.
+3. Add Clerk-to-Supabase JWT bridging before restoring direct Supabase Realtime subscriptions.
+4. Move the nested per-function editor save into one reviewed transaction.
+5. Resolve budget/guest singleton ownership before adding uniqueness.
+6. Expand one-event budget links into split allocations only when a real planning case requires it.
+7. Add true drag ordering for vendor catalogue media and rows.
 
 ## Known Risks
 
 - Vercel CLI is linked and authenticated, but the current Production environment still uses Clerk development keys. Replace both Clerk keys with live credentials before launch.
+- The readiness branch has not been deployed by design. The Vercel alias may
+  still represent older `main` code.
 - The current event-linked budget model supports one event per budget line item.
 - Vendor service catalogue rows support image/reference attachments, but true drag ordering is still deferred.
 - Manager booking notes and payment amounts can be viewed, but inline manager editing is still intentionally limited to status actions.

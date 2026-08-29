@@ -1,6 +1,6 @@
 # Elysian Celebrations Project Memory
 
-Last updated: 2026-08-02
+Last updated: 2026-08-29
 
 This is the durable memory file for Codex, Claude, Cursor, and any future agent working in this repo. Read this after `AGENTS.md` and before making product, frontend, backend, Supabase, or deployment decisions.
 
@@ -326,6 +326,7 @@ The Prisma schema names remain wedding-oriented in places:
 - `WeddingEventMenuItem`
 - `WeddingEventLogistics`
 - `WeddingEventTask`
+- `Payment`
 - `VendorProfile`
 - `VendorCategory`
 - `VendorService`
@@ -361,6 +362,7 @@ Important event-platform fields:
 - `wedding_events.time_block`
 - `wedding_events.requirement_payload`
 - `wedding_events.venue`
+- `wedding_events.venue_id`
 - `wedding_events.guest_count`
 - `wedding_event_requirements.category`
 - `wedding_event_requirements.vendor_profile_id`
@@ -387,6 +389,21 @@ Important budget sync fields:
 - `budget_items.actual_cost`
 - `budget_items.is_paid`
 
+Important payment-ledger fields:
+
+- `payments.kind` - `CLIENT_IN` for receipts and `VENDOR_OUT` for payouts.
+- `payments.amount`
+- `payments.due_date`
+- `payments.is_paid`
+- `payments.paid_at`
+- `payments.method`
+- `payments.reference`
+- `payments.voided_at`
+- `payments.void_reason`
+
+`bookings.paid_amount` is a deprecated compatibility mirror. New payment
+progress must come from active `payments` rows grouped by direction.
+
 ## API Surface
 
 Planner and client:
@@ -404,6 +421,8 @@ Planner and client:
 - `src/app/api/saved-vendors/[slug]/route.ts`
 - `src/app/api/bookings/route.ts`
 - `src/app/api/bookings/[id]/route.ts`
+- `src/app/api/bookings/[id]/payments/route.ts`
+- `src/app/api/bookings/[id]/payments/[paymentId]/route.ts`
 - `src/app/api/guests/route.ts`
 - `src/app/api/guests/[id]/route.ts`
 - `src/app/api/timeline/route.ts`
@@ -460,11 +479,12 @@ npm run seed
 
 Migrations live in `supabase/migrations/`. Schema reference lives in `supabase/schema.sql`. Seed data lives in `supabase/seed.sql` and `scripts/supabase-seed.ts`.
 
-Remote migration history was verified on 2026-08-10 through
-`20260810201500_tokenize_vendor_media_reservations.sql`. This includes the
-database-backed API limits introduced by
-`20260810181932_add_api_rate_limits.sql`, the locked trigger search path, and
-exact per-upload media reservation tokens that cannot collide during cleanup.
+Remote migration history was verified on 2026-08-29 through
+`20260829061409_complete_vendor_operations_settings.sql`. The newer applied
+migrations normalize event venues with `wedding_events.venue_id`, create plans
+through the transactional `create_event_plan` RPC, activate directional payment
+ledger maintenance, and persist vendor tax ID plus inquiry availability. A
+`db:push:dry-run` on 2026-08-29 reported the remote database fully up to date.
 
 If remote data was manually changed, do not blindly push baseline migrations. Inspect migration state first.
 
@@ -519,11 +539,13 @@ Planner input direction: chips, pickers, swatches, steppers, dropdowns. Avoid ra
 
 ## Current Implementation State
 
-As of the 2026-08-10 memory update:
+As of the 2026-08-29 production-readiness pass:
 
-- `main` is the deployment branch and pushes to it trigger the linked Vercel production project.
-- Recent local verification for the app has used `npm run lint`, `npx tsc --noEmit --pretty false`, and `npm run build`.
-- Recent pushes go directly to `origin/main`, which Vercel auto-deploys.
+- The verified working branch is `codex/production-readiness`. It is intentionally
+  ahead of `origin/main`; do not deploy or merge it until the user explicitly
+  authorizes launch.
+- `main` remains the Vercel deployment branch, so a merge/push can trigger the
+  linked production project.
 - `.vercel` is linked locally to the Vercel project.
 - The marketing hero and event-system story have been redesigned around the event platform.
 - The planner now uses a radial `CelebrationCanvas` for the event map.
@@ -532,6 +554,13 @@ As of the 2026-08-10 memory update:
 - Venue selection is present in onboarding time blocks and planner basics through dropdown/custom venue UI.
 - Venue dropdowns load up to 30 matching catalogue records, support local search,
   and reveal custom entry only when the catalogue does not cover the user's query.
+- Catalogue selections persist both a normalized `venue_id` and a point-in-time
+  venue-name snapshot. Database validation rejects unknown, inactive,
+  destination-mismatched, or undersized venues while preserving custom-area
+  fallback through a null `venue_id`.
+- Whole-plan creation runs through one Postgres transaction. Focused rollback
+  tests prove that invalid functions, requirements, and menus cannot leave a
+  partial event structure behind.
 - Vendor service selection in the planner supports multiple selections and catalogue row application.
 - Client vendor discovery derives its sourcing lanes from the actual plan's
   day/function requirements and current selections; no hardcoded Haldi/Sangeet
@@ -546,6 +575,10 @@ As of the 2026-08-10 memory update:
   restricted to Unsplash or the public Supabase `vendor-media` path; reference
   links are HTTPS-only.
 - Commercial pricing is admin-owned: `/admin/pricing` records the agreed vendor payout and flat Elysian fee, derives the client final, and controls publication. Client APIs gate published finals behind 100% function readiness and never serialize vendor payout or fee data.
+- Client receipts and vendor payouts are separate ledger directions. Admin and
+  manager surfaces can maintain both; clients see only `CLIENT_IN` rows and
+  vendors see only `VENDOR_OUT` rows. Scheduled, settled, and voided entries are
+  backed by database RPCs and booking-context validation.
 - `src/lib/event-readiness.ts` is the canonical readiness contract. Planner
   hydration, budget, bookings, wedding APIs, and admin pricing consume the same
   percentage/ready/gap result; focused readiness tests cover the formerly
@@ -583,17 +616,30 @@ As of the 2026-08-10 memory update:
   available and otherwise reads the linked PostgreSQL catalogue directly.
 - Mood-board items retain category and creation metadata through migration
   `20260802000500_restore_mood_board_item_metadata.sql`.
+- Vendor operations settings persist an uppercased, bounded tax ID and an
+  `accepting_inquiries` switch. Paused vendors disappear from discovery and new
+  booking attempts are rejected; public vendor APIs use explicit allow-lists so
+  tax IDs and Clerk/user IDs never leave the server.
+- Dashboard date states no longer label concluded functions as live. Marketplace,
+  booking, manager, vendor, package-price, review, and empty-state copy now uses
+  honest event-platform terminology and INR formatting.
+- Mobile vendor discovery opens the brief in an accessible modal sheet instead
+  of extending the page by thousands of pixels; desktop retains its sticky
+  comparison rail.
+- Artificial global route transitions were removed. App/dashboard error and
+  loading boundaries now fail honestly without a full-screen fake delay.
 
 ## Known Gaps And Active Priorities
 
 These are the highest-value next directions. Confirm against source before editing because parts may already be in progress.
 
-1. Transaction boundary: move event creation and per-function multi-table saves
-   into reviewed Postgres RPCs so rollback is guaranteed rather than compensated.
-2. Venue normalization: add `wedding_events.venue_id` while preserving the text
-   snapshot/custom-area fallback, then add capacity and destination validation.
-3. Financial ledger: split client receipts from vendor payouts instead of using
-   `bookings.paid_amount` for both operational directions.
+1. Production identity: replace Clerk development credentials with production
+   keys and re-run authenticated smoke tests before public launch.
+2. Automated browser regression: encode the currently manual client, vendor,
+   manager, and admin role matrix plus critical create/save/payment flows in CI.
+3. Per-function transaction boundary: event creation is atomic, but the larger
+   nested function editor save still uses coordinated API writes and should move
+   into a reviewed RPC before high-concurrency operations.
 4. Legacy singleton ownership: decide whether budgets and guest lists belong to a
    client or an event, then merge existing duplicates before adding uniqueness.
 5. Messaging scale: add booking-scoped incremental reads/pagination while keeping
@@ -624,6 +670,12 @@ npm run lint
 npx tsc --noEmit --pretty false
 npm run test:readiness
 npm run test:abuse-controls
+npm run test:event-plan
+npm run test:venue
+npm run test:payments
+npm run db:migrations
+npm run db:push:dry-run
+npm audit --omit=dev
 npm run build
 ```
 
@@ -652,7 +704,12 @@ origin -> https://github.com/rayyanpasha89/Elysian-Celebrations.git
 Deployment:
 
 - Vercel is connected to GitHub.
-- Pushes to `main` are expected to auto-deploy.
+- The configured alias is `https://elysian-events-v2.vercel.app/`, but it is not
+  evidence that the current readiness branch is deployed.
+- The user explicitly requested local completion without a deployment. Do not
+  merge/push the readiness branch to `main` or run `vercel --prod` without fresh
+  explicit approval.
+- Pushes to `main` may auto-deploy.
 - Vercel env vars must include Clerk and Supabase values.
 - Never commit `.env`, `.env.local`, `.env.vercel.production`, passwords, service keys, access tokens, or user-provided secret values.
 

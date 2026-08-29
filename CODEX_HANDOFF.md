@@ -3,6 +3,16 @@
 _Date: 2026-08-03. Written by Claude after independently verifying the 2026-08-02
 remediation wave. Supersedes the June 5 handoff (that work is shipped)._
 
+## 2026-08-29 supersession note
+
+This file is now a historical audit trail. Do not execute its suggested queue
+without reconciling it against `PROJECT_MEMORY.md` and
+`docs/production-readiness-2026-08-29.md`. The readiness branch has since closed
+the transaction, venue-normalization, payment-direction, loading-boundary,
+dashboard-state, and vendor-operations work described there. The branch is
+intentionally not deployed; production Clerk credentials and explicit launch
+approval remain required.
+
 ## 2026-08-10 status note
 
 This handoff is retained as the corrective review that drove the next hardening
