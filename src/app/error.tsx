@@ -1,15 +1,20 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { editorialBorderButtonClass } from "@/components/auth/auth-styles";
 
 export default function Error({
   error,
-  reset,
+  unstable_retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  unstable_retry: () => void;
 }) {
+  useEffect(() => {
+    console.error(error);
+  }, [error]);
+
   return (
     <div className="relative flex min-h-[85vh] flex-col items-center justify-center overflow-hidden bg-midnight px-6 py-24">
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
@@ -25,11 +30,16 @@ export default function Error({
         <h1 className="font-display text-2xl font-semibold text-ivory md:text-3xl">
           Something went wrong
         </h1>
-        <p className="font-heading mt-4 text-sm font-light text-ivory/55">
-          {error.message || "An unexpected error occurred."}
+        <p className="font-heading mt-4 text-sm font-light text-ivory/65">
+          Your information is safe. Retry the page, or return home and continue
+          when the connection is ready.
         </p>
         <div className="mt-10 flex flex-col items-center gap-6 sm:flex-row sm:justify-center">
-          <button type="button" onClick={() => reset()} className={editorialBorderButtonClass}>
+          <button
+            type="button"
+            onClick={() => unstable_retry()}
+            className={editorialBorderButtonClass}
+          >
             Try again
           </button>
           <Link
