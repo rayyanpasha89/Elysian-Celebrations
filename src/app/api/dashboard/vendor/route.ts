@@ -296,7 +296,7 @@ export async function GET() {
       pendingInquiries: inquiryList,
       upcomingEvents,
       needsOnboarding,
-      subtitle: `${pendingInquiryCount ?? 0} new inquiries · ${upcomingEvents.length} upcoming events`,
+      subtitle: `${pendingInquiryCount ?? 0} new ${pendingInquiryCount === 1 ? "inquiry" : "inquiries"} · ${upcomingEvents.length} upcoming ${upcomingEvents.length === 1 ? "event" : "events"}`,
     });
   } catch (e) {
     console.error("dashboard vendor", e);

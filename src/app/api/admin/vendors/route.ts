@@ -47,7 +47,7 @@ export async function GET() {
         supabase
           .from("vendor_profiles")
           .select(
-            "id, business_name, slug, city, description, rating, is_verified, is_featured, category_id, category:vendor_categories(id, name)"
+            "id, business_name, slug, city, description, rating, review_count, is_verified, is_featured, category_id, category:vendor_categories(id, name)"
           )
           .order("created_at", { ascending: false }),
         supabase.from("vendor_categories").select("id, name, slug").order("name"),
@@ -75,6 +75,7 @@ export async function GET() {
         city: v.city,
         description: v.description,
         rating: v.rating ?? null,
+        reviewCount: v.review_count ?? 0,
         isVerified: Boolean(v.is_verified),
         isFeatured: Boolean(v.is_featured),
         categoryId: cat?.id ?? v.category_id ?? null,

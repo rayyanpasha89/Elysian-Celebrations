@@ -82,7 +82,7 @@ export async function GET() {
       },
       recentInquiries: inquiryList,
       upcomingWeddings: weddingList,
-      subtitle: `${pendingInquiries ?? 0} new inquiries · ${activeWeddings ?? 0} active weddings`,
+      subtitle: `${pendingInquiries ?? 0} new inquiries · ${activeWeddings ?? 0} active ${activeWeddings === 1 ? "event" : "events"}`,
     });
   } catch (e) {
     console.error("dashboard manager", e);

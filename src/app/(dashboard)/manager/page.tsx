@@ -106,7 +106,7 @@ export default function ManagerDashboard() {
   );
   if (!data) return <DashboardSkeleton />;
 
-  const firstName = user?.firstName ?? "there";
+  const hubTitle = user?.firstName ? `${user.firstName}'s Hub` : "Operations Hub";
   const { stats, recentInquiries, upcomingWeddings } = data;
 
   const pipelineCounts = PIPELINE_STATUSES.map((s) => ({
@@ -130,7 +130,7 @@ export default function ManagerDashboard() {
           <div>
             <p className={dashLabel}>Operations</p>
             <h1 className="font-display mt-3 text-4xl font-semibold text-charcoal lg:text-5xl">
-              {firstName}&apos;s Hub
+              {hubTitle}
             </h1>
             <p className="font-heading mt-2 text-base font-light text-slate">
               {data.subtitle}

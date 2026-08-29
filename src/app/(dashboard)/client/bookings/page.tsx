@@ -341,7 +341,7 @@ export default function ClientBookingsPage() {
                       {clientPrice(booking)}
                     </p>
                     <p>
-                      <span className={dashLabel}>Paid </span>
+                      <span className={dashLabel}>Received </span>
                       {formatCurrency(clientPaid(booking))}
                     </p>
                     <p className="sm:col-span-2">

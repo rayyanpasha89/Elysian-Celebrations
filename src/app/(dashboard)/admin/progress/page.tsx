@@ -159,7 +159,7 @@ export default function AdminProgressPage() {
                     <span className="text-xs text-slate">· {c.wedding?.name}</span>
                   </div>
                   <p className="mt-0.5 text-xs text-slate">
-                    {c.readiness.eventCount} functions · {c.totals.bookingCount} vendor picks
+                    {c.readiness.eventCount} {c.readiness.eventCount === 1 ? "function" : "functions"} · {c.totals.bookingCount} vendor picks
                     {c.totals.pricedCount > 0 ? ` · ${c.totals.pricedCount} priced` : ""}
                   </p>
                 </div>

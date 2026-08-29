@@ -74,9 +74,20 @@ function greeting() {
 }
 function daysTo(date: string | null): number | null {
   if (!date) return null;
-  const t = new Date(date).getTime();
-  if (Number.isNaN(t)) return null;
-  return Math.ceil((t - Date.now()) / 86400000);
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  const target = dateOnly
+    ? new Date(
+        Number(dateOnly[1]),
+        Number(dateOnly[2]) - 1,
+        Number(dateOnly[3])
+      )
+    : new Date(date);
+  if (Number.isNaN(target.getTime())) return null;
+
+  target.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((target.getTime() - today.getTime()) / 86400000);
 }
 
 const dashLabel = "font-accent text-[10px] uppercase tracking-[0.2em] text-slate";
@@ -207,8 +218,12 @@ export default function ClientCommandCenter() {
     );
     const upcoming = events
       .filter((e) => e.date && (daysTo(e.date) ?? -1) >= 0)
-      .sort((a, b) => (a.date! < b.date! ? -1 : 1));
-    const nextFn = upcoming[0] ?? events[0] ?? null;
+      .sort((a, b) => {
+        const byDate = a.date!.localeCompare(b.date!);
+        if (byDate !== 0) return byDate;
+        return (a.startTime ?? "23:59").localeCompare(b.startTime ?? "23:59");
+      });
+    const nextFn = upcoming[0] ?? null;
 
     return {
       guests: {
@@ -337,6 +352,14 @@ export default function ClientCommandCenter() {
   const firstName = user?.firstName ?? "there";
   const wedding = dash.wedding;
   const dday = wedding?.date ? daysTo(wedding.date) : dash.stats.daysUntil;
+  const eventTiming =
+    dday == null
+      ? { value: "—", label: "date pending" }
+      : dday < 0
+        ? { value: "Complete", label: "event concluded" }
+        : dday === 0
+          ? { value: "Today", label: "event day" }
+          : { value: String(dday), label: "days to go" };
 
   return (
     <motion.div
@@ -395,10 +418,10 @@ export default function ClientCommandCenter() {
           <div className="flex items-end gap-4">
             <div className="text-right">
               <p className="font-display text-6xl leading-none text-gold-primary">
-                {dday != null ? Math.max(0, dday) : "—"}
+                {eventTiming.value}
               </p>
               <p className="mt-1 font-accent text-[10px] uppercase tracking-[0.18em] text-ivory/60">
-                days to go
+                {eventTiming.label}
               </p>
             </div>
           </div>
@@ -516,20 +539,26 @@ export default function ClientCommandCenter() {
           value={
             failedSources.includes("event schedule")
               ? "—"
-              : agg.nextFn?.name ?? "—"
+              : agg.nextFn?.name ?? (agg.plan.events > 0 ? "Plan complete" : "—")
           }
           unit={
             failedSources.includes("event schedule")
               ? "temporarily unavailable"
-              : agg.nextFn?.dayName ?? "Run of show"
+              : agg.nextFn?.dayName ??
+                (agg.plan.events > 0 ? "No upcoming functions" : "Run of show")
           }
           footer={(() => {
             if (failedSources.includes("event schedule")) {
               return "Retry to restore the schedule";
             }
+            if (!agg.nextFn) {
+              return agg.plan.events > 0
+                ? "Review the completed run of show"
+                : "Add your first function";
+            }
             const d = daysTo(agg.nextFn?.date ?? null);
             if (d == null) return "Open run of show";
-            if (d <= 0) return "Happening now";
+            if (d === 0) return "Happening today";
             return `In ${d} ${d === 1 ? "day" : "days"}`;
           })()}
           valueSmall

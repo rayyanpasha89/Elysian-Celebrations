@@ -302,7 +302,7 @@ export default function VendorMessagesPage() {
           Messages
         </h2>
         <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate">
-          Reply to clients with the booking, wedding event, service scope, date,
+          Reply to clients with the booking, event function, service scope, date,
           venue, and notes visible beside the conversation.
         </p>
       </motion.div>

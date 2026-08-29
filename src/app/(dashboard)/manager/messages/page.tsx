@@ -154,7 +154,7 @@ export default function ManagerMessagesPage() {
         </h2>
         <p className="max-w-2xl text-sm leading-relaxed text-slate">
           Read client-vendor conversations in context, with booking status,
-          service scope, wedding day, venue, and notes beside the thread.
+          service scope, event day, venue, and notes beside the thread.
         </p>
       </motion.div>
 

@@ -19,7 +19,6 @@ const categories = [
   "Makeup",
   "Hospitality",
   "Logistics",
-  "Venues",
 ] as const;
 
 type Cat = (typeof categories)[number];
@@ -90,7 +89,6 @@ const categoryApiSlug: Record<Exclude<Cat, "All">, string | null> = {
   Makeup: "makeup",
   Hospitality: "planning",
   Logistics: "travel",
-  Venues: null,
 };
 
 type VendorServiceItemApi = {
@@ -164,7 +162,11 @@ function priceRangeFromVendor(v: VendorCardApi): string {
   return `₹${(min / 1000).toFixed(0)}K+`;
 }
 
-function ratingLabel(rating: number | null | undefined) {
+function ratingLabel(
+  rating: number | null | undefined,
+  reviewCount: number | null | undefined
+) {
+  if (!reviewCount) return "No reviews yet";
   return `${Number(rating ?? 0).toFixed(1)} / 5`;
 }
 
@@ -684,7 +686,10 @@ export default function ClientVendorsPage() {
     };
   }, [selectedSlug]);
 
-  const eventNeedFilters = useMemo(() => buildPlanNeedFilters(plan), [plan]);
+  const eventNeedFilters = useMemo(
+    () => (planLoading ? [] : buildPlanNeedFilters(plan)),
+    [plan, planLoading]
+  );
 
   useEffect(() => {
     // An empty id is the deliberate "browsing by category, no lane selected"
@@ -699,21 +704,11 @@ export default function ClientVendorsPage() {
 
   const filtered = useMemo(() => {
     let list = vendors;
-    if (cat === "Venues") {
-      list = list.filter((v) => {
-        const categoryName = (v.category?.name ?? "").toLowerCase();
-        return (
-          categoryName.includes("venue") ||
-          categoryName.includes("hospitality") ||
-          categoryName.includes("hotel")
-        );
-      });
-    }
     if (showSavedOnly) {
       list = list.filter((v) => savedSlugs.includes(v.slug));
     }
     return list;
-  }, [vendors, cat, savedSlugs, showSavedOnly]);
+  }, [vendors, savedSlugs, showSavedOnly]);
 
   useEffect(() => {
     if (loading) return;
@@ -836,13 +831,19 @@ export default function ClientVendorsPage() {
               Current brief
             </p>
             <h3 className="mt-2 font-display text-2xl leading-tight">
-              {planError ? "Plan context unavailable" : activeNeed?.label ?? cat}
+              {planLoading
+                ? "Loading your event brief"
+                : planError
+                  ? "Plan context unavailable"
+                  : activeNeed?.label ?? cat}
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-ivory/70">
-              {planError
-                ? "Vendor browsing is still available, but no function is being presented as covered until the event plan reconnects."
-                : activeNeed?.intent ??
-                "Manual category filter selected. Use the function lanes below to return to plan-first sourcing."}
+              {planLoading
+                ? "Connecting the vendor catalogue to your saved functions and open requirements."
+                : planError
+                  ? "Vendor browsing is still available, but no function is being presented as covered until the event plan reconnects."
+                  : activeNeed?.intent ??
+                    "Manual category filter selected. Use the function lanes below to return to plan-first sourcing."}
             </p>
             <div className="mt-5 grid grid-cols-3 gap-2 border-t border-ivory/10 pt-4">
               <BriefMetric label="Saved" value={String(savedCount)} />
@@ -962,10 +963,14 @@ export default function ClientVendorsPage() {
             <div>
               <p className={dashLabel}>Matching vendor briefs</p>
               <h3 className="mt-1 font-display text-2xl text-charcoal">
-                {activeNeed?.label ?? `${cat} vendors`}
+                {planLoading
+                  ? "Connecting to your event plan"
+                  : activeNeed?.label ?? `${cat} vendors`}
               </h3>
               <p className="mt-1 text-sm leading-relaxed text-slate">
-                {showSavedOnly
+                {planLoading
+                  ? "Vendor profiles are ready while function-specific matching finishes loading."
+                  : showSavedOnly
                   ? "Showing only vendors saved to your account."
                   : activeNeed?.intent ??
                     "Category view is active. Open a function lane when you want event-plan-first sourcing."}
@@ -1119,7 +1124,10 @@ export default function ClientVendorsPage() {
 
                       <div className="mt-4 grid grid-cols-2 gap-3">
                         <MetricCard label="Starting from" value={priceRangeFromVendor(v)} />
-                        <MetricCard label="Rating" value={ratingLabel(v.rating)} />
+                        <MetricCard
+                          label="Rating"
+                          value={ratingLabel(v.rating, v.review_count)}
+                        />
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2">
                         <span className="border border-charcoal/10 bg-ivory px-2.5 py-1.5 font-heading text-[11px] text-charcoal/75">
@@ -1315,7 +1323,10 @@ function VendorDetailPanel({
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <MetricCard label="Rating" value={ratingLabel(vendor.rating)} />
+        <MetricCard
+          label="Rating"
+          value={ratingLabel(vendor.rating, vendor.review_count ?? reviews.length)}
+        />
         <MetricCard
           label="Reviews"
           value={String(vendor.review_count ?? reviews.length ?? 0)}

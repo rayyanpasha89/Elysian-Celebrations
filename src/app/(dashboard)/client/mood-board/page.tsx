@@ -358,7 +358,10 @@ export default function ClientMoodBoardPage() {
 
       {filtered.length === 0 ? (
         <div className="mt-10">
-          <ListEmptyState hint="Save inspiration images to your mood board as you plan your look and feel." />
+          <ListEmptyState
+            title="No inspiration saved yet"
+            hint="Save inspiration images to your mood board as you plan your look and feel."
+          />
         </div>
       ) : (
         <motion.div variants={fadeUp} className="mt-10 columns-2 gap-4 md:columns-3">

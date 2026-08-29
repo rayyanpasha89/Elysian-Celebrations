@@ -15,7 +15,8 @@ type VendorRow = {
   name: string;
   category: string;
   city: string;
-  rating: number;
+  rating: number | null;
+  reviewCount: number;
   isVerified: boolean;
   isFeatured: boolean;
 };
@@ -26,6 +27,7 @@ type VendorApiRow = {
   categoryName: string | null;
   city: string | null;
   rating: number | null;
+  reviewCount: number;
   isVerified: boolean;
   isFeatured: boolean;
 };
@@ -41,7 +43,8 @@ async function fetchVendors() {
     name: vendor.businessName ?? "—",
     category: vendor.categoryName ?? "—",
     city: vendor.city ?? "—",
-    rating: vendor.rating ?? 0,
+    rating: vendor.rating,
+    reviewCount: vendor.reviewCount,
     isVerified: vendor.isVerified,
     isFeatured: vendor.isFeatured,
   }));
@@ -168,7 +171,11 @@ export default function ManagerVendorsPage() {
                   <td className="py-4 pr-4 font-heading text-sm text-charcoal">{v.name}</td>
                   <td className="py-4 pr-4 font-heading text-sm text-slate">{v.category}</td>
                   <td className="py-4 pr-4 font-heading text-sm text-slate">{v.city}</td>
-                  <td className="py-4 pr-4 font-heading text-sm text-charcoal">{v.rating.toFixed(1)}</td>
+                  <td className="py-4 pr-4 font-heading text-sm text-charcoal">
+                    {v.reviewCount > 0 && v.rating != null
+                      ? v.rating.toFixed(1)
+                      : "No reviews yet"}
+                  </td>
                   <td className="py-4 pr-4">
                     <span className={cn(statusBadgeBase, v.isVerified ? "border-sage/70 text-sage" : "border-gold-primary/70 text-gold-dark")}>
                       {v.isVerified ? "VERIFIED" : "PENDING"}

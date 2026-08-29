@@ -68,7 +68,7 @@ export default function ManagerDestinationsPage() {
         <p className={dashLabel}>Reference</p>
         <h2 className="font-display mt-2 text-3xl font-semibold text-charcoal">Destinations</h2>
         <p className="font-heading mt-2 text-sm text-slate">
-          Active destinations available for client weddings.
+          Active destinations available across client event plans.
         </p>
       </motion.div>
 

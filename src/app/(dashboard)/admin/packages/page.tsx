@@ -20,6 +20,12 @@ type PackageRow = {
   isActive: boolean;
 };
 
+const inr = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  maximumFractionDigits: 0,
+});
+
 export default function AdminPackagesPage() {
   const [loading, setLoading] = useState(true);
   const [packages, setPackages] = useState<PackageRow[]>([]);
@@ -120,7 +126,7 @@ export default function AdminPackagesPage() {
               </div>
 
               <p className="mt-4 font-display text-2xl font-semibold text-gold-dark">
-                ${p.startingPrice.toLocaleString()}
+                {inr.format(p.startingPrice)}
                 <span className="font-heading text-sm font-normal text-slate"> starting</span>
               </p>
 

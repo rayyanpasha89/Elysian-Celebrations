@@ -160,7 +160,11 @@ export default function VendorDashboard() {
           { label: "Total Bookings", value: stats.totalBookings, sub: "all time" },
           { label: "Pending Inquiries", value: stats.pendingInquiries, sub: "awaiting response", highlight: stats.pendingInquiries > 0 },
           { label: "Profile Views", value: stats.profileViews, sub: "this month" },
-          { label: "Avg Rating", value: `${stats.avgRating.toFixed(1)} / 5`, sub: "from reviews" },
+          {
+            label: "Avg Rating",
+            value: stats.avgRating > 0 ? `${stats.avgRating.toFixed(1)} / 5` : "No reviews",
+            sub: stats.avgRating > 0 ? "from published reviews" : "waiting for first review",
+          },
         ].map((s) => (
           <motion.div
             key={s.label}
@@ -265,7 +269,10 @@ export default function VendorDashboard() {
               {[
                 { label: "Bookings", value: stats.totalBookings },
                 { label: "Views", value: stats.profileViews },
-                { label: "Rating", value: `${stats.avgRating.toFixed(1)}★` },
+                {
+                  label: "Rating",
+                  value: stats.avgRating > 0 ? `${stats.avgRating.toFixed(1)}★` : "—",
+                },
               ].map((m) => (
                 <div key={m.label} className="border border-charcoal/8 bg-cream/40 p-3 text-center">
                   <p className="font-display text-xl text-charcoal">{m.value}</p>
