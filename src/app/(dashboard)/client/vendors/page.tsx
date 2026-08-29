@@ -558,6 +558,15 @@ export default function ClientVendorsPage() {
   const [savedSlugs, setSavedSlugs] = useState<string[]>([]);
   const [showSavedOnly, setShowSavedOnly] = useState(false);
   const [syncingSlug, setSyncingSlug] = useState<string | null>(null);
+  const [isCompactViewport, setIsCompactViewport] = useState(false);
+
+  useEffect(() => {
+    const compactViewport = window.matchMedia("(max-width: 1279px)");
+    const syncViewport = () => setIsCompactViewport(compactViewport.matches);
+    syncViewport();
+    compactViewport.addEventListener("change", syncViewport);
+    return () => compactViewport.removeEventListener("change", syncViewport);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -712,16 +721,29 @@ export default function ClientVendorsPage() {
 
   useEffect(() => {
     if (loading) return;
-    if (filtered.length === 0) {
-      if (selectedSlug !== null) setSelectedSlug(null);
-      return;
+    if (
+      selectedSlug &&
+      !filtered.some((vendor) => vendor.slug === selectedSlug)
+    ) {
+      setSelectedSlug(null);
     }
-    if (selectedSlug && filtered.some((vendor) => vendor.slug === selectedSlug)) {
-      return;
-    }
-    const firstVendor = filtered[0];
-    if (firstVendor) setSelectedSlug(firstVendor.slug);
   }, [filtered, loading, selectedSlug]);
+
+  useEffect(() => {
+    if (!selectedSlug || !isCompactViewport) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSelectedSlug(null);
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isCompactViewport, selectedSlug]);
 
   const activeNeed =
     eventNeedFilters.find((need) => need.id === activeNeedId) ?? null;
@@ -742,7 +764,6 @@ export default function ClientVendorsPage() {
     }),
     [filtered]
   );
-
   const chooseNeed = (need: EventNeedFilter) => {
     setActiveNeedId(need.id);
     setCat(need.category);
@@ -788,6 +809,28 @@ export default function ClientVendorsPage() {
       setSyncingSlug(null);
     }
   };
+  const detailContent = detailLoading ? (
+    <div className="space-y-3 animate-pulse">
+      <div className="h-48 bg-charcoal/5" />
+      <div className="h-6 w-48 bg-charcoal/5" />
+      <div className="h-4 w-32 bg-charcoal/5" />
+      <div className="h-24 bg-charcoal/5" />
+    </div>
+  ) : detailError ? (
+    <ListEmptyState title="Could not load profile" hint={detailError} />
+  ) : selectedSummary ? (
+    <VendorDetailPanel
+      vendor={selectedVendor ?? selectedSummary}
+      isSaved={savedSlugs.includes(selectedSummary.slug)}
+      saving={syncingSlug === selectedSummary.slug}
+      onToggleSaved={() => void toggleSaved(selectedSummary.slug)}
+    />
+  ) : (
+    <ListEmptyState
+      title="Open a vendor brief"
+      hint="Pick a vendor card to compare packages, catalogue rows, and shortlist fit."
+    />
+  );
 
   return (
     <motion.div variants={staggerContainer} initial="hidden" animate="visible">
@@ -1175,7 +1218,7 @@ export default function ClientVendorsPage() {
           )}
         </div>
 
-        <aside className="self-start">
+        <aside className="hidden self-start xl:block">
           <div className="sticky top-6 overflow-hidden border border-charcoal/8 bg-ivory">
             <div className="border-b border-charcoal/8 bg-cream/35 p-5">
               <p className={dashLabel}>Selected vendor brief</p>
@@ -1185,32 +1228,40 @@ export default function ClientVendorsPage() {
               </p>
             </div>
             <div className="p-5">
-              {detailLoading ? (
-                <div className="space-y-3 animate-pulse">
-                  <div className="h-48 bg-charcoal/5" />
-                  <div className="h-6 w-48 bg-charcoal/5" />
-                  <div className="h-4 w-32 bg-charcoal/5" />
-                  <div className="h-24 bg-charcoal/5" />
-                </div>
-              ) : detailError ? (
-                <ListEmptyState title="Could not load profile" hint={detailError} />
-              ) : selectedSummary ? (
-                <VendorDetailPanel
-                  vendor={selectedVendor ?? selectedSummary}
-                  isSaved={savedSlugs.includes(selectedSummary.slug)}
-                  saving={syncingSlug === selectedSummary.slug}
-                  onToggleSaved={() => void toggleSaved(selectedSummary.slug)}
-                />
-              ) : (
-                <ListEmptyState
-                  title="Open a vendor brief"
-                  hint="Pick a vendor card to compare packages, catalogue rows, and shortlist fit."
-                />
-              )}
+              {detailContent}
             </div>
           </div>
         </aside>
       </div>
+
+      {selectedSlug && isCompactViewport ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="mobile-vendor-brief-title"
+          className="fixed inset-0 z-[80] overflow-y-auto bg-cream xl:hidden"
+        >
+          <div className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-charcoal/10 bg-cream/95 px-4 py-3 backdrop-blur-md">
+            <div>
+              <p className={dashLabel}>Selected vendor</p>
+              <h3
+                id="mobile-vendor-brief-title"
+                className="mt-1 font-display text-xl text-charcoal"
+              >
+                {selectedSummary?.business_name ?? "Loading brief"}
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedSlug(null)}
+              className="border border-charcoal/15 px-3 py-2 font-accent text-[10px] uppercase tracking-[0.16em] text-charcoal"
+            >
+              Close
+            </button>
+          </div>
+          <div className="p-4 pb-12">{detailContent}</div>
+        </div>
+      ) : null}
     </motion.div>
   );
 }
