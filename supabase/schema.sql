@@ -66,6 +66,8 @@ create table vendor_profiles (
   city text,
   state text,
   country text not null default 'India',
+  tax_id text check (tax_id is null or char_length(tax_id) <= 64),
+  accepting_inquiries boolean not null default true,
   experience integer,
   is_verified boolean not null default false,
   is_featured boolean not null default false,

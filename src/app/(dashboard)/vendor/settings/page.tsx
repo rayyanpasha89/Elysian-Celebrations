@@ -13,6 +13,7 @@ import { dashBtn, dashCard, dashLabel } from "@/lib/dashboard-styles";
 type BusinessForm = {
   businessName: string;
   phone: string;
+  taxId: string;
   city: string;
   state: string;
   country: string;
@@ -25,11 +26,14 @@ export default function VendorSettingsPage() {
     process.env.NEXT_PUBLIC_ELYSIAN_TEST_AUTH_BYPASS === "1";
   const [loading, setLoading] = useState(true);
   const [hasVendorProfile, setHasVendorProfile] = useState(true);
+  const [acceptingInquiries, setAcceptingInquiries] = useState(true);
+  const [availabilitySaving, setAvailabilitySaving] = useState(false);
 
   const business = useForm<BusinessForm>({
     defaultValues: {
       businessName: "",
       phone: "",
+      taxId: "",
       city: "",
       state: "",
       country: "India",
@@ -47,9 +51,11 @@ export default function VendorSettingsPage() {
         const v = data.vendor;
         const u = data.user ?? {};
         setHasVendorProfile(!!v);
+        setAcceptingInquiries(v?.acceptingInquiries ?? true);
         business.reset({
           businessName: v?.businessName ?? "",
           phone: u.phone ?? "",
+          taxId: v?.taxId ?? "",
           city: v?.city ?? "",
           state: v?.state ?? "",
           country: v?.country ?? "India",
@@ -67,6 +73,30 @@ export default function VendorSettingsPage() {
   }, []);
 
   const email = user?.primaryEmailAddress?.emailAddress ?? "";
+
+  const updateAvailability = async (next: boolean) => {
+    const previous = acceptingInquiries;
+    setAcceptingInquiries(next);
+    setAvailabilitySaving(true);
+
+    try {
+      const res = await fetch("/api/settings/vendor", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acceptingInquiries: next }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Availability update failed");
+      toast.success(next ? "New inquiries enabled" : "New inquiries paused");
+    } catch (error) {
+      setAcceptingInquiries(previous);
+      toast.error(
+        error instanceof Error ? error.message : "Could not update availability"
+      );
+    } finally {
+      setAvailabilitySaving(false);
+    }
+  };
 
   if ((!testAuthEnabled && !clerkLoaded) || loading) {
     return (
@@ -105,6 +135,7 @@ export default function VendorSettingsPage() {
                 body: JSON.stringify({
                   businessName: values.businessName,
                   phone: values.phone,
+                  taxId: values.taxId,
                   city: values.city,
                   state: values.state,
                   country: values.country,
@@ -126,13 +157,23 @@ export default function VendorSettingsPage() {
             <p className="font-heading mt-2 text-xs text-slate">Read-only. Change it under Account security.</p>
           </div>
           <FloatingField id="vb-phone" label="Phone" type="tel" {...business.register("phone")} />
-          <div className="border border-charcoal/10 bg-cream/30 px-4 py-3">
-            <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-slate">GST / tax ID</p>
-            <p className="font-heading mt-2 text-sm text-slate">
-              Tax identifiers are not stored on your vendor profile in this database yet. Keep GST on invoices and
-              contracts outside the app until we add a dedicated field.
-            </p>
-          </div>
+          <FloatingField
+            id="vb-tax-id"
+            label="GST / tax ID"
+            maxLength={64}
+            autoCapitalize="characters"
+            {...business.register("taxId", {
+              maxLength: {
+                value: 64,
+                message: "Use 64 characters or fewer",
+              },
+              pattern: {
+                value: /^[A-Za-z0-9 .:/_-]*$/,
+                message: "Use letters, numbers, spaces, dots, slashes, colons, underscores, or hyphens",
+              },
+            })}
+            error={business.formState.errors.taxId?.message}
+          />
           <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
             <FloatingField id="vb-city" label="City" {...business.register("city")} />
             <FloatingField id="vb-state" label="State" {...business.register("state")} />
@@ -149,19 +190,49 @@ export default function VendorSettingsPage() {
       </motion.section>
 
       <motion.section variants={fadeUp} className={dashCard}>
-        <h3 className="font-display text-lg text-charcoal">Availability</h3>
-        <p className="font-heading mt-2 text-sm text-slate">
-          A &quot;pause new inquiries&quot; flag is not stored in the database yet. To manage demand, coordinate with
-          your planner or hide individual services on the Services page until this feature ships.
-        </p>
-      </motion.section>
-
-      <motion.section variants={fadeUp} className={dashCard}>
-        <h3 className="font-display text-lg text-charcoal">Notifications</h3>
-        <p className="font-heading mt-2 text-sm text-slate">
-          Per-channel notification preferences are not stored yet. You will still receive booking and message alerts
-          according to platform events.
-        </p>
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className={dashLabel}>Availability</p>
+            <h3 className="mt-2 font-display text-lg text-charcoal">
+              {acceptingInquiries
+                ? "Accepting new inquiries"
+                : "New inquiries paused"}
+            </h3>
+            <p className="font-heading mt-2 max-w-2xl text-sm leading-relaxed text-slate">
+              {acceptingInquiries
+                ? "Your verified profile can appear in client discovery and receive new event bookings."
+                : "Your existing bookings remain available, but clients cannot discover or add you to a new function."}
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={acceptingInquiries}
+            disabled={availabilitySaving || !hasVendorProfile}
+            onClick={() => void updateAvailability(!acceptingInquiries)}
+            className="inline-flex min-w-44 items-center justify-between gap-4 border border-charcoal/15 bg-cream/30 px-4 py-3 text-left transition-colors hover:border-gold-primary disabled:pointer-events-none disabled:opacity-40"
+          >
+            <span className="font-accent text-[10px] uppercase tracking-[0.16em] text-charcoal">
+              {availabilitySaving
+                ? "Saving"
+                : acceptingInquiries
+                  ? "Open"
+                  : "Paused"}
+            </span>
+            <span
+              aria-hidden
+              className={`relative h-6 w-11 rounded-full transition-colors ${
+                acceptingInquiries ? "bg-sage" : "bg-charcoal/20"
+              }`}
+            >
+              <span
+                className={`absolute top-1 h-4 w-4 rounded-full bg-ivory shadow-sm transition-transform ${
+                  acceptingInquiries ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </span>
+          </button>
+        </div>
       </motion.section>
 
       <motion.section variants={fadeUp} className={dashCard}>

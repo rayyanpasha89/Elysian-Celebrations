@@ -1349,6 +1349,8 @@ export type Database = {
           "review_count": number
           "created_at": string
           "updated_at": string
+          "tax_id": string | null
+          "accepting_inquiries": boolean
         }
         Insert:
         {
@@ -1371,6 +1373,8 @@ export type Database = {
           "review_count"?: number
           "created_at"?: string
           "updated_at"?: string
+          "tax_id"?: string | null
+          "accepting_inquiries"?: boolean
         }
         Update:
         {
@@ -1393,6 +1397,8 @@ export type Database = {
           "review_count"?: number
           "created_at"?: string
           "updated_at"?: string
+          "tax_id"?: string | null
+          "accepting_inquiries"?: boolean
         }
         Relationships: [
           {

@@ -14,6 +14,9 @@ type SelectedReview = {
   created_at: string;
 };
 
+const PUBLIC_VENDOR_DETAIL_COLUMNS =
+  "id, business_name, slug, category_id, description, short_bio, cover_image, portfolio, city, state, country, experience, is_verified, is_featured, rating, review_count, created_at, updated_at";
+
 function toPublicReviews(reviews: unknown) {
   if (!Array.isArray(reviews)) return [];
 
@@ -39,10 +42,11 @@ export async function GET(
     const { data: vendor, error } = await supabase
       .from("vendor_profiles")
       .select(
-        `*, category:vendor_categories(name, slug), services:vendor_services!inner(*, items:vendor_service_items(id, item_type, name, description, dietary_tags, image_urls, reference_url, sort_order)), reviews(id, rating, title, content, is_published, created_at)`
+        `${PUBLIC_VENDOR_DETAIL_COLUMNS}, category:vendor_categories(name, slug), services:vendor_services!inner(id, name, description, service_scope, base_price, max_price, unit, event_type_fit, inclusions, deliverables, add_ons, is_active, items:vendor_service_items(id, item_type, name, description, dietary_tags, image_urls, reference_url, sort_order)), reviews(id, rating, title, content, is_published, created_at)`
       )
       .eq("slug", slug)
       .eq("is_verified", true)
+      .eq("accepting_inquiries", true)
       .eq("services.is_active", true)
       .eq("reviews.is_published", true)
       .single();
@@ -51,11 +55,7 @@ export async function GET(
       return apiError("Vendor not found", 404);
     }
 
-    const publicVendor = {
-      ...vendor,
-      user_id: undefined,
-      reviews: undefined,
-    };
+    const publicVendor = { ...vendor, reviews: undefined };
 
     return apiSuccess({
       ...publicVendor,

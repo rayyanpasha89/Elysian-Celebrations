@@ -99,6 +99,7 @@ export async function GET(request: NextRequest) {
       // Marketplace discovery is a client-facing promise: only approved
       // partners with bookable services belong in this result set.
       .eq("is_verified", true)
+      .eq("accepting_inquiries", true)
       .eq("services.is_active", true)
       .order("is_featured", { ascending: false })
       .order("rating", { ascending: false });

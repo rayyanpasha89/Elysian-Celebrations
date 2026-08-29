@@ -468,7 +468,7 @@ export async function POST(request: NextRequest) {
 
     const { data: vendorProfile, error: vendorProfileError } = await supabase
       .from("vendor_profiles")
-      .select("id")
+      .select("id, accepting_inquiries")
       .eq("id", vendorProfileId)
       .eq("is_verified", true)
       .maybeSingle();
@@ -480,6 +480,9 @@ export async function POST(request: NextRequest) {
 
     if (!vendorProfile) {
       return apiError("This vendor is not available for client bookings", 409);
+    }
+    if (!vendorProfile.accepting_inquiries) {
+      return apiError("This vendor has paused new inquiries", 409);
     }
 
     if (vendorServiceId) {

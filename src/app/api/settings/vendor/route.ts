@@ -33,7 +33,9 @@ export async function GET() {
 
     const { data: vp, error: vErr } = await supabase
       .from("vendor_profiles")
-      .select("id, business_name, city, state, country")
+      .select(
+        "id, business_name, city, state, country, tax_id, accepting_inquiries"
+      )
       .eq("user_id", session.userId)
       .maybeSingle();
     if (vErr) {
@@ -53,6 +55,8 @@ export async function GET() {
             city: vp.city ?? "",
             state: vp.state ?? "",
             country: vp.country ?? "",
+            taxId: vp.tax_id ?? "",
+            acceptingInquiries: vp.accepting_inquiries,
           }
         : null,
     });
@@ -70,17 +74,82 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const supabase = createAdminSupabaseClient();
-    const body = (await request.json()) as {
+    const parsedBody: unknown = await request.json();
+    if (
+      !parsedBody ||
+      typeof parsedBody !== "object" ||
+      Array.isArray(parsedBody)
+    ) {
+      return apiError("Settings payload must be an object", 400);
+    }
+    const body = parsedBody as {
       phone?: string;
       businessName?: string;
       city?: string;
       state?: string;
       country?: string;
+      taxId?: string;
+      acceptingInquiries?: boolean;
     };
+
+    if (body.phone !== undefined && typeof body.phone !== "string") {
+      return apiError("Phone must be text", 400);
+    }
+    if (typeof body.phone === "string" && body.phone.trim().length > 40) {
+      return apiError("Phone must be 40 characters or fewer", 400);
+    }
+    if (body.businessName !== undefined) {
+      if (typeof body.businessName !== "string" || !body.businessName.trim()) {
+        return apiError("Business name is required", 400);
+      }
+      if (body.businessName.trim().length > 120) {
+        return apiError("Business name must be 120 characters or fewer", 400);
+      }
+    }
+    for (const [label, value] of [
+      ["City", body.city],
+      ["State", body.state],
+      ["Country", body.country],
+    ] as const) {
+      if (value !== undefined && typeof value !== "string") {
+        return apiError(`${label} must be text`, 400);
+      }
+      if (typeof value === "string" && value.trim().length > 100) {
+        return apiError(`${label} must be 100 characters or fewer`, 400);
+      }
+    }
+    if (
+      body.country !== undefined &&
+      typeof body.country === "string" &&
+      !body.country.trim()
+    ) {
+      return apiError("Country is required", 400);
+    }
+
+    let normalizedTaxId: string | null | undefined;
+    if (body.taxId !== undefined) {
+      if (typeof body.taxId !== "string") {
+        return apiError("GST / tax ID must be text", 400);
+      }
+      const taxId = body.taxId.trim().toUpperCase();
+      if (taxId.length > 64) {
+        return apiError("GST / tax ID must be 64 characters or fewer", 400);
+      }
+      if (taxId && !/^[A-Z0-9 .:/_-]+$/.test(taxId)) {
+        return apiError("GST / tax ID contains unsupported characters", 400);
+      }
+      normalizedTaxId = taxId || null;
+    }
+    if (
+      body.acceptingInquiries !== undefined &&
+      typeof body.acceptingInquiries !== "boolean"
+    ) {
+      return apiError("Inquiry availability must be true or false", 400);
+    }
 
     if (body.phone !== undefined) {
       const phone =
-        typeof body.phone === "string" && body.phone.trim()
+        body.phone.trim()
           ? body.phone.trim()
           : null;
       const userUpdate: UserUpdate = { phone };
@@ -115,6 +184,12 @@ export async function PATCH(request: NextRequest) {
     if (typeof body.state === "string") vpUpdates.state = body.state.trim() || null;
     if (typeof body.country === "string" && body.country.trim()) {
       vpUpdates.country = body.country.trim();
+    }
+    if (normalizedTaxId !== undefined) {
+      vpUpdates.tax_id = normalizedTaxId;
+    }
+    if (body.acceptingInquiries !== undefined) {
+      vpUpdates.accepting_inquiries = body.acceptingInquiries;
     }
 
     if (Object.keys(vpUpdates).length) {

@@ -295,6 +295,8 @@ model VendorProfile {
   city         String?
   state        String?
   country      String   @default("India")
+  taxId        String?
+  acceptingInquiries Boolean @default(true)
   experience   Int?
   isVerified   Boolean  @default(false)
   isFeatured   Boolean  @default(false)
