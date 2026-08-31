@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer } from "@/animations/variants";
+import { DashboardLoadError } from "@/components/dashboard/dashboard-load-error";
 import { ListEmptyState } from "@/components/dashboard/list-empty-state";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { dashLabel, statusBadgeBase } from "@/lib/dashboard-styles";
@@ -24,6 +25,8 @@ export default function AdminVenuesPage() {
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [venues, setVenues] = useState<VenueRow[]>([]);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const load = async () => {
     const res = await fetch("/api/admin/venues");
@@ -35,12 +38,16 @@ export default function AdminVenuesPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try { await load(); }
-      catch { if (!cancelled) toast.error("Could not load venues"); }
+      try {
+        setLoading(true);
+        setLoadError(false);
+        await load();
+      }
+      catch { if (!cancelled) setLoadError(true); }
       finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [reloadKey]);
 
   const toggle = async (id: string, current: boolean) => {
     try {
@@ -77,6 +84,20 @@ export default function AdminVenuesPage() {
         <div className="h-10 w-48 bg-charcoal/10" />
         <div className="h-64 border border-charcoal/8 bg-charcoal/5" />
       </div>
+    );
+  }
+
+
+  if (loadError) {
+    return (
+      <DashboardLoadError
+        eyebrow="Management"
+        pageTitle="Venues"
+        label="Venue catalogue unavailable"
+        title="We could not load venue operations"
+        description="No zero venue count or empty catalogue has been inferred from the failed request. Retry to reconnect to venue inventory."
+        onRetry={() => setReloadKey((key) => key + 1)}
+      />
     );
   }
 

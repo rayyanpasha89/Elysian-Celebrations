@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { toast } from "sonner";
 import { fadeUp, staggerContainer } from "@/animations/variants";
+import { DashboardLoadError } from "@/components/dashboard/dashboard-load-error";
 import { ListEmptyState } from "@/components/dashboard/list-empty-state";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { dashLabel } from "@/lib/dashboard-styles";
@@ -28,23 +28,27 @@ export default function AdminClientsPage() {
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [clients, setClients] = useState<ClientRow[]>([]);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
+        setLoading(true);
+        setLoadError(false);
         const res = await fetch("/api/admin/clients");
         const json = await res.json();
         if (!res.ok) throw new Error(json.error);
         setClients(json.clients ?? []);
       } catch {
-        if (!cancelled) toast.error("Could not load clients");
+        if (!cancelled) setLoadError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [reloadKey]);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -66,6 +70,20 @@ export default function AdminClientsPage() {
         <div className="h-10 w-48 bg-charcoal/10" />
         <div className="h-64 border border-charcoal/8 bg-charcoal/5" />
       </div>
+    );
+  }
+
+
+  if (loadError) {
+    return (
+      <DashboardLoadError
+        eyebrow="Directory"
+        pageTitle="Clients"
+        label="Client directory unavailable"
+        title="We could not load client event records"
+        description="No empty client list or zero planning totals have been inferred from the failed request. Retry to reconnect to the directory."
+        onRetry={() => setReloadKey((key) => key + 1)}
+      />
     );
   }
 

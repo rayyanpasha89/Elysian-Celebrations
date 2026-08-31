@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer } from "@/animations/variants";
+import { DashboardLoadError } from "@/components/dashboard/dashboard-load-error";
 import { ListEmptyState } from "@/components/dashboard/list-empty-state";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { dashLabel, statusBadgeBase } from "@/lib/dashboard-styles";
@@ -30,6 +31,8 @@ export default function AdminBlogPage() {
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState<PostRow[]>([]);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const load = async () => {
     const res = await fetch("/api/admin/blog");
@@ -62,12 +65,16 @@ export default function AdminBlogPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try { await load(); }
-      catch { if (!cancelled) toast.error("Could not load blog posts"); }
+      try {
+        setLoading(true);
+        setLoadError(false);
+        await load();
+      }
+      catch { if (!cancelled) setLoadError(true); }
       finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [reloadKey]);
 
   const togglePublish = async (id: string, current: boolean) => {
     try {
@@ -116,6 +123,20 @@ export default function AdminBlogPage() {
         <div className="h-10 w-48 bg-charcoal/10" />
         <div className="h-64 border border-charcoal/8 bg-charcoal/5" />
       </div>
+    );
+  }
+
+
+  if (loadError) {
+    return (
+      <DashboardLoadError
+        eyebrow="Content"
+        pageTitle="Blog Posts"
+        label="Content feed unavailable"
+        title="We could not load the editorial library"
+        description="The page has not presented a failed request as an empty blog. Retry to reconnect to published and draft content."
+        onRetry={() => setReloadKey((key) => key + 1)}
+      />
     );
   }
 

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer, staggerItem } from "@/animations/variants";
+import { DashboardLoadError } from "@/components/dashboard/dashboard-load-error";
 import { ListEmptyState } from "@/components/dashboard/list-empty-state";
 import { dashBtn, dashCard, dashLabel, statusBadgeBase } from "@/lib/dashboard-styles";
 import { cn } from "@/lib/utils";
@@ -39,6 +40,8 @@ export default function AdminInquiriesPage() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [inquiries, setInquiries] = useState<InquiryRow[]>([]);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const load = async () => {
     const res = await fetch("/api/admin/inquiries");
@@ -73,9 +76,11 @@ export default function AdminInquiriesPage() {
     let cancelled = false;
     (async () => {
       try {
+        setLoading(true);
+        setLoadError(false);
         await load();
       } catch {
-        if (!cancelled) toast.error("Could not load inquiries");
+        if (!cancelled) setLoadError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -83,7 +88,7 @@ export default function AdminInquiriesPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
 
   const filtered = useMemo(() => inquiries.filter((i) => i.status === tab), [inquiries, tab]);
 
@@ -109,6 +114,20 @@ export default function AdminInquiriesPage() {
         <div className="h-10 w-48 bg-charcoal/10" />
         <div className="h-40 border border-charcoal/8 bg-charcoal/5" />
       </div>
+    );
+  }
+
+
+  if (loadError) {
+    return (
+      <DashboardLoadError
+        eyebrow="Leads"
+        pageTitle="Inquiries"
+        label="Inquiry feed unavailable"
+        title="We could not load incoming briefs"
+        description="The selected status has not been shown as empty because the request failed. Retry to reconnect to the lead pipeline."
+        onRetry={() => setReloadKey((key) => key + 1)}
+      />
     );
   }
 

@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { toast } from "sonner";
 import { CalendarDays, ChevronDown, MapPin, Users } from "lucide-react";
+import { DashboardLoadError } from "@/components/dashboard/dashboard-load-error";
 import { cn } from "@/lib/utils";
 
 type Booking = { id: string; vendorName: string; categoryName: string; finalPrice: number | null; pricePublished: boolean };
@@ -41,21 +41,29 @@ export default function AdminProgressPage() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "active" | "stalled" | "ready">("all");
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
+        setLoading(true);
+        setLoadError(false);
         const res = await fetch("/api/admin/pricing");
         const json = await res.json();
         if (!res.ok) throw new Error(json.error ?? "Failed to load");
-        setClients((json.clients ?? []) as AdminClient[]);
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Failed to load progress");
+        if (!cancelled) setClients((json.clients ?? []) as AdminClient[]);
+      } catch {
+        if (!cancelled) setLoadError(true);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
 
   const withWedding = useMemo(() => clients.filter((c) => c.wedding), [clients]);
 
@@ -83,6 +91,19 @@ export default function AdminProgressPage() {
       <div className="flex h-64 items-center justify-center">
         <p className={dashLabel}>Loading client progress...</p>
       </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <DashboardLoadError
+        eyebrow="Client progress"
+        pageTitle="Event readiness"
+        label="Progress feed unavailable"
+        title="We could not load client readiness"
+        description="No client has been classified as stalled or complete from a failed request. Retry to reconnect to the canonical event-readiness feed."
+        onRetry={() => setReloadKey((key) => key + 1)}
+      />
     );
   }
 

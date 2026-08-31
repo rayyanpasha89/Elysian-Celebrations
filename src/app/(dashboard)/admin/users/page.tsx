@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer } from "@/animations/variants";
+import { DashboardLoadError } from "@/components/dashboard/dashboard-load-error";
 import { ListEmptyState } from "@/components/dashboard/list-empty-state";
 import { dashLabel, statusBadgeBase } from "@/lib/dashboard-styles";
 import { cn } from "@/lib/utils";
@@ -42,6 +43,8 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const loadUsers = useCallback(async () => {
     const res = await fetch("/api/admin/users");
@@ -71,13 +74,12 @@ export default function AdminUsersPage() {
     let cancelled = false;
     (async () => {
       try {
+        setLoading(true);
+        setLoadError(false);
         const mapped = await loadUsers();
         if (!cancelled) setUsers(mapped);
       } catch {
-        if (!cancelled) {
-          setUsers([]);
-          toast.error("Could not load users");
-        }
+        if (!cancelled) setLoadError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -85,7 +87,7 @@ export default function AdminUsersPage() {
     return () => {
       cancelled = true;
     };
-  }, [loadUsers]);
+  }, [loadUsers, reloadKey]);
 
   const patchUser = async (id: string, updates: { isActive?: boolean; role?: string }) => {
     setUpdatingUserId(id);
@@ -130,6 +132,19 @@ export default function AdminUsersPage() {
         <div className="h-10 w-48 bg-charcoal/10" />
         <div className="h-64 border border-charcoal/8 bg-charcoal/5" />
       </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <DashboardLoadError
+        eyebrow="Directory"
+        pageTitle="Users"
+        label="User directory unavailable"
+        title="We could not load platform accounts"
+        description="No empty directory or zero totals have been inferred from the failed request. Retry to reconnect to the account source of truth."
+        onRetry={() => setReloadKey((key) => key + 1)}
+      />
     );
   }
 
