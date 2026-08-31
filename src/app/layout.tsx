@@ -48,7 +48,11 @@ export default function RootLayout({
 }>) {
   const testAuthEnabled = isTestAuthEnabled();
   const content = (
-    <html lang="en" className={`${fontVariables} h-full antialiased`}>
+    <html
+      lang="en"
+      className={`${fontVariables} h-full antialiased`}
+      data-scroll-behavior="smooth"
+    >
       <body className="min-h-full flex flex-col font-sans">
         {children}
         {testAuthEnabled ? <TestAuthSwitcher /> : null}

@@ -520,6 +520,7 @@ function QuickAdd({
         <UserPlus className="h-4 w-4 shrink-0 text-slate" />
         <input
           ref={inputRef}
+          aria-label="Guest name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Add a guest by name…"
@@ -598,6 +599,7 @@ function FilterBar({
       <div className="flex items-center gap-2 border border-charcoal/15 px-3 lg:w-64">
         <Search className="h-4 w-4 shrink-0 text-slate" />
         <input
+          aria-label="Search guests"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search guests…"

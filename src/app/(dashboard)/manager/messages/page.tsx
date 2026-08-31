@@ -238,7 +238,7 @@ export default function ManagerMessagesPage() {
       ) : (
         <motion.div
           variants={fadeUp}
-          className="mt-10 grid min-h-[560px] gap-6 xl:grid-cols-[340px_minmax(0,1fr)_320px]"
+          className="mt-10 grid items-start gap-6 xl:grid-cols-[340px_minmax(0,1fr)_320px]"
         >
           <ConversationQueue
             conversations={conversations}
@@ -268,7 +268,12 @@ function ConversationQueue({
   onSelect: (id: string) => void;
 }) {
   return (
-    <div className={cn(dashCard, "flex flex-col p-0")}>
+    <div
+      className={cn(
+        dashCard,
+        "flex max-h-72 min-w-0 flex-col p-0 xl:h-[min(72vh,720px)] xl:max-h-none xl:min-h-[30rem]"
+      )}
+    >
       <div className="border-b border-charcoal/8 px-4 py-3">
         <p className={dashLabel}>Conversation queue</p>
         <p className="mt-1 text-xs text-slate">
@@ -276,7 +281,7 @@ function ConversationQueue({
           active threads
         </p>
       </div>
-      <ul className="list-none divide-y divide-charcoal/8 pl-0">
+      <ul className="min-h-0 flex-1 list-none divide-y divide-charcoal/8 overflow-y-auto pl-0">
         {conversations.map((conversation) => {
           const active = conversation.id === activeId;
           const tone = statusTone(conversation.booking.status);
@@ -346,7 +351,12 @@ function ThreadPanel({
 }) {
   if (!conversation) {
     return (
-      <div className={cn(dashCard, "flex items-center justify-center p-10")}>
+      <div
+        className={cn(
+          dashCard,
+          "flex h-[min(72vh,720px)] min-h-[30rem] min-w-0 items-center justify-center p-10"
+        )}
+      >
         <ListEmptyState
           title="Pick a thread"
           hint="Select a client-vendor conversation to inspect the message history."
@@ -356,7 +366,12 @@ function ThreadPanel({
   }
 
   return (
-    <div className={cn(dashCard, "flex flex-col p-0")}>
+    <div
+      className={cn(
+        dashCard,
+        "flex h-[min(72vh,720px)] min-h-[30rem] min-w-0 flex-col p-0"
+      )}
+    >
       <div className="border-b border-charcoal/8 px-6 py-4">
         <p className={dashLabel}>Thread</p>
         <h3 className="mt-2 font-display text-xl text-charcoal">
@@ -441,7 +456,12 @@ function ManagerContextPanel({
 }) {
   if (!conversation) {
     return (
-      <aside className={cn(dashCard, "hidden flex-col gap-3 p-5 xl:flex")}>
+      <aside
+        className={cn(
+          dashCard,
+          "hidden h-[min(72vh,720px)] min-h-[30rem] overflow-y-auto p-5 xl:flex xl:flex-col xl:gap-3"
+        )}
+      >
         <p className={dashLabel}>Booking context</p>
         <p className="text-sm leading-relaxed text-slate">
           Select a thread to see its operational context.
@@ -456,7 +476,12 @@ function ManagerContextPanel({
     formatBookingDate(booking.weddingEvent?.date ?? null);
 
   return (
-    <aside className={cn(dashCard, "hidden flex-col gap-5 p-5 xl:flex")}>
+    <aside
+      className={cn(
+        dashCard,
+        "hidden h-[min(72vh,720px)] min-h-[30rem] overflow-y-auto p-5 xl:flex xl:flex-col xl:gap-5"
+      )}
+    >
       <div>
         <p className={dashLabel}>Booking context</p>
         <h3 className="font-display mt-2 text-lg text-charcoal">

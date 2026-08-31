@@ -46,6 +46,10 @@ type RequestOptions = {
 const TEST_COOKIE = "ec_test_role";
 const SERVER_START_TIMEOUT_MS = 120_000;
 const SERVER_STOP_TIMEOUT_MS = 8_000;
+const inspectionHoldMs = Math.max(
+  0,
+  Number(process.env.ELYSIAN_JOURNEY_INSPECTION_HOLD_MS) || 0
+);
 
 function requiredEnv(...names: string[]) {
   for (const name of names) {
@@ -1068,6 +1072,12 @@ async function main() {
     console.log(
       `Authenticated journeys passed: ${completed.length} groups in ${Date.now() - startedAt} ms.`
     );
+    if (inspectionHoldMs > 0) {
+      console.log(
+        `Inspection window open for ${Math.round(inspectionHoldMs / 1000)} seconds at ${server.baseUrl}.`
+      );
+      await sleep(inspectionHoldMs);
+    }
   } catch (error) {
     journeyError = error;
     if (server?.logs()) {

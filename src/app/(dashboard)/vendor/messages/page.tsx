@@ -375,7 +375,7 @@ export default function VendorMessagesPage() {
 
       <motion.div
         variants={fadeUp}
-        className="mt-10 grid min-h-[520px] grid-cols-1 gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)_minmax(0,300px)]"
+        className="mt-10 grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)_minmax(0,300px)]"
       >
         <ConversationList
           conversations={conversations}
@@ -418,7 +418,12 @@ function ConversationList({
   onSelect: (id: string) => void;
 }) {
   return (
-    <div className={cn(dashCard, "flex flex-col p-0")}>
+    <div
+      className={cn(
+        dashCard,
+        "flex max-h-72 min-w-0 flex-col p-0 lg:h-[min(72vh,720px)] lg:max-h-none lg:min-h-[30rem]"
+      )}
+    >
       <div className="border-b border-charcoal/8 px-4 py-3">
         <p className={dashLabel}>Client threads</p>
         <p className="mt-1 text-xs text-slate">
@@ -427,7 +432,7 @@ function ConversationList({
           {conversations.filter((c) => c.hasMessages).length} active
         </p>
       </div>
-      <ul className="list-none divide-y divide-charcoal/8 pl-0">
+      <ul className="min-h-0 flex-1 list-none divide-y divide-charcoal/8 overflow-y-auto pl-0">
         {conversations.map((conversation) => {
           const active = conversation.id === activeId;
           const tone = statusTone(conversation.booking.status);
@@ -489,7 +494,12 @@ function ConversationList({
 function ContextPanel({ conversation }: { conversation: Conversation | null }) {
   if (!conversation) {
     return (
-      <aside className={cn(dashCard, "hidden flex-col gap-3 p-5 lg:flex")}>
+      <aside
+        className={cn(
+          dashCard,
+          "hidden h-[min(72vh,720px)] min-h-[30rem] overflow-y-auto p-5 lg:flex lg:flex-col lg:gap-3"
+        )}
+      >
         <p className={dashLabel}>Booking context</p>
         <p className="text-sm leading-relaxed text-slate">
           Select a thread to see the linked booking, event, and venue.
@@ -504,7 +514,12 @@ function ContextPanel({ conversation }: { conversation: Conversation | null }) {
     formatBookingDate(booking.weddingEvent?.date ?? null);
 
   return (
-    <aside className={cn(dashCard, "hidden flex-col gap-5 p-5 lg:flex")}>
+    <aside
+      className={cn(
+        dashCard,
+        "hidden h-[min(72vh,720px)] min-h-[30rem] overflow-y-auto p-5 lg:flex lg:flex-col lg:gap-5"
+      )}
+    >
       <div>
         <p className={dashLabel}>Booking context</p>
         <h3 className="font-display mt-2 text-lg text-charcoal">

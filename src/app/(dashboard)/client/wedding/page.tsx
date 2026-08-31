@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  Children,
   cloneElement,
   isValidElement,
   useCallback,
@@ -6218,23 +6219,30 @@ function Field({
   className?: string;
 }) {
   const generatedId = useId();
-  const isNativeControl =
-    isValidElement<{ id?: string }>(children) &&
-    typeof children.type === "string" &&
-    ["input", "select", "textarea"].includes(children.type);
-  const controlId = isNativeControl
-    ? children.props.id ?? generatedId
-    : undefined;
+  const childArray = Children.toArray(children);
+  const nativeControlIndex = childArray.findIndex(
+    (child) =>
+      isValidElement<{ id?: string }>(child) &&
+      typeof child.type === "string" &&
+      ["input", "select", "textarea"].includes(child.type)
+  );
+  const nativeControl =
+    nativeControlIndex >= 0 &&
+    isValidElement<{ id?: string }>(childArray[nativeControlIndex])
+      ? childArray[nativeControlIndex]
+      : null;
+  const controlId = nativeControl?.props.id ?? generatedId;
   const labelId = `${generatedId}-label`;
+  const hasNativeControl = nativeControl !== null;
 
   return (
     <div
       className={className}
-      {...(!isNativeControl
+      {...(!hasNativeControl
         ? { role: "group", "aria-labelledby": labelId }
         : {})}
     >
-      {isNativeControl ? (
+      {hasNativeControl ? (
         <label htmlFor={controlId} className={dashLabel}>
           {label}
         </label>
@@ -6244,8 +6252,12 @@ function Field({
         </span>
       )}
       <div className="mt-2">
-        {isNativeControl
-          ? cloneElement(children, { id: controlId })
+        {hasNativeControl
+          ? childArray.map((child, index) =>
+              index === nativeControlIndex
+                ? cloneElement(nativeControl, { id: controlId })
+                : child
+            )
           : children}
       </div>
     </div>

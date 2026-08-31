@@ -43,7 +43,12 @@ export function MessageThread({
 }) {
   if (!conversation) {
     return (
-      <div className={cn(dashCard, "flex items-center justify-center p-10")}>
+      <div
+        className={cn(
+          dashCard,
+          "flex h-[min(72vh,720px)] min-h-[30rem] min-w-0 items-center justify-center p-10"
+        )}
+      >
         <ListEmptyState
           title="Pick a booking"
           hint="Select a conversation from the list to see its thread and context."
@@ -55,7 +60,12 @@ export function MessageThread({
   const canSend = draft.trim().length > 0 && !sending;
 
   return (
-    <div className={cn(dashCard, "flex flex-col p-0")}>
+    <div
+      className={cn(
+        dashCard,
+        "flex h-[min(72vh,720px)] min-h-[30rem] min-w-0 flex-col p-0"
+      )}
+    >
       <div className="flex items-center gap-3 border-b border-charcoal/8 px-6 py-4">
         <div className="flex h-11 w-11 items-center justify-center border border-charcoal/15 bg-midnight font-accent text-[11px] text-ivory">
           {conversation.initials}
