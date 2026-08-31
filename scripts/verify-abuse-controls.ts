@@ -119,6 +119,70 @@ async function main() {
     assert.equal(permissions.rows[0]?.service_can_reserve, true);
     assert.equal(permissions.rows[0]?.reservation_rls_enabled, true);
 
+    const publicBoundary = await client.query<{
+      table_count: number;
+      tables_without_rls: number;
+      browser_table_grants: number;
+      browser_function_grants: number;
+      browser_sequence_grants: number;
+      service_missing_select: number;
+    }>(`
+      with public_tables as (
+        select class.oid, class.relrowsecurity
+        from pg_catalog.pg_class as class
+        join pg_catalog.pg_namespace as namespace
+          on namespace.oid = class.relnamespace
+        where namespace.nspname = 'public'
+          and class.relkind in ('r', 'p')
+      ), public_functions as (
+        select procedure.oid
+        from pg_catalog.pg_proc as procedure
+        join pg_catalog.pg_namespace as namespace
+          on namespace.oid = procedure.pronamespace
+        where namespace.nspname = 'public'
+      ), public_sequences as (
+        select class.oid
+        from pg_catalog.pg_class as class
+        join pg_catalog.pg_namespace as namespace
+          on namespace.oid = class.relnamespace
+        where namespace.nspname = 'public'
+          and class.relkind = 'S'
+      )
+      select
+        (select count(*)::int from public_tables) as table_count,
+        (select count(*)::int from public_tables where not relrowsecurity)
+          as tables_without_rls,
+        (select count(*)::int from public_tables where
+          has_table_privilege('anon', oid, 'select')
+          or has_table_privilege('anon', oid, 'insert')
+          or has_table_privilege('anon', oid, 'update')
+          or has_table_privilege('anon', oid, 'delete')
+          or has_table_privilege('authenticated', oid, 'select')
+          or has_table_privilege('authenticated', oid, 'insert')
+          or has_table_privilege('authenticated', oid, 'update')
+          or has_table_privilege('authenticated', oid, 'delete')
+        ) as browser_table_grants,
+        (select count(*)::int from public_functions where
+          has_function_privilege('anon', oid, 'execute')
+          or has_function_privilege('authenticated', oid, 'execute')
+        ) as browser_function_grants,
+        (select count(*)::int from public_sequences where
+          has_sequence_privilege('anon', oid, 'usage')
+          or has_sequence_privilege('anon', oid, 'select')
+          or has_sequence_privilege('authenticated', oid, 'usage')
+          or has_sequence_privilege('authenticated', oid, 'select')
+        ) as browser_sequence_grants,
+        (select count(*)::int from public_tables where
+          not has_table_privilege('service_role', oid, 'select')
+        ) as service_missing_select
+    `);
+    assert.ok((publicBoundary.rows[0]?.table_count ?? 0) >= 45);
+    assert.equal(publicBoundary.rows[0]?.tables_without_rls, 0);
+    assert.equal(publicBoundary.rows[0]?.browser_table_grants, 0);
+    assert.equal(publicBoundary.rows[0]?.browser_function_grants, 0);
+    assert.equal(publicBoundary.rows[0]?.browser_sequence_grants, 0);
+    assert.equal(publicBoundary.rows[0]?.service_missing_select, 0);
+
     const vendor = await client.query<{ id: string }>(
       "select id from public.vendor_profiles order by created_at asc limit 1"
     );

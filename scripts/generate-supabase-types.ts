@@ -59,7 +59,11 @@ function requiredEnv(name: string) {
 
 function writeTypes(contents: string) {
   const temporaryPath = `${outputPath}.tmp`;
-  writeFileSync(temporaryPath, contents, "utf8");
+  const normalized = contents.replace(
+    /Args:\s*\{\s*\}/g,
+    "Args: Record<string, never>",
+  );
+  writeFileSync(temporaryPath, normalized, "utf8");
   renameSync(temporaryPath, outputPath);
 }
 

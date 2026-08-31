@@ -27,6 +27,7 @@ const DASHBOARD_ROUTE_TITLES: Record<string, string> = {
   "/client/wedding": "Event Plan",
   "/client/timeline": "Run of Show",
   "/client/bookings": "Bookings",
+  "/client/billing": "Billing",
 
   "/vendor": "Dashboard",
   "/vendor/profile": "Profile",
@@ -42,6 +43,7 @@ const DASHBOARD_ROUTE_TITLES: Record<string, string> = {
 
   "/admin": "Dashboard",
   "/admin/pricing": "Final Pricing",
+  "/admin/billing": "Client Billing",
   "/admin/progress": "Client Progress",
   "/admin/revenue": "Revenue Dashboard",
   "/admin/vendors": "Vendors",

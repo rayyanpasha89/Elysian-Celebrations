@@ -72,6 +72,327 @@ export type Database = {
         Relationships: [
         ]
       }
+      "billing_invoices": {
+        Row:
+        {
+          "id": string
+          "invoice_number": string
+          "booking_id": string
+          "payment_id": string
+          "idempotency_key": string
+          "client_profile_id": string
+          "wedding_id": string | null
+          "installment_number": number
+          "label": string
+          "description": string | null
+          "amount": number
+          "currency": string
+          "status": string
+          "due_date": string
+          "issued_at": string
+          "paid_at": string | null
+          "refunded_amount": number
+          "refunded_at": string | null
+          "voided_at": string | null
+          "voided_by": string | null
+          "void_reason": string | null
+          "created_by": string | null
+          "created_at": string
+          "updated_at": string
+        }
+        Insert:
+        {
+          "id"?: string
+          "invoice_number"?: string
+          "booking_id": string
+          "payment_id": string
+          "idempotency_key": string
+          "client_profile_id": string
+          "wedding_id"?: string | null
+          "installment_number": number
+          "label": string
+          "description"?: string | null
+          "amount": number
+          "currency"?: string
+          "status"?: string
+          "due_date": string
+          "issued_at"?: string
+          "paid_at"?: string | null
+          "refunded_amount"?: number
+          "refunded_at"?: string | null
+          "voided_at"?: string | null
+          "voided_by"?: string | null
+          "void_reason"?: string | null
+          "created_by"?: string | null
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Update:
+        {
+          "id"?: string
+          "invoice_number"?: string
+          "booking_id"?: string
+          "payment_id"?: string
+          "idempotency_key"?: string
+          "client_profile_id"?: string
+          "wedding_id"?: string | null
+          "installment_number"?: number
+          "label"?: string
+          "description"?: string | null
+          "amount"?: number
+          "currency"?: string
+          "status"?: string
+          "due_date"?: string
+          "issued_at"?: string
+          "paid_at"?: string | null
+          "refunded_amount"?: number
+          "refunded_at"?: string | null
+          "voided_at"?: string | null
+          "voided_by"?: string | null
+          "void_reason"?: string | null
+          "created_by"?: string | null
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_invoices_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_invoices_client_profile_id_fkey"
+            columns: ["client_profile_id"]
+            isOneToOne: false
+            referencedRelation: "client_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_invoices_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: true
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_invoices_wedding_id_fkey"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "weddings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      "billing_payment_attempts": {
+        Row:
+        {
+          "id": string
+          "invoice_id": string
+          "provider": string
+          "idempotency_key": string
+          "provider_order_id": string | null
+          "provider_payment_id": string | null
+          "status": string
+          "amount_minor": number
+          "currency": string
+          "failure_code": string | null
+          "failure_message": string | null
+          "checkout_expires_at": string | null
+          "authorized_at": string | null
+          "captured_at": string | null
+          "failed_at": string | null
+          "metadata": Json
+          "created_at": string
+          "updated_at": string
+        }
+        Insert:
+        {
+          "id"?: string
+          "invoice_id": string
+          "provider": string
+          "idempotency_key": string
+          "provider_order_id"?: string | null
+          "provider_payment_id"?: string | null
+          "status"?: string
+          "amount_minor": number
+          "currency"?: string
+          "failure_code"?: string | null
+          "failure_message"?: string | null
+          "checkout_expires_at"?: string | null
+          "authorized_at"?: string | null
+          "captured_at"?: string | null
+          "failed_at"?: string | null
+          "metadata"?: Json
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Update:
+        {
+          "id"?: string
+          "invoice_id"?: string
+          "provider"?: string
+          "idempotency_key"?: string
+          "provider_order_id"?: string | null
+          "provider_payment_id"?: string | null
+          "status"?: string
+          "amount_minor"?: number
+          "currency"?: string
+          "failure_code"?: string | null
+          "failure_message"?: string | null
+          "checkout_expires_at"?: string | null
+          "authorized_at"?: string | null
+          "captured_at"?: string | null
+          "failed_at"?: string | null
+          "metadata"?: Json
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_payment_attempts_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "billing_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      "billing_refunds": {
+        Row:
+        {
+          "id": string
+          "invoice_id": string
+          "payment_attempt_id": string | null
+          "provider": string
+          "idempotency_key": string
+          "provider_refund_id": string | null
+          "amount": number
+          "currency": string
+          "status": string
+          "method": string | null
+          "reference": string | null
+          "reason": string
+          "requested_by": string | null
+          "processed_at": string | null
+          "failure_code": string | null
+          "failure_message": string | null
+          "created_at": string
+          "updated_at": string
+        }
+        Insert:
+        {
+          "id"?: string
+          "invoice_id": string
+          "payment_attempt_id"?: string | null
+          "provider"?: string
+          "idempotency_key": string
+          "provider_refund_id"?: string | null
+          "amount": number
+          "currency"?: string
+          "status"?: string
+          "method"?: string | null
+          "reference"?: string | null
+          "reason": string
+          "requested_by"?: string | null
+          "processed_at"?: string | null
+          "failure_code"?: string | null
+          "failure_message"?: string | null
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Update:
+        {
+          "id"?: string
+          "invoice_id"?: string
+          "payment_attempt_id"?: string | null
+          "provider"?: string
+          "idempotency_key"?: string
+          "provider_refund_id"?: string | null
+          "amount"?: number
+          "currency"?: string
+          "status"?: string
+          "method"?: string | null
+          "reference"?: string | null
+          "reason"?: string
+          "requested_by"?: string | null
+          "processed_at"?: string | null
+          "failure_code"?: string | null
+          "failure_message"?: string | null
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_refunds_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "billing_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_refunds_payment_attempt_id_fkey"
+            columns: ["payment_attempt_id"]
+            isOneToOne: false
+            referencedRelation: "billing_payment_attempts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      "billing_webhook_events": {
+        Row:
+        {
+          "id": string
+          "provider": string
+          "provider_event_id": string
+          "event_type": string
+          "payload_sha256": string
+          "payment_attempt_id": string | null
+          "status": string
+          "delivery_count": number
+          "last_error": string | null
+          "received_at": string
+          "processed_at": string | null
+        }
+        Insert:
+        {
+          "id"?: string
+          "provider": string
+          "provider_event_id": string
+          "event_type": string
+          "payload_sha256": string
+          "payment_attempt_id"?: string | null
+          "status"?: string
+          "delivery_count"?: number
+          "last_error"?: string | null
+          "received_at"?: string
+          "processed_at"?: string | null
+        }
+        Update:
+        {
+          "id"?: string
+          "provider"?: string
+          "provider_event_id"?: string
+          "event_type"?: string
+          "payload_sha256"?: string
+          "payment_attempt_id"?: string | null
+          "status"?: string
+          "delivery_count"?: number
+          "last_error"?: string | null
+          "received_at"?: string
+          "processed_at"?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_webhook_events_payment_attempt_id_fkey"
+            columns: ["payment_attempt_id"]
+            isOneToOne: false
+            referencedRelation: "billing_payment_attempts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       "blog_posts": {
         Row:
         {
@@ -2083,6 +2404,41 @@ export type Database = {
         }
         Returns: string
       }
+      "issue_booking_invoice": {
+        Args: {
+          "p_booking_id": string
+          "p_amount": number
+          "p_due_date": string
+          "p_idempotency_key": string
+          "p_label": string
+          "p_description": string
+          "p_actor_user_id": string
+        }
+        Returns: string
+      }
+      "next_billing_invoice_number": {
+        Args: Record<string, never>
+        Returns: string
+      }
+      "purge_test_booking_financials": {
+        Args: {
+          "p_booking_ids": string[]
+          "p_actor_user_id": string
+        }
+        Returns: number
+      }
+      "record_billing_refund": {
+        Args: {
+          "p_invoice_id": string
+          "p_amount": number
+          "p_idempotency_key": string
+          "p_method": string
+          "p_reference": string
+          "p_reason": string
+          "p_actor_user_id": string
+        }
+        Returns: string
+      }
       "record_booking_payment": {
         Args: {
           "p_booking_id": string
@@ -2120,6 +2476,27 @@ export type Database = {
           "remaining_bytes": number
         }[]
       }
+      "set_booking_pricing": {
+        Args: {
+          "p_booking_id": string
+          "p_vendor_amount": number
+          "p_fee": number
+          "p_price_published": boolean
+          "p_expected_updated_at": string
+          "p_actor_user_id": string
+        }
+        Returns: string
+      }
+      "settle_billing_invoice": {
+        Args: {
+          "p_invoice_id": string
+          "p_method": string
+          "p_paid_at": string
+          "p_reference": string
+          "p_actor_user_id": string
+        }
+        Returns: string
+      }
       "settle_booking_payment": {
         Args: {
           "p_booking_id": string
@@ -2127,6 +2504,14 @@ export type Database = {
           "p_method": string
           "p_paid_at": string
           "p_reference": string
+          "p_actor_user_id": string
+        }
+        Returns: string
+      }
+      "void_billing_invoice": {
+        Args: {
+          "p_invoice_id": string
+          "p_reason": string
           "p_actor_user_id": string
         }
         Returns: string

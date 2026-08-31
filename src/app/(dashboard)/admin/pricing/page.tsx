@@ -729,6 +729,7 @@ function PricingEditor({
             key={booking.updatedAt}
             bookingId={booking.id}
             className="mt-6"
+            clientBillingHref="/admin/billing"
           />
         </div>
       </motion.div>

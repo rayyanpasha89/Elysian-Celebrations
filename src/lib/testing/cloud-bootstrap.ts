@@ -1402,10 +1402,18 @@ async function resetFixtureData(
 
     const bookingIds = (bookingRows ?? []).map((row) => row.id as string);
     if (bookingIds.length > 0) {
-      await ensureSuccess(
-        "Clearing booking payments",
-        supabase.from("payments").delete().in("booking_id", bookingIds)
+      const { error: financialPurgeError } = await supabase.rpc(
+        "purge_test_booking_financials",
+        {
+          p_booking_ids: bookingIds,
+          p_actor_user_id: "cloud-bootstrap",
+        }
       );
+      if (financialPurgeError) {
+        throw new Error(
+          `Clearing test booking financials: ${financialPurgeError.message}`
+        );
+      }
       await ensureSuccess(
         "Clearing booking messages",
         supabase.from("messages").delete().in("booking_id", bookingIds)

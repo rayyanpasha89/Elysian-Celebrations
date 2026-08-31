@@ -20,7 +20,8 @@
     "db:types": "tsx --tsconfig tsconfig.json scripts/generate-supabase-types.ts",
     "test:event-plan": "tsx --tsconfig tsconfig.json scripts/verify-event-plan-transaction.ts",
     "test:venue": "tsx --tsconfig tsconfig.json scripts/verify-venue-rules.ts",
-    "test:payments": "tsx --tsconfig tsconfig.json scripts/verify-payment-ledger.ts"
+    "test:payments": "tsx --tsconfig tsconfig.json scripts/verify-payment-ledger.ts",
+    "test:billing": "tsx --tsconfig tsconfig.json scripts/verify-billing-invoices.ts"
   },
   "overrides": {
     "nanoid": "3.3.18",

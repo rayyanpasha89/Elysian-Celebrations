@@ -155,13 +155,30 @@ async function main() {
       );
     }
 
+    await expectDatabaseError(
+      client,
+      () =>
+        client.query(
+          "select void_booking_payment($1, $2, 'Verification correction', $3)",
+          [booking.id, clientPaymentId, actor]
+        ),
+      "23514"
+    );
+
+    const replaceableSchedule = await client.query(
+      `select (record_booking_payment(
+        $1, 'CLIENT_IN', 1, 'Replaceable schedule', current_date, false,
+        null, null, null, 'Rollback-safe void test', $2
+      )).id as id`,
+      [booking.id, actor]
+    );
     await client.query(
       "select void_booking_payment($1, $2, 'Verification correction', $3)",
-      [booking.id, clientPaymentId, actor]
+      [booking.id, replaceableSchedule.rows[0].id, actor]
     );
     const voided = await client.query(
       "select voided_at, void_reason from payments where id = $1",
-      [clientPaymentId]
+      [replaceableSchedule.rows[0].id]
     );
     assert.ok(voided.rows[0].voided_at);
     assert.equal(voided.rows[0].void_reason, "Verification correction");
@@ -172,7 +189,13 @@ async function main() {
     );
     assert.deepEqual(
       audit.rows.map((row) => row.action).sort(),
-      ["PAYMENT_RECORDED", "PAYMENT_RECORDED", "PAYMENT_SETTLED", "PAYMENT_VOIDED"].sort()
+      [
+        "PAYMENT_RECORDED",
+        "PAYMENT_RECORDED",
+        "PAYMENT_RECORDED",
+        "PAYMENT_SETTLED",
+        "PAYMENT_VOIDED",
+      ].sort()
     );
 
     await client.query("rollback");

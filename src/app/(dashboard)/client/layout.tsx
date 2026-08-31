@@ -25,6 +25,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: "Messages", href: "/client/messages" },
       { label: "Bookings", href: "/client/bookings" },
+      { label: "Billing", href: "/client/billing" },
     ],
   },
   {

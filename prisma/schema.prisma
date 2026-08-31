@@ -104,6 +104,7 @@ model ClientProfile {
   inquiries    ContactInquiry[]
   moodBoards   MoodBoard[]
   payments     Payment[]
+  billingInvoices BillingInvoice[]
 
   @@map("client_profiles")
 }
@@ -130,6 +131,7 @@ model Wedding {
   events        WeddingEvent[]
   timeline      TimelineItem[]
   payments      Payment[]
+  billingInvoices BillingInvoice[]
 
   @@map("weddings")
 }
@@ -517,6 +519,7 @@ model Booking {
   messages      Message[]
   threadReads   MessageThreadRead[]
   payments      Payment[]
+  billingInvoices BillingInvoice[]
 
   @@map("bookings")
 }
@@ -544,12 +547,125 @@ model Payment {
   voidedBy          String?  @map("voided_by")
   voidReason        String?  @map("void_reason")
 
-  clientProfile ClientProfile? @relation(fields: [clientProfileId], references: [id], onDelete: Cascade)
-  vendorProfile VendorProfile? @relation(fields: [vendorProfileId], references: [id], onDelete: SetNull)
-  wedding       Wedding?       @relation(fields: [weddingId], references: [id], onDelete: Cascade)
-  booking       Booking?       @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  clientProfile ClientProfile? @relation(fields: [clientProfileId], references: [id], onDelete: Restrict)
+  vendorProfile VendorProfile? @relation(fields: [vendorProfileId], references: [id], onDelete: Restrict)
+  wedding       Wedding?       @relation(fields: [weddingId], references: [id], onDelete: Restrict)
+  booking       Booking?       @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  billingInvoice BillingInvoice?
 
   @@map("payments")
+}
+
+model BillingInvoice {
+  id                String   @id @default(uuid())
+  invoiceNumber     String   @unique @map("invoice_number")
+  bookingId         String   @map("booking_id")
+  paymentId         String   @unique @map("payment_id")
+  idempotencyKey    String   @map("idempotency_key")
+  clientProfileId   String   @map("client_profile_id")
+  weddingId         String?  @map("wedding_id")
+  installmentNumber Int      @map("installment_number")
+  label             String
+  description       String?
+  amount            Int
+  currency          String   @default("INR")
+  status            String   @default("ISSUED")
+  dueDate           DateTime @db.Date @map("due_date")
+  issuedAt          DateTime @default(now()) @map("issued_at")
+  paidAt            DateTime? @map("paid_at")
+  refundedAmount    Int      @default(0) @map("refunded_amount")
+  refundedAt        DateTime? @map("refunded_at")
+  voidedAt          DateTime? @map("voided_at")
+  voidedBy          String?  @map("voided_by")
+  voidReason        String?  @map("void_reason")
+  createdBy         String?  @map("created_by")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  booking       Booking                 @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  payment       Payment                 @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  clientProfile ClientProfile           @relation(fields: [clientProfileId], references: [id], onDelete: Restrict)
+  wedding       Wedding?                @relation(fields: [weddingId], references: [id], onDelete: Restrict)
+  attempts      BillingPaymentAttempt[]
+  refunds       BillingRefund[]
+
+  @@unique([bookingId, installmentNumber])
+  @@unique([bookingId, idempotencyKey])
+  @@map("billing_invoices")
+}
+
+model BillingPaymentAttempt {
+  id                String   @id @default(uuid())
+  invoiceId         String   @map("invoice_id")
+  provider          String
+  idempotencyKey    String   @map("idempotency_key")
+  providerOrderId   String?  @map("provider_order_id")
+  providerPaymentId String?  @map("provider_payment_id")
+  status            String   @default("CREATED")
+  amountMinor       BigInt   @map("amount_minor")
+  currency          String   @default("INR")
+  failureCode       String?  @map("failure_code")
+  failureMessage    String?  @map("failure_message")
+  checkoutExpiresAt DateTime? @map("checkout_expires_at")
+  authorizedAt      DateTime? @map("authorized_at")
+  capturedAt        DateTime? @map("captured_at")
+  failedAt          DateTime? @map("failed_at")
+  metadata          Json     @default("{}")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  invoice       BillingInvoice       @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  webhookEvents BillingWebhookEvent[]
+  refunds       BillingRefund[]
+
+  @@unique([provider, idempotencyKey])
+  @@map("billing_payment_attempts")
+}
+
+model BillingRefund {
+  id                String   @id @default(uuid())
+  invoiceId         String   @map("invoice_id")
+  paymentAttemptId  String?  @map("payment_attempt_id")
+  provider          String   @default("MANUAL")
+  idempotencyKey    String   @map("idempotency_key")
+  providerRefundId  String?  @map("provider_refund_id")
+  amount            Int
+  currency          String   @default("INR")
+  status            String   @default("PROCESSED")
+  method            String?
+  reference         String?
+  reason            String
+  requestedBy       String?  @map("requested_by")
+  processedAt       DateTime? @map("processed_at")
+  failureCode       String?  @map("failure_code")
+  failureMessage    String?  @map("failure_message")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  invoice        BillingInvoice        @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  paymentAttempt BillingPaymentAttempt? @relation(fields: [paymentAttemptId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, idempotencyKey])
+  @@map("billing_refunds")
+}
+
+model BillingWebhookEvent {
+  id               String   @id @default(uuid())
+  provider         String
+  providerEventId  String   @map("provider_event_id")
+  eventType        String   @map("event_type")
+  payloadSha256    String   @map("payload_sha256")
+  paymentAttemptId String?  @map("payment_attempt_id")
+  status           String   @default("RECEIVED")
+  deliveryCount    Int      @default(1) @map("delivery_count")
+  lastError        String?  @map("last_error")
+  receivedAt       DateTime @default(now()) @map("received_at")
+  processedAt      DateTime? @map("processed_at")
+
+  paymentAttempt BillingPaymentAttempt? @relation(fields: [paymentAttemptId], references: [id], onDelete: SetNull)
+
+  @@unique([provider, providerEventId])
+  @@map("billing_webhook_events")
 }
 
 enum BookingStatus {

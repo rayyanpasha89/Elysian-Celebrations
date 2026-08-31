@@ -130,11 +130,21 @@ export function visiblePaymentRows(
   rows: readonly PaymentLedgerRow[],
   role: "client" | "vendor" | "admin" | "manager"
 ) {
-  if (role === "client") {
-    return rows.filter((row) => row.kind === "CLIENT_IN");
-  }
-  if (role === "vendor") {
-    return rows.filter((row) => row.kind === "VENDOR_OUT");
+  if (role === "client" || role === "vendor") {
+    const direction = role === "client" ? "CLIENT_IN" : "VENDOR_OUT";
+    return rows
+      .filter((row) => row.kind === direction)
+      .map((row) => ({
+        id: row.id,
+        kind: row.kind,
+        label: row.label,
+        amount: row.amount,
+        due_date: row.due_date,
+        is_paid: row.is_paid,
+        paid_at: row.paid_at,
+        method: row.method,
+        created_at: row.created_at,
+      }));
   }
   return [...rows];
 }

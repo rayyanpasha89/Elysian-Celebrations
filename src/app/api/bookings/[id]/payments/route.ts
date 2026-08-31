@@ -26,9 +26,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function positiveMoney(value: unknown) {
-  const amount = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(amount) || amount <= 0) return null;
-  return Math.round(amount);
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0
+    ? value
+    : null;
 }
 
 function optionalText(value: unknown, maxLength: number) {
@@ -137,6 +137,12 @@ export async function POST(
     if (!isPaymentKind(kind)) {
       return apiError("Choose client receipt or vendor payout", 400);
     }
+    if (kind === "CLIENT_IN") {
+      return apiError(
+        "Issue or settle client installments from Billing so every receipt remains invoice-linked",
+        409
+      );
+    }
     if (amount == null) return apiError("Enter a positive payment amount", 400);
     if (isPaid && !isPaymentMethod(method)) {
       return apiError("Choose how the settled payment moved", 400);
@@ -155,8 +161,7 @@ export async function POST(
       p_kind: kind,
       p_amount: amount,
       p_label:
-        optionalText(rawBody.label, 160) ??
-        (kind === "CLIENT_IN" ? "Client receipt" : "Vendor payout"),
+        optionalText(rawBody.label, 160) ?? "Vendor payout",
       p_due_date: dueDate,
       p_is_paid: isPaid,
       p_paid_at: isPaid ? paidAt : null,

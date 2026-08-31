@@ -686,6 +686,39 @@ export async function DELETE() {
       .filter((id): id is string => typeof id === "string" && id.length > 0);
 
     if (eventIds.length > 0) {
+      const { data: linkedBookings, error: linkedBookingsError } = await supabase
+        .from("bookings")
+        .select("id")
+        .in("wedding_event_id", eventIds);
+      if (linkedBookingsError) {
+        console.error("bookings financial check:", linkedBookingsError);
+        return apiError("Failed to verify event plan history", 500);
+      }
+      const linkedBookingIds = (linkedBookings ?? []).map((booking) => booking.id);
+      if (linkedBookingIds.length > 0) {
+        const [{ count: paymentCount, error: paymentError }, { count: invoiceCount, error: invoiceError }] =
+          await Promise.all([
+            supabase
+              .from("payments")
+              .select("id", { count: "exact", head: true })
+              .in("booking_id", linkedBookingIds),
+            supabase
+              .from("billing_invoices")
+              .select("id", { count: "exact", head: true })
+              .in("booking_id", linkedBookingIds),
+          ]);
+        if (paymentError || invoiceError) {
+          console.error("event plan financial history:", paymentError ?? invoiceError);
+          return apiError("Failed to verify event plan history", 500);
+        }
+        if ((paymentCount ?? 0) > 0 || (invoiceCount ?? 0) > 0) {
+          return apiError(
+            "This event plan has billing history. Cancel its bookings instead of deleting the plan.",
+            409
+          );
+        }
+      }
+
       const { error: draftBookingsError } = await supabase
         .from("bookings")
         .delete()
@@ -726,7 +759,12 @@ export async function DELETE() {
 
     if (deleteError) {
       console.error("weddings delete:", deleteError);
-      return apiError("Failed to delete event plan", 500);
+      return apiError(
+        deleteError.code === "23503"
+          ? "This event plan has linked history and cannot be deleted"
+          : "Failed to delete event plan",
+        deleteError.code === "23503" ? 409 : 500
+      );
     }
 
     return apiSuccess({

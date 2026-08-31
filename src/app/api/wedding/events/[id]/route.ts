@@ -185,6 +185,39 @@ export async function DELETE(
       return apiError("Event not found", 404);
     }
 
+    const { data: linkedBookings, error: linkedBookingsError } = await supabase
+      .from("bookings")
+      .select("id")
+      .eq("wedding_event_id", id);
+    if (linkedBookingsError) {
+      console.error("bookings financial check:", linkedBookingsError);
+      return apiError("Failed to verify event history", 500);
+    }
+    const linkedBookingIds = (linkedBookings ?? []).map((booking) => booking.id);
+    if (linkedBookingIds.length > 0) {
+      const [{ count: paymentCount, error: paymentError }, { count: invoiceCount, error: invoiceError }] =
+        await Promise.all([
+          supabase
+            .from("payments")
+            .select("id", { count: "exact", head: true })
+            .in("booking_id", linkedBookingIds),
+          supabase
+            .from("billing_invoices")
+            .select("id", { count: "exact", head: true })
+            .in("booking_id", linkedBookingIds),
+        ]);
+      if (paymentError || invoiceError) {
+        console.error("event financial history:", paymentError ?? invoiceError);
+        return apiError("Failed to verify event history", 500);
+      }
+      if ((paymentCount ?? 0) > 0 || (invoiceCount ?? 0) > 0) {
+        return apiError(
+          "This function has billing history. Cancel its bookings instead of deleting it.",
+          409
+        );
+      }
+    }
+
     const { error: deleteBookingsError } = await supabase
       .from("bookings")
       .delete()
@@ -199,7 +232,12 @@ export async function DELETE(
     const { error } = await supabase.from("wedding_events").delete().eq("id", id);
     if (error) {
       console.error("wedding_events delete:", error);
-      return apiError("Failed to delete event", 500);
+      return apiError(
+        error.code === "23503"
+          ? "This function has linked history and cannot be deleted"
+          : "Failed to delete event",
+        error.code === "23503" ? 409 : 500
+      );
     }
 
     return apiSuccess({ ok: true });

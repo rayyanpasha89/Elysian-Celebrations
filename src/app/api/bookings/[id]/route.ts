@@ -210,11 +210,38 @@ export async function DELETE(
       );
     }
 
+    const [{ count: paymentCount, error: paymentError }, { count: invoiceCount, error: invoiceError }] =
+      await Promise.all([
+        supabase
+          .from("payments")
+          .select("id", { count: "exact", head: true })
+          .eq("booking_id", id),
+        supabase
+          .from("billing_invoices")
+          .select("id", { count: "exact", head: true })
+          .eq("booking_id", id),
+      ]);
+    if (paymentError || invoiceError) {
+      console.error("Booking financial history check:", paymentError ?? invoiceError);
+      return apiError("Failed to verify booking history", 500);
+    }
+    if ((paymentCount ?? 0) > 0 || (invoiceCount ?? 0) > 0) {
+      return apiError(
+        "This booking has financial history and must be cancelled rather than deleted",
+        409
+      );
+    }
+
     const { error } = await supabase.from("bookings").delete().eq("id", id);
 
     if (error) {
       console.error("Booking delete error:", error);
-      return apiError("Failed to delete booking", 500);
+      return apiError(
+        error.code === "23503"
+          ? "This booking has linked history and must be cancelled rather than deleted"
+          : "Failed to delete booking",
+        error.code === "23503" ? 409 : 500
+      );
     }
 
     return apiSuccess({ ok: true });

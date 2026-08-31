@@ -30,6 +30,20 @@ report, not a claim that this branch is deployed to Vercel.
   tax ID and internal user-ID leakage.
 - Rebuilt mobile vendor-detail inspection as an accessible modal sheet while
   retaining the desktop sticky brief rail.
+- Added an invoice-backed client billing system with atomic installment issue,
+  settlement, unpaid void, append-only refund, payment-attempt, and webhook
+  replay models.
+- Separated client collections from vendor payouts across APIs and UI. Client
+  receipts are now invoice-linked; the booking ledger creates vendor payouts only.
+- Added role-safe `/client/billing` and `/admin/billing` workspaces with honest
+  manual-reconciliation state while online checkout is disabled.
+- Locked pricing after invoice issue, protected financial parents from deletion,
+  removed internal ledger fields from client/vendor projections, and added a
+  provider-neutral gateway boundary.
+- Removed direct `service_role` mutation and invoice-sequence grants from all
+  billing tables; application writes now require audited security-definer RPCs.
+- Revoked direct browser/service execution of seven trigger-only helpers created
+  after the original public-schema lockdown.
 
 ## Automated Verification
 
@@ -42,10 +56,12 @@ All checks below passed on 2026-08-29 with Node 22:
 - `npm run test:event-plan` - 5 transaction/rollback cases
 - `npm run test:venue` - 6 venue-integrity cases
 - `npm run test:payments` - 8 ledger cases with full rollback
+- `npm run test:billing` - invoice/refund/state-transition/security checks with
+  full rollback
 - `npm audit --omit=dev` - 0 vulnerabilities
 - `npm run build` - Next.js 16.2.12 production build, 67 static pages generated
 - `npm run db:migrations` - local and remote histories match through
-  `20260829061409`
+  `20260829181500`
 - `npm run db:push:dry-run` - remote database is up to date, no pending migration
 
 ## API And Browser Verification
@@ -72,6 +88,14 @@ All checks below passed on 2026-08-29 with Node 22:
 - Manual responsive checks covered onboarding Step 5, the Layer 2 radial planner,
   scoped editor actions, client dashboard states, vendor discovery/modal,
   vendor settings, and admin package pricing.
+- Live remote-backed API checks covered client/admin billing projections and
+  cross-role rejection. Desktop and 390px browser checks covered both billing
+  workspaces, invoice filters, invoice detail selection, issuer expansion,
+  responsive overflow, and the disabled-checkout state.
+- The fresh production artifact returned `200` for core public routes, redirected
+  every signed-out portal to Clerk, returned `401` for protected billing APIs,
+  and retained the CSP, frame, nosniff, referrer, permissions, COOP, and HSTS
+  headers.
 
 ## Launch Blockers And Intentional Deferrals
 
@@ -88,6 +112,9 @@ All checks below passed on 2026-08-29 with Node 22:
 6. Budget/guest singleton ownership, message pagination, split budget allocation,
    and catalogue drag ordering remain architectural/product follow-ups rather
    than broken launch controls.
+7. Online checkout is intentionally disabled. Elysian must confirm whether it
+   collects the full client price and settles vendors or collects only its own
+   fee before a payment provider adapter and KYC credentials can be activated.
 
 ## Deployment Rule
 

@@ -6,7 +6,6 @@ import {
   apiError,
   apiSuccess,
 } from "@/lib/api-utils";
-import { recordAudit } from "@/lib/admin-audit";
 import {
   EVENT_READINESS_SELECT,
   evaluateEventReadiness,
@@ -14,12 +13,12 @@ import {
 } from "@/lib/event-readiness";
 import {
   bookingPaymentSummary,
-  totalsFromPayments,
   type PaymentLedgerRow,
 } from "@/lib/payment-ledger";
 import type { Database } from "@/types/database.types";
 
-type BookingUpdate = Database["public"]["Tables"]["bookings"]["Update"];
+type SetPricingArgs =
+  Database["public"]["Functions"]["set_booking_pricing"]["Args"];
 
 function firstRel<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null;
@@ -289,60 +288,60 @@ export async function PATCH(request: NextRequest) {
 
     const toAmount = (value: unknown) => {
       if (value === null || value === "") return null;
-      if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+      if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
         return undefined;
       }
-      const amount = Math.round(value);
-      return Number.isSafeInteger(amount) && amount <= 2_147_483_647
-        ? amount
+      return value <= 2_147_483_647
+        ? value
         : undefined;
     };
 
-    const updates: BookingUpdate = {};
     const hasPricingInput =
       body.vendorPrice !== undefined || body.fee !== undefined;
+    let requestedVendorPrice: number | null | undefined;
+    let requestedFee: number | null | undefined;
     if (hasPricingInput) {
       if (body.vendorPrice === undefined || body.fee === undefined) {
         return apiError("Vendor price and Elysian fee must be saved together", 400);
       }
 
-      const vendorPrice = toAmount(body.vendorPrice);
-      const fee = toAmount(body.fee);
-      if (vendorPrice === undefined) return apiError("Invalid vendor price", 400);
-      if (fee === undefined) return apiError("Invalid Elysian fee", 400);
+      requestedVendorPrice = toAmount(body.vendorPrice);
+      requestedFee = toAmount(body.fee);
+      if (requestedVendorPrice === undefined) {
+        return apiError("Invalid vendor price", 400);
+      }
+      if (requestedFee === undefined) return apiError("Invalid Elysian fee", 400);
 
-      if ((vendorPrice == null) !== (fee == null)) {
+      if ((requestedVendorPrice == null) !== (requestedFee == null)) {
         return apiError("Clear both amounts or provide both amounts", 400);
       }
-      if (vendorPrice != null && vendorPrice <= 0) {
+      if (requestedVendorPrice != null && requestedVendorPrice <= 0) {
         return apiError("Vendor price must be greater than zero", 400);
       }
 
       const finalPrice =
-        vendorPrice != null && fee != null ? vendorPrice + fee : null;
+        requestedVendorPrice != null && requestedFee != null
+          ? requestedVendorPrice + requestedFee
+          : null;
       if (finalPrice != null && finalPrice > 2_147_483_647) {
         return apiError("Combined price is too large", 400);
       }
-
-      updates.vendor_amount = vendorPrice;
-      updates.total_amount = vendorPrice;
-      updates.final_price = finalPrice;
-      if (finalPrice == null) updates.price_published = false;
     }
     if (body.pricePublished !== undefined) {
       if (typeof body.pricePublished !== "boolean") {
         return apiError("pricePublished must be a boolean", 400);
       }
-      updates.price_published = body.pricePublished;
     }
-    if (Object.keys(updates).length === 0) {
+    if (!hasPricingInput && body.pricePublished === undefined) {
       return apiError("Nothing to update", 400);
     }
 
     const supabase = createAdminSupabaseClient();
     const { data: current, error: currentErr } = await supabase
       .from("bookings")
-      .select("id, vendor_amount, final_price, price_published, updated_at")
+      .select(
+        "id, vendor_amount, final_price, service_fee, price_published, updated_at"
+      )
       .eq("id", bookingId)
       .maybeSingle();
     if (currentErr) {
@@ -357,84 +356,74 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const nextVendorPrice = Object.hasOwn(updates, "vendor_amount")
-      ? (updates.vendor_amount ?? null)
+    const currentFee =
+      current.service_fee ??
+      (current.final_price != null && current.vendor_amount != null
+        ? current.final_price - current.vendor_amount
+        : null);
+    const nextVendorPrice = hasPricingInput
+      ? (requestedVendorPrice ?? null)
       : current.vendor_amount;
+    const nextFee = hasPricingInput ? (requestedFee ?? null) : currentFee;
     const nextFinalPrice =
-      Object.hasOwn(updates, "final_price")
-        ? (updates.final_price ?? null)
-        : current.final_price;
+      nextVendorPrice != null && nextFee != null
+        ? nextVendorPrice + nextFee
+        : null;
+    const nextPublished =
+      nextFinalPrice == null
+        ? false
+        : typeof body.pricePublished === "boolean"
+          ? body.pricePublished
+          : Boolean(current.price_published);
 
-    if ((nextVendorPrice == null) !== (nextFinalPrice == null)) {
+    if ((nextVendorPrice == null) !== (nextFee == null)) {
       return apiError("Pricing must include both vendor and client amounts", 400);
     }
-    if (updates.price_published === true && nextFinalPrice == null) {
+    if (body.pricePublished === true && nextFinalPrice == null) {
       return apiError("Set a final price before publishing", 400);
     }
-    if (nextFinalPrice == null && current.price_published) {
-      updates.price_published = false;
-    }
 
-    const { data: paymentRows, error: paymentRowsError } = await supabase
-      .from("payments")
-      .select("kind, amount, is_paid, voided_at")
-      .eq("booking_id", bookingId)
-      .is("voided_at", null);
-    if (paymentRowsError) {
-      console.error("PATCH /api/admin/pricing payments:", paymentRowsError);
-      return apiError("Failed to validate payment history", 500);
-    }
-    const paymentTotals = totalsFromPayments(paymentRows ?? []);
-    const clientRecorded =
-      paymentTotals.clientPaid + paymentTotals.clientScheduled;
-    const vendorRecorded =
-      paymentTotals.vendorPaid + paymentTotals.vendorScheduled;
-
-    if (nextFinalPrice == null && clientRecorded > 0) {
-      return apiError(
-        "Void the recorded client receipts before clearing the final price",
-        409
-      );
-    }
-    if (nextVendorPrice == null && vendorRecorded > 0) {
-      return apiError(
-        "Void the recorded vendor payouts before clearing the vendor price",
-        409
-      );
-    }
-    if (nextFinalPrice != null && nextFinalPrice < clientRecorded) {
-      return apiError(
-        `Final price cannot be lower than the ${clientRecorded.toLocaleString("en-IN")} already received or scheduled`,
-        409
-      );
-    }
-    if (nextVendorPrice != null && nextVendorPrice < vendorRecorded) {
-      return apiError(
-        `Vendor price cannot be lower than the ${vendorRecorded.toLocaleString("en-IN")} already paid or scheduled`,
-        409
-      );
-    }
-
-    const { data, error } = await supabase
-      .from("bookings")
-      .update(updates)
-      .eq("id", bookingId)
-      .eq("updated_at", updatedAt)
-      .select(
-        "id, vendor_amount, final_price, service_fee, price_published, updated_at"
-      )
-      .maybeSingle();
+    const args = {
+      p_booking_id: bookingId,
+      p_vendor_amount: nextVendorPrice,
+      p_fee: nextFee,
+      p_price_published: nextPublished,
+      p_expected_updated_at: updatedAt,
+      p_actor_user_id: session.userId,
+    } as unknown as SetPricingArgs;
+    const { data: rpcData, error } = await supabase.rpc(
+      "set_booking_pricing",
+      args
+    );
 
     if (error) {
-      console.error("PATCH /api/admin/pricing update:", error);
+      const message = error.message?.trim();
+      if (error.code === "P0002") return apiError(message || "Booking not found", 404);
+      if (error.code === "40001") {
+        return apiError(
+          message || "Pricing changed in another session. Refresh before saving again.",
+          409
+        );
+      }
+      if (error.code === "23514") {
+        return apiError(message || "Pricing conflicts with billing history", 409);
+      }
+      if (error.code === "22023") {
+        return apiError(message || "Invalid pricing", 400);
+      }
+      console.error("PATCH /api/admin/pricing RPC:", error);
       return apiError("Failed to update pricing", 500);
     }
-    if (!data) {
-      return apiError(
-        "Pricing changed in another session. Refresh before saving again.",
-        409
-      );
-    }
+
+    const data = rpcData as unknown as {
+      id: string;
+      vendor_amount: number | null;
+      final_price: number | null;
+      service_fee: number | null;
+      price_published: boolean;
+      updated_at: string;
+    } | null;
+    if (!data) return apiError("Pricing update returned no record", 500);
 
     const updatedVendorPrice = data.vendor_amount ?? null;
     const fee =
@@ -442,27 +431,6 @@ export async function PATCH(request: NextRequest) {
       (data.final_price != null && updatedVendorPrice != null
         ? data.final_price - updatedVendorPrice
         : null);
-
-    await recordAudit({
-      actorUserId: session.userId,
-      action:
-        body.pricePublished === true
-          ? "PRICE_PUBLISH"
-          : body.pricePublished === false
-            ? "PRICE_UNPUBLISH"
-            : "PRICE_SET",
-      entityType: "booking",
-      entityId: bookingId,
-      summary: `agreed vendor ₹${updatedVendorPrice ?? "—"} · fee ₹${fee ?? "—"} · client final ₹${data.final_price ?? "—"}${
-        data.price_published ? " · published" : ""
-      }`,
-      meta: {
-        vendorPrice: updatedVendorPrice,
-        fee,
-        finalPrice: data.final_price ?? null,
-        published: Boolean(data.price_published),
-      },
-    });
 
     return apiSuccess({
       booking: {

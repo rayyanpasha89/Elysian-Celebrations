@@ -14,6 +14,10 @@ type SettleArgs =
   Database["public"]["Functions"]["settle_booking_payment"]["Args"];
 type VoidArgs =
   Database["public"]["Functions"]["void_booking_payment"]["Args"];
+type SettleInvoiceArgs =
+  Database["public"]["Functions"]["settle_billing_invoice"]["Args"];
+type VoidInvoiceArgs =
+  Database["public"]["Functions"]["void_billing_invoice"]["Args"];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -65,6 +69,17 @@ export async function PATCH(
     if (!isRecord(rawBody)) return apiError("Invalid payment action", 400);
 
     const supabase = createAdminSupabaseClient();
+    const { data: linkedInvoice, error: invoiceError } = await supabase
+      .from("billing_invoices")
+      .select("id")
+      .eq("booking_id", id)
+      .eq("payment_id", paymentId)
+      .maybeSingle();
+    if (invoiceError) {
+      console.error("Payment invoice lookup:", invoiceError);
+      return apiError("Could not verify the payment record", 500);
+    }
+
     if (rawBody.action === "settle") {
       const method = optionalText(rawBody.method, 20)?.toUpperCase() ?? null;
       if (!isPaymentMethod(method)) {
@@ -75,31 +90,49 @@ export async function PATCH(
         return apiError("Invalid settlement date", 400);
       }
 
-      const args = {
-        p_booking_id: id,
-        p_payment_id: paymentId,
-        p_method: method,
-        p_paid_at: paidAt,
-        p_reference: optionalText(rawBody.reference, 160),
-        p_actor_user_id: session.userId,
-      } as unknown as SettleArgs;
-      const { error } = await supabase.rpc("settle_booking_payment", args);
+      const args = linkedInvoice
+        ? ({
+            p_invoice_id: linkedInvoice.id,
+            p_method: method,
+            p_paid_at: paidAt,
+            p_reference: optionalText(rawBody.reference, 160),
+            p_actor_user_id: session.userId,
+          } as unknown as SettleInvoiceArgs)
+        : ({
+            p_booking_id: id,
+            p_payment_id: paymentId,
+            p_method: method,
+            p_paid_at: paidAt,
+            p_reference: optionalText(rawBody.reference, 160),
+            p_actor_user_id: session.userId,
+          } as unknown as SettleArgs);
+      const { error } = linkedInvoice
+        ? await supabase.rpc("settle_billing_invoice", args as SettleInvoiceArgs)
+        : await supabase.rpc("settle_booking_payment", args as SettleArgs);
       if (error) return actionError(error);
-      return apiSuccess({ ok: true });
+      return apiSuccess({ ok: true, invoiceId: linkedInvoice?.id ?? null });
     }
 
     if (rawBody.action === "void") {
       const reason = optionalText(rawBody.reason, 500);
       if (!reason) return apiError("Explain why this entry is being voided", 400);
-      const args = {
-        p_booking_id: id,
-        p_payment_id: paymentId,
-        p_reason: reason,
-        p_actor_user_id: session.userId,
-      } as VoidArgs;
-      const { error } = await supabase.rpc("void_booking_payment", args);
+      const args = linkedInvoice
+        ? ({
+            p_invoice_id: linkedInvoice.id,
+            p_reason: reason,
+            p_actor_user_id: session.userId,
+          } as VoidInvoiceArgs)
+        : ({
+            p_booking_id: id,
+            p_payment_id: paymentId,
+            p_reason: reason,
+            p_actor_user_id: session.userId,
+          } as VoidArgs);
+      const { error } = linkedInvoice
+        ? await supabase.rpc("void_billing_invoice", args as VoidInvoiceArgs)
+        : await supabase.rpc("void_booking_payment", args as VoidArgs);
       if (error) return actionError(error);
-      return apiSuccess({ ok: true });
+      return apiSuccess({ ok: true, invoiceId: linkedInvoice?.id ?? null });
     }
 
     return apiError("Choose settle or void", 400);

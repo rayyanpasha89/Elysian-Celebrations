@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import {
   PAYMENT_METHODS,
   type BookingPaymentSummary,
-  type PaymentKind,
   type PaymentLedgerRow,
   type PaymentMethod,
 } from "@/lib/payment-ledger";
@@ -46,15 +46,17 @@ export function BookingPaymentLedger({
   bookingId,
   className,
   onLedgerChanged,
+  clientBillingHref,
 }: {
   bookingId: string;
   className?: string;
   onLedgerChanged?: () => void;
+  clientBillingHref?: string;
 }) {
   const [ledger, setLedger] = useState<LedgerPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [direction, setDirection] = useState<PaymentKind>("CLIENT_IN");
+  const direction = "VENDOR_OUT" as const;
   const [amount, setAmount] = useState("");
   const [settled, setSettled] = useState(true);
   const [method, setMethod] = useState<PaymentMethod>("BANK");
@@ -98,14 +100,11 @@ export function BookingPaymentLedger({
   }, [bookingId]);
 
   const summary = ledger?.summary;
-  const target =
-    direction === "CLIENT_IN" ? summary?.clientTarget : summary?.vendorTarget;
-  const paid =
-    direction === "CLIENT_IN" ? summary?.clientPaid : summary?.vendorPaid;
-  const scheduled =
-    direction === "CLIENT_IN"
-      ? summary?.clientScheduled
-      : summary?.vendorScheduled;
+  const target = summary?.vendorTarget;
+  const paid = summary?.vendorPaid;
+  const scheduled = summary?.vendorScheduled;
+  const vendorPayments =
+    ledger?.payments.filter((payment) => payment.kind === "VENDOR_OUT") ?? [];
   const available =
     target == null ? null : Math.max(0, target - (paid ?? 0) - (scheduled ?? 0));
 
@@ -235,42 +234,38 @@ export function BookingPaymentLedger({
     <section className={cn("border border-charcoal/10 bg-cream/35 p-4", className)}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className={labelClass}>Directional payment ledger</p>
+          <p className={labelClass}>Vendor settlement ledger</p>
           <h4 className="mt-1 font-display text-xl text-charcoal">
-            Client receipts and vendor payouts
+            Vendor payouts
           </h4>
         </div>
         <p className="max-w-xs text-xs leading-relaxed text-slate">
-          Record actual money movement. Scheduled entries do not count as paid.
+          Record actual vendor money movement. Scheduled entries do not count as paid.
         </p>
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <LedgerMetric label="Client received" value={summary?.clientPaid ?? 0} />
-        <LedgerMetric label="Client due" value={summary?.clientDue} />
+        <LedgerMetric label="Agreed payout" value={summary?.vendorTarget} />
         <LedgerMetric label="Vendor paid" value={summary?.vendorPaid ?? 0} />
+        <LedgerMetric label="Scheduled" value={summary?.vendorScheduled ?? 0} />
         <LedgerMetric label="Vendor due" value={summary?.vendorDue} />
       </div>
 
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border border-dry-sage-2/25 bg-dry-sage/15 px-3 py-2.5">
+        <p className="text-xs leading-relaxed text-charcoal-brown">
+          Client installments are invoice-linked and managed separately from payouts.
+        </p>
+        {clientBillingHref ? (
+          <Link
+            href={clientBillingHref}
+            className="font-accent text-[9px] uppercase tracking-[0.15em] text-saddle-brown underline decoration-saddle-brown/30 underline-offset-4"
+          >
+            Open client billing
+          </Link>
+        ) : null}
+      </div>
+
       <form onSubmit={recordPayment} className="mt-4 border-t border-charcoal/8 pt-4">
-        <div className="flex gap-1 border border-charcoal/10 bg-ivory p-1">
-          {(["CLIENT_IN", "VENDOR_OUT"] as const).map((kind) => (
-            <button
-              key={kind}
-              type="button"
-              aria-pressed={direction === kind}
-              onClick={() => setDirection(kind)}
-              className={cn(
-                "flex-1 px-2 py-2 font-accent text-[9px] uppercase tracking-[0.14em] transition-colors",
-                direction === kind
-                  ? "bg-charcoal-brown text-ivory"
-                  : "text-slate hover:text-charcoal"
-              )}
-            >
-              {directionLabel(kind)}
-            </button>
-          ))}
-        </div>
 
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label>
@@ -392,12 +387,12 @@ export function BookingPaymentLedger({
       </form>
 
       <div className="mt-5 border-t border-charcoal/8 pt-4">
-        <p className={labelClass}>History</p>
-        {ledger.payments.length === 0 ? (
-          <p className="mt-2 text-sm text-slate">No payment movement recorded yet.</p>
+        <p className={labelClass}>Vendor payout history</p>
+        {vendorPayments.length === 0 ? (
+          <p className="mt-2 text-sm text-slate">No vendor payout movement recorded yet.</p>
         ) : (
           <ul className="mt-3 list-none space-y-2 pl-0">
-            {ledger.payments.map((payment) => {
+            {vendorPayments.map((payment) => {
               const voided = Boolean(payment.voided_at);
               return (
                 <li
@@ -451,7 +446,7 @@ export function BookingPaymentLedger({
                           Mark settled
                         </button>
                       ) : null}
-                      {payment.id ? (
+                      {!payment.is_paid && payment.id ? (
                         <button
                           type="button"
                           disabled={saving}
@@ -461,7 +456,7 @@ export function BookingPaymentLedger({
                           }}
                           className="border border-charcoal/12 px-2.5 py-1.5 font-accent text-[8px] uppercase tracking-[0.13em] text-slate hover:border-rose hover:text-rose"
                         >
-                          Void entry
+                          Void schedule
                         </button>
                       ) : null}
                     </div>

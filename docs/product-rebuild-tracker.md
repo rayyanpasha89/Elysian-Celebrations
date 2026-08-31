@@ -242,7 +242,10 @@ claims that the changes are committed, deployed, or active in the remote databas
 - Remote migration synchronization through `20260713135700_admin_owned_offline_pricing.sql`
 - Remote migration synchronization through `20260802000100_harden_booking_pricing_and_selection.sql`; duplicate preflight returned zero groups, the three legacy amount mirrors were repaired, and remote checks confirm the mirror constraint plus active-selection unique index are present.
 - Remote SQL checks confirm generated `bookings.service_fee`, all three final-pricing constraints, no vendor-amount lock trigger/function, and zero invalid final prices, publications, or fee mismatches
-- Remote SQL proof: 39/39 public tables have RLS, browser roles have zero table/function grants, service role retains all 39 tables, and pricing has zero invalid finals, invalid publications, or fee mismatches
+- Remote SQL proof: 45/45 public tables have RLS, browser roles have zero
+  table/function/sequence grants, service role retains read access to all 45
+  tables, and pricing has zero invalid finals, invalid publications, or fee
+  mismatches
 - Direct Supabase REST proof that the publishable key receives HTTP 401 / permission denied for `bookings`
 - Live role-based API checks confirming no fee/vendor/draft-final/Clerk-ID leakage to client, vendor, or manager booking responses, and no sealed final total in `/api/budget`
 - Live browser checks for admin final-pricing drill-down/editor, admin fee intelligence, client spend selector across all six dimensions, manager vendor data, and vendor agreed-payout visibility
@@ -255,18 +258,32 @@ claims that the changes are committed, deployed, or active in the remote databas
 - Browser auth-gate smoke check passed for `/manager/messages`, redirecting signed-out users to Clerk login with no fresh console errors.
 - `/client/budget` correctly redirects unauthenticated users to Clerk login
 - Browser auth-gate smoke checks passed for `/vendor/portfolio`, `/vendor/reviews`, `/vendor/inquiries`, `/vendor/calendar`, and `/manager/weddings`, all redirecting signed-out users to Clerk login with no fresh console errors.
+- Added invoice-backed client billing with fixed-price installments, immutable
+  receipt history, append-only refunds, idempotent issue/refund operations,
+  gateway attempt state, and webhook replay protection.
+- Added `/client/billing` and `/admin/billing`, separated client invoices from
+  vendor payouts, and moved client collection actions out of the shared booking
+  ledger.
+- Applied and verified remote migrations through `20260829181500`; the billing
+  suite covers retry-safe settlement plus terminal partial/full refund states,
+  and the directional ledger passes 8 cases, both with full rollback.
+- Verified both billing workspaces against linked Supabase data at desktop and
+  mobile widths with no horizontal overflow or runtime errors. Online checkout
+  remains honestly disabled pending the collection-model and provider decision.
 
 ## Current Rebuild Order
 
 1. Replace Clerk development credentials with live production keys and repeat the
    authenticated smoke matrix before public launch.
-2. Add automated authenticated browser regression for pricing, booking, vendor,
+2. Confirm whether Elysian collects the full client price and settles vendors or
+   collects only its fee, then implement the selected gateway adapter and webhooks.
+3. Add automated authenticated browser regression for pricing, booking, vendor,
    admin, planner, and payment flows.
-3. Add Clerk-to-Supabase JWT bridging before restoring direct Supabase Realtime subscriptions.
-4. Move the nested per-function editor save into one reviewed transaction.
-5. Resolve budget/guest singleton ownership before adding uniqueness.
-6. Expand one-event budget links into split allocations only when a real planning case requires it.
-7. Add true drag ordering for vendor catalogue media and rows.
+4. Add Clerk-to-Supabase JWT bridging before restoring direct Supabase Realtime subscriptions.
+5. Move the nested per-function editor save into one reviewed transaction.
+6. Resolve budget/guest singleton ownership before adding uniqueness.
+7. Expand one-event budget links into split allocations only when a real planning case requires it.
+8. Add true drag ordering for vendor catalogue media and rows.
 
 ## Known Risks
 
@@ -277,3 +294,6 @@ claims that the changes are committed, deployed, or active in the remote databas
 - Vendor service catalogue rows support image/reference attachments, but true drag ordering is still deferred.
 - Manager booking notes and payment amounts can be viewed, but inline manager editing is still intentionally limited to status actions.
 - Messages are real booking threads with persisted unread state and visibility-aware API polling; direct Realtime awaits a Clerk-to-Supabase JWT bridge. Visible read receipts and per-message attachments remain future work.
+- Online checkout is intentionally inactive. The schema and UI support manual
+  reconciliation safely, but a provider cannot be activated until Elysian's
+  collection/settlement model, KYC account, credentials, and webhook secrets are confirmed.
