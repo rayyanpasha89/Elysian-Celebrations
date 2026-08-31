@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { fadeUp, staggerContainer } from "@/animations/variants";
+import { DashboardLoadError } from "@/components/dashboard/dashboard-load-error";
 import { MessageThread } from "@/components/dashboard/message-thread";
 import { useMessageRealtime } from "@/hooks/use-message-realtime";
 import { dashCard, dashLabel, statusBadgeBase } from "@/lib/dashboard-styles";
@@ -28,6 +29,8 @@ export default function VendorMessagesPage() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [needsProfile, setNeedsProfile] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const messagesScrollRef = useRef<HTMLDivElement | null>(null);
 
   async function refreshConversations() {
@@ -56,6 +59,8 @@ export default function VendorMessagesPage() {
     let cancelled = false;
     (async () => {
       try {
+        setLoading(true);
+        setLoadError(false);
         const res = await fetch("/api/messages");
         const json = await res.json();
         if (!res.ok) throw new Error(json.error);
@@ -71,10 +76,7 @@ export default function VendorMessagesPage() {
           setActive(initial);
         }
       } catch {
-        if (!cancelled) {
-          setConversations([]);
-          setActive(null);
-        }
+        if (!cancelled) setLoadError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -82,7 +84,7 @@ export default function VendorMessagesPage() {
     return () => {
       cancelled = true;
     };
-  }, [bookingIdParam]);
+  }, [bookingIdParam, reloadKey]);
 
   useEffect(() => {
     if (bookingIdParam) setActive(bookingIdParam);
@@ -90,7 +92,7 @@ export default function VendorMessagesPage() {
 
   useMessageRealtime({
     conversations,
-    enabled: !loading && conversations.length > 0,
+    enabled: !loading && !loadError && conversations.length > 0,
     onRefresh: refreshConversations,
   });
 
@@ -227,6 +229,19 @@ export default function VendorMessagesPage() {
           <div className="hidden border border-charcoal/8 bg-charcoal/5 lg:block" />
         </div>
       </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <DashboardLoadError
+        eyebrow="Inbox"
+        pageTitle="Messages"
+        label="Conversations unavailable"
+        title="We could not load your client conversations"
+        description="The booking inbox has not been replaced with an empty state. Retry to reconnect without losing the current thread context."
+        onRetry={() => setReloadKey((key) => key + 1)}
+      />
     );
   }
 

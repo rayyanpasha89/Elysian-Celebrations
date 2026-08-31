@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { fadeUp, staggerContainer, staggerItem } from "@/animations/variants";
+import { DashboardLoadError } from "@/components/dashboard/dashboard-load-error";
 import { ListEmptyState } from "@/components/dashboard/list-empty-state";
 import { useMessageRealtime } from "@/hooks/use-message-realtime";
 import { dashCard, dashLabel, statusBadgeBase } from "@/lib/dashboard-styles";
@@ -19,6 +20,8 @@ export default function ManagerMessagesPage() {
   const [loading, setLoading] = useState(true);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [active, setActive] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const messagesScrollRef = useRef<HTMLDivElement | null>(null);
 
   async function refreshConversations() {
@@ -43,6 +46,8 @@ export default function ManagerMessagesPage() {
     let cancelled = false;
     (async () => {
       try {
+        setLoading(true);
+        setLoadError(false);
         const res = await fetch("/api/messages");
         const json = await res.json();
         if (!res.ok) throw new Error(json.error ?? "Failed to load messages");
@@ -52,10 +57,7 @@ export default function ManagerMessagesPage() {
           setActive(list[0]?.id ?? null);
         }
       } catch {
-        if (!cancelled) {
-          setConversations([]);
-          setActive(null);
-        }
+        if (!cancelled) setLoadError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -63,11 +65,11 @@ export default function ManagerMessagesPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
 
   useMessageRealtime({
     conversations,
-    enabled: !loading && conversations.length > 0,
+    enabled: !loading && !loadError && conversations.length > 0,
     onRefresh: refreshConversations,
   });
 
@@ -142,6 +144,19 @@ export default function ManagerMessagesPage() {
           <div className="hidden border border-charcoal/8 bg-charcoal/5 xl:block" />
         </div>
       </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <DashboardLoadError
+        eyebrow="Operations"
+        pageTitle="Message Command"
+        label="Conversation feed unavailable"
+        title="We could not load the operations inbox"
+        description="No empty queue has been inferred from a failed request. Retry to reconnect to the client-vendor conversation feed."
+        onRetry={() => setReloadKey((key) => key + 1)}
+      />
     );
   }
 
