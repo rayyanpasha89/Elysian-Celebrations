@@ -143,7 +143,9 @@ export async function GET() {
       wedding?.id
         ? supabase
             .from("wedding_events")
-            .select("id, name, date, wedding_day:wedding_days(name)")
+            .select(
+              "id, name, date, wedding_day:wedding_days!wedding_events_wedding_day_id_fkey(name)"
+            )
             .eq("wedding_id", wedding.id)
         : Promise.resolve({ data: [], error: null }),
     ]);

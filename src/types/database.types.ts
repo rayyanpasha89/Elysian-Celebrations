@@ -658,7 +658,7 @@ export type Database = {
           {
             foreignKeyName: "budgets_client_profile_id_fkey"
             columns: ["client_profile_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "client_profiles"
             referencedColumns: ["id"]
           },
@@ -848,7 +848,7 @@ export type Database = {
           {
             foreignKeyName: "guest_lists_client_profile_id_fkey"
             columns: ["client_profile_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "client_profiles"
             referencedColumns: ["id"]
           },
@@ -2286,6 +2286,34 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "wedding_events_day_ownership_fkey"
+            columns: ["wedding_day_id"]
+            isOneToOne: false
+            referencedRelation: "wedding_days"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "wedding_events_day_ownership_fkey"
+            columns: ["wedding_day_id"]
+            isOneToOne: false
+            referencedRelation: "wedding_days"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wedding_events_day_ownership_fkey"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "wedding_days"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "wedding_events_day_ownership_fkey"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "wedding_days"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "wedding_events_venue_id_fkey"
             columns: ["venue_id"]
             isOneToOne: false
@@ -2361,7 +2389,7 @@ export type Database = {
           {
             foreignKeyName: "weddings_client_profile_id_fkey"
             columns: ["client_profile_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "client_profiles"
             referencedColumns: ["id"]
           },
@@ -2475,6 +2503,17 @@ export type Database = {
           "reserved_bytes": number
           "remaining_bytes": number
         }[]
+      }
+      "save_event_planning": {
+        Args: {
+          "p_actor_user_id": string
+          "p_event_id": string
+          "p_menus": Json
+          "p_logistics": Json
+          "p_tasks": Json
+          "p_requirements": Json
+        }
+        Returns: Json
       }
       "set_booking_pricing": {
         Args: {

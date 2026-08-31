@@ -126,7 +126,7 @@ async function loadCalendar(): Promise<LoadResult> {
       `id, status, event_date, vendor_amount, notes,
        client:client_profiles(partner_name, user:users(name)),
        service:vendor_services(name),
-       wedding_event:wedding_events(name, event_type, date, start_time, end_time, venue, wedding_day:wedding_days(name, date))`
+       wedding_event:wedding_events(name, event_type, date, start_time, end_time, venue, wedding_day:wedding_days!wedding_events_wedding_day_id_fkey(name, date))`
     )
     .eq("vendor_profile_id", vendorProfile.id)
     .in("status", CALENDAR_STATUSES)

@@ -22,7 +22,8 @@
     "test:venue": "tsx --tsconfig tsconfig.json scripts/verify-venue-rules.ts",
     "test:payments": "tsx --tsconfig tsconfig.json scripts/verify-payment-ledger.ts",
     "test:billing": "tsx --tsconfig tsconfig.json scripts/verify-billing-invoices.ts",
-    "test:ownership": "tsx --tsconfig tsconfig.json scripts/verify-ownership-integrity.ts"
+    "test:ownership": "tsx --tsconfig tsconfig.json scripts/verify-ownership-integrity.ts",
+    "test:planning-atomic": "tsx --tsconfig tsconfig.json scripts/verify-event-planning-atomicity.ts"
   },
   "overrides": {
     "nanoid": "3.3.18",

@@ -67,7 +67,7 @@ export async function GET() {
       supabase
         .from("wedding_events")
         .select(
-          "id, name, date, start_time, end_time, venue, time_block, sort_order, wedding_day_id, wedding_day:wedding_days(id, name, date, sort_order)"
+          "id, name, date, start_time, end_time, venue, time_block, sort_order, wedding_day_id, wedding_day:wedding_days!wedding_events_wedding_day_id_fkey(id, name, date, sort_order)"
         )
         .eq("wedding_id", wedding.id),
     ]);

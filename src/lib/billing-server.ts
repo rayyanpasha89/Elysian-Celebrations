@@ -24,7 +24,7 @@ export const CLIENT_BILLING_SELECT = `
     service:vendor_services(name),
     event:wedding_events(
       name, date, start_time, end_time, venue,
-      day:wedding_days(name, date)
+      day:wedding_days!wedding_events_wedding_day_id_fkey(name, date)
     )
   )
 `;
@@ -40,7 +40,7 @@ export const ADMIN_BILLING_SELECT = `
     service:vendor_services(name),
     event:wedding_events(
       name, date, start_time, end_time, venue,
-      day:wedding_days(name, date)
+      day:wedding_days!wedding_events_wedding_day_id_fkey(name, date)
     )
   ),
   attempts:billing_payment_attempts(

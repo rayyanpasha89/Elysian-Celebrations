@@ -49,7 +49,7 @@ const BILLABLE_BOOKING_SELECT = `
   client:client_profiles(partner_name, user:users(name, email)),
   vendor:vendor_profiles(business_name, slug),
   service:vendor_services(name),
-  event:wedding_events(name, date, day:wedding_days(name, date)),
+  event:wedding_events(name, date, day:wedding_days!wedding_events_wedding_day_id_fkey(name, date)),
   payments(kind, amount, voided_at),
   invoices:billing_invoices(id, status, amount)
 `;

@@ -144,7 +144,7 @@ type Conversation = {
 };
 
 const BOOKING_SELECT =
-  "id, status, event_date, created_at, notes, client:client_profiles(user_id, partner_name), vendor:vendor_profiles(user_id, business_name, slug), service:vendor_services(id, name, service_scope), wedding_event:wedding_events(id, name, event_type, date, start_time, venue, wedding_day:wedding_days(id, name, date))";
+  "id, status, event_date, created_at, notes, client:client_profiles(user_id, partner_name), vendor:vendor_profiles(user_id, business_name, slug), service:vendor_services(id, name, service_scope), wedding_event:wedding_events(id, name, event_type, date, start_time, venue, wedding_day:wedding_days!wedding_events_wedding_day_id_fkey(id, name, date))";
 
 function deriveBookingContext(booking: BookingRow): BookingContext {
   const service = pickOne(booking.service);

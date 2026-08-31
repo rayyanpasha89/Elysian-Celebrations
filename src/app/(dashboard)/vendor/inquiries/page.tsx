@@ -70,7 +70,7 @@ async function loadInquiries(): Promise<LoadResult> {
       `id, status, event_date, notes, created_at, vendor_amount,
        client:client_profiles(partner_name, user:users(name)),
        service:vendor_services(name),
-       wedding_event:wedding_events(name, event_type, date, venue, wedding_day:wedding_days(name))`
+       wedding_event:wedding_events(name, event_type, date, venue, wedding_day:wedding_days!wedding_events_wedding_day_id_fkey(name))`
     )
     .eq("vendor_profile_id", vp.id)
     .in("status", OPEN_INQUIRY_STATUSES)

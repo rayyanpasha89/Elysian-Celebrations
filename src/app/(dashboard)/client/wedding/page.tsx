@@ -2647,27 +2647,15 @@ export default function ClientWeddingPage() {
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(planningPayloadFromDraft(draftToSave)),
+          body: JSON.stringify({
+            ...planningPayloadFromDraft(draftToSave),
+            ...requirementsPayloadFromDraft(draftToSave),
+          }),
         }
       );
       const planningJson = await planningResponse.json();
       if (!planningResponse.ok) {
         throw new Error(planningJson.error ?? "Failed to save event planning");
-      }
-
-      const requirementsResponse = await fetch(
-        `/api/wedding/events/${selectedEvent.id}/requirements`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(requirementsPayloadFromDraft(draftToSave)),
-        }
-      );
-      const requirementsJson = await requirementsResponse.json();
-      if (!requirementsResponse.ok) {
-        throw new Error(
-          requirementsJson.error ?? "Failed to save event requirements"
-        );
       }
 
       await syncVendorSelections(selectedEvent, draftToSave);
