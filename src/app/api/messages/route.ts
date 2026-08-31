@@ -95,9 +95,11 @@ type MessageRow = {
   created_at: string;
 };
 
-type ThreadReadRow = {
-  booking_id: string;
-  read_at: string;
+type InboxSnapshot = {
+  messages: MessageRow[];
+  messageCount: number;
+  unreadCount: number;
+  lastReadAt: string | null;
 };
 
 type ConversationMessage = {
@@ -140,9 +142,17 @@ type Conversation = {
   unreadCount: number;
   lastReadAt: string | null;
   booking: BookingContext;
-  messages: { id: string; from: "vendor" | "client"; text: string; time: string }[];
+  messagePage: {
+    hasOlder: boolean;
+    oldestCreatedAt: string | null;
+    oldestId: string | null;
+    totalCount: number;
+  };
+  messages: ConversationMessage[];
 };
 
+const MESSAGE_PAGE_SIZE = 40;
+const MESSAGE_PAGE_QUERY_SIZE = MESSAGE_PAGE_SIZE + 1;
 const BOOKING_SELECT =
   "id, status, event_date, created_at, notes, client:client_profiles(user_id, partner_name), vendor:vendor_profiles(user_id, business_name, slug), service:vendor_services(id, name, service_scope), wedding_event:wedding_events(id, name, event_type, date, start_time, venue, wedding_day:wedding_days!wedding_events_wedding_day_id_fkey(id, name, date))";
 
@@ -183,8 +193,7 @@ function buildConversation(
   booking: BookingRow,
   counterpartyRole: "vendor" | "client",
   myUserId: string,
-  messages: MessageRow[],
-  threadReadAt: string | null,
+  snapshot: InboxSnapshot,
   labelOverride?: string
 ): Conversation {
   const vendor = pickOne(booking.vendor);
@@ -194,22 +203,13 @@ function buildConversation(
   const counterpartyName =
     labelOverride ?? (counterpartyRole === "vendor" ? vendorName : clientName);
 
-  const projected: ConversationMessage[] = messages.map((m) => ({
-    id: m.id,
-    from:
-      m.sender_id === vendor?.user_id
-        ? "vendor"
-        : m.sender_id === client?.user_id
-          ? "client"
-          : m.sender_id === myUserId
-            ? counterpartyRole === "vendor"
-              ? "client"
-              : "vendor"
-            : counterpartyRole,
-    text: m.content,
-    time: formatMessageTimestamp(m.created_at),
-    createdAt: m.created_at,
-  }));
+  const projected = projectMessageRows(
+    snapshot.messages,
+    vendor?.user_id ?? null,
+    client?.user_id ?? null,
+    myUserId,
+    counterpartyRole
+  );
 
   const last = projected[projected.length - 1] ?? null;
   const context = deriveBookingContext(booking);
@@ -219,20 +219,17 @@ function buildConversation(
     context.weddingEvent?.name ||
     "Inquiry waiting on a first message";
 
-  const readBoundary = threadReadAt ? new Date(threadReadAt).getTime() : 0;
   const isParticipant =
     myUserId === vendor?.user_id || myUserId === client?.user_id;
-  const unreadMessages = messages.filter((message) => {
-    if (message.sender_id === myUserId) return false;
-    return new Date(message.created_at).getTime() > readBoundary;
-  });
   const inquiryCreatedAt = new Date(booking.created_at).getTime();
   const freshInquiryUnread =
-    messages.length === 0 &&
+    snapshot.messageCount === 0 &&
     context.status === "INQUIRY" &&
     (counterpartyRole === "client" || !isParticipant) &&
-    inquiryCreatedAt > readBoundary;
-  const unreadCount = unreadMessages.length + (freshInquiryUnread ? 1 : 0);
+    inquiryCreatedAt >
+      (snapshot.lastReadAt ? new Date(snapshot.lastReadAt).getTime() : 0);
+  const unreadCount = snapshot.unreadCount + (freshInquiryUnread ? 1 : 0);
+  const oldest = projected[0] ?? null;
 
   return {
     id: booking.id,
@@ -245,47 +242,190 @@ function buildConversation(
     vendorName,
     counterpartyName,
     counterpartyRole,
-    hasMessages: projected.length > 0,
+    hasMessages: snapshot.messageCount > 0,
     unread: unreadCount > 0,
     unreadCount,
-    lastReadAt: threadReadAt,
+    lastReadAt: snapshot.lastReadAt,
     booking: context,
-    messages: projected.map((m) => ({
-      id: m.id,
-      from: m.from,
-      text: m.text,
-      time: m.time,
-      createdAt: m.createdAt,
-    })),
+    messagePage: {
+      hasOlder: snapshot.messageCount > projected.length,
+      oldestCreatedAt: oldest?.createdAt ?? null,
+      oldestId: oldest?.id ?? null,
+      totalCount: snapshot.messageCount,
+    },
+    messages: projected,
   };
 }
 
-function mapThreadReads(reads: ThreadReadRow[] | null) {
-  const byBooking = new Map<string, string>();
-  for (const read of reads ?? []) {
-    byBooking.set(read.booking_id, read.read_at);
-  }
-  return byBooking;
+function projectMessageRows(
+  messages: MessageRow[],
+  vendorUserId: string | null,
+  clientUserId: string | null,
+  myUserId: string,
+  counterpartyRole: "vendor" | "client"
+): ConversationMessage[] {
+  return messages.map((message) => ({
+    id: message.id,
+    from:
+      message.sender_id === vendorUserId
+        ? "vendor"
+        : message.sender_id === clientUserId
+          ? "client"
+          : message.sender_id === myUserId
+            ? counterpartyRole === "vendor"
+              ? "client"
+              : "vendor"
+            : counterpartyRole,
+    text: message.content,
+    time: formatMessageTimestamp(message.created_at),
+    createdAt: message.created_at,
+  }));
 }
 
-async function loadThreadReads(
+function normalizeMessageRows(value: unknown): MessageRow[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
+    const row = entry as Record<string, unknown>;
+    if (
+      typeof row.id !== "string" ||
+      typeof row.booking_id !== "string" ||
+      typeof row.sender_id !== "string" ||
+      typeof row.content !== "string" ||
+      typeof row.created_at !== "string"
+    ) {
+      return [];
+    }
+    return [
+      {
+        id: row.id,
+        booking_id: row.booking_id,
+        sender_id: row.sender_id,
+        content: row.content,
+        created_at: row.created_at,
+      },
+    ];
+  });
+}
+
+function emptyInboxSnapshot(): InboxSnapshot {
+  return {
+    messages: [],
+    messageCount: 0,
+    unreadCount: 0,
+    lastReadAt: null,
+  };
+}
+
+async function loadInboxSnapshots(
   supabase: ReturnType<typeof createAdminSupabaseClient>,
   userId: string,
   bookingIds: string[]
 ) {
-  if (bookingIds.length === 0) return new Map<string, string>();
-  const { data, error } = await supabase
-    .from("message_thread_reads")
-    .select("booking_id, read_at")
-    .eq("user_id", userId)
-    .in("booking_id", bookingIds);
+  const byBooking = new Map<string, InboxSnapshot>();
+  if (bookingIds.length === 0) return byBooking;
+
+  const { data, error } = await supabase.rpc("load_message_inbox_pages", {
+    p_booking_ids: bookingIds,
+    p_user_id: userId,
+    p_recent_limit: MESSAGE_PAGE_SIZE,
+  });
 
   if (error) {
-    console.error("message_thread_reads:", error);
-    throw new Error("Failed to load read state");
+    console.error("load_message_inbox_pages:", error);
+    throw new Error("Failed to load message history");
   }
 
-  return mapThreadReads((data ?? []) as ThreadReadRow[]);
+  for (const row of data ?? []) {
+    byBooking.set(row.booking_id, {
+      messages: normalizeMessageRows(row.messages),
+      messageCount: Number(row.message_count) || 0,
+      unreadCount: Number(row.unread_count) || 0,
+      lastReadAt: row.last_read_at ?? null,
+    });
+  }
+  return byBooking;
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value
+  );
+}
+
+async function loadOlderMessagePage(
+  supabase: ReturnType<typeof createAdminSupabaseClient>,
+  session: { userId: string; role: string },
+  searchParams: URLSearchParams
+) {
+  const bookingId = searchParams.get("bookingId")?.trim() ?? "";
+  if (!bookingId) return null;
+  if (!isUuid(bookingId)) return apiError("Invalid booking ID");
+
+  const beforeCreatedAt = searchParams.get("beforeCreatedAt")?.trim() ?? "";
+  const beforeId = searchParams.get("beforeId")?.trim() ?? "";
+  if (!beforeCreatedAt || !beforeId) {
+    return apiError("Both message cursor fields are required");
+  }
+  if (Number.isNaN(new Date(beforeCreatedAt).getTime()) || !isUuid(beforeId)) {
+    return apiError("Invalid message cursor");
+  }
+
+  const { data: booking, error: bookingError } = await supabase
+    .from("bookings")
+    .select(
+      "id, client:client_profiles(user_id), vendor:vendor_profiles(user_id)"
+    )
+    .eq("id", bookingId)
+    .maybeSingle();
+
+  if (bookingError) {
+    console.error("bookings:", bookingError);
+    return apiError("Failed to load booking", 500);
+  }
+  if (!booking) return apiError("Booking not found", 404);
+
+  const client = pickOne(booking.client);
+  const vendor = pickOne(booking.vendor);
+  const canRead =
+    session.role === "manager" ||
+    session.role === "admin" ||
+    client?.user_id === session.userId ||
+    vendor?.user_id === session.userId;
+  if (!canRead) return apiError("Forbidden", 403);
+
+  const { data, error } = await supabase.rpc("load_message_page", {
+    p_booking_id: bookingId,
+    p_before_created_at: beforeCreatedAt,
+    p_before_id: beforeId,
+    p_limit: MESSAGE_PAGE_QUERY_SIZE,
+  });
+  if (error) {
+    console.error("load_message_page:", error);
+    return apiError("Failed to load earlier messages", 500);
+  }
+
+  const hasOlder = (data?.length ?? 0) > MESSAGE_PAGE_SIZE;
+  const rows = ((data ?? []).slice(0, MESSAGE_PAGE_SIZE) as MessageRow[]).reverse();
+  const counterpartyRole = session.role === "client" ? "vendor" : "client";
+  const messages = projectMessageRows(
+    rows,
+    vendor?.user_id ?? null,
+    client?.user_id ?? null,
+    session.userId,
+    counterpartyRole
+  );
+  const oldest = messages[0] ?? null;
+
+  return apiSuccess({
+    bookingId,
+    messages,
+    page: {
+      hasOlder,
+      oldestCreatedAt: oldest?.createdAt ?? null,
+      oldestId: oldest?.id ?? null,
+    },
+  });
 }
 
 function sortConversations(list: Conversation[]) {
@@ -302,7 +442,7 @@ function sortConversations(list: Conversation[]) {
   });
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await getAuthSession();
   if (session instanceof NextResponse) return session;
   const roleCheck = requireRole(session, "client", "vendor", "admin", "manager");
@@ -310,6 +450,12 @@ export async function GET() {
 
   try {
     const supabase = createAdminSupabaseClient();
+    const messagePageResponse = await loadOlderMessagePage(
+      supabase,
+      session,
+      new URL(request.url).searchParams
+    );
+    if (messagePageResponse) return messagePageResponse;
 
     if (session.role === "client") {
       const { data: profile, error: pErr } = await supabase
@@ -337,28 +483,11 @@ export async function GET() {
 
       const bookingRows = (bookings ?? []) as BookingRow[];
       const bookingIds = bookingRows.map((b) => b.id);
-      const messagesByBooking = new Map<string, MessageRow[]>();
-      const threadReadsByBooking = await loadThreadReads(
+      const snapshots = await loadInboxSnapshots(
         supabase,
         session.userId,
         bookingIds
       );
-      if (bookingIds.length > 0) {
-        const { data: msgs, error: mErr } = await supabase
-          .from("messages")
-          .select("id, booking_id, sender_id, content, created_at")
-          .in("booking_id", bookingIds)
-          .order("created_at", { ascending: true });
-        if (mErr) {
-          console.error("messages:", mErr);
-          return apiError("Failed to load messages", 500);
-        }
-        for (const m of (msgs ?? []) as MessageRow[]) {
-          const bucket = messagesByBooking.get(m.booking_id);
-          if (bucket) bucket.push(m);
-          else messagesByBooking.set(m.booking_id, [m]);
-        }
-      }
 
       const conversations = sortConversations(
         bookingRows.map((booking) =>
@@ -366,8 +495,7 @@ export async function GET() {
             booking,
             "vendor",
             session.userId,
-            messagesByBooking.get(booking.id) ?? [],
-            threadReadsByBooking.get(booking.id) ?? null
+            snapshots.get(booking.id) ?? emptyInboxSnapshot()
           )
         )
       );
@@ -401,28 +529,11 @@ export async function GET() {
 
       const bookingRows = (bookings ?? []) as BookingRow[];
       const bookingIds = bookingRows.map((b) => b.id);
-      const messagesByBooking = new Map<string, MessageRow[]>();
-      const threadReadsByBooking = await loadThreadReads(
+      const snapshots = await loadInboxSnapshots(
         supabase,
         session.userId,
         bookingIds
       );
-      if (bookingIds.length > 0) {
-        const { data: msgs, error: mErr } = await supabase
-          .from("messages")
-          .select("id, booking_id, sender_id, content, created_at")
-          .in("booking_id", bookingIds)
-          .order("created_at", { ascending: true });
-        if (mErr) {
-          console.error("messages:", mErr);
-          return apiError("Failed to load messages", 500);
-        }
-        for (const m of (msgs ?? []) as MessageRow[]) {
-          const bucket = messagesByBooking.get(m.booking_id);
-          if (bucket) bucket.push(m);
-          else messagesByBooking.set(m.booking_id, [m]);
-        }
-      }
 
       const conversations = sortConversations(
         bookingRows.map((booking) =>
@@ -430,8 +541,7 @@ export async function GET() {
             booking,
             "client",
             session.userId,
-            messagesByBooking.get(booking.id) ?? [],
-            threadReadsByBooking.get(booking.id) ?? null
+            snapshots.get(booking.id) ?? emptyInboxSnapshot()
           )
         )
       );
@@ -452,31 +562,11 @@ export async function GET() {
 
       const bookingRows = (bookings ?? []) as BookingRow[];
       const bookingIds = bookingRows.map((b) => b.id);
-      const messagesByBooking = new Map<string, MessageRow[]>();
-      const threadReadsByBooking = await loadThreadReads(
+      const snapshots = await loadInboxSnapshots(
         supabase,
         session.userId,
         bookingIds
       );
-
-      if (bookingIds.length > 0) {
-        const { data: msgs, error: mErr } = await supabase
-          .from("messages")
-          .select("id, booking_id, sender_id, content, created_at")
-          .in("booking_id", bookingIds)
-          .order("created_at", { ascending: true });
-
-        if (mErr) {
-          console.error("messages:", mErr);
-          return apiError("Failed to load messages", 500);
-        }
-
-        for (const m of (msgs ?? []) as MessageRow[]) {
-          const bucket = messagesByBooking.get(m.booking_id);
-          if (bucket) bucket.push(m);
-          else messagesByBooking.set(m.booking_id, [m]);
-        }
-      }
 
       const conversations = sortConversations(
         bookingRows.map((booking) => {
@@ -490,8 +580,7 @@ export async function GET() {
             booking,
             "client",
             session.userId,
-            messagesByBooking.get(booking.id) ?? [],
-            threadReadsByBooking.get(booking.id) ?? null,
+            snapshots.get(booking.id) ?? emptyInboxSnapshot(),
             label
           );
         })

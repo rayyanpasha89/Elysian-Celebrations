@@ -6,6 +6,19 @@ export type MessageEntry = {
   createdAt?: string | null;
 };
 
+export type MessagePageState = {
+  hasOlder: boolean;
+  oldestCreatedAt: string | null;
+  oldestId: string | null;
+  totalCount: number;
+};
+
+export type OlderMessagePage = {
+  bookingId: string;
+  messages: MessageEntry[];
+  page: Omit<MessagePageState, "totalCount">;
+};
+
 export function formatMessageTime(message: MessageEntry) {
   if (!message.createdAt) return message.time;
   const date = new Date(message.createdAt);
@@ -49,8 +62,102 @@ export type Conversation = {
   unreadCount: number;
   lastReadAt: string | null;
   booking: BookingContext;
+  messagePage: MessagePageState;
   messages: MessageEntry[];
 };
+
+function messageSortValue(message: MessageEntry) {
+  const timestamp = message.createdAt
+    ? new Date(message.createdAt).getTime()
+    : Number.NaN;
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function mergeMessageEntries(...groups: MessageEntry[][]) {
+  const messages = new Map<string, MessageEntry>();
+  const withoutIds: MessageEntry[] = [];
+
+  for (const group of groups) {
+    for (const message of group) {
+      if (message.id) messages.set(message.id, message);
+      else withoutIds.push(message);
+    }
+  }
+
+  return [...messages.values(), ...withoutIds].sort((left, right) => {
+    const dateDifference = messageSortValue(left) - messageSortValue(right);
+    if (dateDifference !== 0) return dateDifference;
+    return (left.id ?? "").localeCompare(right.id ?? "");
+  });
+}
+
+/** Preserve already-loaded history while polling refreshes recent summaries. */
+export function mergeConversationRefresh(
+  current: Conversation[],
+  incoming: Conversation[]
+) {
+  const currentById = new Map(current.map((conversation) => [conversation.id, conversation]));
+
+  return incoming.map((conversation) => {
+    const previous = currentById.get(conversation.id);
+    if (!previous) return conversation;
+
+    const messages = mergeMessageEntries(previous.messages, conversation.messages);
+    const oldest = messages[0] ?? null;
+    return {
+      ...conversation,
+      messages,
+      messagePage: {
+        ...conversation.messagePage,
+        hasOlder: messages.length < conversation.messagePage.totalCount,
+        oldestCreatedAt: oldest?.createdAt ?? null,
+        oldestId: oldest?.id ?? null,
+      },
+    };
+  });
+}
+
+export function prependOlderMessagePage(
+  conversation: Conversation,
+  olderPage: OlderMessagePage
+) {
+  const messages = mergeMessageEntries(olderPage.messages, conversation.messages);
+  const oldest = messages[0] ?? null;
+  return {
+    ...conversation,
+    messages,
+    messagePage: {
+      ...conversation.messagePage,
+      hasOlder: olderPage.page.hasOlder,
+      oldestCreatedAt: oldest?.createdAt ?? null,
+      oldestId: oldest?.id ?? null,
+    },
+  };
+}
+
+export async function fetchOlderMessagePage(
+  conversation: Conversation
+): Promise<OlderMessagePage> {
+  const { oldestCreatedAt, oldestId } = conversation.messagePage;
+  if (!oldestCreatedAt || !oldestId) {
+    throw new Error("This thread does not have an earlier-message cursor");
+  }
+
+  const params = new URLSearchParams({
+    bookingId: conversation.id,
+    beforeCreatedAt: oldestCreatedAt,
+    beforeId: oldestId,
+  });
+  const response = await fetch(`/api/messages?${params.toString()}`);
+  const json = (await response.json()) as OlderMessagePage & { error?: string };
+  if (!response.ok) {
+    throw new Error(json.error ?? "Failed to load earlier messages");
+  }
+  if (!Array.isArray(json.messages) || !json.page) {
+    throw new Error("Invalid earlier-message response");
+  }
+  return json;
+}
 
 export function formatBookingDate(raw: string | null) {
   if (!raw) return null;

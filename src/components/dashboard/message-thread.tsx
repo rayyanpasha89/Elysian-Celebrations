@@ -25,6 +25,8 @@ export function MessageThread({
   selfRole,
   firstMessageTips,
   onUseTip,
+  loadingOlder,
+  onLoadOlder,
 }: {
   conversation: Conversation | null;
   draft: string;
@@ -36,6 +38,8 @@ export function MessageThread({
   selfRole: "client" | "vendor";
   firstMessageTips: string[];
   onUseTip: (tip: string) => void;
+  loadingOlder: boolean;
+  onLoadOlder: () => void;
 }) {
   if (!conversation) {
     return (
@@ -73,6 +77,21 @@ export function MessageThread({
         ref={messagesScrollRef}
         className="flex flex-1 flex-col gap-4 overflow-y-auto px-6 py-6"
       >
+        {conversation.messages.length > 0 && conversation.messagePage.hasOlder ? (
+          <div className="flex items-center justify-center gap-3 border-b border-charcoal/8 pb-4">
+            <button
+              type="button"
+              onClick={onLoadOlder}
+              disabled={loadingOlder}
+              className="font-accent border border-charcoal/15 bg-ivory px-4 py-2 text-[10px] uppercase tracking-[0.18em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark disabled:cursor-wait disabled:opacity-60"
+            >
+              {loadingOlder ? "Loading..." : "Load earlier messages"}
+            </button>
+            <span className="font-accent text-[9px] uppercase tracking-[0.15em] text-slate">
+              {conversation.messages.length} of {conversation.messagePage.totalCount}
+            </span>
+          </div>
+        ) : null}
         {conversation.messages.length === 0 ? (
           <div className="flex flex-1 flex-col items-start justify-center gap-3 border border-dashed border-charcoal/15 bg-cream/30 p-6">
             <p className={dashLabel}>Start the thread</p>

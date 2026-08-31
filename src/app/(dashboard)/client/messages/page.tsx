@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -12,8 +12,11 @@ import { useMessageRealtime } from "@/hooks/use-message-realtime";
 import { dashCard, dashLabel, statusBadgeBase } from "@/lib/dashboard-styles";
 import {
   clientPlaceholder,
+  fetchOlderMessagePage,
   firstMessageSuggestionsForClient,
   formatBookingDate,
+  mergeConversationRefresh,
+  prependOlderMessagePage,
   statusTone,
   type Conversation,
 } from "@/lib/messages-shared";
@@ -43,14 +46,20 @@ export default function ClientMessagesPage() {
   const [sending, setSending] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const messagesScrollRef = useRef<HTMLDivElement | null>(null);
+  const scrollRestoreRef = useRef<{
+    bookingId: string;
+    height: number;
+    top: number;
+  } | null>(null);
 
   async function refreshConversations() {
     try {
       const json = await fetchConversations();
       const list = json.conversations;
-      setConversations(list);
+      setConversations((current) => mergeConversationRefresh(current, list));
       setNeedsOnboarding(Boolean(json.needsOnboarding));
       setActive((currentActive) => {
         if (currentActive && list.some((conversation) => conversation.id === currentActive)) {
@@ -111,10 +120,48 @@ export default function ClientMessagesPage() {
   const currentId = current?.id ?? null;
   const currentUnread = Boolean(current?.unread);
 
-  useEffect(() => {
-    if (!messagesScrollRef.current) return;
-    messagesScrollRef.current.scrollTop = messagesScrollRef.current.scrollHeight;
+  useLayoutEffect(() => {
+    const element = messagesScrollRef.current;
+    if (!element) return;
+    const restore = scrollRestoreRef.current;
+    if (restore && restore.bookingId === current?.id) {
+      element.scrollTop = element.scrollHeight - restore.height + restore.top;
+      scrollRestoreRef.current = null;
+      return;
+    }
+    element.scrollTop = element.scrollHeight;
   }, [current?.id, current?.messages.length]);
+
+  const loadOlderMessages = async () => {
+    if (!current || loadingOlder || !current.messagePage.hasOlder) return;
+    const element = messagesScrollRef.current;
+    if (element) {
+      scrollRestoreRef.current = {
+        bookingId: current.id,
+        height: element.scrollHeight,
+        top: element.scrollTop,
+      };
+    }
+
+    setLoadingOlder(true);
+    try {
+      const page = await fetchOlderMessagePage(current);
+      setConversations((list) =>
+        list.map((conversation) =>
+          conversation.id === current.id
+            ? prependOlderMessagePage(conversation, page)
+            : conversation
+        )
+      );
+    } catch (error) {
+      scrollRestoreRef.current = null;
+      toast.error(
+        error instanceof Error ? error.message : "Failed to load earlier messages"
+      );
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
 
   useEffect(() => {
     if (!currentId || !currentUnread) return;
@@ -199,6 +246,10 @@ export default function ClientMessagesPage() {
                 unread: false,
                 unreadCount: 0,
                 lastReadAt: new Date().toISOString(),
+                messagePage: {
+                  ...conversation.messagePage,
+                  totalCount: conversation.messagePage.totalCount + 1,
+                },
                 messages: [
                   ...conversation.messages,
                   {
@@ -365,6 +416,8 @@ export default function ClientMessagesPage() {
               : []
           }
           onUseTip={(tip) => setDraft(tip)}
+          loadingOlder={loadingOlder}
+          onLoadOlder={() => void loadOlderMessages()}
         />
 
         <ContextPanel conversation={current} viewer="client" />

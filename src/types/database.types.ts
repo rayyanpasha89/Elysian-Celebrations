@@ -2444,6 +2444,35 @@ export type Database = {
         }
         Returns: string
       }
+      "load_message_inbox_pages": {
+        Args: {
+          "p_booking_ids": string[]
+          "p_user_id": string
+          "p_recent_limit": number
+        }
+        Returns: {
+          "booking_id": string
+          "message_count": number
+          "unread_count": number
+          "last_read_at": string
+          "messages": Json
+        }[]
+      }
+      "load_message_page": {
+        Args: {
+          "p_booking_id": string
+          "p_before_created_at": string
+          "p_before_id": string
+          "p_limit": number
+        }
+        Returns: {
+          "id": string
+          "booking_id": string
+          "sender_id": string
+          "content": string
+          "created_at": string
+        }[]
+      }
       "next_billing_invoice_number": {
         Args: Record<string, never>
         Returns: string

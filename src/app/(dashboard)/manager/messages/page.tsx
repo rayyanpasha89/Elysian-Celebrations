@@ -1,16 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 import { fadeUp, staggerContainer, staggerItem } from "@/animations/variants";
 import { DashboardLoadError } from "@/components/dashboard/dashboard-load-error";
 import { ListEmptyState } from "@/components/dashboard/list-empty-state";
 import { useMessageRealtime } from "@/hooks/use-message-realtime";
 import { dashCard, dashLabel, statusBadgeBase } from "@/lib/dashboard-styles";
 import {
+  fetchOlderMessagePage,
   formatBookingDate,
   formatMessageTime,
+  mergeConversationRefresh,
+  prependOlderMessagePage,
   statusTone,
   type Conversation,
 } from "@/lib/messages-shared";
@@ -21,8 +25,14 @@ export default function ManagerMessagesPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [active, setActive] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const messagesScrollRef = useRef<HTMLDivElement | null>(null);
+  const scrollRestoreRef = useRef<{
+    bookingId: string;
+    height: number;
+    top: number;
+  } | null>(null);
 
   async function refreshConversations() {
     try {
@@ -30,7 +40,7 @@ export default function ManagerMessagesPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Failed to load messages");
       const list = (json.conversations ?? []) as Conversation[];
-      setConversations(list);
+      setConversations((current) => mergeConversationRefresh(current, list));
       setActive((currentActive) => {
         if (currentActive && list.some((conversation) => conversation.id === currentActive)) {
           return currentActive;
@@ -80,10 +90,48 @@ export default function ManagerMessagesPage() {
   const currentId = current?.id ?? null;
   const currentUnread = Boolean(current?.unread);
 
-  useEffect(() => {
-    if (!messagesScrollRef.current) return;
-    messagesScrollRef.current.scrollTop = messagesScrollRef.current.scrollHeight;
+  useLayoutEffect(() => {
+    const element = messagesScrollRef.current;
+    if (!element) return;
+    const restore = scrollRestoreRef.current;
+    if (restore && restore.bookingId === current?.id) {
+      element.scrollTop = element.scrollHeight - restore.height + restore.top;
+      scrollRestoreRef.current = null;
+      return;
+    }
+    element.scrollTop = element.scrollHeight;
   }, [current?.id, current?.messages.length]);
+
+  const loadOlderMessages = async () => {
+    if (!current || loadingOlder || !current.messagePage.hasOlder) return;
+    const element = messagesScrollRef.current;
+    if (element) {
+      scrollRestoreRef.current = {
+        bookingId: current.id,
+        height: element.scrollHeight,
+        top: element.scrollTop,
+      };
+    }
+
+    setLoadingOlder(true);
+    try {
+      const page = await fetchOlderMessagePage(current);
+      setConversations((list) =>
+        list.map((conversation) =>
+          conversation.id === current.id
+            ? prependOlderMessagePage(conversation, page)
+            : conversation
+        )
+      );
+    } catch (error) {
+      scrollRestoreRef.current = null;
+      toast.error(
+        error instanceof Error ? error.message : "Failed to load earlier messages"
+      );
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
 
   useEffect(() => {
     if (!currentId || !currentUnread) return;
@@ -200,6 +248,8 @@ export default function ManagerMessagesPage() {
           <ThreadPanel
             conversation={current}
             messagesScrollRef={messagesScrollRef}
+            loadingOlder={loadingOlder}
+            onLoadOlder={() => void loadOlderMessages()}
           />
           <ManagerContextPanel conversation={current} />
         </motion.div>
@@ -286,9 +336,13 @@ function ConversationQueue({
 function ThreadPanel({
   conversation,
   messagesScrollRef,
+  loadingOlder,
+  onLoadOlder,
 }: {
   conversation: Conversation | null;
   messagesScrollRef: React.RefObject<HTMLDivElement | null>;
+  loadingOlder: boolean;
+  onLoadOlder: () => void;
 }) {
   if (!conversation) {
     return (
@@ -319,6 +373,21 @@ function ThreadPanel({
         ref={messagesScrollRef}
         className="flex flex-1 flex-col gap-4 overflow-y-auto px-6 py-6"
       >
+        {conversation.messages.length > 0 && conversation.messagePage.hasOlder ? (
+          <div className="flex items-center justify-center gap-3 border-b border-charcoal/8 pb-4">
+            <button
+              type="button"
+              onClick={onLoadOlder}
+              disabled={loadingOlder}
+              className="font-accent border border-charcoal/15 bg-ivory px-4 py-2 text-[10px] uppercase tracking-[0.18em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark disabled:cursor-wait disabled:opacity-60"
+            >
+              {loadingOlder ? "Loading..." : "Load earlier messages"}
+            </button>
+            <span className="font-accent text-[9px] uppercase tracking-[0.15em] text-slate">
+              {conversation.messages.length} of {conversation.messagePage.totalCount}
+            </span>
+          </div>
+        ) : null}
         {conversation.messages.length === 0 ? (
           <div className="flex flex-1 flex-col items-start justify-center border border-dashed border-charcoal/15 bg-cream/30 p-6">
             <p className={dashLabel}>No messages yet</p>

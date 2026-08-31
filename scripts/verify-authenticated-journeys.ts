@@ -488,7 +488,11 @@ function createHttpClient(baseUrl: string, fixture: Fixture) {
   return { request, page, redirect };
 }
 
-async function runJourneys(baseUrl: string, fixture: Fixture) {
+async function runJourneys(
+  baseUrl: string,
+  fixture: Fixture,
+  supabase: TestSupabase
+) {
   const http = createHttpClient(baseUrl, fixture);
   const completed: { name: string; elapsedMs: number }[] = [];
 
@@ -850,6 +854,71 @@ async function runJourneys(baseUrl: string, fixture: Fixture) {
       assert.deepEqual(messageTexts, [clientMessage, vendorMessage]);
     }
 
+    const archiveMessageCount = 45;
+    const archiveMessages = Array.from({ length: archiveMessageCount }, (_, index) => ({
+      booking_id: fixture.bookingId!,
+      sender_id: fixture.userIds.client,
+      content: `Archived journey message ${String(index + 1).padStart(2, "0")} ${fixture.runId}`,
+      created_at: new Date(
+        Date.now() - (archiveMessageCount - index + 10) * 60_000
+      ).toISOString(),
+    }));
+    const archiveInsert = await supabase.from("messages").insert(archiveMessages);
+    assert.equal(
+      archiveInsert.error,
+      null,
+      archiveInsert.error?.message ?? "archived messages should seed"
+    );
+
+    const pagedInbox = await http.request("client", "/api/messages");
+    const pagedConversation = asArray(
+      asRecord(pagedInbox.payload, "paged inbox").conversations,
+      "paged conversations"
+    )
+      .map((entry) => asRecord(entry, "paged conversation"))
+      .find((entry) => entry.id === fixture.bookingId);
+    assert.ok(pagedConversation);
+    const recentMessages = asArray(
+      pagedConversation.messages,
+      "bounded recent messages"
+    );
+    const pageState = asRecord(
+      pagedConversation.messagePage,
+      "message page state"
+    );
+    assert.equal(recentMessages.length, 40);
+    assert.equal(pageState.totalCount, 47);
+    assert.equal(pageState.hasOlder, true);
+
+    const olderParams = new URLSearchParams({
+      bookingId: fixture.bookingId,
+      beforeCreatedAt: String(pageState.oldestCreatedAt),
+      beforeId: String(pageState.oldestId),
+    });
+    const olderResponse = await http.request(
+      "client",
+      `/api/messages?${olderParams.toString()}`
+    );
+    const olderMessages = asArray(
+      asRecord(olderResponse.payload, "older message page").messages,
+      "older messages"
+    );
+    const olderPage = asRecord(
+      asRecord(olderResponse.payload, "older message page").page,
+      "older page state"
+    );
+    assert.equal(olderMessages.length, 7);
+    assert.equal(olderPage.hasOlder, false);
+
+    const combinedIds = [...olderMessages, ...recentMessages].map((entry) =>
+      String(asRecord(entry, "combined message").id)
+    );
+    assert.equal(new Set(combinedIds).size, 47);
+
+    await http.request("client", `/api/messages?bookingId=${fixture.bookingId}`, {
+      expectedStatus: 400,
+    });
+
     await http.request("admin", `/api/bookings/${fixture.bookingId}`, {
       method: "PATCH",
       body: { status: "CONFIRMED" },
@@ -994,7 +1063,7 @@ async function main() {
     await seedFixture(supabase, fixture);
     server = await startDevelopmentServer(fixture);
     console.log(`Local Next server ready at ${server.baseUrl}`);
-    const completed = await runJourneys(server.baseUrl, fixture);
+    const completed = await runJourneys(server.baseUrl, fixture, supabase);
     console.log("");
     console.log(
       `Authenticated journeys passed: ${completed.length} groups in ${Date.now() - startedAt} ms.`
