@@ -1,6 +1,7 @@
 # Elysian Celebrations
 
-Luxury destination wedding planning platform built with Next.js, Clerk, and Supabase.
+Premium multi-day event planning and operations platform built with Next.js,
+Clerk, and Supabase.
 
 ## Project memory
 
@@ -46,3 +47,30 @@ npm run db:migrations
 npm run db:push
 npm run db:query -- --sql "select now();"
 ```
+
+## Release verification
+
+The focused database suites use rollback-only fixtures; the authenticated
+journey starts an isolated local Next.js server and removes all test identities
+and product data after completion.
+
+```bash
+npm run lint
+npx tsc --noEmit --pretty false
+npm run test:ownership
+npm run test:event-plan
+npm run test:planning-atomic
+npm run test:venue
+npm run test:readiness
+npm run test:abuse-controls
+npm run test:payments
+npm run test:billing
+npm run test:journeys
+npm run db:migrations
+npm run db:push:dry-run
+npm audit --omit=dev
+npm run build
+```
+
+The latest verified gate is recorded in
+[`docs/production-readiness-2026-09-01.md`](./docs/production-readiness-2026-09-01.md).

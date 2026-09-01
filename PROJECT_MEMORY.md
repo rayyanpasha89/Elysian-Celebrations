@@ -1,6 +1,6 @@
 # Elysian Celebrations Project Memory
 
-Last updated: 2026-08-29
+Last updated: 2026-09-02
 
 This is the durable memory file for Codex, Claude, Cursor, and any future agent working in this repo. Read this after `AGENTS.md` and before making product, frontend, backend, Supabase, or deployment decisions.
 
@@ -539,7 +539,7 @@ Planner input direction: chips, pickers, swatches, steppers, dropdowns. Avoid ra
 
 ## Current Implementation State
 
-As of the 2026-08-29 production-readiness pass:
+As of the 2026-09-02 production-readiness pass:
 
 - The verified working branch is `codex/production-readiness`. It is intentionally
   ahead of `origin/main`; do not deploy or merge it until the user explicitly
@@ -561,6 +561,14 @@ As of the 2026-08-29 production-readiness pass:
 - Whole-plan creation runs through one Postgres transaction. Focused rollback
   tests prove that invalid functions, requirements, and menus cannot leave a
   partial event structure behind.
+- A Layer 2 Save is also one transaction. The client sends event details,
+  normalized catalogue `venue_id`, menus/items, logistics, tasks, requirements,
+  and the desired vendor/service set to
+  `/api/wedding/events/[id]/workspace`; the service-role-only
+  `save_event_workspace` RPC either commits the complete workspace or rolls all
+  of it back. Confirmed/commercial bookings cannot be removed from the planner,
+  while an existing selection remains saveable if that vendor later pauses new
+  inquiries.
 - Vendor service selection in the planner supports multiple selections and catalogue row application.
 - Client vendor discovery derives its sourcing lanes from the actual plan's
   day/function requirements and current selections; no hardcoded Haldi/Sangeet
@@ -610,6 +618,15 @@ As of the 2026-08-29 production-readiness pass:
 - Messaging intentionally uses visibility-aware eight-second refreshes through
   the role-checked `/api/messages` boundary. Direct Supabase Realtime remains
   deferred until Clerk-to-Supabase JWT bridging is available.
+- Message history is bounded and paginated: inbox payloads carry the newest 40
+  messages with exact counts, and booking-scoped cursor reads load older pages
+  without gaps or duplicates. The client, vendor, and manager thread panes use
+  internal scrolling rather than growing the entire dashboard page.
+- One rollback-clean authenticated journey harness now covers onboarding, the
+  full Layer 2 workspace transaction, vendor discovery/shortlist, idempotent
+  booking selection, two-way paginated messaging, budget projection, fixed
+  admin pricing, invoice billing, role denials, and all 48 client/vendor/manager/
+  admin navigation destinations.
 - Supabase browser/server factories use generated `Database` types, and dynamic
   API write payloads are compile-checked against table insert/update contracts.
   `npm run db:types` prefers the pinned official CLI when a management token is
@@ -628,30 +645,35 @@ As of the 2026-08-29 production-readiness pass:
   comparison rail.
 - Artificial global route transitions were removed. App/dashboard error and
   loading boundaries now fail honestly without a full-screen fake delay.
+- Database constraints enforce one event plan, budget, and guest-list container
+  per client where the product model is singleton, and cross-owner day, event,
+  booking, and budget references are rejected at the database boundary.
 
 ## Known Gaps And Active Priorities
 
 These are the highest-value next directions. Confirm against source before editing because parts may already be in progress.
 
 1. Production identity: replace Clerk development credentials with production
-   keys and re-run authenticated smoke tests before public launch.
-2. Automated browser regression: encode the currently manual client, vendor,
-   manager, and admin role matrix plus critical create/save/payment flows in CI.
-3. Per-function transaction boundary: event creation is atomic, but the larger
-   nested function editor save still uses coordinated API writes and should move
-   into a reviewed RPC before high-concurrency operations.
-4. Legacy singleton ownership: decide whether budgets and guest lists belong to a
-   client or an event, then merge existing duplicates before adding uniqueness.
-5. Messaging scale: add booking-scoped incremental reads/pagination while keeping
-   the role-checked API boundary used by Clerk identities.
-6. Rendering architecture: decompose the large client planner and move stable
+   keys and re-run the authenticated journey before public launch.
+2. Online collection decision: confirm whether Elysian collects the full client
+   total or only its fee, select a provider, complete KYC, and supply checkout
+   plus webhook credentials. Manual invoice and reconciliation flows are already
+   operational; online checkout must stay disabled until this is decided.
+3. Deployment authorization: this branch is verified locally and against linked
+   Supabase, but must not be merged to `main` or deployed until the user explicitly
+   approves launch.
+4. Rendering architecture: decompose the large client planner and move stable
    dashboard reads server-side without regressing the radial interaction model.
-7. Planner editing: keep save/create/delete actions regression-tested across
+5. Planner editing: keep save/create/delete actions regression-tested across
    narrow mobile widths and preserve authoritative refresh after partial errors.
-8. Estimates: deepen per-person food and guest-sensitive pricing using real
+6. Estimates: deepen per-person food and guest-sensitive pricing using real
    service units while preserving manual-pricing disclosure for custom requests.
-9. Admin/manager alignment: continue mapping operations surfaces onto the same
+7. Admin/manager alignment: continue mapping operations surfaces onto the same
    event, venue, vendor, catalogue, readiness, and spend concepts clients see.
+8. Optional realtime: add Clerk-to-Supabase JWT bridging before replacing the
+   secure polling path with direct Supabase subscriptions.
+9. Catalogue ordering: add true drag ordering for vendor catalogue rows/media
+   only when the interaction can remain accessible on touch and keyboard.
 10. Legacy naming: schema/routes still use wedding names. Do not rush a destructive
     rename; keep changing user-facing vocabulary first.
 
@@ -671,8 +693,12 @@ npx tsc --noEmit --pretty false
 npm run test:readiness
 npm run test:abuse-controls
 npm run test:event-plan
+npm run test:planning-atomic
+npm run test:ownership
 npm run test:venue
 npm run test:payments
+npm run test:billing
+npm run test:journeys
 npm run db:migrations
 npm run db:push:dry-run
 npm audit --omit=dev

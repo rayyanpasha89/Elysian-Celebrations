@@ -51,6 +51,18 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
   - `20260826050000_activate_payment_ledger.sql`
   - `20260826051000_allow_server_payment_maintenance.sql`
   - `20260829061409_complete_vendor_operations_settings.sql`
+  - `20260829115443_add_client_billing_invoices.sql`
+  - `20260829144640_backfill_client_receipt_invoices.sql`
+  - `20260829172000_harden_billing_state_transitions.sql`
+  - `20260829180000_lock_billing_table_mutations.sql`
+  - `20260829181500_lock_trigger_function_execution.sql`
+  - `20260831135409_harden_client_ownership_integrity.sql`
+  - `20260831135713_cover_event_day_ownership_fk.sql`
+  - `20260831140500_atomic_event_planning_save.sql`
+  - `20260831143023_paginate_booking_messages.sql`
+  - `20260901035842_save_event_workspace_atomic.sql`
+  - `20260901041117_preserve_existing_workspace_vendor_selections.sql`
+  - `20260901042506_protect_workspace_booking_financial_history.sql`
 - Remote table/column checks passed for:
   - `wedding_event_menus`
   - `wedding_event_menu_items`
@@ -72,7 +84,7 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
   - generated `bookings.service_fee`
   - final-price validation constraints and admin-owned offline pricing metadata
 
-## Current Working-Tree Hardening (2026-08-10)
+## Current Working-Tree Hardening (2026-09-02)
 
 These items are present in the current source tree. They are not, by themselves,
 claims that the changes are committed, deployed, or active in the remote database:
@@ -104,6 +116,20 @@ claims that the changes are committed, deployed, or active in the remote databas
 
 ## Shipped Recently
 
+- Replaced the Layer 2 editor's event PATCH + planning PATCH + booking create/delete
+  chain with one `/api/wedding/events/[id]/workspace` request backed by the
+  service-role-only `save_event_workspace` RPC. Event fields, normalized venue
+  reference, nested planning, and vendor selections now commit or roll back
+  together. Progressed bookings are protected from planner deletion, while
+  existing selections remain editable after a vendor pauses new inquiries.
+- Added cursor-based booking message history. Inbox payloads return the newest 40
+  messages and exact counts; older pages load without gaps or duplicate IDs, and
+  client/vendor/manager inboxes use bounded internal scrolling.
+- Added a rollback-clean authenticated journey suite covering the complete client
+  onboarding/workspace/vendor/booking/message/budget path, admin pricing and
+  invoices, cross-role denials, and all 48 portal navigation destinations.
+- Enforced client ownership at the database boundary, including one event plan,
+  budget, and guest-list container per client plus cross-owner reference guards.
 - Closed the first production-readiness backend sequence: whole-plan creation is
   transactional, catalogue venues persist as validated `venue_id` references,
   and client receipts are separated from vendor payouts through directional
@@ -225,10 +251,17 @@ claims that the changes are committed, deployed, or active in the remote databas
 - `npm run build`
 - `npm audit --omit=dev` (zero vulnerabilities after the Next/PostCSS/Sharp patch upgrade)
 - `npm run db:migrations`
-- `npm run db:push:dry-run` (remote up to date through `20260829061409`)
+- `npm run db:push:dry-run` (remote up to date through `20260901042506`)
 - `npm run test:event-plan` (5 focused cases)
+- `npm run test:planning-atomic` (15 focused cases with full rollback)
+- `npm run test:ownership` (14 focused cases with full rollback)
 - `npm run test:venue` (6 focused cases)
 - `npm run test:payments` (8 focused cases with full rollback)
+- `npm run test:billing` (invoice state/security cases with full rollback)
+- `npm run test:readiness` (8 focused cases)
+- `npm run test:abuse-controls` (rate limit, grants, RLS, and media reservations)
+- `npm run test:journeys` (9 authenticated groups, including all 48 portal routes)
+- `npx supabase db lint --schema public --level warning --fail-on error`
 - `npm run db:query` for newly added Supabase tables and columns
 - `npm run db:push` for pending media + realtime migrations
 - `npm run db:push` for `20260604000100_event_platform_definition_layer.sql`
@@ -251,6 +284,9 @@ claims that the changes are committed, deployed, or active in the remote databas
 - Live browser checks for admin final-pricing drill-down/editor, admin fee intelligence, client spend selector across all six dimensions, manager vendor data, and vendor agreed-payout visibility
 - Live regression of all 15 admin routes, mobile navigation, notifications, account menu, destination creation form, client booking price privacy, and vendor pricing-state rendering
 - Authenticated client browser checks at desktop and mobile widths for Enter-to-advance without auto-create, the 14-day Step 5 accordion, collapsed function rows, `Day / All time blocks` and `Day / Afternoon` context, Layer 2 flowchart drill-down, active-day Add Event targeting, scoped Basics editor, compact date/time/venue context, unsaved-change protection, and non-overlapping sticky save actions
+- Live atomic-save browser check: event hub -> day -> function -> Basics, labelled
+  venue and guest controls, disabled `Saving...` state, success toast, preserved
+  editor context, and re-enabled Save after authoritative refresh.
 - `127.0.0.1` development hydration/HMR verification with `allowedDevOrigins`, plus zero measured overlap from the collapsed local test-role dock
 - Local dev server started at `http://localhost:3000`
 - Basic HTTP smoke check passed for `/`
@@ -277,13 +313,13 @@ claims that the changes are committed, deployed, or active in the remote databas
    authenticated smoke matrix before public launch.
 2. Confirm whether Elysian collects the full client price and settles vendors or
    collects only its fee, then implement the selected gateway adapter and webhooks.
-3. Add automated authenticated browser regression for pricing, booking, vendor,
-   admin, planner, and payment flows.
+3. Keep the readiness branch local until explicit merge/deploy approval; then run
+   the authenticated journey against the launch candidate.
 4. Add Clerk-to-Supabase JWT bridging before restoring direct Supabase Realtime subscriptions.
-5. Move the nested per-function editor save into one reviewed transaction.
-6. Resolve budget/guest singleton ownership before adding uniqueness.
-7. Expand one-event budget links into split allocations only when a real planning case requires it.
-8. Add true drag ordering for vendor catalogue media and rows.
+5. Decompose the large planner component without changing the radial interaction
+   or the atomic workspace boundary.
+6. Expand one-event budget links into split allocations only when a real planning case requires it.
+7. Add true drag ordering for vendor catalogue media and rows.
 
 ## Known Risks
 
