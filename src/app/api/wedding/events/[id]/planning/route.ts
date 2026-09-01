@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  EVENT_REQUIREMENT_CATEGORIES,
-  normalizeEventRequirementPayload,
-} from "@/lib/event-platform";
+  isRecord,
+  normalizeLogistics,
+  normalizeMenus,
+  normalizeRequirements,
+  normalizeTasks,
+} from "@/lib/event-workspace-payload";
 import { getClientWeddingContext } from "@/lib/wedding-plan.server";
 import {
   apiError,
@@ -10,191 +13,7 @@ import {
   getAuthSession,
   requireRole,
 } from "@/lib/api-utils";
-
-const ALLOWED_CATEGORIES = new Set(
-  EVENT_REQUIREMENT_CATEGORIES.map((category) => category.key)
-);
-const ALLOWED_REQUIREMENT_STATUSES = new Set([
-  "DRAFT",
-  "NEEDS_VENDOR",
-  "QUOTE_NEEDED",
-  "CONFIRMED",
-  "DONE",
-]);
-const ALLOWED_REQUIREMENT_PRIORITIES = new Set([
-  "LOW",
-  "NORMAL",
-  "HIGH",
-  "CRITICAL",
-]);
-
-type MenuDraft = {
-  id?: unknown;
-  name?: unknown;
-  mealPeriod?: unknown;
-  serviceStyle?: unknown;
-  notes?: unknown;
-  items?: unknown;
-};
-
-type MenuItemDraft = {
-  id?: unknown;
-  name?: unknown;
-  course?: unknown;
-  dietaryTags?: unknown;
-  notes?: unknown;
-};
-
-type TaskDraft = {
-  id?: unknown;
-  title?: unknown;
-  owner?: unknown;
-  status?: unknown;
-  dueDate?: unknown;
-};
-
-type RequirementDraft = {
-  id?: unknown;
-  category?: unknown;
-  title?: unknown;
-  status?: unknown;
-  priority?: unknown;
-  vendorProfileId?: unknown;
-  vendorServiceId?: unknown;
-  payload?: unknown;
-  notes?: unknown;
-};
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function toOptionalString(value: unknown, maxLength = 500) {
-  return typeof value === "string" && value.trim()
-    ? value.trim().slice(0, maxLength)
-    : null;
-}
-
-function toRequiredString(value: unknown, fallback: string, maxLength = 160) {
-  return toOptionalString(value, maxLength) ?? fallback;
-}
-
-function toOptionalId(value: unknown) {
-  return toOptionalString(value, 80);
-}
-
-function toOptionalStringArray(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  return value
-    .filter(
-      (entry): entry is string =>
-        typeof entry === "string" && entry.trim().length > 0
-    )
-    .slice(0, 40)
-    .map((entry) => entry.trim().slice(0, 80));
-}
-
-function toOptionalDate(value: unknown) {
-  if (typeof value !== "string" || !value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
-
-function normalizeTaskStatus(value: unknown) {
-  const status = toOptionalString(value, 40)?.toUpperCase();
-  if (status === "IN_PROGRESS" || status === "DONE") return status;
-  return "OPEN";
-}
-
-function normalizeMenus(value: unknown) {
-  return (value as MenuDraft[]).slice(0, 8).map((menu, menuIndex) => ({
-    id: toOptionalId(menu.id),
-    name: toRequiredString(menu.name, `Menu ${menuIndex + 1}`),
-    meal_period: toOptionalString(menu.mealPeriod, 80),
-    service_style: toOptionalString(menu.serviceStyle, 120),
-    notes: toOptionalString(menu.notes, 1000),
-    sort_order: menuIndex,
-    items: Array.isArray(menu.items)
-      ? menu.items.slice(0, 40).map((item: MenuItemDraft, itemIndex) => ({
-          id: toOptionalId(item.id),
-          name: toRequiredString(item.name, `Menu item ${itemIndex + 1}`),
-          course: toOptionalString(item.course, 80),
-          dietary_tags: toOptionalStringArray(item.dietaryTags),
-          notes: toOptionalString(item.notes, 500),
-          sort_order: itemIndex,
-        }))
-      : [],
-  }));
-}
-
-function normalizeTasks(value: unknown) {
-  return (value as TaskDraft[])
-    .slice(0, 40)
-    .map((task, taskIndex) => ({
-      id: toOptionalId(task.id),
-      title: toOptionalString(task.title, 180),
-      owner: toOptionalString(task.owner, 80),
-      status: normalizeTaskStatus(task.status),
-      due_date: toOptionalDate(task.dueDate),
-      sort_order: taskIndex,
-    }))
-    .filter((task) => task.title);
-}
-
-function normalizeLogistics(value: Record<string, unknown>) {
-  return {
-    guest_arrival_time: toOptionalString(value.guestArrivalTime, 40),
-    vendor_load_in_time: toOptionalString(value.vendorLoadInTime, 40),
-    family_call_time: toOptionalString(value.familyCallTime, 40),
-    transport_notes: toOptionalString(value.transportNotes, 1000),
-    rooming_notes: toOptionalString(value.roomingNotes, 1000),
-    weather_plan: toOptionalString(value.weatherPlan, 1000),
-    ceremony_notes: toOptionalString(value.ceremonyNotes, 1000),
-  };
-}
-
-function normalizeLookup(value: string) {
-  return value.trim().toLowerCase().replace(/[\s_/]+/g, "-");
-}
-
-function normalizeCategory(value: unknown) {
-  if (typeof value !== "string") return "custom";
-  const lookup = normalizeLookup(value);
-  return ALLOWED_CATEGORIES.has(lookup as never) ? lookup : "custom";
-}
-
-function normalizeRequirementStatus(value: unknown) {
-  const status = toOptionalString(value, 40)?.toUpperCase();
-  return status && ALLOWED_REQUIREMENT_STATUSES.has(status) ? status : "DRAFT";
-}
-
-function normalizeRequirementPriority(value: unknown) {
-  const priority = toOptionalString(value, 40)?.toUpperCase();
-  return priority && ALLOWED_REQUIREMENT_PRIORITIES.has(priority)
-    ? priority
-    : "NORMAL";
-}
-
-function normalizeRequirements(value: unknown) {
-  return (value as RequirementDraft[]).slice(0, 60).map((requirement, index) => {
-    const category = normalizeCategory(requirement.category);
-    return {
-      id: toOptionalId(requirement.id),
-      category,
-      title:
-        toOptionalString(requirement.title, 160) ??
-        EVENT_REQUIREMENT_CATEGORIES.find((item) => item.key === category)?.label ??
-        "Requirement",
-      status: normalizeRequirementStatus(requirement.status),
-      priority: normalizeRequirementPriority(requirement.priority),
-      vendor_profile_id: toOptionalId(requirement.vendorProfileId),
-      vendor_service_id: toOptionalId(requirement.vendorServiceId),
-      payload: normalizeEventRequirementPayload(requirement.payload),
-      notes: toOptionalString(requirement.notes, 4000),
-      sort_order: index,
-    };
-  });
-}
+import { isUuid } from "@/lib/id-utils";
 
 async function requireOwnedEvent(userId: string, eventId: string) {
   const { supabase, wedding } = await getClientWeddingContext(userId);
@@ -245,7 +64,13 @@ export async function PATCH(
 
   try {
     const { id } = await params;
-    const body = (await request.json()) as Record<string, unknown>;
+    if (!isUuid(id)) return apiError("Invalid event ID", 400);
+
+    const parsedBody: unknown = await request.json();
+    if (!isRecord(parsedBody)) {
+      return apiError("Event planning payload has an invalid shape", 400);
+    }
+    const body = parsedBody;
 
     if (
       !Array.isArray(body.menus) ||

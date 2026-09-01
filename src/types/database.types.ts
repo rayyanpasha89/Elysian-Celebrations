@@ -2544,6 +2544,19 @@ export type Database = {
         }
         Returns: Json
       }
+      "save_event_workspace": {
+        Args: {
+          "p_actor_user_id": string
+          "p_event_id": string
+          "p_event": Json
+          "p_menus": Json
+          "p_logistics": Json
+          "p_tasks": Json
+          "p_requirements": Json
+          "p_vendor_selections": Json
+        }
+        Returns: Json
+      }
       "set_booking_pricing": {
         Args: {
           "p_booking_id": string

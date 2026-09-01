@@ -25,6 +25,7 @@ type Fixture = {
   vendorProfileId: string | null;
   vendorServiceId: string | null;
   weddingId: string | null;
+  dayId: string | null;
   eventId: string | null;
   bookingId: string | null;
   invoiceId: string | null;
@@ -46,6 +47,64 @@ type RequestOptions = {
 const TEST_COOKIE = "ec_test_role";
 const SERVER_START_TIMEOUT_MS = 120_000;
 const SERVER_STOP_TIMEOUT_MS = 8_000;
+const PORTAL_ROUTE_MATRIX = {
+  client: [
+    "/client",
+    "/client/wedding",
+    "/client/budget",
+    "/client/vendors",
+    "/client/guests",
+    "/client/timeline",
+    "/client/mood-board",
+    "/client/messages",
+    "/client/bookings",
+    "/client/billing",
+    "/client/settings",
+  ],
+  vendor: [
+    "/vendor",
+    "/vendor/analytics",
+    "/vendor/profile",
+    "/vendor/services",
+    "/vendor/portfolio",
+    "/vendor/reviews",
+    "/vendor/inquiries",
+    "/vendor/bookings",
+    "/vendor/calendar",
+    "/vendor/messages",
+    "/vendor/settings",
+  ],
+  manager: [
+    "/manager",
+    "/manager/inquiries",
+    "/manager/bookings",
+    "/manager/messages",
+    "/manager/clients",
+    "/manager/vendors",
+    "/manager/configurator",
+    "/manager/destinations",
+    "/manager/weddings",
+    "/manager/settings",
+  ],
+  admin: [
+    "/admin",
+    "/admin/analytics",
+    "/admin/pricing",
+    "/admin/billing",
+    "/admin/progress",
+    "/admin/revenue",
+    "/admin/vendors",
+    "/admin/clients",
+    "/admin/destinations",
+    "/admin/packages",
+    "/admin/venues",
+    "/admin/blog",
+    "/admin/testimonials",
+    "/admin/inquiries",
+    "/admin/users",
+    "/admin/settings",
+  ],
+} as const satisfies Record<Role, readonly string[]>;
 const inspectionHoldMs = Math.max(
   0,
   Number(process.env.ELYSIAN_JOURNEY_INSPECTION_HOLD_MS) || 0
@@ -98,6 +157,7 @@ function makeFixture(): Fixture {
     vendorProfileId: null,
     vendorServiceId: null,
     weddingId: null,
+    dayId: null,
     eventId: null,
     bookingId: null,
     invoiceId: null,
@@ -586,7 +646,9 @@ async function runJourneys(
     assert.equal(wedding.event_type, "corporate");
     const days = asArray(plannerBody.days, "planner days");
     assert.equal(days.length, 1);
-    const events = asArray(asRecord(days[0], "planner day").events, "planner events");
+    const plannerDay = asRecord(days[0], "planner day");
+    fixture.dayId = String(plannerDay.id);
+    const events = asArray(plannerDay.events, "planner events");
     assert.equal(events.length, 1);
     const event = asRecord(events[0], "planner event");
     fixture.eventId = String(event.id);
@@ -604,7 +666,44 @@ async function runJourneys(
   });
 
   await check("Layer 2 planning saves atomically through the authenticated API", async () => {
-    assert.ok(fixture.eventId);
+    assert.ok(
+      fixture.eventId &&
+        fixture.dayId &&
+        fixture.vendorProfileId &&
+        fixture.vendorServiceId
+    );
+    const venueCatalogue = await http.request("client", "/api/venues?limit=30");
+    const journeyVenue = asArray(
+      asRecord(venueCatalogue.payload, "venue catalogue").venues,
+      "venue catalogue rows"
+    )
+      .map((entry) => asRecord(entry, "venue catalogue row"))
+      .find(
+        (venue) =>
+          venue.capacity == null ||
+          (typeof venue.capacity === "number" && venue.capacity >= 84)
+      );
+    assert.ok(journeyVenue, "the venue catalogue needs one option for 84 guests");
+    const workspaceEvent = {
+      weddingDayId: fixture.dayId,
+      name: "Authenticated Journey Session Updated",
+      eventType: "Conference Session",
+      date: "2027-02-20",
+      startTime: "09:15",
+      endTime: "12:15",
+      venue: String(journeyVenue.name),
+      venueId: String(journeyVenue.id),
+      guestCount: 84,
+      estimatedBudget: 180000,
+      foodStyle: "Plated",
+      foodPreferences: ["vegetarian"],
+      menuNotes: "Journey menu direction",
+      decorStyle: "Editorial",
+      decorNotes: "Journey stage direction",
+      attireNotes: "Business formal",
+      notes: "Authenticated full-workspace save.",
+      requirementPayload: { stepNotes: { basics: "Authenticated save" } },
+    };
     const planningPayload = {
       menus: [
         {
@@ -659,15 +758,50 @@ async function runJourneys(
       ],
     };
 
+    await http.request("client", "/api/wedding/events/not-a-uuid/workspace", {
+      method: "PATCH",
+      expectedStatus: 400,
+      body: {
+        event: workspaceEvent,
+        planning: planningPayload,
+        vendorSelections: [],
+      },
+    });
     await http.request(
       "client",
-      `/api/wedding/events/${fixture.eventId}/planning`,
-      { method: "PATCH", body: planningPayload }
+      `/api/wedding/events/${fixture.eventId}/workspace`,
+      { method: "PATCH", expectedStatus: 400, body: [] }
+    );
+
+    await http.request(
+      "client",
+      `/api/wedding/events/${fixture.eventId}/workspace`,
+      {
+        method: "PATCH",
+        body: {
+          event: workspaceEvent,
+          planning: planningPayload,
+          vendorSelections: [
+            {
+              vendorProfileId: fixture.vendorProfileId,
+              vendorServiceId: fixture.vendorServiceId,
+            },
+          ],
+        },
+      }
     );
     await http.request(
       "vendor",
-      `/api/wedding/events/${fixture.eventId}/planning`,
-      { method: "PATCH", body: planningPayload, expectedStatus: 403 }
+      `/api/wedding/events/${fixture.eventId}/workspace`,
+      {
+        method: "PATCH",
+        body: {
+          event: workspaceEvent,
+          planning: planningPayload,
+          vendorSelections: [],
+        },
+        expectedStatus: 403,
+      }
     );
 
     const savedPlan = asRecord(
@@ -681,6 +815,9 @@ async function runJourneys(
       )[0],
       "saved event"
     );
+    assert.equal(savedEvent.name, "Authenticated Journey Session Updated");
+    assert.equal(savedEvent.guest_count, 84);
+    assert.equal(savedEvent.venue_id, journeyVenue.id);
     assert.equal(
       asRecord(asArray(savedEvent.menus, "saved menus")[0], "saved menu").name,
       "Journey working dinner"
@@ -689,6 +826,38 @@ async function runJourneys(
       asRecord(savedEvent.logistics, "saved logistics").transportNotes,
       "Journey shuttle loop"
     );
+
+    const createdWithCatalogueVenue = asRecord(
+      (
+        await http.request("client", "/api/wedding/events", {
+          method: "POST",
+          expectedStatus: 201,
+          body: {
+            weddingDayId: fixture.dayId,
+            name: "Catalogue venue regression",
+            eventType: "Breakout Session",
+            timeBlock: "afternoon",
+            date: "2027-02-20",
+            startTime: "14:00",
+            endTime: "15:00",
+            venue: String(journeyVenue.name),
+            venueId: String(journeyVenue.id),
+            guestCount: 40,
+          },
+        })
+      ).payload,
+      "catalogue venue event creation"
+    );
+    const catalogueVenueEvent = asRecord(
+      createdWithCatalogueVenue.event,
+      "catalogue venue event"
+    );
+    assert.equal(catalogueVenueEvent.venue_id, journeyVenue.id);
+    await http.request(
+      "client",
+      `/api/wedding/events/${String(catalogueVenueEvent.id)}`,
+      { method: "DELETE" }
+    );
     assert.equal(
       asRecord(asArray(savedEvent.tasks, "saved tasks")[0], "saved task").title,
       "Confirm the journey run of show"
@@ -696,33 +865,46 @@ async function runJourneys(
 
     await http.request(
       "client",
-      `/api/wedding/events/${fixture.eventId}/planning`,
+      `/api/wedding/events/${fixture.eventId}/workspace`,
       {
         method: "PATCH",
         expectedStatus: 409,
         body: {
-          ...planningPayload,
-          menus: [
-            {
-              ...planningPayload.menus[0],
-              name: "This menu must roll back",
-            },
-          ],
-          logistics: {
-            ...planningPayload.logistics,
-            transportNotes: "This logistics change must roll back",
+          event: {
+            ...workspaceEvent,
+            name: "This event name must roll back",
           },
-          tasks: [
+          planning: {
+            ...planningPayload,
+            menus: [
+              {
+                ...planningPayload.menus[0],
+                name: "This menu must roll back",
+              },
+            ],
+            logistics: {
+              ...planningPayload.logistics,
+              transportNotes: "This logistics change must roll back",
+            },
+            tasks: [
+              {
+                ...planningPayload.tasks[0],
+                title: "This task must roll back",
+              },
+            ],
+            requirements: planningPayload.requirements.map(
+              (requirement, index) =>
+                index === 0
+                  ? { ...requirement, vendorServiceId: randomUUID() }
+                  : requirement
+            ),
+          },
+          vendorSelections: [
             {
-              ...planningPayload.tasks[0],
-              title: "This task must roll back",
+              vendorProfileId: fixture.vendorProfileId,
+              vendorServiceId: fixture.vendorServiceId,
             },
           ],
-          requirements: planningPayload.requirements.map((requirement, index) =>
-            index === 0
-              ? { ...requirement, vendorServiceId: randomUUID() }
-              : requirement
-          ),
         },
       }
     );
@@ -740,6 +922,10 @@ async function runJourneys(
         "events after failed save"
       )[0],
       "event after failed save"
+    );
+    assert.equal(
+      afterFailureEvent.name,
+      "Authenticated Journey Session Updated"
     );
     assert.equal(
       asRecord(
@@ -799,7 +985,7 @@ async function runJourneys(
     assert.ok(fixture.vendorProfileId && fixture.vendorServiceId && fixture.eventId);
     const bookingResponse = await http.request("client", "/api/bookings", {
       method: "POST",
-      expectedStatus: 201,
+      expectedStatus: 200,
       body: {
         vendorProfileId: fixture.vendorProfileId,
         vendorServiceId: fixture.vendorServiceId,
@@ -1038,6 +1224,14 @@ async function runJourneys(
     assert.ok(clientBooking);
     assert.equal(hasKeyDeep(clientBooking, "vendor_amount"), false);
     assert.equal(hasKeyDeep(clientBooking, "service_fee"), false);
+  });
+
+  await check("every portal navigation destination renders for its role", async () => {
+    for (const role of Object.keys(PORTAL_ROUTE_MATRIX) as Role[]) {
+      for (const path of PORTAL_ROUTE_MATRIX[role]) {
+        await http.page(role, path);
+      }
+    }
   });
 
   return completed;

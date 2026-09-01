@@ -1,5 +1,4 @@
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { toOptionalUuid } from "@/lib/id-utils";
 
 /**
  * Normalize a caller-supplied venue id.
@@ -9,9 +8,7 @@ const UUID_PATTERN =
  * from an invalid-uuid parse error.
  */
 export function toOptionalVenueId(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return UUID_PATTERN.test(trimmed) ? trimmed : null;
+  return toOptionalUuid(value);
 }
 
 /**

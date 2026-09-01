@@ -181,6 +181,7 @@ type WeddingEvent = {
   start_time: string | null;
   end_time: string | null;
   venue: string | null;
+  venue_id: string | null;
   guest_count: number | null;
   estimated_budget: number | null;
   food_style: string | null;
@@ -363,6 +364,7 @@ type EventCreationDraft = {
   startTime: string;
   endTime: string;
   venue: string;
+  venueId: string | null;
 };
 
 type EventDetailDraft = {
@@ -373,6 +375,7 @@ type EventDetailDraft = {
   startTime: string;
   endTime: string;
   venue: string;
+  venueId: string | null;
   guestCount: string;
   estimatedBudget: string;
   foodStyle: string;
@@ -672,6 +675,7 @@ function createEventDraftForDay(day?: WeddingDay): EventCreationDraft {
     startTime: defaults.defaultStartTime,
     endTime: defaults.defaultEndTime,
     venue: "",
+    venueId: null,
   };
 }
 
@@ -739,6 +743,7 @@ function buildDetailDraft(event: WeddingEvent): EventDetailDraft {
     startTime: event.start_time ?? "",
     endTime: event.end_time ?? "",
     venue: event.venue ?? "",
+    venueId: event.venue_id,
     guestCount: event.guest_count ? String(event.guest_count) : "",
     estimatedBudget: event.estimated_budget
       ? String(event.estimated_budget)
@@ -976,7 +981,15 @@ function venueMatchesValue(venue: VenueOption, value: string) {
   );
 }
 
-function findVenueByValue(venues: VenueOption[], value: string | null | undefined) {
+function findVenueByValue(
+  venues: VenueOption[],
+  value: string | null | undefined,
+  venueId?: string | null
+) {
+  if (venueId) {
+    const venueById = venues.find((venue) => venue.id === venueId);
+    if (venueById) return venueById;
+  }
   if (!value) return null;
   return venues.find((venue) => venueMatchesValue(venue, value)) ?? null;
 }
@@ -1091,7 +1104,7 @@ function estimateEventSpend(
   const ranges: PriceRange[] = [];
   let missingCount = 0;
 
-  const venue = findVenueByValue(venueOptions, event.venue);
+  const venue = findVenueByValue(venueOptions, event.venue, event.venue_id);
   const venueRange = parseVenuePriceRange(venue?.price_range);
   if (venueRange) {
     ranges.push({
@@ -1153,7 +1166,7 @@ function estimateDraftSpend({
   const ranges: PriceRange[] = [];
   let missingCount = 0;
 
-  const venue = findVenueByValue(venueOptions, draft.venue);
+  const venue = findVenueByValue(venueOptions, draft.venue, draft.venueId);
   const venueRange = parseVenuePriceRange(venue?.price_range);
   if (venueRange) {
     ranges.push({
@@ -1491,6 +1504,48 @@ function uniqueVendorDraftSelections(selections: VendorDraftSelection[]) {
     seen.add(key);
     return true;
   });
+}
+
+function workspaceVendorSelections(
+  event: WeddingEvent,
+  draft: EventDetailDraft
+) {
+  const managedCategorySlugs = new Set<string>(
+    PLANNER_VENDOR_CATEGORIES.map((category) => category.slug)
+  );
+  const selections = PLANNER_VENDOR_CATEGORIES.flatMap((category) =>
+    uniqueVendorDraftSelections(draft.vendorSelections[category.key]).map(
+      (selection) => ({
+        vendorProfileId: selection.vendorProfileId,
+        vendorServiceId: selection.vendorServiceId || null,
+      })
+    )
+  );
+
+  // A legacy or newly-added vendor category may not yet have an editor lane.
+  // Preserve those existing selections rather than deleting data the current
+  // screen cannot display or manage.
+  for (const selection of event.vendorSelections) {
+    if (
+      !selection.vendor ||
+      managedCategorySlugs.has(selection.vendor.categorySlug)
+    ) {
+      continue;
+    }
+    selections.push({
+      vendorProfileId: selection.vendor.id,
+      vendorServiceId: selection.service?.id ?? null,
+    });
+  }
+
+  return [
+    ...new Map(
+      selections.map((selection) => [
+        `${selection.vendorProfileId}:${selection.vendorServiceId ?? "no-service"}`,
+        selection,
+      ])
+    ).values(),
+  ];
 }
 
 function upsertVendorDraftSelection(
@@ -1956,7 +2011,11 @@ export default function ClientWeddingPage() {
               .sort((left, right) => left.sort_order - right.sort_order)
               .map((event) => {
                 const readiness = event.readinessPercent;
-                const resolvedVenue = findVenueByValue(venueOptions, event.venue);
+                const resolvedVenue = findVenueByValue(
+                  venueOptions,
+                  event.venue,
+                  event.venue_id
+                );
                 const venueLabel = resolvedVenue?.name ?? event.venue?.trim() ?? "";
                 return {
                   id: event.id,
@@ -2456,6 +2515,7 @@ export default function ClientWeddingPage() {
           startTime: eventDraft.startTime || null,
           endTime: eventDraft.endTime || null,
           venue: eventDraft.venue || null,
+          venueId: eventDraft.venueId,
         }),
       });
       const json = await response.json();
@@ -2486,109 +2546,6 @@ export default function ClientWeddingPage() {
     }
   };
 
-  const syncVendorSelections = async (
-    event: WeddingEvent,
-    draft: EventDetailDraft
-  ) => {
-    const currentSelectionsByCategory = Object.fromEntries(
-      PLANNER_VENDOR_CATEGORIES.map((category) => [
-        category.key,
-        event.vendorSelections.filter(
-          (selection) => selection.vendor?.categorySlug === category.slug
-        ),
-      ])
-    ) as Record<PlannerVendorCategoryKey, EventVendorSelection[]>;
-
-    const additions: {
-      categoryLabel: string;
-      selection: VendorDraftSelection;
-    }[] = [];
-    const removals: {
-      categoryLabel: string;
-      selection: EventVendorSelection;
-    }[] = [];
-
-    for (const category of PLANNER_VENDOR_CATEGORIES) {
-      const currentSelections = currentSelectionsByCategory[category.key];
-      const nextSelections = uniqueVendorDraftSelections(
-        draft.vendorSelections[category.key]
-      );
-      const currentByKey = new Map(
-        currentSelections.map((selection) => [
-          eventVendorSelectionKey(selection),
-          selection,
-        ])
-      );
-      const nextKeys = new Set(nextSelections.map(vendorDraftSelectionKey));
-
-      for (const currentSelection of currentSelections) {
-        const currentKey = eventVendorSelectionKey(currentSelection);
-        if (nextKeys.has(currentKey)) continue;
-
-        if (currentSelection.status !== "INQUIRY") {
-          throw new Error(
-            `${category.label} is already ${formatBookingStatus(
-              currentSelection.status
-            )}. Update that booking from the bookings area instead.`
-          );
-        }
-
-        removals.push({
-          categoryLabel: category.label,
-          selection: currentSelection,
-        });
-      }
-
-      for (const nextSelection of nextSelections) {
-        if (currentByKey.has(vendorDraftSelectionKey(nextSelection))) continue;
-
-        additions.push({
-          categoryLabel: category.label,
-          selection: nextSelection,
-        });
-      }
-    }
-
-    // Create replacements before deleting draft inquiries. If a create fails,
-    // the user's existing selections remain intact and the final refresh shows
-    // any successfully-created rows instead of hiding server truth.
-    for (const addition of additions) {
-      const nextSelection = addition.selection;
-        const createResponse = await fetch("/api/bookings", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            vendorProfileId: nextSelection.vendorProfileId,
-            vendorServiceId: nextSelection.vendorServiceId || undefined,
-            weddingEventId: event.id,
-            eventDate: draft.date || null,
-            notes: `Planner selection for ${event.name}`,
-          }),
-        });
-        const createJson = await createResponse.json();
-        if (!createResponse.ok) {
-          throw new Error(
-            createJson.error ??
-              `Failed to save ${addition.categoryLabel.toLowerCase()}`
-          );
-        }
-    }
-
-    for (const removal of removals) {
-      const deleteResponse = await fetch(
-        `/api/bookings/${removal.selection.id}`,
-        { method: "DELETE" }
-      );
-      const deleteJson = await deleteResponse.json();
-      if (!deleteResponse.ok) {
-        throw new Error(
-          deleteJson.error ??
-            `Failed to clear ${removal.categoryLabel.toLowerCase()}`
-        );
-      }
-    }
-  };
-
   const saveEventDetails = async (
     draftOverride?: EventDetailDraft,
     options: { successMessage?: string } = {}
@@ -2607,59 +2564,56 @@ export default function ClientWeddingPage() {
     setSavingDetail(true);
 
     try {
-      const response = await fetch(`/api/wedding/events/${selectedEvent.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          weddingDayId: draftToSave.weddingDayId,
-          name: draftToSave.name,
-          eventType: draftToSave.eventType,
-          date: draftToSave.date || null,
-          startTime: draftToSave.startTime || null,
-          endTime: draftToSave.endTime || null,
-          venue: draftToSave.venue || null,
-          guestCount: draftToSave.guestCount
-            ? Number(draftToSave.guestCount)
-            : null,
-          estimatedBudget:
-            spendEstimateToSave && spendEstimateToSave.min > 0
-              ? spendEstimateToSave.min
-              : null,
-          foodStyle: draftToSave.foodStyle || null,
-          foodPreferences: draftToSave.foodPreferences,
-          menuNotes: draftToSave.menuNotes || null,
-          decorStyle: draftToSave.decorStyle || null,
-          decorNotes: draftToSave.decorNotes || null,
-          attireNotes: draftToSave.attireNotes || null,
-          notes: draftToSave.notes || null,
-          requirementPayload: {
-            ...(selectedEvent.requirement_payload ?? {}),
-            stepNotes: draftToSave.stepNotes,
-          },
-        }),
-      });
-      const json = await response.json();
-      if (!response.ok) {
-        throw new Error(json.error ?? "Failed to save event");
-      }
-
-      const planningResponse = await fetch(
-        `/api/wedding/events/${selectedEvent.id}/planning`,
+      const response = await fetch(
+        `/api/wedding/events/${selectedEvent.id}/workspace`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            ...planningPayloadFromDraft(draftToSave),
-            ...requirementsPayloadFromDraft(draftToSave),
+            event: {
+              weddingDayId: draftToSave.weddingDayId,
+              name: draftToSave.name,
+              eventType: draftToSave.eventType,
+              date: draftToSave.date || null,
+              startTime: draftToSave.startTime || null,
+              endTime: draftToSave.endTime || null,
+              venue: draftToSave.venue || null,
+              venueId: draftToSave.venueId,
+              guestCount: draftToSave.guestCount
+                ? Number(draftToSave.guestCount)
+                : null,
+              estimatedBudget:
+                spendEstimateToSave && spendEstimateToSave.min > 0
+                  ? spendEstimateToSave.min
+                  : null,
+              foodStyle: draftToSave.foodStyle || null,
+              foodPreferences: draftToSave.foodPreferences,
+              menuNotes: draftToSave.menuNotes || null,
+              decorStyle: draftToSave.decorStyle || null,
+              decorNotes: draftToSave.decorNotes || null,
+              attireNotes: draftToSave.attireNotes || null,
+              notes: draftToSave.notes || null,
+              requirementPayload: {
+                ...(selectedEvent.requirement_payload ?? {}),
+                stepNotes: draftToSave.stepNotes,
+              },
+            },
+            planning: {
+              ...planningPayloadFromDraft(draftToSave),
+              ...requirementsPayloadFromDraft(draftToSave),
+            },
+            vendorSelections: workspaceVendorSelections(
+              selectedEvent,
+              draftToSave
+            ),
           }),
         }
       );
-      const planningJson = await planningResponse.json();
-      if (!planningResponse.ok) {
-        throw new Error(planningJson.error ?? "Failed to save event planning");
+      const json = await response.json();
+      if (!response.ok) {
+        throw new Error(json.error ?? "Failed to save event workspace");
       }
 
-      await syncVendorSelections(selectedEvent, draftToSave);
       toast.success(options.successMessage ?? "Event plan saved");
     } catch (error) {
       toast.error(
@@ -3495,10 +3449,15 @@ export default function ClientWeddingPage() {
                           venues={venueOptions}
                           loading={venueOptionsLoading}
                           value={eventDraft.venue}
+                          venueId={eventDraft.venueId}
                           compact
                           dropdown
-                          onChange={(venue) =>
-                            setEventDraft((current) => ({ ...current, venue }))
+                          onChange={(venue, venueId) =>
+                            setEventDraft((current) => ({
+                              ...current,
+                              venue,
+                              venueId,
+                            }))
                           }
                         />
                       </Field>
@@ -3762,10 +3721,11 @@ export default function ClientWeddingPage() {
                       venues={venueOptions}
                       loading={venueOptionsLoading}
                       value={detailDraft.venue}
+                      venueId={detailDraft.venueId}
                       dropdown
-                      onChange={(venue) =>
+                      onChange={(venue, venueId) =>
                         setDetailDraft((current) =>
-                          current ? { ...current, venue } : current
+                          current ? { ...current, venue, venueId } : current
                         )
                       }
                     />
@@ -4818,6 +4778,7 @@ function VenuePicker({
   venues,
   loading,
   value,
+  venueId,
   onChange,
   compact = false,
   dropdown = false,
@@ -4825,11 +4786,12 @@ function VenuePicker({
   venues: VenueOption[];
   loading: boolean;
   value: string;
-  onChange: (value: string) => void;
+  venueId: string | null;
+  onChange: (value: string, venueId: string | null) => void;
   compact?: boolean;
   dropdown?: boolean;
 }) {
-  const selectedVenue = venues.find((venue) => venueMatchesValue(venue, value));
+  const selectedVenue = findVenueByValue(venues, value, venueId);
   const [showCustom, setShowCustom] = useState(false);
   const [search, setSearch] = useState("");
   const visibleVenues = compact ? venues.slice(0, 4) : venues.slice(0, 6);
@@ -4856,7 +4818,7 @@ function VenuePicker({
 
   // Compact pull-down — used in the Basics editor so it doesn't eat the page.
   if (dropdown) {
-    const selectValue = selectedVenue ? selectedVenue.name : customValueActive ? "__custom__" : "";
+    const selectValue = selectedVenue ? selectedVenue.id : customValueActive ? "__custom__" : "";
     return (
       <div className="space-y-2">
         {venues.length > 6 ? (
@@ -4878,10 +4840,11 @@ function VenuePicker({
                 const next = event.target.value;
                 if (next === "__custom__") {
                   setShowCustom(true);
-                  if (selectedVenue) onChange(search.trim());
+                  if (selectedVenue) onChange(search.trim(), null);
                 } else {
                   setShowCustom(false);
-                  onChange(next);
+                  const nextVenue = venues.find((venue) => venue.id === next);
+                  onChange(nextVenue?.name ?? "", nextVenue?.id ?? null);
                 }
               }}
               className="w-full appearance-none border border-charcoal/15 bg-transparent px-3 py-2.5 pr-9 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
@@ -4890,7 +4853,7 @@ function VenuePicker({
               {dropdownVenues.map((venue) => {
                 const dest = venueDestinationLabel(venue);
                 return (
-                  <option key={venue.id} value={venue.name}>
+                  <option key={venue.id} value={venue.id}>
                     {venue.name}
                     {dest ? ` — ${dest}` : ""}
                   </option>
@@ -4904,7 +4867,7 @@ function VenuePicker({
             <button
               type="button"
               onClick={() => {
-                onChange("");
+                onChange("", null);
                 setShowCustom(false);
               }}
               className="shrink-0 font-accent text-[10px] uppercase tracking-[0.14em] text-slate transition-colors hover:text-rose"
@@ -4918,7 +4881,7 @@ function VenuePicker({
             type="button"
             onClick={() => {
               setShowCustom(true);
-              onChange(search.trim());
+              onChange(search.trim(), null);
             }}
             className="font-accent text-[9px] uppercase tracking-[0.14em] text-gold-dark underline decoration-gold-primary/30 underline-offset-4"
           >
@@ -4931,7 +4894,7 @@ function VenuePicker({
           <input
             type="text"
             value={selectedVenue ? "" : value}
-            onChange={(event) => onChange(event.target.value)}
+            onChange={(event) => onChange(event.target.value, null)}
             placeholder="Custom venue, lawn, ballroom, beach…"
             className="w-full border border-charcoal/15 bg-transparent px-3 py-2.5 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
           />
@@ -4968,7 +4931,7 @@ function VenuePicker({
                 key={venue.id}
                 type="button"
                 onClick={() => {
-                  onChange(venue.name);
+                  onChange(venue.name, venue.id);
                   setShowCustom(false);
                 }}
                 className={cn(
@@ -5028,7 +4991,7 @@ function VenuePicker({
           type="button"
           onClick={() => {
             if (customValueActive) {
-              onChange("");
+              onChange("", null);
               setShowCustom(false);
               return;
             }
@@ -5045,7 +5008,7 @@ function VenuePicker({
         {value ? (
           <button
             type="button"
-            onClick={() => onChange("")}
+            onClick={() => onChange("", null)}
             className="font-accent text-[10px] uppercase tracking-[0.16em] text-slate transition-colors hover:text-rose"
           >
             Clear venue
@@ -5057,7 +5020,7 @@ function VenuePicker({
         <input
           type="text"
           value={selectedVenue ? "" : value}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={(event) => onChange(event.target.value, null)}
           placeholder="Custom venue, lawn, ballroom, beach, terrace..."
           className="w-full border border-charcoal/15 bg-transparent px-4 py-3 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
         />
