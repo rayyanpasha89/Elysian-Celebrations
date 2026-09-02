@@ -166,7 +166,7 @@ export default function AdminBillingPage() {
             <p className="font-accent text-[10px] uppercase tracking-[0.24em] text-khaki-beige">Revenue operations</p>
             <h2 className="mt-3 font-display text-4xl md:text-5xl">Issue, reconcile, and preserve every client receipt.</h2>
             <p className="mt-4 max-w-2xl text-sm leading-relaxed text-ivory/72">
-              Fixed client prices become installment invoices here. Settlement and refund changes remain append-only and auditable.
+              Elysian collects every published client total here. Vendor payouts remain a separate settlement direction, while receipts and refunds stay append-only and auditable.
             </p>
           </div>
           <button
@@ -202,7 +202,7 @@ export default function AdminBillingPage() {
         <section className="flex items-start gap-3 border border-dry-sage-2/30 bg-dry-sage/15 p-4">
           <Landmark className="mt-0.5 h-5 w-5 shrink-0 text-dusty-olive" aria-hidden />
           <div>
-            <p className="font-heading text-sm text-charcoal">Manual reconciliation is active</p>
+            <p className="font-heading text-sm text-charcoal">Full-price collection, manual channel</p>
             <p className="mt-1 text-xs leading-relaxed text-slate">{workspace.capability.reason} Do not mark an invoice received until the bank or approved channel confirms settlement.</p>
           </div>
         </section>

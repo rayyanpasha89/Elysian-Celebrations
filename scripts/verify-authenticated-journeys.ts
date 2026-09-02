@@ -1232,11 +1232,12 @@ async function runJourneys(
     assert.ok(clientInvoice, "client billing must show the issued installment");
     assert.equal(clientInvoice.amount, 50_000);
     assert.equal(hasKeyDeep(clientInvoice, "clientEmail"), false);
-    assert.equal(
-      asRecord(asRecord(clientBilling.payload, "client billing").capability, "billing capability")
-        .onlineCheckout,
-      false
+    const billingCapability = asRecord(
+      asRecord(clientBilling.payload, "client billing").capability,
+      "billing capability"
     );
+    assert.equal(billingCapability.onlineCheckout, false);
+    assert.equal(billingCapability.collectionModel, "FULL_CLIENT_PRICE");
 
     const clientBookings = await http.request("client", "/api/bookings");
     const clientBooking = asArray(

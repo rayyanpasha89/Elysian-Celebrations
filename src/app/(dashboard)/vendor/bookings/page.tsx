@@ -477,7 +477,7 @@ function VendorBookingBrief({
         <p className="mt-2 text-xs leading-relaxed text-slate">
           {agreedPayout === null
             ? "Elysian will record your payout after pricing is agreed offline. No pricing action is required here."
-            : "Recorded by Elysian after the offline pricing handoff. This is the only booking price shown in your workspace."}
+            : "Elysian collects the client price and settles this agreed amount to you separately. This is the only booking price shown in your workspace."}
         </p>
         {agreedPayout != null ? (
           <div className="mt-4 grid grid-cols-2 gap-2 border-t border-gold-primary/20 pt-3">

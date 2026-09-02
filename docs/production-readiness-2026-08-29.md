@@ -112,9 +112,10 @@ All checks below passed on 2026-08-29 with Node 22:
 6. Budget/guest singleton ownership, message pagination, split budget allocation,
    and catalogue drag ordering remain architectural/product follow-ups rather
    than broken launch controls.
-7. Online checkout is intentionally disabled. Elysian must confirm whether it
-   collects the full client price and settles vendors or collects only its own
-   fee before a payment provider adapter and KYC credentials can be activated.
+7. Online checkout is intentionally disabled. This historical report predated
+   the full-price decision; Elysian now collects the complete client price and
+   settles vendors separately. A marketplace adapter still requires KYC,
+   settlement approval, credentials, and webhook verification before activation.
 
 ## Deployment Rule
 

@@ -200,7 +200,7 @@ export default function ClientBillingPage() {
           <p className="font-accent text-[10px] uppercase tracking-[0.24em] text-khaki-beige">Client billing</p>
           <h2 className="mt-3 font-display text-4xl leading-tight md:text-5xl">Every installment, in one calm timeline.</h2>
           <p className="mt-4 max-w-2xl text-sm leading-relaxed text-ivory/72 md:text-base">
-            Review what Elysian has scheduled, what has been received, and any refund adjustment without exposing internal vendor settlement details.
+            Your complete published price is paid to Elysian through these installments. Track receipts and refunds here while Elysian handles vendor settlements separately.
           </p>
         </div>
       </section>
@@ -216,7 +216,7 @@ export default function ClientBillingPage() {
         <section className="flex items-start gap-3 border border-dry-sage-2/30 bg-dry-sage/15 p-4">
           <Landmark className="mt-0.5 h-5 w-5 shrink-0 text-dusty-olive" aria-hidden />
           <div>
-            <p className="font-heading text-sm text-charcoal">Payment coordination stays human for now</p>
+            <p className="font-heading text-sm text-charcoal">Elysian is your single payment counterparty</p>
             <p className="mt-1 text-xs leading-relaxed text-slate">{payload.capability.reason}</p>
           </div>
         </section>
@@ -380,7 +380,7 @@ function InvoiceDetail({
             {checkoutPending ? "Opening secure checkout..." : "Pay securely"}
           </button>
           <p className="mt-2 text-center text-[11px] leading-relaxed text-slate">
-            Payment details are entered only on the approved provider&apos;s hosted page.
+            You pay Elysian on the approved provider&apos;s hosted page. Card, bank, and UPI credentials never enter this application.
           </p>
           {checkoutError ? (
             <p className="mt-3 border border-rose/30 bg-rose/[0.04] p-2 text-xs leading-relaxed text-rose" role="alert">

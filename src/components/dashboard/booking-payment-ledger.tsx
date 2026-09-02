@@ -253,7 +253,7 @@ export function BookingPaymentLedger({
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border border-dry-sage-2/25 bg-dry-sage/15 px-3 py-2.5">
         <p className="text-xs leading-relaxed text-charcoal-brown">
-          Client installments are invoice-linked and managed separately from payouts.
+          Clients pay the complete published price to Elysian through invoices. This ledger records only Elysian&apos;s separate vendor payouts.
         </p>
         {clientBillingHref ? (
           <Link

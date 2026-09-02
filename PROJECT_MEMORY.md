@@ -672,10 +672,13 @@ These are the highest-value next directions. Confirm against source before editi
 
 1. Production identity: replace Clerk development credentials with production
    keys and re-run the authenticated journey before public launch.
-2. Online collection decision: confirm whether Elysian collects the full client
-   total or only its fee, select a provider, complete KYC, and supply checkout
-   plus webhook credentials. Manual invoice and reconciliation flows are already
-   operational; online checkout must stay disabled until this is decided.
+2. Online payments: the commercial model is fixed. Elysian collects the complete
+   published client price, retains its flat fee, and settles the agreed vendor
+   payout separately. Select an India marketplace provider (evaluate Razorpay
+   Route, then Cashfree Easy Split), complete KYC and settlement onboarding, set
+   the payout-release policy, and supply checkout plus webhook credentials.
+   Manual invoice and reconciliation flows are operational; online checkout must
+   stay disabled until those external gates are complete.
 3. Deployment authorization: this branch is verified locally and against linked
    Supabase, but must not be merged to `main` or deployed until the user explicitly
    approves launch.

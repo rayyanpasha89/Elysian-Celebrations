@@ -14,6 +14,9 @@ local and linked-Supabase release gate, not deployment authorization.
 - Provider-neutral hosted checkout now has ownership/idempotency transactions,
   verified-webhook replay handling, delayed-order recovery, and atomic invoice
   settlement. No gateway adapter is active, so charging remains impossible.
+- The commercial model is now explicit: Elysian collects the complete published
+  client price, retains its fixed fee, and settles the agreed vendor payout in a
+  separate ledger direction.
 - Existing confirmed/commercial bookings cannot be removed from the planner.
 - Existing selections remain saveable after a vendor pauses inquiries; new
   selections from that vendor remain blocked.
@@ -70,9 +73,10 @@ local and linked-Supabase release gate, not deployment authorization.
 ## External Launch Gates
 
 1. Replace Clerk development credentials with production keys.
-2. Decide whether Elysian collects the full client total or only its fee, select
-   the online payment provider, complete KYC, and provide checkout/webhook
-   credentials. Manual invoice and reconciliation flows are ready meanwhile.
+2. Select an India marketplace payment provider, complete KYC and vendor
+   settlement onboarding, approve whether payouts require captured client funds
+   or may be pre-funded, and provide checkout/webhook credentials. Manual invoice
+   and reconciliation flows are ready meanwhile.
 3. Receive explicit approval to merge/deploy. This branch remains intentionally
    local and has not been deployed in this pass.
 

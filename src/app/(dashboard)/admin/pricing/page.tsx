@@ -299,8 +299,9 @@ export default function AdminPricingPage() {
               One price, clearly composed
             </h1>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-ivory/70">
-              Record the vendor price agreed offline, add Elysian&apos;s flat fee, and
-              publish one complete client total. No portal negotiation or quote wait.
+              Record the agreed vendor payout, add Elysian&apos;s flat fee, and publish
+              the complete amount Elysian will collect from the client. No portal
+              negotiation or quote wait.
             </p>
           </div>
           <div className="flex gap-6">

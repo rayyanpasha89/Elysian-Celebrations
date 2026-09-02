@@ -6,6 +6,18 @@ export const BILLING_INVOICE_STATUSES = [
   "VOID",
 ] as const;
 
+export const ELYSIAN_COLLECTION_MODEL = {
+  id: "FULL_CLIENT_PRICE",
+  clientObligation: "PUBLISHED_FINAL_PRICE",
+  platformRevenue: "FIXED_ELYSIAN_FEE",
+  vendorObligation: "AGREED_VENDOR_AMOUNT",
+  settlementFlow: "SEPARATE_VENDOR_PAYOUT",
+  currency: "INR",
+} as const;
+
+export type ElysianCollectionModel =
+  (typeof ELYSIAN_COLLECTION_MODEL)["id"];
+
 export type BillingInvoiceStatus =
   (typeof BILLING_INVOICE_STATUSES)[number];
 export type BillingDisplayStatus = BillingInvoiceStatus | "OVERDUE";
@@ -89,6 +101,7 @@ export type BillingSummary = {
 export type BillingCapability = {
   onlineCheckout: boolean;
   provider: string | null;
+  collectionModel: ElysianCollectionModel;
   reason: string;
 };
 

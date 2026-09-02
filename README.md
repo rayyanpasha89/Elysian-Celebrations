@@ -35,6 +35,16 @@ Full instructions live in [docs/cloud-testing.md](docs/cloud-testing.md).
 
 The project keeps its schema and SQL seed references under [`supabase/`](./supabase/). The application itself uses Clerk for auth and Supabase for product data, so the cloud bootstrap is the reliable way to stand up a usable test environment.
 
+## Billing model
+
+Elysian invoices and collects the complete published client price, retains its
+fixed service fee, and settles the agreed vendor payout separately. Client
+collections use invoice-linked `CLIENT_IN` records; vendor settlements use
+`VENDOR_OUT` records. Hosted online checkout remains deliberately disabled until
+an India marketplace provider, KYC account, settlement agreement, and verified
+webhook credentials are approved. See
+[`docs/billing-architecture.md`](./docs/billing-architecture.md).
+
 ## Remote Supabase workflow
 
 For remote-first schema changes, linked-project pushes, and ad-hoc SQL queries, use the CLI workflow documented in [docs/supabase-remote-workflow.md](docs/supabase-remote-workflow.md).

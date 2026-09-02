@@ -18,10 +18,10 @@ export default function AdminSettingsPage() {
         <p className="font-heading mt-3 text-sm leading-relaxed text-slate">
           Brand name and contact email are managed through the deployment environment,
           CMS, or operations runbook. Commercial pricing is handled per vendor pick in
-          Final Pricing: Elysian records the vendor price agreed offline, adds one flat
-          service fee, and the platform derives the complete client price. Vendors do
-          not submit quotes in the portal, and there is no commission-rate or
-          negotiation setting on this page.
+          Final Pricing: Elysian records the agreed vendor payout, adds one flat service
+          fee, and collects the complete published client price. Vendor settlement is a
+          separate audited payout flow. Vendors do not submit quotes in the portal, and
+          there is no commission-rate or negotiation setting on this page.
         </p>
         <p className="font-heading mt-4 text-sm leading-relaxed text-slate">
           To change which destinations appear on marketing surfaces, use the destinations catalogue: visibility

@@ -2,13 +2,19 @@
 
 This document is the source of truth for client collections and vendor payouts.
 The current implementation is production-safe for manually reconciled payments.
-Online checkout remains deliberately disabled until Elysian confirms its legal
-collection model, provider, and KYC account.
+The commercial collection model is fixed: Elysian collects the complete
+published client price and settles vendors separately. Online checkout remains
+deliberately disabled until a marketplace provider, KYC account, settlement
+agreement, and credentials are approved.
 
 ## Commercial Model
 
 - Admin records an agreed vendor amount plus a fixed Elysian fee.
-- The client sees only the published final price: vendor amount + Elysian fee.
+- Elysian invoices and collects the complete published client price: vendor
+  amount + Elysian fee.
+- The vendor sees only the agreed vendor amount and its payout history.
+- Elysian retains the fixed fee and settles the agreed vendor amount through a
+  separate payout direction.
 - Client collections and vendor payouts are different directions and never
   share a write flow.
 - Client collections use invoices. Vendor payouts use the directional booking
@@ -146,17 +152,30 @@ amount matching, order identity, delivery replay protection, delayed webhook
 recovery, and exactly-once invoice settlement. `ELYSIAN_APP_URL` must be an
 HTTPS origin when a production adapter is activated.
 
-Before implementing an adapter, Elysian must choose one collection model:
+The chosen model requires an India-capable marketplace or split-settlement
+product. Provider evaluation should proceed in this order, subject to commercial
+approval and onboarding terms:
 
-1. Elysian collects the full published client price and later settles vendors.
-   This generally requires a marketplace/split-settlement product and the
-   corresponding KYC, agreements, refund, tax, and reconciliation process.
-2. Elysian collects only its own fee online while vendor amounts move offline.
+1. [Razorpay Route](https://razorpay.com/docs/payments/route/linked-account/) with
+   hosted [Payment Links](https://razorpay.com/docs/api/payments/payment-links/).
+   Route supports INR linked accounts and transfers from captured client
+   payments, including transfer and settlement webhooks.
+2. [Cashfree Easy Split](https://www.cashfree.com/docs/payments/split/overview)
+   with Payment Gateway or Payment Links. Easy Split supports vendor onboarding,
+   payment splitting, scheduled settlements, refunds, and vendor-settlement
+   webhooks, but must be activated for the merchant account.
+3. [Stripe Connect India](https://stripe.com/in/connect) is not the default path
+   while the India product remains invitation-only.
 
-After that choice, the adapter needs provider credentials, verified webhook
-secrets, production return URLs, provider-side idempotency, webhook replay
-tests, failure/retry tests, refund reconciliation, and a low-value live payment
-canary. No secret belongs in `NEXT_PUBLIC_*` variables.
+No provider has been selected or activated in code. After selection, the adapter
+needs marketplace KYC approval, credentials, verified webhook secrets,
+production return URLs, provider-side idempotency, webhook replay tests,
+failure/retry tests, refund and payout reconciliation, and a low-value live
+payment canary. No secret belongs in `NEXT_PUBLIC_*` variables.
+
+Automated vendor release also requires an explicit treasury policy: settle only
+against captured client funds, or permit Elysian-funded early payouts. The
+current manual payout ledger deliberately does not make that business decision.
 
 ## Verification
 

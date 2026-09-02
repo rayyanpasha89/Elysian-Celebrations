@@ -325,14 +325,21 @@ claims that the changes are committed, deployed, or active in the remote databas
   and the directional ledger passes 8 cases, both with full rollback.
 - Verified both billing workspaces against linked Supabase data at desktop and
   mobile widths with no horizontal overflow or runtime errors. Online checkout
-  remains honestly disabled pending the collection-model and provider decision.
+  remains honestly disabled pending provider, KYC, and settlement approval.
+- Locked the commercial model to full-price collection: clients pay the complete
+  published price to Elysian, Elysian retains its flat fee, and vendor payouts
+  remain a separate audited ledger direction. The API capability now exposes
+  `FULL_CLIENT_PRICE` so client, admin, and test contracts cannot drift back to a
+  fee-only interpretation.
 
 ## Current Rebuild Order
 
 1. Replace Clerk development credentials with live production keys and repeat the
    authenticated smoke matrix before public launch.
-2. Confirm whether Elysian collects the full client price and settles vendors or
-   collects only its fee, then implement the selected gateway adapter and webhooks.
+2. Select and onboard an India marketplace provider for the confirmed full-price
+   model. Evaluate Razorpay Route first and Cashfree Easy Split second, approve
+   the vendor payout-release policy, then implement the reviewed adapter and
+   settlement webhooks.
 3. Keep the readiness branch local until explicit merge/deploy approval; then run
    the authenticated journey against the launch candidate.
 4. Add Clerk-to-Supabase JWT bridging before restoring direct Supabase Realtime subscriptions.
@@ -351,5 +358,6 @@ claims that the changes are committed, deployed, or active in the remote databas
 - Manager booking notes and payment amounts can be viewed, but inline manager editing is still intentionally limited to status actions.
 - Messages are real booking threads with persisted unread state and visibility-aware API polling; direct Realtime awaits a Clerk-to-Supabase JWT bridge. Visible read receipts and per-message attachments remain future work.
 - Online checkout is intentionally inactive. The schema and UI support manual
-  reconciliation safely, but a provider cannot be activated until Elysian's
-  collection/settlement model, KYC account, credentials, and webhook secrets are confirmed.
+  reconciliation safely, but a provider cannot be activated until marketplace
+  KYC, settlement terms, payout-release policy, credentials, and webhook secrets
+  are confirmed.
