@@ -65,6 +65,8 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
   - `20260901042506_protect_workspace_booking_financial_history.sql`
   - `20260901192023_make_event_function_lifecycle_atomic.sql`
   - `20260901193028_make_event_plan_deletion_atomic.sql`
+  - `20260902072526_add_billing_gateway_transactions.sql`
+  - `20260902073945_retry_unmatched_billing_webhooks.sql`
 - Remote table/column checks passed for:
   - `wedding_event_menus`
   - `wedding_event_menu_items`
@@ -132,6 +134,11 @@ claims that the changes are committed, deployed, or active in the remote databas
   history blocks deletion without mutation; otherwise draft selections are
   removed, retained booking and budget history is unlinked, and the event plan
   cascades in one transaction.
+- Added an inactive-by-default hosted checkout boundary. Client-owned invoice
+  attempts, provider order attachment, provider failure, signature-verified
+  webhook replay, early-delivery recovery, and invoice settlement now use
+  audited transactions. No adapter is active and no environment flag can charge
+  a client by itself.
 - Added cursor-based booking message history. Inbox payloads return the newest 40
   messages and exact counts; older pages load without gaps or duplicate IDs, and
   client/vendor/manager inboxes use bounded internal scrolling.
@@ -261,7 +268,7 @@ claims that the changes are committed, deployed, or active in the remote databas
 - `npm run build`
 - `npm audit --omit=dev` (zero vulnerabilities after the Next/PostCSS/Sharp patch upgrade)
 - `npm run db:migrations`
-- `npm run db:push:dry-run` (remote up to date through `20260901193028`)
+- `npm run db:push:dry-run` (remote up to date through `20260902073945`)
 - `npm run test:event-plan` (5 focused cases)
 - `npm run test:planning-atomic` (15 focused cases with full rollback)
 - `npm run test:event-function` (8 focused cases with full rollback)
@@ -270,6 +277,7 @@ claims that the changes are committed, deployed, or active in the remote databas
 - `npm run test:venue` (6 focused cases)
 - `npm run test:payments` (8 focused cases with full rollback)
 - `npm run test:billing` (invoice state/security cases with full rollback)
+- `npm run test:billing-gateway` (13 focused cases with full rollback)
 - `npm run test:readiness` (8 focused cases)
 - `npm run test:abuse-controls` (rate limit, grants, RLS, and media reservations)
 - `npm run test:journeys` (9 authenticated groups, including all 48 portal routes)

@@ -67,6 +67,7 @@ npm run test:readiness
 npm run test:abuse-controls
 npm run test:payments
 npm run test:billing
+npm run test:billing-gateway
 npm run test:journeys
 npm run db:migrations
 npm run db:push:dry-run

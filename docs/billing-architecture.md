@@ -89,6 +89,9 @@ surface.
 ### Client
 
 - `GET /api/client/billing`
+- `POST /api/client/billing/[id]/checkout` starts or safely reuses a hosted
+  checkout attempt for an issued invoice. It requires a client-owned invoice,
+  rate limit, and idempotency key.
 - Returns only the signed-in client's invoices, event context, public vendor and
   service labels, totals, and checkout capability.
 - Does not expose internal references, notes, actor IDs, void reasons, provider
@@ -106,6 +109,13 @@ surface.
 - Vendors see their agreed payout direction only.
 - The shared booking payment editor can create vendor payouts only.
 - Client receipts must be managed from Admin Billing.
+
+### Provider Webhook
+
+- `POST /api/webhooks/billing/[provider]` accepts only the currently active
+  adapter, caps the raw body, verifies the provider signature before any write,
+  stores only a SHA-256 digest, and applies the normalized event through one
+  replay-safe transaction.
 
 ## User Interfaces
 
@@ -127,6 +137,15 @@ creation and verified webhook normalization. `activeBillingGateway()` currently
 returns `null`, so setting an environment variable cannot accidentally enable
 online payment collection.
 
+The shared implementation uses hosted redirect checkout only. Elysian never
+collects or stores card numbers, bank credentials, UPI PINs, or raw provider
+payloads. The database RPCs `begin_billing_checkout`,
+`attach_billing_checkout_order`, `fail_billing_checkout_attempt`, and
+`process_billing_gateway_event` enforce ownership, one active provider attempt,
+amount matching, order identity, delivery replay protection, delayed webhook
+recovery, and exactly-once invoice settlement. `ELYSIAN_APP_URL` must be an
+HTTPS origin when a production adapter is activated.
+
 Before implementing an adapter, Elysian must choose one collection model:
 
 1. Elysian collects the full published client price and later settles vendors.
@@ -146,6 +165,7 @@ Run with Node 22:
 ```bash
 npm run test:payments
 npm run test:billing
+npm run test:billing-gateway
 npm run db:migrations
 npm run db:push:dry-run
 npm run lint
@@ -158,3 +178,7 @@ The billing suite executes issue, duplicate retry, retry-safe settlement,
 over-allocation, paid/refunded-void rejection, terminal partial/full refund
 states, over-refund rejection, pricing lock, and grant/RLS checks inside a full
 database rollback.
+
+The gateway suite adds 13 rollback-clean cases for ownership, grants, attempt
+reuse, provider-order idempotency, provider failure, unknown-order recovery,
+capture settlement, duplicate delivery, payload tampering, and late failure.

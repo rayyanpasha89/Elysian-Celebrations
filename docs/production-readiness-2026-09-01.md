@@ -11,6 +11,9 @@ local and linked-Supabase release gate, not deployment authorization.
   nested planning, draft vendor selections, and protected booking history.
 - Whole-plan deletion is atomic across billing-history checks, draft-selection
   cleanup, retained booking/budget unlinking, and cascading planner removal.
+- Provider-neutral hosted checkout now has ownership/idempotency transactions,
+  verified-webhook replay handling, delayed-order recovery, and atomic invoice
+  settlement. No gateway adapter is active, so charging remains impossible.
 - Existing confirmed/commercial bookings cannot be removed from the planner.
 - Existing selections remain saveable after a vendor pauses inquiries; new
   selections from that vendor remain blocked.
@@ -26,13 +29,14 @@ local and linked-Supabase release gate, not deployment authorization.
 ## Database State
 
 - Local and remote migration histories match through
-  `20260901193028_make_event_plan_deletion_atomic.sql`.
+  `20260902073945_retry_unmatched_billing_webhooks.sql`.
 - `save_event_workspace`, `save_event_planning`, `create_event_function`,
-  `delete_event_function`, and `delete_event_plan` are executable by
-  `service_role` only; `public`, `anon`, and `authenticated` are denied.
+  `delete_event_function`, `delete_event_plan`, and all four billing-gateway
+  mutation RPCs are executable by `service_role` only; `public`, `anon`, and
+  `authenticated` are denied.
 - Supabase schema lint reports no errors in `public`.
 - Supabase security/performance advisors report no issues.
-- Generated TypeScript database contracts include 45 tables, 21 functions, and
+- Generated TypeScript database contracts include 45 tables, 25 functions, and
   7 enums.
 
 ## Verification Record
@@ -53,7 +57,8 @@ local and linked-Supabase release gate, not deployment authorization.
   reservations passed.
 - `npm run test:payments` - 8 cases, rollback clean.
 - `npm run test:billing` - invoice state/security checks, rollback clean.
-- `npm run test:journeys` - 9 authenticated groups in 42.5 seconds; fixture
+- `npm run test:billing-gateway` - 13 cases, rollback clean.
+- `npm run test:journeys` - 9 authenticated groups in 40.9 seconds; fixture
   identities, financial rows, messages, and rate-limit rows were removed.
 - Live client browser - drilled hub to day to function to Basics, verified the
   labelled venue/guest controls, clicked Save, observed the disabled `Saving...`

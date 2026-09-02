@@ -480,12 +480,13 @@ npm run seed
 Migrations live in `supabase/migrations/`. Schema reference lives in `supabase/schema.sql`. Seed data lives in `supabase/seed.sql` and `scripts/supabase-seed.ts`.
 
 Remote migration history was verified on 2026-09-02 through
-`20260901193028_make_event_plan_deletion_atomic.sql`. The applied migrations
+`20260902073945_retry_unmatched_billing_webhooks.sql`. The applied migrations
 normalize event venues with `wedding_events.venue_id`, create plans through the
 transactional `create_event_plan` RPC, save complete Layer 2 workspaces through
 `save_event_workspace`, make standalone function creation/deletion atomic, make
-whole-plan deletion atomic, activate directional payment-ledger maintenance, and
-persist vendor tax ID plus inquiry availability. A `db:push:dry-run` on
+whole-plan deletion atomic, activate directional payment-ledger maintenance, add
+provider-neutral checkout/webhook transactions, and persist vendor tax ID plus
+inquiry availability. A `db:push:dry-run` on
 2026-09-02 reported the remote database fully up to date.
 
 If remote data was manually changed, do not blindly push baseline migrations. Inspect migration state first.
@@ -597,6 +598,12 @@ As of the 2026-09-02 production-readiness pass:
   manager surfaces can maintain both; clients see only `CLIENT_IN` rows and
   vendors see only `VENDOR_OUT` rows. Scheduled, settled, and voided entries are
   backed by database RPCs and booking-context validation.
+- Provider-neutral hosted checkout is wired end to end but deliberately
+  inactive. Checkout attempts are ownership-checked and idempotent; provider
+  order attachment, failures, signature-verified webhook replay, delayed-order
+  recovery, capture settlement, and invoice updates are atomic. The client only
+  sees a Pay action when `activeBillingGateway()` returns a reviewed adapter;
+  environment variables alone cannot enable charging.
 - `src/lib/event-readiness.ts` is the canonical readiness contract. Planner
   hydration, budget, bookings, wedding APIs, and admin pricing consume the same
   percentage/ready/gap result; focused readiness tests cover the formerly
@@ -710,6 +717,7 @@ npm run test:ownership
 npm run test:venue
 npm run test:payments
 npm run test:billing
+npm run test:billing-gateway
 npm run test:journeys
 npm run db:migrations
 npm run db:push:dry-run
