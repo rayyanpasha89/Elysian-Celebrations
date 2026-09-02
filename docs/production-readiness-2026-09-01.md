@@ -7,6 +7,10 @@ local and linked-Supabase release gate, not deployment authorization.
 
 - Layer 2 Save is one atomic operation across event details, catalogue venue,
   menus/items, logistics, tasks, requirements, and vendor/service selections.
+- Standalone function creation and deletion are atomic across event details,
+  nested planning, draft vendor selections, and protected booking history.
+- Whole-plan deletion is atomic across billing-history checks, draft-selection
+  cleanup, retained booking/budget unlinking, and cascading planner removal.
 - Existing confirmed/commercial bookings cannot be removed from the planner.
 - Existing selections remain saveable after a vendor pauses inquiries; new
   selections from that vendor remain blocked.
@@ -22,11 +26,13 @@ local and linked-Supabase release gate, not deployment authorization.
 ## Database State
 
 - Local and remote migration histories match through
-  `20260901042506_protect_workspace_booking_financial_history.sql`.
-- `save_event_workspace` and `save_event_planning` are executable by
+  `20260901193028_make_event_plan_deletion_atomic.sql`.
+- `save_event_workspace`, `save_event_planning`, `create_event_function`,
+  `delete_event_function`, and `delete_event_plan` are executable by
   `service_role` only; `public`, `anon`, and `authenticated` are denied.
 - Supabase schema lint reports no errors in `public`.
-- Generated TypeScript database contracts include 45 tables, 18 functions, and
+- Supabase security/performance advisors report no issues.
+- Generated TypeScript database contracts include 45 tables, 21 functions, and
   7 enums.
 
 ## Verification Record
@@ -39,13 +45,15 @@ local and linked-Supabase release gate, not deployment authorization.
 - `npm run test:ownership` - 14 cases, rollback clean.
 - `npm run test:event-plan` - 5 cases.
 - `npm run test:planning-atomic` - 15 cases, rollback clean.
+- `npm run test:event-function` - 8 cases, rollback clean.
+- `npm run test:event-plan-delete` - 6 cases, rollback clean.
 - `npm run test:venue` - 6 cases.
 - `npm run test:readiness` - 8 cases.
 - `npm run test:abuse-controls` - rate boundary, grants, RLS, and media quota
   reservations passed.
 - `npm run test:payments` - 8 cases, rollback clean.
 - `npm run test:billing` - invoice state/security checks, rollback clean.
-- `npm run test:journeys` - 9 authenticated groups in 34.2 seconds; fixture
+- `npm run test:journeys` - 9 authenticated groups in 42.5 seconds; fixture
   identities, financial rows, messages, and rate-limit rows were removed.
 - Live client browser - drilled hub to day to function to Basics, verified the
   labelled venue/guest controls, clicked Save, observed the disabled `Saving...`

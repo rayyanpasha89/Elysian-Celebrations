@@ -63,6 +63,8 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
   - `20260901035842_save_event_workspace_atomic.sql`
   - `20260901041117_preserve_existing_workspace_vendor_selections.sql`
   - `20260901042506_protect_workspace_booking_financial_history.sql`
+  - `20260901192023_make_event_function_lifecycle_atomic.sql`
+  - `20260901193028_make_event_plan_deletion_atomic.sql`
 - Remote table/column checks passed for:
   - `wedding_event_menus`
   - `wedding_event_menu_items`
@@ -122,6 +124,14 @@ claims that the changes are committed, deployed, or active in the remote databas
   reference, nested planning, and vendor selections now commit or roll back
   together. Progressed bookings are protected from planner deletion, while
   existing selections remain editable after a vendor pauses new inquiries.
+- Replaced standalone function create/delete write chains with service-role-only
+  `create_event_function` and `delete_event_function` transactions. Nested
+  planning cannot be orphaned, progressed/financial bookings are protected, and
+  safe inquiry cleanup rolls back with the event when any step fails.
+- Replaced whole-plan delete write chains with `delete_event_plan`. Financial
+  history blocks deletion without mutation; otherwise draft selections are
+  removed, retained booking and budget history is unlinked, and the event plan
+  cascades in one transaction.
 - Added cursor-based booking message history. Inbox payloads return the newest 40
   messages and exact counts; older pages load without gaps or duplicate IDs, and
   client/vendor/manager inboxes use bounded internal scrolling.
@@ -251,9 +261,11 @@ claims that the changes are committed, deployed, or active in the remote databas
 - `npm run build`
 - `npm audit --omit=dev` (zero vulnerabilities after the Next/PostCSS/Sharp patch upgrade)
 - `npm run db:migrations`
-- `npm run db:push:dry-run` (remote up to date through `20260901042506`)
+- `npm run db:push:dry-run` (remote up to date through `20260901193028`)
 - `npm run test:event-plan` (5 focused cases)
 - `npm run test:planning-atomic` (15 focused cases with full rollback)
+- `npm run test:event-function` (8 focused cases with full rollback)
+- `npm run test:event-plan-delete` (6 focused cases with full rollback)
 - `npm run test:ownership` (14 focused cases with full rollback)
 - `npm run test:venue` (6 focused cases)
 - `npm run test:payments` (8 focused cases with full rollback)

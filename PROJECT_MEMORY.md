@@ -479,12 +479,14 @@ npm run seed
 
 Migrations live in `supabase/migrations/`. Schema reference lives in `supabase/schema.sql`. Seed data lives in `supabase/seed.sql` and `scripts/supabase-seed.ts`.
 
-Remote migration history was verified on 2026-08-29 through
-`20260829061409_complete_vendor_operations_settings.sql`. The newer applied
-migrations normalize event venues with `wedding_events.venue_id`, create plans
-through the transactional `create_event_plan` RPC, activate directional payment
-ledger maintenance, and persist vendor tax ID plus inquiry availability. A
-`db:push:dry-run` on 2026-08-29 reported the remote database fully up to date.
+Remote migration history was verified on 2026-09-02 through
+`20260901193028_make_event_plan_deletion_atomic.sql`. The applied migrations
+normalize event venues with `wedding_events.venue_id`, create plans through the
+transactional `create_event_plan` RPC, save complete Layer 2 workspaces through
+`save_event_workspace`, make standalone function creation/deletion atomic, make
+whole-plan deletion atomic, activate directional payment-ledger maintenance, and
+persist vendor tax ID plus inquiry availability. A `db:push:dry-run` on
+2026-09-02 reported the remote database fully up to date.
 
 If remote data was manually changed, do not blindly push baseline migrations. Inspect migration state first.
 
@@ -561,6 +563,14 @@ As of the 2026-09-02 production-readiness pass:
 - Whole-plan creation runs through one Postgres transaction. Focused rollback
   tests prove that invalid functions, requirements, and menus cannot leave a
   partial event structure behind.
+- Standalone function creation and deletion also run through ownership-checked
+  Postgres transactions. Creating a function cannot leave an event without its
+  nested planning rows, and deleting one protects progressed or financial
+  booking history while atomically cleaning safe draft selections.
+- Whole-plan deletion now performs financial-history checks, draft-selection
+  cleanup, retained-booking unlinking, budget unlinking, and cascading planner
+  deletion inside one service-role-only transaction. A rejected deletion leaves
+  the complete plan unchanged.
 - A Layer 2 Save is also one transaction. The client sends event details,
   normalized catalogue `venue_id`, menus/items, logistics, tasks, requirements,
   and the desired vendor/service set to
@@ -694,6 +704,8 @@ npm run test:readiness
 npm run test:abuse-controls
 npm run test:event-plan
 npm run test:planning-atomic
+npm run test:event-function
+npm run test:event-plan-delete
 npm run test:ownership
 npm run test:venue
 npm run test:payments

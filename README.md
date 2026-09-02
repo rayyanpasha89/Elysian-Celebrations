@@ -60,6 +60,8 @@ npx tsc --noEmit --pretty false
 npm run test:ownership
 npm run test:event-plan
 npm run test:planning-atomic
+npm run test:event-function
+npm run test:event-plan-delete
 npm run test:venue
 npm run test:readiness
 npm run test:abuse-controls
