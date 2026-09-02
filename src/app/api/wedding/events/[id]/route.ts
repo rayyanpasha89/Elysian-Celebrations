@@ -10,11 +10,29 @@ import {
   getAuthSession,
   requireRole,
 } from "@/lib/api-utils";
+import { isUuid } from "@/lib/id-utils";
 import { toOptionalVenueId, venueRuleMessage } from "@/lib/venue-selection";
 import type { Database } from "@/types/database.types";
 
 type WeddingEventUpdate =
   Database["public"]["Tables"]["wedding_events"]["Update"];
+
+function eventDeletionRpcError(code?: string | null) {
+  if (code === "22004" || code === "22023" || code === "22P02") {
+    return apiError("Invalid event ID", 400);
+  }
+  if (code === "42501") return apiError("Event not found", 404);
+  if (code === "55000") {
+    return apiError(
+      "This function has progressed bookings or financial history. Manage those bookings before deleting the function.",
+      409
+    );
+  }
+  if (code === "23503" || code === "40001") {
+    return apiError("This function changed while it was being deleted", 409);
+  }
+  return apiError("Failed to delete event", 500);
+}
 
 function toOptionalString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -164,83 +182,23 @@ export async function DELETE(
 
   try {
     const { id } = await params;
+    if (!isUuid(id)) return apiError("Invalid event ID", 400);
+
     const { supabase, wedding } = await getClientWeddingContext(session.userId);
     if (!wedding) {
       return apiError("Event plan not found", 404);
     }
 
-    const { data: event, error: loadError } = await supabase
-      .from("wedding_events")
-      .select("id")
-      .eq("id", id)
-      .eq("wedding_id", wedding.id)
-      .maybeSingle();
-
-    if (loadError) {
-      console.error("wedding_events load:", loadError);
-      return apiError("Failed to load event", 500);
-    }
-
-    if (!event) {
-      return apiError("Event not found", 404);
-    }
-
-    const { data: linkedBookings, error: linkedBookingsError } = await supabase
-      .from("bookings")
-      .select("id")
-      .eq("wedding_event_id", id);
-    if (linkedBookingsError) {
-      console.error("bookings financial check:", linkedBookingsError);
-      return apiError("Failed to verify event history", 500);
-    }
-    const linkedBookingIds = (linkedBookings ?? []).map((booking) => booking.id);
-    if (linkedBookingIds.length > 0) {
-      const [{ count: paymentCount, error: paymentError }, { count: invoiceCount, error: invoiceError }] =
-        await Promise.all([
-          supabase
-            .from("payments")
-            .select("id", { count: "exact", head: true })
-            .in("booking_id", linkedBookingIds),
-          supabase
-            .from("billing_invoices")
-            .select("id", { count: "exact", head: true })
-            .in("booking_id", linkedBookingIds),
-        ]);
-      if (paymentError || invoiceError) {
-        console.error("event financial history:", paymentError ?? invoiceError);
-        return apiError("Failed to verify event history", 500);
-      }
-      if ((paymentCount ?? 0) > 0 || (invoiceCount ?? 0) > 0) {
-        return apiError(
-          "This function has billing history. Cancel its bookings instead of deleting it.",
-          409
-        );
-      }
-    }
-
-    const { error: deleteBookingsError } = await supabase
-      .from("bookings")
-      .delete()
-      .eq("wedding_event_id", id)
-      .eq("status", "INQUIRY");
-
-    if (deleteBookingsError) {
-      console.error("bookings delete:", deleteBookingsError);
-      return apiError("Failed to remove linked selections", 500);
-    }
-
-    const { error } = await supabase.from("wedding_events").delete().eq("id", id);
+    const { data, error } = await supabase.rpc("delete_event_function", {
+      p_actor_user_id: session.userId,
+      p_event_id: id,
+    });
     if (error) {
-      console.error("wedding_events delete:", error);
-      return apiError(
-        error.code === "23503"
-          ? "This function has linked history and cannot be deleted"
-          : "Failed to delete event",
-        error.code === "23503" ? 409 : 500
-      );
+      console.error("delete_event_function RPC:", error);
+      return eventDeletionRpcError(error.code);
     }
 
-    return apiSuccess({ ok: true });
+    return apiSuccess({ ok: true, result: data });
   } catch (error) {
     console.error("DELETE /api/wedding/events/[id]", error);
     return apiError("Internal server error", 500);

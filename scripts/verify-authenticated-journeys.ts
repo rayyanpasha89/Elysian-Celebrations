@@ -1224,6 +1224,20 @@ async function runJourneys(
     assert.ok(clientBooking);
     assert.equal(hasKeyDeep(clientBooking, "vendor_amount"), false);
     assert.equal(hasKeyDeep(clientBooking, "service_fee"), false);
+
+    await http.request("client", "/api/wedding", {
+      method: "DELETE",
+      expectedStatus: 409,
+    });
+    const preservedPlan = asRecord(
+      (await http.request("client", "/api/wedding")).payload,
+      "planner after blocked whole-plan deletion"
+    );
+    assert.equal(
+      asRecord(preservedPlan.wedding, "preserved wedding").id,
+      fixture.weddingId,
+      "billing history must leave the complete event plan intact"
+    );
   });
 
   await check("every portal navigation destination renders for its role", async () => {

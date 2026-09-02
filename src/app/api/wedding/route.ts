@@ -671,94 +671,25 @@ export async function DELETE() {
       return apiError("Event plan not found", 404);
     }
 
-    const { data: events, error: eventsError } = await supabase
-      .from("wedding_events")
-      .select("id")
-      .eq("wedding_id", wedding.id);
-
-    if (eventsError) {
-      console.error("wedding_events:", eventsError);
-      return apiError("Failed to load event plan dependencies", 500);
-    }
-
-    const eventIds = (events ?? [])
-      .map((event) => event.id)
-      .filter((id): id is string => typeof id === "string" && id.length > 0);
-
-    if (eventIds.length > 0) {
-      const { data: linkedBookings, error: linkedBookingsError } = await supabase
-        .from("bookings")
-        .select("id")
-        .in("wedding_event_id", eventIds);
-      if (linkedBookingsError) {
-        console.error("bookings financial check:", linkedBookingsError);
-        return apiError("Failed to verify event plan history", 500);
+    const { data: result, error: deleteError } = await supabase.rpc(
+      "delete_event_plan",
+      {
+        p_actor_user_id: session.userId,
+        p_wedding_id: wedding.id,
       }
-      const linkedBookingIds = (linkedBookings ?? []).map((booking) => booking.id);
-      if (linkedBookingIds.length > 0) {
-        const [{ count: paymentCount, error: paymentError }, { count: invoiceCount, error: invoiceError }] =
-          await Promise.all([
-            supabase
-              .from("payments")
-              .select("id", { count: "exact", head: true })
-              .in("booking_id", linkedBookingIds),
-            supabase
-              .from("billing_invoices")
-              .select("id", { count: "exact", head: true })
-              .in("booking_id", linkedBookingIds),
-          ]);
-        if (paymentError || invoiceError) {
-          console.error("event plan financial history:", paymentError ?? invoiceError);
-          return apiError("Failed to verify event plan history", 500);
-        }
-        if ((paymentCount ?? 0) > 0 || (invoiceCount ?? 0) > 0) {
-          return apiError(
-            "This event plan has billing history. Cancel its bookings instead of deleting the plan.",
-            409
-          );
-        }
-      }
-
-      const { error: draftBookingsError } = await supabase
-        .from("bookings")
-        .delete()
-        .in("wedding_event_id", eventIds)
-        .in("status", ["INQUIRY", "QUOTE_SENT"]);
-
-      if (draftBookingsError) {
-        console.error("bookings draft delete:", draftBookingsError);
-        return apiError("Failed to remove draft vendor inquiries", 500);
-      }
-
-      const { error: bookingUnlinkError } = await supabase
-        .from("bookings")
-        .update({ wedding_event_id: null })
-        .in("wedding_event_id", eventIds);
-
-      if (bookingUnlinkError) {
-        console.error("bookings unlink:", bookingUnlinkError);
-        return apiError("Failed to unlink confirmed bookings", 500);
-      }
-
-      const { error: budgetUnlinkError } = await supabase
-        .from("budget_items")
-        .update({ wedding_event_id: null })
-        .in("wedding_event_id", eventIds);
-
-      if (budgetUnlinkError) {
-        console.error("budget_items unlink:", budgetUnlinkError);
-        return apiError("Failed to unlink budget items", 500);
-      }
-    }
-
-    const { error: deleteError } = await supabase
-      .from("weddings")
-      .delete()
-      .eq("id", wedding.id)
-      .eq("client_profile_id", profile.id);
+    );
 
     if (deleteError) {
-      console.error("weddings delete:", deleteError);
+      console.error("delete_event_plan:", deleteError);
+      if (deleteError.code === "42501") {
+        return apiError("Event plan not found", 404);
+      }
+      if (deleteError.code === "55000") {
+        return apiError(
+          "This event plan has billing history. Cancel its bookings instead of deleting the plan.",
+          409
+        );
+      }
       return apiError(
         deleteError.code === "23503"
           ? "This event plan has linked history and cannot be deleted"
@@ -767,10 +698,12 @@ export async function DELETE() {
       );
     }
 
-    return apiSuccess({
-      ok: true,
-      deletedPlans: [{ id: wedding.id, name: wedding.name }],
-    });
+    return apiSuccess(
+      result ?? {
+        ok: true,
+        deletedPlans: [{ id: wedding.id, name: wedding.name }],
+      }
+    );
   } catch (error) {
     console.error("DELETE /api/wedding", error);
     return apiError("Internal server error", 500);

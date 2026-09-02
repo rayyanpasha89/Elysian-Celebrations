@@ -2424,6 +2424,19 @@ export type Database = {
           "reset_at": string
         }[]
       }
+      "create_event_function": {
+        Args: {
+          "p_actor_user_id": string
+          "p_wedding_id": string
+          "p_day_id": string
+          "p_event": Json
+          "p_menus": Json
+          "p_logistics": Json
+          "p_tasks": Json
+          "p_requirements": Json
+        }
+        Returns: Json
+      }
       "create_event_plan": {
         Args: {
           "p_client_profile_id": string
@@ -2431,6 +2444,20 @@ export type Database = {
           "p_days": Json
         }
         Returns: string
+      }
+      "delete_event_function": {
+        Args: {
+          "p_actor_user_id": string
+          "p_event_id": string
+        }
+        Returns: Json
+      }
+      "delete_event_plan": {
+        Args: {
+          "p_actor_user_id": string
+          "p_wedding_id": string
+        }
+        Returns: Json
       }
       "issue_booking_invoice": {
         Args: {

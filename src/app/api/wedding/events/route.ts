@@ -3,32 +3,46 @@ import { getClientWeddingContext, ensureWeddingDays } from "@/lib/wedding-plan.s
 import {
   buildDefaultRequirementsForEvent,
   mealPeriodForTimeBlock,
-  normalizeEventRequirementPayload,
   normalizeTimeBlockKey,
 } from "@/lib/event-platform";
+import {
+  isRecord,
+  normalizeEventDetails,
+  normalizeLogistics,
+  normalizeMenus,
+  normalizeRequirements,
+  normalizeTasks,
+} from "@/lib/event-workspace-payload";
 import {
   apiError,
   apiSuccess,
   getAuthSession,
   requireRole,
 } from "@/lib/api-utils";
-import { toOptionalVenueId, venueRuleMessage } from "@/lib/venue-selection";
+import { venueRuleMessage } from "@/lib/venue-selection";
 
-function toOptionalString(value: unknown) {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function toOptionalInt(value: unknown) {
-  if (typeof value !== "number" || !Number.isFinite(value)) return null;
-  const parsed = Math.round(value);
-  return parsed > 0 ? parsed : null;
-}
-
-function toOptionalStringArray(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  return value
-    .filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
-    .map((entry) => entry.trim());
+function eventCreationRpcError(error: {
+  code?: string | null;
+  message?: string | null;
+}) {
+  const venueMessage = venueRuleMessage(error);
+  if (venueMessage) return apiError(venueMessage, 422);
+  if (
+    error.code === "22004" ||
+    error.code === "22007" ||
+    error.code === "22023" ||
+    error.code === "22P02"
+  ) {
+    return apiError("Some event details are invalid", 400);
+  }
+  if (error.code === "42501") return apiError("Event plan not found", 404);
+  if (error.code === "23503" || error.code === "23505") {
+    return apiError(
+      "The selected day, venue, vendor, or service is no longer available",
+      409
+    );
+  }
+  return apiError("Failed to create event", 500);
 }
 
 export async function POST(request: NextRequest) {
@@ -38,14 +52,15 @@ export async function POST(request: NextRequest) {
   if (roleCheck) return roleCheck;
 
   try {
-    const body = (await request.json()) as Record<string, unknown>;
+    const parsedBody: unknown = await request.json();
+    if (!isRecord(parsedBody)) {
+      return apiError("Event payload has an invalid shape", 400);
+    }
+    const body = parsedBody;
     const name = typeof body.name === "string" ? body.name.trim() : "";
-    const weddingDayId = toOptionalString(body.weddingDayId);
-    const parsedDate =
-      typeof body.date === "string" && body.date ? new Date(body.date) : null;
-    const date =
-      parsedDate && !Number.isNaN(parsedDate.getTime())
-        ? parsedDate.toISOString()
+    const weddingDayId =
+      typeof body.weddingDayId === "string" && body.weddingDayId.trim()
+        ? body.weddingDayId.trim()
         : null;
 
     if (!name) {
@@ -86,108 +101,56 @@ export async function POST(request: NextRequest) {
       return apiError("Celebration day not found", 404);
     }
 
-    const nextSortOrder =
-      (existingEvents ?? [])
-        .filter((event) => event.wedding_day_id === targetDayId)
-        .reduce((max, event) => Math.max(max, event.sort_order), -1) + 1;
     const timeBlock = normalizeTimeBlockKey(body.timeBlock);
-
-    const { data: event, error } = await supabase
-      .from("wedding_events")
-      .insert({
-        wedding_id: wedding.id,
-        wedding_day_id: targetDayId,
-        name,
-        event_type: toOptionalString(body.eventType),
-        time_block: timeBlock,
-        date,
-        start_time: toOptionalString(body.startTime),
-        end_time: toOptionalString(body.endTime),
-        venue: toOptionalString(body.venue),
-        venue_id: toOptionalVenueId(body.venueId),
-        guest_count: toOptionalInt(body.guestCount),
-        estimated_budget: toOptionalInt(body.estimatedBudget),
-        food_style: toOptionalString(body.foodStyle),
-        food_preferences: toOptionalStringArray(body.foodPreferences),
-        menu_notes: toOptionalString(body.menuNotes),
-        decor_style: toOptionalString(body.decorStyle),
-        decor_notes: toOptionalString(body.decorNotes),
-        attire_notes: toOptionalString(body.attireNotes),
-        notes: toOptionalString(body.notes),
-        requirement_payload: normalizeEventRequirementPayload(body.requirementPayload),
-        sort_order: nextSortOrder,
-      })
-      .select(
-        "id, wedding_day_id, name, event_type, time_block, date, start_time, end_time, venue, venue_id, guest_count, estimated_budget, food_style, food_preferences, menu_notes, decor_style, decor_notes, attire_notes, notes, requirement_payload, sort_order"
-      )
-      .single();
-
-    if (error) {
-      const venueMessage = venueRuleMessage(error);
-      if (venueMessage) return apiError(venueMessage, 422);
-      console.error("wedding_events insert:", error);
-      return apiError("Failed to create event", 500);
-    }
-
     const requirementSeeds = buildDefaultRequirementsForEvent({
-      eventName: event.name,
-      timeBlock: normalizeTimeBlockKey(event.time_block),
-      startTime: event.start_time,
+      eventName: name,
+      timeBlock,
+      startTime:
+        typeof body.startTime === "string" ? body.startTime.trim() || null : null,
+    });
+    const normalizedEvent = {
+      ...normalizeEventDetails({ ...body, weddingDayId: targetDayId, name }),
+      time_block: timeBlock,
+    };
+    const defaultMenus = requirementSeeds.some(
+      (requirement) => requirement.category === "food"
+    )
+      ? [
+          {
+            name: `${name} Food and beverage plan`,
+            mealPeriod: mealPeriodForTimeBlock(
+              timeBlock,
+              normalizedEvent.start_time
+            ),
+            serviceStyle: normalizedEvent.food_style,
+            notes:
+              normalizedEvent.menu_notes ??
+              "Use this starter menu to define drinks, pre-meal stations, mains, post-meal stations, live counters, and custom food requirements.",
+            items: [],
+          },
+        ]
+      : [];
+
+    const { data: event, error } = await supabase.rpc("create_event_function", {
+      p_actor_user_id: session.userId,
+      p_wedding_id: wedding.id,
+      p_day_id: targetDayId,
+      p_event: normalizedEvent,
+      p_menus: normalizeMenus(defaultMenus),
+      p_logistics: normalizeLogistics({}),
+      p_tasks: normalizeTasks([
+        {
+          title: "Confirm final run of show",
+          owner: "Planner",
+          status: "OPEN",
+        },
+      ]),
+      p_requirements: normalizeRequirements(requirementSeeds),
     });
 
-    if (requirementSeeds.some((requirement) => requirement.category === "food")) {
-      const { error: menuInsertError } = await supabase
-        .from("wedding_event_menus")
-        .insert({
-          wedding_event_id: event.id,
-          name: `${event.name} Food and beverage plan`,
-          meal_period: mealPeriodForTimeBlock(
-            normalizeTimeBlockKey(event.time_block),
-            event.start_time
-          ),
-          service_style: event.food_style ?? null,
-          notes:
-            event.menu_notes ??
-            "Use this starter menu to define drinks, pre-meal stations, mains, post-meal stations, live counters, and custom food requirements.",
-          sort_order: 0,
-        });
-
-      if (menuInsertError) {
-        console.error("wedding_event_menus insert:", menuInsertError);
-      }
-    }
-
-    const { error: taskInsertError } = await supabase
-      .from("wedding_event_tasks")
-      .insert({
-        wedding_event_id: event.id,
-        title: "Confirm final run of show",
-        owner: "Planner",
-        status: "OPEN",
-        sort_order: 0,
-      });
-
-    if (taskInsertError) {
-      console.error("wedding_event_tasks insert:", taskInsertError);
-    }
-
-    const requirementRows = requirementSeeds.map((requirement) => ({
-      wedding_event_id: event.id,
-      category: requirement.category,
-      title: requirement.title,
-      status: requirement.status,
-      priority: requirement.priority,
-      payload: requirement.payload,
-      notes: requirement.notes,
-      sort_order: requirement.sortOrder,
-    }));
-
-    const { error: requirementsInsertError } = await supabase
-      .from("wedding_event_requirements")
-      .insert(requirementRows);
-
-    if (requirementsInsertError) {
-      console.error("wedding_event_requirements insert:", requirementsInsertError);
+    if (error) {
+      console.error("create_event_function RPC:", error);
+      return eventCreationRpcError(error);
     }
 
     return apiSuccess({ event }, 201);

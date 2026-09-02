@@ -24,6 +24,8 @@
     "test:billing": "tsx --tsconfig tsconfig.json scripts/verify-billing-invoices.ts",
     "test:ownership": "tsx --tsconfig tsconfig.json scripts/verify-ownership-integrity.ts",
     "test:planning-atomic": "tsx --tsconfig tsconfig.json scripts/verify-event-planning-atomicity.ts",
+    "test:event-function": "tsx --tsconfig tsconfig.json scripts/verify-event-function-lifecycle.ts",
+    "test:event-plan-delete": "tsx --tsconfig tsconfig.json scripts/verify-event-plan-deletion.ts",
     "test:journeys": "tsx --tsconfig tsconfig.json scripts/verify-authenticated-journeys.ts"
   },
   "overrides": {
