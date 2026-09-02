@@ -1198,6 +1198,30 @@ async function runJourneys(
     assert.equal(invoice.amount, 50_000);
     assert.equal(invoice.status, "ISSUED");
 
+    await http.request(
+      "client",
+      `/api/client/billing/${fixture.invoiceId}/checkout`,
+      {
+        method: "POST",
+        expectedStatus: 503,
+        headers: { "idempotency-key": `journey-checkout-${fixture.runId}` },
+      }
+    );
+    await http.request(
+      "vendor",
+      `/api/client/billing/${fixture.invoiceId}/checkout`,
+      {
+        method: "POST",
+        expectedStatus: 403,
+        headers: { "idempotency-key": `journey-checkout-${fixture.runId}` },
+      }
+    );
+    await http.request("client", "/api/webhooks/billing/testpay", {
+      method: "POST",
+      expectedStatus: 404,
+      body: { event: "must-not-process-without-an-active-gateway" },
+    });
+
     const clientBilling = await http.request("client", "/api/client/billing");
     const clientInvoice = asArray(
       asRecord(clientBilling.payload, "client billing").invoices,

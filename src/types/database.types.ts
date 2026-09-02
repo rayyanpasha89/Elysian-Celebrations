@@ -2412,6 +2412,25 @@ export type Database = {
     }
     Views: { [_ in never]: never }
     Functions: {
+      "attach_billing_checkout_order": {
+        Args: {
+          "p_actor_user_id": string
+          "p_attempt_id": string
+          "p_provider_order_id": string
+          "p_checkout_expires_at": string
+          "p_metadata": Json
+        }
+        Returns: string
+      }
+      "begin_billing_checkout": {
+        Args: {
+          "p_actor_user_id": string
+          "p_invoice_id": string
+          "p_provider": string
+          "p_idempotency_key": string
+        }
+        Returns: string
+      }
       "consume_api_rate_limit": {
         Args: {
           "p_key_hash": string
@@ -2459,6 +2478,15 @@ export type Database = {
         }
         Returns: Json
       }
+      "fail_billing_checkout_attempt": {
+        Args: {
+          "p_actor_user_id": string
+          "p_attempt_id": string
+          "p_failure_code": string
+          "p_failure_message": string
+        }
+        Returns: string
+      }
       "issue_booking_invoice": {
         Args: {
           "p_booking_id": string
@@ -2503,6 +2531,21 @@ export type Database = {
       "next_billing_invoice_number": {
         Args: Record<string, never>
         Returns: string
+      }
+      "process_billing_gateway_event": {
+        Args: {
+          "p_provider": string
+          "p_provider_event_id": string
+          "p_event_type": string
+          "p_payload_sha256": string
+          "p_provider_order_id": string
+          "p_provider_payment_id": string
+          "p_status": string
+          "p_occurred_at": string
+          "p_failure_code": string
+          "p_failure_message": string
+        }
+        Returns: Json
       }
       "purge_test_booking_financials": {
         Args: {

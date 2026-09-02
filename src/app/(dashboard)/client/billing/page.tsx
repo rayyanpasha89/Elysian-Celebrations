@@ -7,7 +7,9 @@ import {
   CalendarClock,
   CheckCircle2,
   CircleAlert,
+  CreditCard,
   Landmark,
+  LoaderCircle,
   ReceiptText,
 } from "lucide-react";
 import type {
@@ -75,6 +77,8 @@ export default function ClientBillingPage() {
   const [filter, setFilter] = useState<Filter>("OPEN");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [checkoutInvoiceId, setCheckoutInvoiceId] = useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,6 +123,30 @@ export default function ClientBillingPage() {
   }, [filtered, selectedId]);
 
   const selected = filtered.find((invoice) => invoice.id === selectedId) ?? null;
+
+  async function startCheckout(invoice: BillingInvoiceView) {
+    if (!payload?.capability.onlineCheckout || checkoutInvoiceId) return;
+    setCheckoutInvoiceId(invoice.id);
+    setCheckoutError(null);
+    try {
+      const response = await fetch(`/api/client/billing/${invoice.id}/checkout`, {
+        method: "POST",
+        headers: { "Idempotency-Key": crypto.randomUUID() },
+      });
+      const json = await response.json().catch(() => null);
+      if (!response.ok || typeof json?.checkoutUrl !== "string") {
+        throw new Error(json?.error ?? "Secure checkout could not be started");
+      }
+      window.location.assign(json.checkoutUrl);
+    } catch (checkoutFailure) {
+      setCheckoutError(
+        checkoutFailure instanceof Error
+          ? checkoutFailure.message
+          : "Secure checkout could not be started"
+      );
+      setCheckoutInvoiceId(null);
+    }
+  }
 
   if (loading) {
     return (
@@ -259,7 +287,15 @@ export default function ClientBillingPage() {
         </div>
 
         <aside className={cn(dashCard, "h-fit xl:sticky xl:top-24")} aria-live="polite">
-          {selected ? <InvoiceDetail invoice={selected} /> : (
+          {selected ? (
+            <InvoiceDetail
+              invoice={selected}
+              capability={payload.capability}
+              checkoutError={checkoutError}
+              checkoutPending={checkoutInvoiceId === selected.id}
+              onCheckout={startCheckout}
+            />
+          ) : (
             <div className="py-12 text-center">
               <ReceiptText className="mx-auto h-8 w-8 text-camel" aria-hidden />
               <p className="mt-4 font-display text-2xl text-charcoal">Choose an installment</p>
@@ -283,7 +319,19 @@ function SummaryCard({ icon: Icon, label, value, hint, alert = false }: { icon: 
   );
 }
 
-function InvoiceDetail({ invoice }: { invoice: BillingInvoiceView }) {
+function InvoiceDetail({
+  invoice,
+  capability,
+  checkoutError,
+  checkoutPending,
+  onCheckout,
+}: {
+  invoice: BillingInvoiceView;
+  capability: BillingCapability;
+  checkoutError: string | null;
+  checkoutPending: boolean;
+  onCheckout: (invoice: BillingInvoiceView) => void;
+}) {
   return (
     <div>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -313,6 +361,34 @@ function InvoiceDetail({ invoice }: { invoice: BillingInvoiceView }) {
         </div>
       ) : null}
       {invoice.description ? <p className="mt-5 text-sm leading-relaxed text-slate">{invoice.description}</p> : null}
+      {capability.onlineCheckout && invoice.status === "ISSUED" ? (
+        <div className="mt-5 border-t border-charcoal/8 pt-5">
+          <button
+            type="button"
+            className={cn(
+              dashBtn,
+              "w-full justify-center bg-saddle-brown text-ivory hover:bg-dark-walnut disabled:cursor-wait disabled:opacity-60"
+            )}
+            disabled={checkoutPending}
+            onClick={() => onCheckout(invoice)}
+          >
+            {checkoutPending ? (
+              <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />
+            ) : (
+              <CreditCard className="h-4 w-4" aria-hidden />
+            )}
+            {checkoutPending ? "Opening secure checkout..." : "Pay securely"}
+          </button>
+          <p className="mt-2 text-center text-[11px] leading-relaxed text-slate">
+            Payment details are entered only on the approved provider&apos;s hosted page.
+          </p>
+          {checkoutError ? (
+            <p className="mt-3 border border-rose/30 bg-rose/[0.04] p-2 text-xs leading-relaxed text-rose" role="alert">
+              {checkoutError}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

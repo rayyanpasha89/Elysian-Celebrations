@@ -16,8 +16,7 @@ export type BillingCheckoutRequest = {
 export type BillingCheckoutSession = {
   provider: string;
   providerOrderId: string;
-  checkoutUrl: string | null;
-  publicPayload: Record<string, string | number | boolean>;
+  checkoutUrl: string;
   expiresAt: string | null;
 };
 
@@ -28,6 +27,8 @@ export type VerifiedBillingWebhook = {
   providerPaymentId: string | null;
   status: "CAPTURED" | "FAILED" | "IGNORED";
   occurredAt: string;
+  failureCode?: string | null;
+  failureMessage?: string | null;
 };
 
 /**
