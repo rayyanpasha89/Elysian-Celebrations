@@ -102,7 +102,18 @@ export function mergeConversationRefresh(
     const previous = currentById.get(conversation.id);
     if (!previous) return conversation;
 
-    const messages = mergeMessageEntries(previous.messages, conversation.messages);
+    const previousIds = new Set(
+      previous.messages.flatMap((message) => (message.id ? [message.id] : []))
+    );
+    const pagesOverlap = conversation.messages.some(
+      (message) => message.id && previousIds.has(message.id)
+    );
+    // A refresh can jump past the cached window when many messages arrive while
+    // the tab is hidden. Reset to the server's newest page so its oldest cursor
+    // can paginate through the missing interval instead of stranding a gap.
+    const messages = pagesOverlap
+      ? mergeMessageEntries(previous.messages, conversation.messages)
+      : conversation.messages;
     const oldest = messages[0] ?? null;
     return {
       ...conversation,

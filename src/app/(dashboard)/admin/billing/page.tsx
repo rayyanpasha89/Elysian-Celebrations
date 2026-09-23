@@ -1,10 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useState,
+  type FormEvent,
+} from "react";
 import {
   BadgeIndianRupee,
   CalendarClock,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   CircleAlert,
   FilePlus2,
   Landmark,
@@ -46,6 +54,12 @@ type BillingWorkspace = {
   bookings: BillableBooking[];
   summary: BillingSummary;
   capability: BillingCapability;
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
 };
 
 type Filter = "OPEN" | "RECEIVED" | "REFUNDS" | "ALL";
@@ -91,16 +105,31 @@ export default function AdminBillingPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("OPEN");
   const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
+  const [page, setPage] = useState(1);
   const [showIssue, setShowIssue] = useState(false);
 
   const loadWorkspace = useCallback(async ({ quiet = false }: { quiet?: boolean } = {}) => {
     try {
       if (!quiet) setLoading(true);
       setError(null);
-      const response = await fetch("/api/admin/billing", { cache: "no-store" });
+      const params = new URLSearchParams({
+        filter,
+        page: String(page),
+        pageSize: "25",
+      });
+      const normalizedSearch = deferredSearch.trim();
+      if (normalizedSearch) params.set("search", normalizedSearch);
+      const response = await fetch(`/api/admin/billing?${params.toString()}`, {
+        cache: "no-store",
+      });
       const json = await response.json().catch(() => null);
       if (!response.ok) throw new Error(json?.error ?? "Billing workspace could not be loaded");
-      setWorkspace(json as BillingWorkspace);
+      const nextWorkspace = json as BillingWorkspace;
+      setWorkspace(nextWorkspace);
+      if (nextWorkspace.pagination.page !== page) {
+        setPage(nextWorkspace.pagination.page);
+      }
     } catch (loadError) {
       const message = loadError instanceof Error ? loadError.message : "Billing workspace could not be loaded";
       setError(message);
@@ -108,41 +137,21 @@ export default function AdminBillingPage() {
     } finally {
       if (!quiet) setLoading(false);
     }
-  }, []);
+  }, [deferredSearch, filter, page]);
 
   useEffect(() => {
     void loadWorkspace();
   }, [loadWorkspace]);
 
-  const filtered = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    return (workspace?.invoices ?? []).filter((invoice) => {
-      const matchesFilter =
-        filter === "ALL" ||
-        (filter === "OPEN" && invoice.status === "ISSUED") ||
-        (filter === "RECEIVED" && ["PAID", "PARTIALLY_REFUNDED"].includes(invoice.status)) ||
-        (filter === "REFUNDS" && invoice.refundedAmount > 0);
-      if (!matchesFilter) return false;
-      if (!needle) return true;
-      return [
-        invoice.invoiceNumber,
-        invoice.label,
-        invoice.party.clientName,
-        invoice.party.clientEmail,
-        invoice.party.vendorName,
-        invoice.party.serviceName,
-        invoice.event?.name,
-      ].some((value) => value?.toLowerCase().includes(needle));
-    });
-  }, [filter, search, workspace?.invoices]);
-
   useEffect(() => {
-    if (!filtered.some((invoice) => invoice.id === selectedId)) {
-      setSelectedId(filtered[0]?.id ?? null);
+    const invoices = workspace?.invoices ?? [];
+    if (!invoices.some((invoice) => invoice.id === selectedId)) {
+      setSelectedId(invoices[0]?.id ?? null);
     }
-  }, [filtered, selectedId]);
+  }, [selectedId, workspace?.invoices]);
 
-  const selected = filtered.find((invoice) => invoice.id === selectedId) ?? null;
+  const selected =
+    workspace?.invoices.find((invoice) => invoice.id === selectedId) ?? null;
 
   if (loading) return <BillingSkeleton />;
   if (error || !workspace) {
@@ -223,7 +232,10 @@ export default function AdminBillingPage() {
                     type="button"
                     role="tab"
                     aria-selected={filter === value}
-                    onClick={() => setFilter(value)}
+                    onClick={() => {
+                      setFilter(value);
+                      setPage(1);
+                    }}
                     className={cn(
                       "px-2.5 py-2 font-accent text-[8px] uppercase tracking-[0.13em] transition-colors sm:px-3",
                       filter === value ? "bg-charcoal-brown text-ivory" : "text-slate hover:text-charcoal"
@@ -237,11 +249,19 @@ export default function AdminBillingPage() {
             <label className="relative block">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate" aria-hidden />
               <span className="sr-only">Search invoices</span>
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search invoice, client, vendor, service..." className="w-full border border-charcoal/10 bg-ivory py-2.5 pl-10 pr-3 text-sm text-charcoal outline-none focus:border-saddle-brown" />
+              <input
+                value={search}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setPage(1);
+                }}
+                placeholder="Search invoice, client, vendor, service..."
+                className="w-full border border-charcoal/10 bg-ivory py-2.5 pl-10 pr-3 text-sm text-charcoal outline-none focus:border-saddle-brown"
+              />
             </label>
           </div>
 
-          {filtered.length === 0 ? (
+          {workspace.invoices.length === 0 ? (
             <div className="flex min-h-80 flex-col items-center justify-center px-6 text-center">
               <ReceiptIndianRupee className="h-8 w-8 text-camel" aria-hidden />
               <h4 className="mt-4 font-display text-2xl text-charcoal">No matching invoices</h4>
@@ -249,7 +269,7 @@ export default function AdminBillingPage() {
             </div>
           ) : (
             <ul className="list-none divide-y divide-charcoal/8 p-0">
-              {filtered.map((invoice) => (
+              {workspace.invoices.map((invoice) => (
                 <li key={invoice.id}>
                   <button type="button" onClick={() => setSelectedId(invoice.id)} aria-pressed={selectedId === invoice.id} className={cn("grid w-full gap-3 px-4 py-4 text-left transition-colors sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center md:px-5", selectedId === invoice.id ? "bg-camel/[0.12]" : "hover:bg-cream/55")}>
                     <span>
@@ -268,6 +288,41 @@ export default function AdminBillingPage() {
               ))}
             </ul>
           )}
+
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-charcoal/8 px-4 py-3 md:px-5">
+            <p className="text-xs text-slate">
+              {workspace.pagination.total === 0
+                ? "No invoices in this view"
+                : `Showing ${(workspace.pagination.page - 1) * workspace.pagination.pageSize + 1}-${Math.min(workspace.pagination.page * workspace.pagination.pageSize, workspace.pagination.total)} of ${workspace.pagination.total}`}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                aria-label="Previous invoice page"
+                disabled={workspace.pagination.page <= 1}
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                className="border border-charcoal/12 p-2 text-charcoal transition-colors hover:border-saddle-brown hover:text-saddle-brown disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                <ChevronLeft className="h-4 w-4" aria-hidden />
+              </button>
+              <span className="min-w-20 text-center font-accent text-[9px] uppercase tracking-[0.13em] text-slate">
+                Page {workspace.pagination.page} of {workspace.pagination.totalPages}
+              </span>
+              <button
+                type="button"
+                aria-label="Next invoice page"
+                disabled={workspace.pagination.page >= workspace.pagination.totalPages}
+                onClick={() =>
+                  setPage((current) =>
+                    Math.min(workspace.pagination.totalPages, current + 1)
+                  )
+                }
+                className="border border-charcoal/12 p-2 text-charcoal transition-colors hover:border-saddle-brown hover:text-saddle-brown disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                <ChevronRight className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
+          </div>
         </div>
 
         <aside className={cn(dashCard, "h-fit xl:sticky xl:top-24")} aria-live="polite">

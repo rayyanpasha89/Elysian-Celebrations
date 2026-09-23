@@ -1168,9 +1168,22 @@ async function runJourneys(
 
     await http.request("client", "/api/admin/billing", { expectedStatus: 403 });
     await http.request("vendor", "/api/admin/pricing", { expectedStatus: 403 });
-    const billingWorkspace = await http.request("admin", "/api/admin/billing");
+    const billingWorkspace = await http.request(
+      "admin",
+      "/api/admin/billing?filter=ALL&pageSize=1"
+    );
+    const billingPayload = asRecord(
+      billingWorkspace.payload,
+      "billing workspace"
+    );
+    const billingPagination = asRecord(
+      billingPayload.pagination,
+      "billing pagination"
+    );
+    assert.equal(billingPagination.pageSize, 1);
+    assert.ok(Number(billingPagination.total) >= 0);
     const billable = asArray(
-      asRecord(billingWorkspace.payload, "billing workspace").bookings,
+      billingPayload.bookings,
       "billable bookings"
     )
       .map((entry) => asRecord(entry, "billable booking"))
@@ -1197,6 +1210,30 @@ async function runJourneys(
     assert.match(fixture.invoiceId, /^[0-9a-f-]{36}$/i);
     assert.equal(invoice.amount, 50_000);
     assert.equal(invoice.status, "ISSUED");
+
+    const searchedBilling = await http.request(
+      "admin",
+      `/api/admin/billing?filter=ALL&pageSize=1&search=${encodeURIComponent(String(invoice.invoiceNumber))}`
+    );
+    const searchedPayload = asRecord(
+      searchedBilling.payload,
+      "searched billing workspace"
+    );
+    const searchedInvoices = asArray(
+      searchedPayload.invoices,
+      "searched invoices"
+    ).map((entry) => asRecord(entry, "searched invoice"));
+    assert.equal(searchedInvoices.length, 1);
+    assert.equal(searchedInvoices[0]?.id, fixture.invoiceId);
+    assert.equal(
+      asRecord(searchedPayload.pagination, "searched billing pagination").total,
+      1
+    );
+    assert.ok(
+      Number(asRecord(searchedPayload.summary, "complete billing summary").scheduled) >=
+        50_000,
+      "billing summary must remain complete when the register is filtered"
+    );
 
     await http.request(
       "client",

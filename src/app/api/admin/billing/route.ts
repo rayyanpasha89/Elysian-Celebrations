@@ -17,6 +17,12 @@ export const dynamic = "force-dynamic";
 
 type IssueInvoiceArgs =
   Database["public"]["Functions"]["issue_booking_invoice"]["Args"];
+type BillingFilter = "OPEN" | "RECEIVED" | "REFUNDS" | "ALL";
+type AdminSupabaseClient = ReturnType<typeof createAdminSupabaseClient>;
+
+const BILLING_BATCH_SIZE = 500;
+const DEFAULT_PAGE_SIZE = 25;
+const MAX_PAGE_SIZE = 100;
 
 type Relation<T> = T | T[] | null | undefined;
 type BillableBookingRow = {
@@ -139,48 +145,127 @@ function billableBookingView(row: BillableBookingRow) {
   };
 }
 
-async function loadBillingWorkspace() {
-  const supabase = createAdminSupabaseClient();
-  const [{ data: invoiceRows, error: invoiceError }, { data: bookingRows, error: bookingError }] =
-    await Promise.all([
-      supabase
-        .from("billing_invoices")
-        .select(ADMIN_BILLING_SELECT)
-        .order("created_at", { ascending: false })
-        .limit(200),
-      supabase
-        .from("bookings")
-        .select(BILLABLE_BOOKING_SELECT)
-        .eq("price_published", true)
-        .not("final_price", "is", null)
-        .neq("status", "CANCELLED")
-        .order("updated_at", { ascending: false })
-        .limit(300),
-    ]);
+function positiveInteger(value: string | null, fallback: number, maximum?: number) {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 1) return fallback;
+  return maximum ? Math.min(parsed, maximum) : parsed;
+}
 
-  if (invoiceError || bookingError) throw invoiceError ?? bookingError;
-  const invoices = (invoiceRows ?? []).map((row) =>
+function billingFilter(value: string | null): BillingFilter {
+  return value === "RECEIVED" || value === "REFUNDS" || value === "ALL"
+    ? value
+    : "OPEN";
+}
+
+async function loadAllInvoiceRows(supabase: AdminSupabaseClient) {
+  const rows: RawBillingInvoice[] = [];
+  for (let from = 0; ; from += BILLING_BATCH_SIZE) {
+    const { data, error } = await supabase
+      .from("billing_invoices")
+      .select(ADMIN_BILLING_SELECT)
+      .order("created_at", { ascending: false })
+      .range(from, from + BILLING_BATCH_SIZE - 1);
+    if (error) throw error;
+    rows.push(...((data ?? []) as unknown as RawBillingInvoice[]));
+    if ((data?.length ?? 0) < BILLING_BATCH_SIZE) return rows;
+  }
+}
+
+async function loadAllBillableBookingRows(supabase: AdminSupabaseClient) {
+  const rows: BillableBookingRow[] = [];
+  for (let from = 0; ; from += BILLING_BATCH_SIZE) {
+    const { data, error } = await supabase
+      .from("bookings")
+      .select(BILLABLE_BOOKING_SELECT)
+      .eq("price_published", true)
+      .not("final_price", "is", null)
+      .neq("status", "CANCELLED")
+      .order("updated_at", { ascending: false })
+      .range(from, from + BILLING_BATCH_SIZE - 1);
+    if (error) throw error;
+    rows.push(...((data ?? []) as unknown as BillableBookingRow[]));
+    if ((data?.length ?? 0) < BILLING_BATCH_SIZE) return rows;
+  }
+}
+
+function matchesInvoiceFilter(
+  invoice: ReturnType<typeof billingInvoiceView>,
+  filter: BillingFilter
+) {
+  if (filter === "OPEN") return invoice.status === "ISSUED";
+  if (filter === "RECEIVED") {
+    return invoice.status === "PAID" || invoice.status === "PARTIALLY_REFUNDED";
+  }
+  if (filter === "REFUNDS") return invoice.refundedAmount > 0;
+  return true;
+}
+
+function matchesInvoiceSearch(
+  invoice: ReturnType<typeof billingInvoiceView>,
+  search: string
+) {
+  if (!search) return true;
+  return [
+    invoice.invoiceNumber,
+    invoice.label,
+    invoice.party.clientName,
+    invoice.party.clientEmail,
+    invoice.party.vendorName,
+    invoice.party.serviceName,
+    invoice.event?.name,
+  ].some((value) => value?.toLowerCase().includes(search));
+}
+
+async function loadBillingWorkspace(request: NextRequest) {
+  const filter = billingFilter(request.nextUrl.searchParams.get("filter"));
+  const requestedPage = positiveInteger(request.nextUrl.searchParams.get("page"), 1);
+  const pageSize = positiveInteger(
+    request.nextUrl.searchParams.get("pageSize"),
+    DEFAULT_PAGE_SIZE,
+    MAX_PAGE_SIZE
+  );
+  const search = (request.nextUrl.searchParams.get("search") ?? "")
+    .trim()
+    .toLowerCase()
+    .slice(0, 160);
+  const supabase = createAdminSupabaseClient();
+  const [invoiceRows, bookingRows] = await Promise.all([
+    loadAllInvoiceRows(supabase),
+    loadAllBillableBookingRows(supabase),
+  ]);
+  const allInvoices = invoiceRows.map((row) =>
     billingInvoiceView(row as unknown as RawBillingInvoice, { admin: true })
   );
-  const bookings = ((bookingRows ?? []) as unknown as BillableBookingRow[])
+  const matchingInvoices = allInvoices.filter(
+    (invoice) =>
+      matchesInvoiceFilter(invoice, filter) &&
+      matchesInvoiceSearch(invoice, search)
+  );
+  const total = matchingInvoices.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const page = Math.min(requestedPage, totalPages);
+  const pageStart = (page - 1) * pageSize;
+  const invoices = matchingInvoices.slice(pageStart, pageStart + pageSize);
+  const bookings = bookingRows
     .map(billableBookingView)
     .filter((booking) => booking.remaining > 0);
   return {
     invoices,
     bookings,
-    summary: summarizeBillingInvoices(invoices),
+    summary: summarizeBillingInvoices(allInvoices),
     capability: billingCapability(),
+    pagination: { page, pageSize, total, totalPages },
   };
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await getAuthSession();
   if (session instanceof NextResponse) return session;
   const roleCheck = requireRole(session, "admin");
   if (roleCheck) return roleCheck;
 
   try {
-    return apiSuccess(await loadBillingWorkspace());
+    return apiSuccess(await loadBillingWorkspace(request));
   } catch (error) {
     console.error("GET /api/admin/billing:", error);
     return apiError("Billing workspace could not be loaded", 500);

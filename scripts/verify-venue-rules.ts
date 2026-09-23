@@ -107,25 +107,41 @@ async function main() {
       );
     }
 
-    // 4 — a retired venue is rejected.
-    const retired = await client.query(
+    // 4 — an active venue can be selected, then remains editable after an
+    //     administrator retires it from future use.
+    const retiring = await client.query(
       `insert into venues (destination_id, name, slug, capacity, is_active)
-       values ($1, $2, $3, 1000, false) returning id`,
-      [destinationId, `Retired ${suffix}`, `retired-${suffix}`]
+       values ($1, $2, $3, 1000, true) returning id`,
+      [destinationId, `Retiring ${suffix}`, `retiring-${suffix}`]
     );
-    createdVenues.push(retired.rows[0].id);
+    createdVenues.push(retiring.rows[0].id);
+    await insertEvent("Retired selection survives", retiring.rows[0].id, 10);
+    await client.query("update venues set is_active = false where id = $1", [
+      retiring.rows[0].id,
+    ]);
+    const preserved = await client.query(
+      `update wedding_events
+          set venue_id = $1, guest_count = 10, notes = 'Unrelated planner edit'
+        where wedding_id = $2 and name = 'Retired selection survives'
+      returning venue_id, notes`,
+      [retiring.rows[0].id, weddingId]
+    );
+    assert.equal(preserved.rows[0].venue_id, retiring.rows[0].id);
+    assert.equal(preserved.rows[0].notes, "Unrelated planner edit");
+
+    // 5 — the same retired venue cannot be assigned to a new function.
     await assert.rejects(
-      insertEvent("Retired venue", retired.rows[0].id, 10),
+      insertEvent("Retired venue", retiring.rows[0].id, 10),
       isCheckViolation,
       "an inactive venue must be rejected"
     );
 
-    // 5 — a custom area with no catalogue row is still allowed.
+    // 6 — a custom area with no catalogue row is still allowed.
     const custom = await insertEvent("Custom area", null, 50, "Poolside Deck");
     assert.equal(custom.rows[0].venue_id, null);
     assert.equal(custom.rows[0].venue, "Poolside Deck");
 
-    // 6 — removing a venue clears the link but keeps the snapshot, so a booked
+    // 7 — removing a venue clears the link but keeps the snapshot, so a booked
     //     function still shows the name it was planned under.
     const temp = await client.query(
       `insert into venues (destination_id, name, slug, capacity, is_active)
@@ -141,7 +157,7 @@ async function main() {
     assert.equal(after.rows[0].venue_id, null, "the link should be cleared");
     assert.equal(after.rows[0].venue, temp.rows[0].name, "the snapshot should survive");
 
-    console.log("Event venue rules: 6 focused cases passed.");
+    console.log("Event venue rules: 7 focused cases passed.");
   } finally {
     await client.query("delete from weddings where id = $1", [weddingId]);
     await client.query("delete from client_profiles where user_id = $1", [userId]);
