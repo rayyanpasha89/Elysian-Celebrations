@@ -819,6 +819,175 @@ export type Database = {
         Relationships: [
         ]
       }
+      "event_operations_items": {
+        Row:
+        {
+          "id": string
+          "wedding_id": string
+          "wedding_event_id": string | null
+          "kind": string
+          "severity": string
+          "status": string
+          "title": string
+          "body": string | null
+          "assignee_user_id": string | null
+          "reported_by": string
+          "due_at": string | null
+          "acknowledged_at": string | null
+          "acknowledged_by": string | null
+          "resolved_at": string | null
+          "resolved_by": string | null
+          "created_at": string
+          "updated_at": string
+        }
+        Insert:
+        {
+          "id"?: string
+          "wedding_id": string
+          "wedding_event_id"?: string | null
+          "kind"?: string
+          "severity"?: string
+          "status"?: string
+          "title": string
+          "body"?: string | null
+          "assignee_user_id"?: string | null
+          "reported_by": string
+          "due_at"?: string | null
+          "acknowledged_at"?: string | null
+          "acknowledged_by"?: string | null
+          "resolved_at"?: string | null
+          "resolved_by"?: string | null
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Update:
+        {
+          "id"?: string
+          "wedding_id"?: string
+          "wedding_event_id"?: string | null
+          "kind"?: string
+          "severity"?: string
+          "status"?: string
+          "title"?: string
+          "body"?: string | null
+          "assignee_user_id"?: string | null
+          "reported_by"?: string
+          "due_at"?: string | null
+          "acknowledged_at"?: string | null
+          "acknowledged_by"?: string | null
+          "resolved_at"?: string | null
+          "resolved_by"?: string | null
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_operations_event_fk"
+            columns: ["wedding_event_id"]
+            isOneToOne: false
+            referencedRelation: "wedding_events"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_operations_event_fk"
+            columns: ["wedding_event_id"]
+            isOneToOne: false
+            referencedRelation: "wedding_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_operations_event_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "wedding_events"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_operations_event_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "wedding_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_operations_items_assignee_user_id_fkey"
+            columns: ["assignee_user_id"]
+            isOneToOne: false
+            referencedRelation: "operations_staff_profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "event_operations_items_wedding_id_fkey"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "weddings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      "event_staff_assignments": {
+        Row:
+        {
+          "id": string
+          "wedding_id": string
+          "staff_user_id": string
+          "event_role": string | null
+          "permissions": string[] | null
+          "shift_start": string | null
+          "shift_end": string | null
+          "notes": string | null
+          "is_active": boolean
+          "assigned_by": string | null
+          "created_at": string
+          "updated_at": string
+        }
+        Insert:
+        {
+          "id"?: string
+          "wedding_id": string
+          "staff_user_id": string
+          "event_role"?: string | null
+          "permissions"?: string[] | null
+          "shift_start"?: string | null
+          "shift_end"?: string | null
+          "notes"?: string | null
+          "is_active"?: boolean
+          "assigned_by"?: string | null
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Update:
+        {
+          "id"?: string
+          "wedding_id"?: string
+          "staff_user_id"?: string
+          "event_role"?: string | null
+          "permissions"?: string[] | null
+          "shift_start"?: string | null
+          "shift_end"?: string | null
+          "notes"?: string | null
+          "is_active"?: boolean
+          "assigned_by"?: string | null
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_staff_assignments_staff_user_id_fkey"
+            columns: ["staff_user_id"]
+            isOneToOne: false
+            referencedRelation: "operations_staff_profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "event_staff_assignments_wedding_id_fkey"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "weddings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       "guest_lists": {
         Row:
         {
@@ -1156,6 +1325,56 @@ export type Database = {
             foreignKeyName: "notifications_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      "operations_staff_profiles": {
+        Row:
+        {
+          "user_id": string
+          "role_template": string
+          "job_title": string | null
+          "phone": string | null
+          "permissions": string[]
+          "is_active": boolean
+          "created_by": string | null
+          "updated_by": string | null
+          "created_at": string
+          "updated_at": string
+        }
+        Insert:
+        {
+          "user_id": string
+          "role_template": string
+          "job_title"?: string | null
+          "phone"?: string | null
+          "permissions"?: string[]
+          "is_active"?: boolean
+          "created_by"?: string | null
+          "updated_by"?: string | null
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Update:
+        {
+          "user_id"?: string
+          "role_template"?: string
+          "job_title"?: string | null
+          "phone"?: string | null
+          "permissions"?: string[]
+          "is_active"?: boolean
+          "created_by"?: string | null
+          "updated_by"?: string | null
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operations_staff_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
@@ -2290,14 +2509,14 @@ export type Database = {
             columns: ["wedding_day_id"]
             isOneToOne: false
             referencedRelation: "wedding_days"
-            referencedColumns: ["wedding_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "wedding_events_day_ownership_fkey"
             columns: ["wedding_day_id"]
             isOneToOne: false
             referencedRelation: "wedding_days"
-            referencedColumns: ["id"]
+            referencedColumns: ["wedding_id"]
           },
           {
             foreignKeyName: "wedding_events_day_ownership_fkey"

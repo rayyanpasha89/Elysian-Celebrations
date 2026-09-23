@@ -1,0 +1,301 @@
+import "server-only";
+
+import type { AuthSession } from "@/lib/api-utils";
+import { evaluateEventReadiness, type EventReadinessRow } from "@/lib/event-readiness";
+import { resolveOperationsAccess } from "@/lib/operations-auth";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
+
+type Relation<T> = T | T[] | null | undefined;
+
+function one<T>(value: Relation<T>): T | null {
+  return Array.isArray(value) ? value[0] ?? null : value ?? null;
+}
+
+function relationList<T>(value: Relation<T>): T[] {
+  return Array.isArray(value) ? value : value ? [value] : [];
+}
+
+export async function loadOperationsEventList(session: AuthSession) {
+  const supabase = createAdminSupabaseClient();
+  let eventIds: string[] | null = null;
+  let needsProfile = false;
+
+  if (session.role !== "admin") {
+    if (session.role !== "manager") return { events: [], needsProfile: false };
+    const { data: profile } = await supabase
+      .from("operations_staff_profiles")
+      .select("is_active")
+      .eq("user_id", session.userId)
+      .maybeSingle();
+    if (!profile?.is_active) {
+      needsProfile = true;
+      return { events: [], needsProfile };
+    }
+    const { data: assignments, error: assignmentError } = await supabase
+      .from("event_staff_assignments")
+      .select("wedding_id")
+      .eq("staff_user_id", session.userId)
+      .eq("is_active", true);
+    if (assignmentError) throw assignmentError;
+    eventIds = (assignments ?? []).map((assignment) => assignment.wedding_id);
+    if (eventIds.length === 0) return { events: [], needsProfile };
+  }
+
+  let eventQuery = supabase
+    .from("weddings")
+    .select(
+      "id, name, date, status, event_type, custom_event_type, destination:destinations(name, country, hero_image)"
+    )
+    .neq("status", "CANCELLED")
+    .order("date", { ascending: true, nullsFirst: false });
+  if (eventIds) eventQuery = eventQuery.in("id", eventIds);
+
+  const { data: events, error } = await eventQuery;
+  if (error) throw error;
+  const ids = (events ?? []).map((event) => event.id);
+  if (ids.length === 0) return { events: [], needsProfile };
+
+  const [{ data: functions }, { data: items }] = await Promise.all([
+    supabase
+      .from("wedding_events")
+      .select("id, wedding_id, date, start_time, end_time")
+      .in("wedding_id", ids),
+    supabase
+      .from("event_operations_items")
+      .select("wedding_id, status, severity, due_at")
+      .in("wedding_id", ids)
+      .neq("status", "RESOLVED"),
+  ]);
+
+  const now = Date.now();
+  return {
+    needsProfile,
+    events: (events ?? []).map((event) => {
+      const destination = one(event.destination);
+      const eventFunctions = (functions ?? []).filter(
+        (entry) => entry.wedding_id === event.id
+      );
+      const operationsItems = (items ?? []).filter(
+        (entry) => entry.wedding_id === event.id
+      );
+      const nextFunction = eventFunctions
+        .filter((entry) => entry.date && new Date(entry.date).getTime() >= now - 86_400_000)
+        .sort((left, right) =>
+          `${left.date ?? ""}${left.start_time ?? ""}`.localeCompare(
+            `${right.date ?? ""}${right.start_time ?? ""}`
+          )
+        )[0];
+      return {
+        id: event.id,
+        name: event.name,
+        date: event.date,
+        status: event.status,
+        eventType: event.custom_event_type || event.event_type || "Event",
+        destination: destination?.name ?? null,
+        country: destination?.country ?? null,
+        heroImage: destination?.hero_image ?? null,
+        functionCount: eventFunctions.length,
+        nextFunctionAt: nextFunction?.date ?? null,
+        openItems: operationsItems.length,
+        criticalItems: operationsItems.filter(
+          (item) => item.severity === "CRITICAL" || item.severity === "URGENT"
+        ).length,
+        overdueItems: operationsItems.filter(
+          (item) => item.due_at && new Date(item.due_at).getTime() < now
+        ).length,
+      };
+    }),
+  };
+}
+
+export async function loadOperationsWorkspace(
+  session: AuthSession,
+  weddingId: string
+) {
+  const access = await resolveOperationsAccess(session, weddingId);
+  if (!access) return null;
+  const supabase = createAdminSupabaseClient();
+
+  const [
+    { data: eventPlan, error: eventError },
+    { data: days, error: dayError },
+    { data: assignments, error: assignmentError },
+    { data: operationsItems, error: itemError },
+  ] = await Promise.all([
+    supabase
+      .from("weddings")
+      .select(
+        "id, name, date, status, event_type, custom_event_type, destination_id, client_profile_id, destination:destinations(name, country, hero_image), client:client_profiles(partner_name, user:users(name, email, phone))"
+      )
+      .eq("id", weddingId)
+      .maybeSingle(),
+    supabase
+      .from("wedding_days")
+      .select("id, name, date, sort_order")
+      .eq("wedding_id", weddingId)
+      .order("sort_order"),
+    supabase
+      .from("event_staff_assignments")
+      .select(
+        "id, staff_user_id, event_role, permissions, shift_start, shift_end, notes, is_active, profile:operations_staff_profiles!event_staff_assignments_staff_user_id_fkey(role_template, job_title, phone, permissions, is_active, user:users(name, email, phone, avatar))"
+      )
+      .eq("wedding_id", weddingId)
+      .eq("is_active", true),
+    supabase
+      .from("event_operations_items")
+      .select("*")
+      .eq("wedding_id", weddingId)
+      .order("created_at", { ascending: false }),
+  ]);
+  if (eventError) throw eventError;
+  if (dayError) throw dayError;
+  if (assignmentError) throw assignmentError;
+  if (itemError) throw itemError;
+  if (!eventPlan) return null;
+
+  const dayIds = (days ?? []).map((day) => day.id);
+  const { data: functions, error: functionError } = dayIds.length
+    ? await supabase
+        .from("wedding_events")
+        .select(
+          "id, wedding_id, wedding_day_id, name, event_type, time_block, date, start_time, end_time, venue, guest_count, estimated_budget, notes, sort_order, requirements:wedding_event_requirements(category, title, status, priority, vendor_profile_id, vendor_service_id, notes), menus:wedding_event_menus(id, name, meal_period, service_style, notes, items:wedding_event_menu_items(id, name, course, dietary_tags, notes, sort_order)), logistics:wedding_event_logistics(guest_arrival_time, vendor_load_in_time, family_call_time, transport_notes, rooming_notes, weather_plan, ceremony_notes), tasks:wedding_event_tasks(id, title, owner, status, due_date, sort_order), bookings(id, status, final_price, price_published, vendor:vendor_profiles(business_name, user_id), service:vendor_services(name, service_scope), payments(kind, amount, voided_at))"
+        )
+        .eq("wedding_id", weddingId)
+        .order("sort_order")
+    : { data: [], error: null };
+  if (functionError) throw functionError;
+
+  const canViewFinancials = access.permissions.includes("VIEW_FINANCIALS");
+  const vendorUserIds = [
+    ...new Set(
+      (functions ?? []).flatMap((event) =>
+        relationList(event.bookings)
+          .map((booking) => one(booking.vendor)?.user_id)
+          .filter((value): value is string => Boolean(value))
+      )
+    ),
+  ];
+  const { data: vendorUsers } = vendorUserIds.length
+    ? await supabase.from("users").select("id, phone").in("id", vendorUserIds)
+    : { data: [] };
+  const vendorPhoneMap = new Map(
+    (vendorUsers ?? []).map((user) => [user.id, user.phone])
+  );
+  const eventFunctions = (functions ?? []).map((event) => ({
+      ...event,
+      readiness: evaluateEventReadiness(event as unknown as EventReadinessRow),
+      bookings: relationList(event.bookings).map((booking) => {
+        const received = canViewFinancials
+          ? relationList(booking.payments).reduce(
+              (sum, payment) =>
+                payment.kind === "CLIENT_IN" && !payment.voided_at
+                  ? sum + payment.amount
+                  : sum,
+              0
+            )
+          : undefined;
+        return {
+          id: booking.id,
+          status: booking.status,
+          vendor: one(booking.vendor)?.business_name ?? "Vendor",
+          vendorPhone:
+            vendorPhoneMap.get(one(booking.vendor)?.user_id ?? "") ?? null,
+          service: one(booking.service)?.name ?? "Service",
+          ...(canViewFinancials
+            ? {
+                clientTotal: booking.price_published
+                  ? booking.final_price
+                  : null,
+                received,
+                due:
+                  booking.price_published && booking.final_price !== null
+                    ? Math.max(0, booking.final_price - (received ?? 0))
+                    : null,
+              }
+            : {}),
+        };
+      }),
+    }));
+
+  const destination = one(eventPlan.destination);
+  const client = one(eventPlan.client);
+  const clientUser = one(client?.user);
+  const team = (assignments ?? []).map((assignment) => {
+    const profile = one(assignment.profile);
+    const user = one(profile?.user);
+    return {
+      id: assignment.id,
+      userId: assignment.staff_user_id,
+      name: user?.name ?? "Team member",
+      email: user?.email ?? null,
+      phone: profile?.phone ?? user?.phone ?? null,
+      avatar: user?.avatar ?? null,
+      roleTemplate: profile?.role_template ?? "VIEWER",
+      jobTitle: profile?.job_title ?? null,
+      eventRole: assignment.event_role ?? profile?.job_title ?? "Event team",
+      shiftStart: assignment.shift_start,
+      shiftEnd: assignment.shift_end,
+      notes: assignment.notes,
+    };
+  });
+
+  const authorIds = [
+    ...new Set(
+      (operationsItems ?? []).flatMap((item) => [
+        item.reported_by,
+        item.acknowledged_by,
+        item.resolved_by,
+      ]).filter((value): value is string => Boolean(value))
+    ),
+  ];
+  const { data: authors } = authorIds.length
+    ? await supabase.from("users").select("id, name").in("id", authorIds)
+    : { data: [] };
+  const authorMap = new Map((authors ?? []).map((author) => [author.id, author.name]));
+
+  return {
+    access,
+    event: {
+      id: eventPlan.id,
+      name: eventPlan.name,
+      date: eventPlan.date,
+      status: eventPlan.status,
+      eventType: eventPlan.custom_event_type || eventPlan.event_type || "Event",
+      destination: destination?.name ?? null,
+      country: destination?.country ?? null,
+      heroImage: destination?.hero_image ?? null,
+      clientName: clientUser?.name ?? client?.partner_name ?? "Client",
+      clientEmail: clientUser?.email ?? null,
+      clientPhone: clientUser?.phone ?? null,
+    },
+    days: (days ?? []).map((day) => ({
+      id: day.id,
+      name: day.name,
+      date: day.date,
+      functions: eventFunctions.filter(
+        (event) => event.wedding_day_id === day.id
+      ),
+    })),
+    team,
+    feed: (operationsItems ?? []).map((item) => ({
+      id: item.id,
+      eventId: item.wedding_event_id,
+      kind: item.kind,
+      severity: item.severity,
+      status: item.status,
+      title: item.title,
+      body: item.body,
+      assigneeUserId: item.assignee_user_id,
+      reportedBy: item.reported_by,
+      reportedByName: authorMap.get(item.reported_by) ?? "Team member",
+      dueAt: item.due_at,
+      acknowledgedAt: item.acknowledged_at,
+      resolvedAt: item.resolved_at,
+      resolvedByName: item.resolved_by
+        ? authorMap.get(item.resolved_by) ?? "Team member"
+        : null,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+    })),
+  };
+}
