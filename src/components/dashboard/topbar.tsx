@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useClerk } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, ChevronDown, ExternalLink, LogOut, Settings } from "lucide-react";
@@ -117,6 +117,7 @@ export function Topbar({
   userRole = "Client",
 }: TopbarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const { signOut } = useClerk();
   const testAuthEnabled =
     process.env.NODE_ENV !== "production" &&
@@ -470,7 +471,7 @@ export function Topbar({
                         onClick={() => {
                           setShowDropdown(false);
                           if (testAuthEnabled) {
-                            window.location.href = "/";
+                            router.push("/");
                             return;
                           }
                           void signOut({ redirectUrl: "/" });
