@@ -2412,6 +2412,19 @@ export type Database = {
     }
     Views: { [_ in never]: never }
     Functions: {
+      "admin_billing_summary": {
+        Args: Record<string, never>
+        Returns: {
+          "scheduled": number
+          "received": number
+          "refunded": number
+          "net_received": number
+          "outstanding": number
+          "overdue": number
+          "issued_count": number
+          "paid_count": number
+        }[]
+      }
       "attach_billing_checkout_order": {
         Args: {
           "p_actor_user_id": string

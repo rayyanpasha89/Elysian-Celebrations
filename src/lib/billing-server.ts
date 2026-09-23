@@ -16,7 +16,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/server";
 export const CLIENT_BILLING_SELECT = `
   id, invoice_number, booking_id, installment_number, label, description,
   amount, currency, status, due_date, issued_at, paid_at,
-  refunded_amount, refunded_at,
+  refunded_amount, refunded_at, created_at,
   booking:bookings(
     id, status, event_date,
     client:client_profiles(partner_name, user:users(name)),
@@ -32,7 +32,7 @@ export const CLIENT_BILLING_SELECT = `
 export const ADMIN_BILLING_SELECT = `
   id, invoice_number, booking_id, installment_number, label, description,
   amount, currency, status, due_date, issued_at, paid_at,
-  refunded_amount, refunded_at,
+  refunded_amount, refunded_at, created_at,
   booking:bookings(
     id, status, event_date,
     client:client_profiles(partner_name, user:users(name, email)),
@@ -112,6 +112,7 @@ export type RawBillingInvoice = {
   paid_at: string | null;
   refunded_amount: number;
   refunded_at: string | null;
+  created_at: string;
   booking?: Relation<RawBooking>;
   attempts?: RawAttempt[] | null;
   refunds?: RawRefund[] | null;

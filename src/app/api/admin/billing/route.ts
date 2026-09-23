@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiError, apiSuccess, getAuthSession, requireRole } from "@/lib/api-utils";
-import { summarizeBillingInvoices } from "@/lib/billing";
+import type { BillingSummary } from "@/lib/billing";
 import {
   ADMIN_BILLING_SELECT,
   billingCapability,
@@ -159,33 +159,71 @@ function billingFilter(value: string | null): BillingFilter {
 
 async function loadAllInvoiceRows(supabase: AdminSupabaseClient) {
   const rows: RawBillingInvoice[] = [];
-  for (let from = 0; ; from += BILLING_BATCH_SIZE) {
-    const { data, error } = await supabase
+  let cursor: { createdAt: string; id: string } | null = null;
+  for (;;) {
+    let query = supabase
       .from("billing_invoices")
       .select(ADMIN_BILLING_SELECT)
       .order("created_at", { ascending: false })
-      .range(from, from + BILLING_BATCH_SIZE - 1);
+      .order("id", { ascending: false })
+      .limit(BILLING_BATCH_SIZE);
+    if (cursor) {
+      query = query.or(
+        `created_at.lt.${cursor.createdAt},and(created_at.eq.${cursor.createdAt},id.lt.${cursor.id})`
+      );
+    }
+    const { data, error } = await query;
     if (error) throw error;
-    rows.push(...((data ?? []) as unknown as RawBillingInvoice[]));
-    if ((data?.length ?? 0) < BILLING_BATCH_SIZE) return rows;
+    const batch = (data ?? []) as unknown as RawBillingInvoice[];
+    rows.push(...batch);
+    if (batch.length < BILLING_BATCH_SIZE) return rows;
+    const last = data?.at(-1);
+    if (!last) return rows;
+    cursor = { createdAt: last.created_at, id: last.id };
   }
 }
 
 async function loadAllBillableBookingRows(supabase: AdminSupabaseClient) {
   const rows: BillableBookingRow[] = [];
-  for (let from = 0; ; from += BILLING_BATCH_SIZE) {
-    const { data, error } = await supabase
+  let cursorId: string | null = null;
+  for (;;) {
+    let query = supabase
       .from("bookings")
       .select(BILLABLE_BOOKING_SELECT)
       .eq("price_published", true)
       .not("final_price", "is", null)
       .neq("status", "CANCELLED")
-      .order("updated_at", { ascending: false })
-      .range(from, from + BILLING_BATCH_SIZE - 1);
+      .order("id", { ascending: true })
+      .limit(BILLING_BATCH_SIZE);
+    if (cursorId) query = query.gt("id", cursorId);
+    const { data, error } = await query;
     if (error) throw error;
-    rows.push(...((data ?? []) as unknown as BillableBookingRow[]));
-    if ((data?.length ?? 0) < BILLING_BATCH_SIZE) return rows;
+    const batch = (data ?? []) as unknown as BillableBookingRow[];
+    rows.push(...batch);
+    if (batch.length < BILLING_BATCH_SIZE) return rows;
+    const last = data?.at(-1);
+    if (!last) return rows;
+    cursorId = last.id;
   }
+}
+
+async function loadBillingSummary(
+  supabase: AdminSupabaseClient
+): Promise<BillingSummary> {
+  const { data, error } = await supabase.rpc("admin_billing_summary");
+  if (error) throw error;
+  const row = data?.[0];
+  if (!row) throw new Error("Billing summary returned no row");
+  return {
+    scheduled: Number(row.scheduled),
+    received: Number(row.received),
+    refunded: Number(row.refunded),
+    netReceived: Number(row.net_received),
+    outstanding: Number(row.outstanding),
+    overdue: Number(row.overdue),
+    issuedCount: Number(row.issued_count),
+    paidCount: Number(row.paid_count),
+  };
 }
 
 function matchesInvoiceFilter(
@@ -229,9 +267,10 @@ async function loadBillingWorkspace(request: NextRequest) {
     .toLowerCase()
     .slice(0, 160);
   const supabase = createAdminSupabaseClient();
-  const [invoiceRows, bookingRows] = await Promise.all([
+  const [invoiceRows, bookingRows, summary] = await Promise.all([
     loadAllInvoiceRows(supabase),
     loadAllBillableBookingRows(supabase),
+    loadBillingSummary(supabase),
   ]);
   const allInvoices = invoiceRows.map((row) =>
     billingInvoiceView(row as unknown as RawBillingInvoice, { admin: true })
@@ -248,11 +287,15 @@ async function loadBillingWorkspace(request: NextRequest) {
   const invoices = matchingInvoices.slice(pageStart, pageStart + pageSize);
   const bookings = bookingRows
     .map(billableBookingView)
-    .filter((booking) => booking.remaining > 0);
+    .filter((booking) => booking.remaining > 0)
+    .sort(
+      (left, right) =>
+        right.updatedAt.localeCompare(left.updatedAt) || left.id.localeCompare(right.id)
+    );
   return {
     invoices,
     bookings,
-    summary: summarizeBillingInvoices(allInvoices),
+    summary,
     capability: billingCapability(),
     pagination: { page, pageSize, total, totalPages },
   };

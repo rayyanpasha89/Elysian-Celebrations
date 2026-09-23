@@ -102,7 +102,8 @@ async function main() {
              ('public.void_billing_invoice(uuid,text,text)'),
              ('public.record_billing_refund(uuid,integer,text,text,text,text,text)'),
              ('public.set_booking_pricing(uuid,integer,integer,boolean,timestamptz,text)'),
-             ('public.purge_test_booking_financials(uuid[],text)')
+             ('public.purge_test_booking_financials(uuid[],text)'),
+             ('public.admin_billing_summary()')
            ) as billing_function(signature)
          ) as service_billing_execute,
          (
@@ -116,7 +117,8 @@ async function main() {
              ('public.void_billing_invoice(uuid,text,text)'),
              ('public.record_billing_refund(uuid,integer,text,text,text,text,text)'),
              ('public.set_booking_pricing(uuid,integer,integer,boolean,timestamptz,text)'),
-             ('public.purge_test_booking_financials(uuid[],text)')
+             ('public.purge_test_booking_financials(uuid[],text)'),
+             ('public.admin_billing_summary()')
            ) as billing_function(signature)
          ) as browser_billing_execute,
          has_function_privilege(
@@ -146,6 +148,9 @@ async function main() {
     });
 
     await client.query("begin");
+    const summaryBefore = await client.query(
+      "select * from public.admin_billing_summary()"
+    );
     const bookingResult = await client.query(
       `select
          booking.id,
@@ -195,6 +200,22 @@ async function main() {
     assert.match(invoice.invoice_number, /^ELYS-[0-9]{4}-[0-9]{6}$/);
     assert.equal(invoice.status, "ISSUED");
     assert.equal(invoice.amount, 10);
+
+    const summaryAfterIssue = await client.query(
+      "select * from public.admin_billing_summary()"
+    );
+    assert.equal(
+      Number(summaryAfterIssue.rows[0].scheduled),
+      Number(summaryBefore.rows[0].scheduled) + 10
+    );
+    assert.equal(
+      Number(summaryAfterIssue.rows[0].outstanding),
+      Number(summaryBefore.rows[0].outstanding) + 10
+    );
+    assert.equal(
+      Number(summaryAfterIssue.rows[0].issued_count),
+      Number(summaryBefore.rows[0].issued_count) + 1
+    );
 
     const payment = await client.query(
       `select kind, amount, is_paid, paid_at

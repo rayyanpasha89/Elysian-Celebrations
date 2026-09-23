@@ -4,6 +4,7 @@ import {
   useCallback,
   useDeferredValue,
   useEffect,
+  useRef,
   useState,
   type FormEvent,
 } from "react";
@@ -101,6 +102,7 @@ const inputClass =
 export default function AdminBillingPage() {
   const [workspace, setWorkspace] = useState<BillingWorkspace | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("OPEN");
@@ -108,10 +110,14 @@ export default function AdminBillingPage() {
   const deferredSearch = useDeferredValue(search);
   const [page, setPage] = useState(1);
   const [showIssue, setShowIssue] = useState(false);
+  const loadedOnceRef = useRef(false);
+  const requestSequenceRef = useRef(0);
 
   const loadWorkspace = useCallback(async ({ quiet = false }: { quiet?: boolean } = {}) => {
+    const requestSequence = ++requestSequenceRef.current;
     try {
-      if (!quiet) setLoading(true);
+      if (!quiet && loadedOnceRef.current) setRefreshing(true);
+      else if (!quiet) setLoading(true);
       setError(null);
       const params = new URLSearchParams({
         filter,
@@ -125,17 +131,23 @@ export default function AdminBillingPage() {
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) throw new Error(json?.error ?? "Billing workspace could not be loaded");
+      if (requestSequence !== requestSequenceRef.current) return;
       const nextWorkspace = json as BillingWorkspace;
       setWorkspace(nextWorkspace);
+      loadedOnceRef.current = true;
       if (nextWorkspace.pagination.page !== page) {
         setPage(nextWorkspace.pagination.page);
       }
     } catch (loadError) {
+      if (requestSequence !== requestSequenceRef.current) return;
       const message = loadError instanceof Error ? loadError.message : "Billing workspace could not be loaded";
       setError(message);
       if (quiet) toast.error(message);
     } finally {
-      if (!quiet) setLoading(false);
+      if (requestSequence === requestSequenceRef.current) {
+        if (!quiet) setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [deferredSearch, filter, page]);
 
@@ -218,7 +230,12 @@ export default function AdminBillingPage() {
       ) : null}
 
       <section className="grid min-h-[38rem] gap-5 xl:grid-cols-[minmax(0,1fr)_430px]">
-        <div className={cn(dashCard, "p-0")}>
+        <div className={cn(dashCard, "relative p-0")} aria-busy={refreshing}>
+          {refreshing ? (
+            <span className="absolute right-4 top-4 z-10 font-accent text-[8px] uppercase tracking-[0.16em] text-saddle-brown">
+              Updating
+            </span>
+          ) : null}
           <div className="space-y-4 border-b border-charcoal/8 p-4 md:p-5">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>

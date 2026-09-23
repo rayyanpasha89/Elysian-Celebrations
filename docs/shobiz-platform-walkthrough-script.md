@@ -1,8 +1,8 @@
 # Shobiz Havas Platform Walkthrough Script
 
-**Target length:** 14-16 minutes  
-**Presenters:** Rayyan frames the problem and pilot; Kanishka operates the product.  
-**Audience:** Shobiz quotation, event operations, and management teams.  
+**Target length:** 14-16 minutes
+**Presenters:** Rayyan frames the problem and pilot; Kanishka operates the product.
+**Audience:** Shobiz quotation, event operations, and management teams.
 **Demo rule:** Use sample or anonymized data only. Do not show source code, GitHub, cloud consoles, credentials, or another client's data.
 
 ## Before Recording
