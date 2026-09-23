@@ -13,13 +13,12 @@ import {
   Clock,
   IndianRupee,
   ListChecks,
-  MapPin,
   ReceiptText,
-  Sparkles,
   Users,
   Wallet,
 } from "lucide-react";
 import { fadeUp, staggerContainer } from "@/animations/variants";
+import { DashboardVisualHero } from "@/components/dashboard/dashboard-visual-hero";
 import { cn } from "@/lib/utils";
 
 // ─── API payloads ───────────────────────────────────────────────────────────
@@ -31,6 +30,7 @@ type DashboardPayload = {
     date: string | null;
     destinationName: string | null;
     status: string;
+    eventType: string;
   } | null;
   stats: {
     daysUntil: number;
@@ -384,49 +384,19 @@ export default function ClientCommandCenter() {
         </div>
       ) : null}
       {/* Hero */}
-      <motion.section
-        variants={fadeUp}
-        className="relative overflow-hidden border border-charcoal/10 bg-midnight text-ivory"
-      >
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(201,169,110,0.28),transparent_55%)]"
-        />
-        <div className="relative flex flex-col gap-6 p-6 md:flex-row md:items-end md:justify-between md:p-8">
-          <div>
-            <p className="font-accent text-[10px] uppercase tracking-[0.24em] text-gold-primary">
-              {greeting()}, {firstName}
-            </p>
-            <h1 className="mt-2 font-display text-3xl text-ivory md:text-4xl">
-              {wedding?.name ?? "Your celebration"}
-            </h1>
-            <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ivory/70">
-              {wedding?.destinationName ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <MapPin className="h-3.5 w-3.5 text-gold-primary" />
-                  {wedding.destinationName}
-                </span>
-              ) : null}
-              <span className="inline-flex items-center gap-1.5">
-                <Sparkles className="h-3.5 w-3.5 text-gold-primary" />
-                {failedSources.includes("event schedule")
-                  ? "Plan size temporarily unavailable"
-                  : `${agg.plan.events} functions · ${agg.plan.days} days`}
-              </span>
-            </p>
-          </div>
-          <div className="flex items-end gap-4">
-            <div className="text-right">
-              <p className="font-display text-6xl leading-none text-gold-primary">
-                {eventTiming.value}
-              </p>
-              <p className="mt-1 font-accent text-[10px] uppercase tracking-[0.18em] text-ivory/60">
-                {eventTiming.label}
-              </p>
+      <motion.div variants={fadeUp}>
+        <DashboardVisualHero
+          eyebrow={`${greeting()}, ${firstName}`}
+          title={wedding?.name ?? "Your event, composed from one clear plan"}
+          description={`${wedding?.destinationName ? `${wedding.destinationName} · ` : ""}${failedSources.includes("event schedule") ? "Plan size temporarily unavailable" : `${agg.plan.events} functions across ${agg.plan.days} days`}. Move from definition to delivery without losing the thread.`}
+          imageUrl="https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1800&q=82"
+          aside={
+            <div className="border border-ivory/15 bg-charcoal-brown/55 px-7 py-5 text-right backdrop-blur-sm">
+              <p className="font-display text-6xl leading-none text-khaki-beige">{eventTiming.value}</p>
+              <p className="mt-2 font-accent text-[9px] uppercase tracking-[0.18em] text-ivory/55">{eventTiming.label}</p>
             </div>
-          </div>
-        </div>
-        <div className="relative flex flex-wrap gap-2 border-t border-ivory/10 p-3 md:px-8">
+          }
+        >
           {QUICK_ACTIONS.map((action) => (
             <Link
               key={action.href}
@@ -436,8 +406,8 @@ export default function ClientCommandCenter() {
               {action.label}
             </Link>
           ))}
-        </div>
-      </motion.section>
+        </DashboardVisualHero>
+      </motion.div>
 
       {/* Attention now */}
       <motion.section variants={fadeUp}>

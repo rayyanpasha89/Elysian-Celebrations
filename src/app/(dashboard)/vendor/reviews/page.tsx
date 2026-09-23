@@ -115,12 +115,12 @@ function formatDate(raw: string | null) {
 }
 
 function coupleLabelFor(client: ReviewRow["client"]): string {
-  if (!client) return "Anonymous couple";
+  if (!client) return "Anonymous client";
   if (client.partner_name && client.partner_name.trim()) {
     return client.partner_name.trim();
   }
   if (client.user?.name && client.user.name.trim()) return client.user.name.trim();
-  return "Anonymous couple";
+  return "Anonymous client";
 }
 
 export default async function VendorReviewsPage() {
@@ -137,7 +137,7 @@ export default async function VendorReviewsPage() {
           </h2>
           <p className="mt-3 text-sm leading-relaxed text-slate">
             Published reviews appear on your vendor profile and in shortlist
-            previews. Unpublished feedback is hidden from couples until you
+            previews. Unpublished feedback is hidden from clients until you
             request publication.
           </p>
         </div>
@@ -159,7 +159,7 @@ export default async function VendorReviewsPage() {
         <div className={cn(dashCard, "border-dashed border-gold-primary/40 bg-gold-primary/8")}>
           <p className={cn(dashLabel, "text-gold-dark")}>What to do next</p>
           <p className="mt-2 font-heading text-sm leading-relaxed text-charcoal">
-            Publish your vendor profile first — couples need to book you before
+            Publish your vendor profile first — clients need to book you before
             they can leave a review.
           </p>
           <Link href="/vendor/profile" className={cn(dashBtn, "mt-4")}>
@@ -235,12 +235,12 @@ function ReviewsList({
         <div className={cn(dashCard, "border-dashed border-charcoal/15")}>
           <p className={dashLabel}>No reviews yet</p>
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate">
-            Reviews appear here when couples submit feedback after a booking.
-            After a wedding wraps, follow up from{" "}
+            Reviews appear here when clients submit feedback after a booking.
+            After an event wraps, follow up from{" "}
             <Link href="/vendor/bookings" className="text-gold-dark underline-offset-2 hover:underline">
               your bookings
             </Link>{" "}
-            and ask for one — most couples will say yes if asked within a week.
+            and ask for one — most clients will say yes if asked within a week.
           </p>
         </div>
       ) : null}

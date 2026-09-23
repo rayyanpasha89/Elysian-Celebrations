@@ -164,7 +164,7 @@ export default function AdminInquiriesPage() {
       {filtered.length === 0 ? (
         <ListEmptyState
           title={`No ${tab.toLowerCase().replace("_", " ")} inquiries`}
-          hint="Inquiries from the contact form will appear here when couples reach out."
+          hint="Inquiries from the contact form will appear here when event clients reach out."
         />
       ) : (
         <ul className="mt-8 list-none space-y-6 pl-0">

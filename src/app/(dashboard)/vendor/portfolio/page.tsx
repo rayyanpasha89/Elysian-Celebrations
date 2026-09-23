@@ -49,7 +49,7 @@ export default async function VendorPortfolioPage() {
             Portfolio
           </h2>
           <p className="mt-3 text-sm leading-relaxed text-slate">
-            The imagery couples see across vendor profiles, service previews,
+            The imagery clients see across vendor profiles, service previews,
             and the Event Editor catalogue. Edits live alongside the rest of
             your profile.
           </p>
@@ -171,7 +171,7 @@ function PortfolioGallery({ profile }: { profile: PortfolioRow }) {
           <div className={cn(dashCard, "border-dashed border-charcoal/15")}>
             <p className="text-sm text-slate">
               Cover image is published but the gallery is empty. Add at least
-              four portfolio shots so couples have a real frame of reference.
+              four portfolio shots so clients have a real frame of reference.
             </p>
           </div>
         ) : (

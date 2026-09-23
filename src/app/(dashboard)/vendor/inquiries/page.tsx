@@ -150,10 +150,10 @@ function statusLabel(status: string) {
 }
 
 function coupleLabel(client: InquiryRow["client"]): string {
-  if (!client) return "Anonymous couple";
+  if (!client) return "Anonymous client";
   if (client.partner_name && client.partner_name.trim()) return client.partner_name.trim();
   if (client.user?.name && client.user.name.trim()) return client.user.name.trim();
-  return "Anonymous couple";
+  return "Anonymous client";
 }
 
 export default async function VendorInquiriesPage() {
@@ -192,7 +192,7 @@ export default async function VendorInquiriesPage() {
         <div className={cn(dashCard, "border-dashed border-gold-primary/40 bg-gold-primary/8")}>
           <p className={cn(dashLabel, "text-gold-dark")}>What to do next</p>
           <p className="mt-2 font-heading text-sm leading-relaxed text-charcoal">
-            Publish your vendor profile and at least one service so couples
+            Publish your vendor profile and at least one service so clients
             can start sending inquiries.
           </p>
           <Link href="/vendor/profile" className={cn(dashBtn, "mt-4")}>
@@ -219,7 +219,7 @@ function InquiriesList({ inquiries }: { inquiries: InquiryRow[] }) {
       <div className={cn(dashCard, "border-dashed border-gold-primary/30 bg-gold-primary/8")}>
         <p className={cn(dashLabel, "text-gold-dark")}>No open inquiries</p>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-charcoal">
-          When couples reach out from your public profile, their request lands
+          When event clients reach out from your public profile, their request lands
           here. While you wait, tighten your catalogue and profile imagery so
           the next inquiry starts on the strongest footing.
         </p>

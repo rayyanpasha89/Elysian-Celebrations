@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { fadeUp, staggerContainer, staggerItem } from "@/animations/variants";
+import { DashboardVisualHero } from "@/components/dashboard/dashboard-visual-hero";
 import { dashLabel, statusBadgeBase } from "@/lib/dashboard-styles";
 import { cn } from "@/lib/utils";
 
@@ -520,33 +521,20 @@ export default function AdminDashboard() {
       animate="visible"
       className="mx-auto max-w-6xl space-y-6"
     >
-      <motion.section variants={fadeUp} className="relative overflow-hidden border border-charcoal/10 bg-midnight text-ivory">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(201,169,110,0.28),transparent_55%)]"
-        />
-        <div className="relative flex flex-col gap-8 p-6 md:flex-row md:items-end md:justify-between md:p-8">
-          <div className="max-w-2xl">
-            <p className="font-accent text-[10px] uppercase tracking-[0.24em] text-gold-primary">
-              Event operations
-            </p>
-            <h1 className="mt-3 font-display text-3xl font-semibold text-ivory md:text-5xl">
-              Admin operations cockpit
-            </h1>
-            <p className="mt-3 text-sm leading-relaxed text-ivory/70 md:text-base">
-              Track event plans, function readiness, vendor approvals, venue coverage, and lead response
-              from the same flow clients use to build their celebration.
-            </p>
-          </div>
-          <div className="min-w-[13rem] border border-ivory/10 bg-ivory/[0.04] p-5 text-right">
-            <span className={cn(statusBadgeBase, health.className)}>{health.label}</span>
-            <p className="mt-4 font-display text-6xl leading-none text-gold-primary">{ops.opsHealth}%</p>
-            <p className="mt-2 font-accent text-[10px] uppercase tracking-[0.18em] text-ivory/55">
-              ops health
-            </p>
-          </div>
-        </div>
-        <div className="relative flex flex-wrap gap-2 border-t border-ivory/10 p-3 md:px-8">
+      <motion.div variants={fadeUp}>
+        <DashboardVisualHero
+          eyebrow="Platform command"
+          title="Admin operations cockpit"
+          description="Control event readiness, employee permissions, final pricing, client billing, vendor quality, venue coverage, and live-delivery risk from one operating view."
+          imageUrl="https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=1800&q=82"
+          aside={
+            <div className="min-w-52 border border-ivory/15 bg-charcoal-brown/55 px-7 py-5 text-right backdrop-blur-sm">
+              <span className={cn(statusBadgeBase, health.className)}>{health.label}</span>
+              <p className="mt-4 font-display text-6xl leading-none text-khaki-beige">{ops.opsHealth}%</p>
+              <p className="mt-2 font-accent text-[9px] uppercase tracking-[0.18em] text-ivory/55">operations health</p>
+            </div>
+          }
+        >
           <Link
             href={primaryCta.href}
             className="font-accent border border-gold-primary bg-gold-primary px-4 py-2 text-[10px] uppercase tracking-[0.16em] text-midnight transition-colors hover:border-gold-dark hover:bg-gold-dark"
@@ -568,8 +556,8 @@ export default function AdminDashboard() {
               {action.label}
             </Link>
           ))}
-        </div>
-      </motion.section>
+        </DashboardVisualHero>
+      </motion.div>
 
       {data.warnings.length > 0 ? (
         <motion.div variants={fadeUp} className="border border-gold-primary/25 bg-gold-primary/10 p-4">

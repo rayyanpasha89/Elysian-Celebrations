@@ -33,7 +33,7 @@ const navGroups: NavGroup[] = [
     title: "Content",
     items: [
       { label: "Blog Posts", href: "/admin/blog" },
-      { label: "Testimonials", href: "/admin/testimonials" },
+      { label: "Client Stories", href: "/admin/testimonials" },
       { label: "Inquiries", href: "/admin/inquiries" },
     ],
   },

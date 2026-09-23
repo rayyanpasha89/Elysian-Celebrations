@@ -128,7 +128,7 @@ type DayTemplateMap = Record<number, DefaultCelebrationDay[]>;
 const DAY_TEMPLATES: DayTemplateMap = {
   1: [
     {
-      name: "Wedding Day",
+      name: "Main Event",
       offsetDays: 0,
       events: [
         {
@@ -163,7 +163,7 @@ const DAY_TEMPLATES: DayTemplateMap = {
       ],
     },
     {
-      name: "Wedding Day",
+      name: "Main Event",
       offsetDays: 0,
       events: [
         {
@@ -225,7 +225,7 @@ const DAY_TEMPLATES: DayTemplateMap = {
       ],
     },
     {
-      name: "Wedding Day",
+      name: "Main Event",
       offsetDays: 0,
       events: [
         {
@@ -293,7 +293,7 @@ const DAY_TEMPLATES: DayTemplateMap = {
       ],
     },
     {
-      name: "Wedding Day",
+      name: "Main Event",
       offsetDays: 0,
       events: [
         {
@@ -374,7 +374,7 @@ const DAY_TEMPLATES: DayTemplateMap = {
       ],
     },
     {
-      name: "Wedding Day",
+      name: "Main Event",
       offsetDays: 0,
       events: [
         {
@@ -414,7 +414,7 @@ function dateAtMiddayIso(rawDate: string | null | undefined, offsetDays: number)
 
 function genericDayTemplate(count: number): DefaultCelebrationDay[] {
   return Array.from({ length: count }, (_, index) => ({
-    name: index === count - 1 ? "Wedding Day" : `Day ${index + 1}`,
+    name: index === count - 1 ? "Main Event" : `Day ${index + 1}`,
     offsetDays: index - (count - 1),
     events: [
       {

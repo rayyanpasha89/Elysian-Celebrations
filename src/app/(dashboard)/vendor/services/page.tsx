@@ -668,7 +668,7 @@ function ServiceEditor({
           </span>
           <input
             className={cn(inputBase, "mt-2")}
-            placeholder="Signature wedding package"
+            placeholder="Signature event package"
             value={draft.name}
             onChange={(e) => updateField("name", e.target.value)}
           />
@@ -697,7 +697,7 @@ function ServiceEditor({
         </span>
         <textarea
           className={cn(textareaBase, "mt-2")}
-          placeholder="One-line summary couples will see beside the package title."
+          placeholder="One-line summary clients will see beside the package title."
           value={draft.description}
           onChange={(e) => updateField("description", e.target.value)}
         />
@@ -885,7 +885,7 @@ function ServiceEditor({
                 </div>
                 <textarea
                   className={cn(textareaBase, "mt-3 min-h-[64px]")}
-                  placeholder="Optional detail couples will read on the public profile."
+                  placeholder="Optional detail clients will read on the public profile."
                   value={item.description}
                   onChange={(e) =>
                     updateItem(index, { description: e.target.value })

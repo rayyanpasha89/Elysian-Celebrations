@@ -5,6 +5,7 @@ import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { fadeUp, staggerContainer, staggerItem } from "@/animations/variants";
+import { DashboardVisualHero } from "@/components/dashboard/dashboard-visual-hero";
 import { dashLabel, statusBadgeBase } from "@/lib/dashboard-styles";
 import { cn } from "@/lib/utils";
 
@@ -61,6 +62,7 @@ function inquiryStatusStyle(status: string) {
 }
 
 const quickLinks = [
+  { label: "Live operations", href: "/manager/operations" },
   { label: "Inquiries", href: "/manager/inquiries" },
   { label: "Events", href: "/manager/weddings" },
   { label: "Vendors", href: "/manager/vendors" },
@@ -118,53 +120,26 @@ export default function ManagerDashboard() {
   return (
     <div className="mx-auto max-w-6xl space-y-8">
 
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-        className="relative overflow-hidden border border-charcoal/8 bg-[radial-gradient(ellipse_at_top_right,rgba(201,169,110,0.1),transparent_50%)] p-8 lg:p-10"
-      >
-        <div className="pointer-events-none absolute right-0 top-0 h-px w-1/2 bg-gradient-to-l from-transparent via-gold-primary/30 to-transparent" />
-        <div className="flex flex-wrap items-start justify-between gap-6">
-          <div>
-            <p className={dashLabel}>Operations</p>
-            <h1 className="font-display mt-3 text-4xl font-semibold text-charcoal lg:text-5xl">
-              {hubTitle}
-            </h1>
-            <p className="font-heading mt-2 text-base font-light text-slate">
-              {data.subtitle}
-            </p>
-            <div className="mt-5 flex flex-wrap gap-2">
-              {quickLinks.map((l) => (
-                <Link
-                  key={l.href}
-                  href={l.href}
-                  className="font-accent border border-charcoal/15 px-4 py-2 text-[10px] uppercase tracking-[0.18em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark"
-                >
-                  {l.label}
-                </Link>
-              ))}
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}>
+        <DashboardVisualHero
+          eyebrow="Operations portal"
+          title={hubTitle}
+          description={`${data.subtitle}. Move from inquiry to live delivery with event-scoped access and a traceable internal record.`}
+          imageUrl="https://images.unsplash.com/photo-1505373877841-8d25f7d46678?auto=format&fit=crop&w=1800&q=82"
+          aside={
+            <div className="min-w-44 border border-ivory/15 bg-charcoal-brown/55 px-7 py-5 text-right backdrop-blur-sm">
+              <p className="font-accent text-[9px] uppercase tracking-[0.18em] text-ivory/50">Needs attention</p>
+              <p className="mt-2 font-display text-6xl leading-none text-khaki-beige">{stats.pendingInquiries}</p>
+              <p className="mt-2 font-heading text-xs text-ivory/55">open inquiries</p>
             </div>
-          </div>
-
-          {/* Inquiry highlight */}
-          <div className="flex flex-col items-center justify-center border border-gold-primary/20 bg-cream/40 px-8 py-6 text-center min-w-[160px]">
-            <p className={dashLabel}>Needs attention</p>
-            <p className="font-display mt-2 text-5xl font-semibold text-charcoal lg:text-6xl">
-              {stats.pendingInquiries}
-            </p>
-            <p className="font-heading mt-1 text-xs text-slate">open inquiries</p>
-            {stats.pendingInquiries > 0 && (
-              <Link
-                href="/manager/inquiries"
-                className="mt-3 font-accent text-[10px] uppercase tracking-[0.18em] text-gold-primary"
-              >
-                Respond
-              </Link>
-            )}
-          </div>
-        </div>
+          }
+        >
+          {quickLinks.map((link) => (
+            <Link key={link.href} href={link.href} className="font-accent border border-ivory/15 px-4 py-2 text-[10px] uppercase tracking-[0.18em] text-ivory/80 transition-colors hover:border-khaki-beige hover:text-khaki-beige">
+              {link.label}
+            </Link>
+          ))}
+        </DashboardVisualHero>
       </motion.div>
 
       {/* Stat row */}

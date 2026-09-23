@@ -214,7 +214,7 @@ export default function VendorProfilePage() {
         </h2>
         <p className="mt-2 max-w-2xl font-heading text-sm text-slate">
           {hasProfile
-            ? "Keep your public business details current so couples can discover and trust your brand."
+            ? "Keep your public business details current so event clients can discover and trust your brand."
             : "Set up the essentials first. Once this is saved, your vendor workspace will start behaving like a real business profile instead of a placeholder shell."}
         </p>
       </motion.div>

@@ -225,7 +225,7 @@ export default function ClientOnboardingPage() {
   // Step 1
   const [profileName, setProfileName] = useState("");
   // Step 2
-  const [eventType, setEventType] = useState<EventPlatformType>("wedding");
+  const [eventType, setEventType] = useState<EventPlatformType | null>(null);
   const [customEventType, setCustomEventType] = useState("");
   // Step 3 — scale
   const [dayCount, setDayCount] = useState(3);
@@ -239,7 +239,7 @@ export default function ClientOnboardingPage() {
       : match.label;
   }, [eventType, customEventType]);
   const [days, setDays] = useState<LocalDay[]>(() =>
-    Array.from({ length: 3 }, (_, i) => createEmptyDay(i, 3, "Wedding"))
+    Array.from({ length: 3 }, (_, i) => createEmptyDay(i, 3, "Event"))
   );
 
   // Re-shape the days array when day count changes and refresh default copy
@@ -279,8 +279,13 @@ export default function ClientOnboardingPage() {
     () =>
       buildEventDefinitionPayload({
         eventName: profileName,
-        eventType,
-        customEventType: eventType === CUSTOM_EVENT_TYPE_VALUE ? customEventType : null,
+        eventType: eventType ?? CUSTOM_EVENT_TYPE_VALUE,
+        customEventType:
+          eventType === null
+            ? "Event"
+            : eventType === CUSTOM_EVENT_TYPE_VALUE
+              ? customEventType
+              : null,
         eventDate: null,
         dayCount,
         days: days.map(toEventDefinitionDay),
@@ -291,6 +296,7 @@ export default function ClientOnboardingPage() {
   const canAdvance = (): boolean => {
     if (step === 0) return profileName.trim().length >= 2;
     if (step === 1) {
+      if (!eventType) return false;
       if (eventType === CUSTOM_EVENT_TYPE_VALUE) return customEventType.trim().length >= 2;
       return true;
     }
@@ -357,7 +363,7 @@ export default function ClientOnboardingPage() {
           coupleName: profileName.trim(),
           weddingDate: days.find((day) => day.date)?.date ?? null,
           dayCount,
-          eventType,
+          eventType: eventType ?? CUSTOM_EVENT_TYPE_VALUE,
           customEventType:
             eventType === CUSTOM_EVENT_TYPE_VALUE ? customEventType.trim() : null,
           definitionPayload: definition,
@@ -535,7 +541,7 @@ function NameStep({ value, onChange }: { value: string; onChange: (v: string) =>
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="mt-3 w-full border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm outline-none focus:border-gold-primary"
-        placeholder="Priya & Arjun · Spring Wedding"
+        placeholder="Northstar Summit · Bengaluru 2027"
         autoFocus
       />
       <p className="mt-3 text-xs leading-relaxed text-slate">
@@ -552,7 +558,7 @@ function TypeStep({
   onChange,
   onCustomChange,
 }: {
-  value: EventPlatformType;
+  value: EventPlatformType | null;
   custom: string;
   onChange: (v: EventPlatformType) => void;
   onCustomChange: (v: string) => void;

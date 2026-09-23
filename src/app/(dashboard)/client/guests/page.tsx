@@ -46,9 +46,9 @@ type Guest = {
 };
 
 const SIDES: { key: GuestSide; label: string; short: string; color: string }[] = [
-  { key: "BRIDE", label: "Bride's side", short: "Bride", color: DASHBOARD_CHART_COLORS.toffee },
-  { key: "GROOM", label: "Groom's side", short: "Groom", color: DASHBOARD_CHART_COLORS.sage },
-  { key: "COUPLE", label: "Both / shared", short: "Both", color: DASHBOARD_CHART_COLORS.camel },
+  { key: "BRIDE", label: "Host group A", short: "Host A", color: DASHBOARD_CHART_COLORS.toffee },
+  { key: "GROOM", label: "Host group B", short: "Host B", color: DASHBOARD_CHART_COLORS.sage },
+  { key: "COUPLE", label: "Shared guests", short: "Shared", color: DASHBOARD_CHART_COLORS.camel },
 ];
 const SIDE_MAP = Object.fromEntries(SIDES.map((s) => [s.key, s])) as Record<
   GuestSide,
@@ -391,7 +391,7 @@ function SummaryBand({ stats }: { stats: Stats }) {
             </span>
           </div>
           <p className="mt-4 max-w-md text-sm leading-relaxed text-slate">
-            Track every reply, balance both sides, plan the seating, and keep a
+            Track every reply, balance host groups, plan the seating, and keep a
             live dietary count your caterer can actually use.
           </p>
 
@@ -428,7 +428,7 @@ function SummaryBand({ stats }: { stats: Stats }) {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="border border-charcoal/10 bg-cream/30 p-4">
-            <p className={dashLabel}>Both sides</p>
+            <p className={dashLabel}>Guest groups</p>
             <div className="mt-3 space-y-3">
               {SIDES.map((side) => {
                 const value =

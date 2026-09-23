@@ -5262,7 +5262,7 @@ function EmbeddedVendorPlanner({
           <div className="border border-dashed border-charcoal/15 bg-ivory/60 p-4">
             <p className={dashLabel}>No partner selected yet</p>
             <p className="mt-2 text-xs leading-relaxed text-slate">
-              {category.hint} Shortlisted partners appear first, so the couple
+              {category.hint} Shortlisted partners appear first, so the client
               can choose from real options instead of typing vendor names.
             </p>
           </div>

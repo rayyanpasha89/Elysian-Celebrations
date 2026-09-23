@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 const PORTAL_LABELS: Record<string, string> = {
   client: "Client Portal",
   vendor: "Vendor Portal",
-  manager: "Manager Console",
+  manager: "Operations Portal",
   admin: "Admin Console",
 };
 
@@ -49,6 +49,7 @@ const DASHBOARD_ROUTE_TITLES: Record<string, string> = {
   "/admin/vendors": "Vendors",
   "/admin/destinations": "Destinations",
   "/admin/users": "Users",
+  "/admin/team": "Team & Permissions",
   "/admin/bookings": "Bookings",
   "/admin/inquiries": "Inquiries",
   "/admin/analytics": "Analytics",
@@ -57,9 +58,10 @@ const DASHBOARD_ROUTE_TITLES: Record<string, string> = {
   "/admin/packages": "Packages",
   "/admin/venues": "Venues",
   "/admin/blog": "Blog Posts",
-  "/admin/testimonials": "Testimonials",
+  "/admin/testimonials": "Client Stories",
 
   "/manager": "Dashboard",
+  "/manager/operations": "Live Operations",
   "/manager/inquiries": "Inquiries",
   "/manager/bookings": "Bookings",
   "/manager/messages": "Messages",
@@ -89,6 +91,10 @@ function fallbackTitleFromPath(pathname: string): string {
 
 export function resolveDashboardTitle(pathname: string, explicitTitle?: string): string {
   const path = normalizePath(pathname);
+  if (path.startsWith("/manager/operations/") && path.endsWith("/print")) {
+    return "Event Book";
+  }
+  if (path.startsWith("/manager/operations/")) return "Command Center";
   return DASHBOARD_ROUTE_TITLES[path] ?? explicitTitle ?? fallbackTitleFromPath(pathname);
 }
 

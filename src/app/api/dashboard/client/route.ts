@@ -75,7 +75,7 @@ export async function GET() {
     ] = await Promise.all([
       supabase
         .from("weddings")
-        .select("id, name, date, status, destination:destinations(name)")
+        .select("id, name, date, status, event_type, custom_event_type, destination:destinations(name)")
         .eq("client_profile_id", profile.id)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -253,6 +253,7 @@ export async function GET() {
             date: wedding.date,
             destinationName: dest?.name ?? null,
             status: wedding.status,
+            eventType: wedding.custom_event_type || wedding.event_type || "Event",
           }
         : null,
       stats: {
@@ -266,7 +267,7 @@ export async function GET() {
       needsOnboarding,
       needsProfile: false,
       subtitle: wedding
-        ? `${dest?.name ?? "Your destination"} wedding — ${daysUntil(weddingDate)} days to go.`
+        ? `${wedding.custom_event_type || wedding.event_type || "Event"} · ${dest?.name ?? "Destination pending"} · ${daysUntil(weddingDate)} days to go.`
         : "Set up your event plan to unlock planning tools.",
     });
   } catch (e) {

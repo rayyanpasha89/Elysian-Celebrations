@@ -243,7 +243,7 @@ function CalendarList({ events }: { events: CalendarEvent[] }) {
     return (
       <StateCard
         title="No confirmed dates yet"
-        body="Open inquiries and legacy pricing handoffs stay in your inquiries page. Once a couple confirms or pays a deposit, the event appears here automatically."
+        body="Open inquiries and legacy pricing handoffs stay in your inquiries page. Once a client confirms or pays a deposit, the event appears here automatically."
         ctaHref="/vendor/inquiries"
         ctaLabel="Review inquiries"
         gold
@@ -338,7 +338,7 @@ function CalendarCard({ event }: { event: CalendarEvent }) {
         </p>
         <div className="flex flex-wrap gap-2">
           <Link href={`/vendor/messages?bookingId=${event.id}`} className={dashBtn}>
-            Message couple
+            Message client
           </Link>
           <Link
             href={`/vendor/bookings?bookingId=${event.id}`}

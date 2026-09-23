@@ -191,7 +191,7 @@ function WeddingsList({ weddings }: { weddings: WeddingSummary[] }) {
       <div className={cn(dashCard, "border-dashed border-gold-primary/40 bg-gold-primary/8")}>
         <p className={cn(dashLabel, "text-gold-dark")}>No events yet</p>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-charcoal">
-          New client onboarding records will appear here once a couple creates
+          New client onboarding records will appear here once a host creates
           their event. Until then, review incoming inquiries and convert the
           right ones into client accounts.
         </p>

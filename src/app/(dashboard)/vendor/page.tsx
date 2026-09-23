@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { fadeUp, staggerContainer, staggerItem } from "@/animations/variants";
-import { dashLabel, statusBadgeBase } from "@/lib/dashboard-styles";
+import { DashboardVisualHero } from "@/components/dashboard/dashboard-visual-hero";
+import { dashLabel } from "@/lib/dashboard-styles";
 import { cn } from "@/lib/utils";
 
 type VendorDashboardPayload = {
@@ -101,7 +102,7 @@ export default function VendorDashboard() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="font-display text-base font-semibold text-charcoal">Complete your vendor profile</p>
-              <p className="font-heading mt-1 text-sm text-slate">Add your business name, category, and bio so couples can find you.</p>
+              <p className="font-heading mt-1 text-sm text-slate">Add your business name, category, and bio so event clients can find you.</p>
             </div>
             <Link href="/vendor/profile" className="flex-shrink-0 font-accent border border-gold-primary px-5 py-2.5 text-[10px] uppercase tracking-[0.2em] text-gold-primary transition-colors hover:bg-gold-primary hover:text-midnight">
               Complete profile
@@ -110,48 +111,26 @@ export default function VendorDashboard() {
         </motion.div>
       )}
 
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-        className="relative overflow-hidden border border-charcoal/8 bg-[radial-gradient(ellipse_at_top_right,rgba(201,169,110,0.1),transparent_50%)] p-8 lg:p-10"
-      >
-        <div className="pointer-events-none absolute right-0 top-0 h-px w-1/2 bg-gradient-to-l from-transparent via-gold-primary/30 to-transparent" />
-        <div className="flex flex-wrap items-start justify-between gap-6">
-          <div>
-            <p className={dashLabel}>Vendor Portal</p>
-            <h1 className="font-display mt-3 text-4xl font-semibold text-charcoal lg:text-5xl">
-              {vendor?.businessName ?? "Your Studio"}
-            </h1>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              {vendor?.isVerified ? (
-                <span className={cn(statusBadgeBase, "border-sage/70 text-sage")}>Verified</span>
-              ) : (
-                <span className={cn(statusBadgeBase, "border-gold-primary/60 text-gold-dark")}>Pending verification</span>
-              )}
-              <span className="font-heading text-sm text-slate">{data.subtitle ?? "Here's your business snapshot."}</span>
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}>
+        <DashboardVisualHero
+          eyebrow={vendor?.isVerified ? "Verified partner studio" : "Vendor operations"}
+          title={vendor?.businessName ?? "Build the studio clients can trust"}
+          description={data.subtitle ?? "Publish clear services, respond to event briefs, and keep every confirmed delivery visible."}
+          imageUrl="https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=1800&q=82"
+          aside={
+            <div className="min-w-52 border border-ivory/15 bg-charcoal-brown/55 px-7 py-5 text-right backdrop-blur-sm">
+              <p className="font-accent text-[9px] uppercase tracking-[0.18em] text-ivory/50">Paid to date</p>
+              <p className="mt-2 font-display text-4xl text-khaki-beige">{formatRevenue(stats.paidToDate)}</p>
+              <p className="mt-1 font-heading text-xs text-ivory/55">{formatRevenue(stats.outstandingAmount)} outstanding</p>
             </div>
-            <div className="mt-5 flex flex-wrap gap-2">
-              {quickLinks.map((l) => (
-                <Link key={l.href} href={l.href} className="font-accent border border-charcoal/15 px-4 py-2 text-[10px] uppercase tracking-[0.18em] text-charcoal transition-colors hover:border-gold-primary hover:text-gold-dark">
-                  {l.label}
-                </Link>
-              ))}
-            </div>
-          </div>
-
-          {/* Revenue highlight */}
-          <div className="flex flex-col items-center justify-center border border-gold-primary/20 bg-cream/40 px-8 py-6 text-center">
-            <p className={dashLabel}>Paid to date</p>
-            <p className="font-display mt-2 text-4xl font-semibold text-charcoal lg:text-5xl">
-              {formatRevenue(stats.paidToDate)}
-            </p>
-            <p className="font-heading mt-1 text-xs text-slate">
-              {formatRevenue(stats.outstandingAmount)} outstanding across {stats.activeBookings} active booking{stats.activeBookings !== 1 ? "s" : ""}
-            </p>
-          </div>
-        </div>
+          }
+        >
+          {quickLinks.map((link) => (
+            <Link key={link.href} href={link.href} className="font-accent border border-ivory/15 px-4 py-2 text-[10px] uppercase tracking-[0.18em] text-ivory/80 transition-colors hover:border-khaki-beige hover:text-khaki-beige">
+              {link.label}
+            </Link>
+          ))}
+        </DashboardVisualHero>
       </motion.div>
 
       {/* Stats row */}

@@ -107,9 +107,9 @@ export default function AdminTestimonialsPage() {
     return (
       <DashboardLoadError
         eyebrow="Content"
-        pageTitle="Testimonials"
-        label="Testimonial feed unavailable"
-        title="We could not load couple stories"
+        pageTitle="Client Stories"
+        label="Client story feed unavailable"
+        title="We could not load client stories"
         description="The page has not interpreted the failed request as an empty testimonial library. Retry to reconnect to publication state."
         onRetry={() => setReloadKey((key) => key + 1)}
       />
@@ -120,7 +120,7 @@ export default function AdminTestimonialsPage() {
     <motion.div variants={staggerContainer} initial="hidden" animate="visible">
       <motion.div variants={fadeUp}>
         <p className={dashLabel}>Content</p>
-        <h2 className="font-display mt-2 text-3xl font-semibold text-charcoal">Testimonials</h2>
+        <h2 className="font-display mt-2 text-3xl font-semibold text-charcoal">Client Stories</h2>
       </motion.div>
 
       <motion.div variants={fadeUp} className="mt-10 grid grid-cols-2 gap-4 lg:grid-cols-3">
@@ -136,7 +136,7 @@ export default function AdminTestimonialsPage() {
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Couple name, destination"
+          placeholder="Client name, destination"
           className="mt-3 w-full max-w-md border border-charcoal/15 bg-ivory px-4 py-3 font-heading text-sm text-charcoal outline-none transition-colors focus:border-gold-primary"
         />
       </motion.div>
@@ -144,7 +144,7 @@ export default function AdminTestimonialsPage() {
       {filtered.length === 0 ? (
         <ListEmptyState
           title={q.trim() ? "No testimonials match your search" : "No testimonials yet"}
-          hint={q.trim() ? "Try a different couple name or destination." : "Testimonials will appear here once added."}
+          hint={q.trim() ? "Try a different client name or destination." : "Client stories will appear here once added."}
         />
       ) : (
         <motion.div variants={fadeUp} className="mt-10 grid gap-4 lg:grid-cols-2">

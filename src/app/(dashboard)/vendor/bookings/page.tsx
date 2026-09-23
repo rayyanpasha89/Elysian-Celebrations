@@ -310,7 +310,7 @@ export default function VendorBookingsPage() {
       <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
         <div>
           {filtered.length === 0 ? (
-            <ListEmptyState hint="New inquiries will appear here when couples reach out." />
+            <ListEmptyState hint="New inquiries will appear here when event clients reach out." />
           ) : (
             <ul className="list-none space-y-6 pl-0">
               {filtered.map((b) => (
