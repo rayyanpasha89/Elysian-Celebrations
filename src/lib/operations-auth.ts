@@ -1,9 +1,10 @@
 import "server-only";
 
-import type { AuthSession } from "@/lib/api-utils";
+import { apiError, type AuthSession } from "@/lib/api-utils";
 import {
   OPERATIONS_PERMISSIONS,
   effectiveOperationsPermissions,
+  normalizeOperationsPermissions,
   type OperationsPermission,
 } from "@/lib/operations";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
@@ -14,6 +15,57 @@ export type OperationsAccess = {
   permissions: OperationsPermission[];
   eventRole: string | null;
 };
+
+export type OperationsStaffScope = {
+  isActive: boolean;
+  permissions: OperationsPermission[];
+  eventIds: string[];
+};
+
+/**
+ * A Manager account becomes event-scoped as soon as an operations profile is
+ * created. Inactive profiles remain scoped so disabling an employee cannot
+ * accidentally restore the legacy platform-manager access surface.
+ */
+export async function loadOperationsStaffScope(
+  session: AuthSession
+): Promise<OperationsStaffScope | null> {
+  if (session.role !== "manager") return null;
+
+  const supabase = createAdminSupabaseClient();
+  const { data: profile, error: profileError } = await supabase
+    .from("operations_staff_profiles")
+    .select("permissions, is_active")
+    .eq("user_id", session.userId)
+    .maybeSingle();
+  if (profileError) throw profileError;
+  if (!profile) return null;
+
+  const { data: assignments, error: assignmentError } = await supabase
+    .from("event_staff_assignments")
+    .select("wedding_id")
+    .eq("staff_user_id", session.userId)
+    .eq("is_active", true);
+  if (assignmentError) throw assignmentError;
+
+  return {
+    isActive: profile.is_active,
+    permissions: normalizeOperationsPermissions(profile.permissions),
+    eventIds: profile.is_active
+      ? (assignments ?? []).map((assignment) => assignment.wedding_id)
+      : [],
+  };
+}
+
+export async function rejectScopedOperationsManager(session: AuthSession) {
+  const scope = await loadOperationsStaffScope(session);
+  return scope
+    ? apiError(
+        "This employee account is limited to assigned event operations",
+        403
+      )
+    : null;
+}
 
 export async function resolveOperationsAccess(
   session: AuthSession,
@@ -56,4 +108,3 @@ export async function resolveOperationsAccess(
     eventRole: data.event_role,
   };
 }
-

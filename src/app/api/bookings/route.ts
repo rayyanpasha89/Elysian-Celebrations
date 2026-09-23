@@ -16,6 +16,7 @@ import {
   visiblePaymentRows,
   type PaymentLedgerRow,
 } from "@/lib/payment-ledger";
+import { rejectScopedOperationsManager } from "@/lib/operations-auth";
 import type { Database } from "@/types/database.types";
 
 type BookingStatus = Database["public"]["Enums"]["booking_status"];
@@ -293,6 +294,8 @@ export async function GET(request: NextRequest) {
 
   const roleCheck = requireRole(session, "client", "vendor", "admin", "manager");
   if (roleCheck) return roleCheck;
+  const scopeCheck = await rejectScopedOperationsManager(session);
+  if (scopeCheck) return scopeCheck;
 
   try {
     const supabase = createAdminSupabaseClient();

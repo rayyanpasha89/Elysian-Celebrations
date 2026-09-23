@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { getAuthSession, apiError, apiSuccess } from "@/lib/api-utils";
+import { rejectScopedOperationsManager } from "@/lib/operations-auth";
 import type { Database } from "@/types/database.types";
 
 type BookingStatus = Database["public"]["Enums"]["booking_status"];
@@ -56,6 +57,8 @@ export async function PATCH(
 ) {
   const session = await getAuthSession();
   if (session instanceof NextResponse) return session;
+  const scopeCheck = await rejectScopedOperationsManager(session);
+  if (scopeCheck) return scopeCheck;
 
   try {
     const { id } = await params;
@@ -176,6 +179,8 @@ export async function DELETE(
 ) {
   const session = await getAuthSession();
   if (session instanceof NextResponse) return session;
+  const scopeCheck = await rejectScopedOperationsManager(session);
+  if (scopeCheck) return scopeCheck;
 
   try {
     const { id } = await params;

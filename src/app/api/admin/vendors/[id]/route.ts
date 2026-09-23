@@ -6,6 +6,7 @@ import {
   apiError,
   apiSuccess,
 } from "@/lib/api-utils";
+import { rejectScopedOperationsManager } from "@/lib/operations-auth";
 import type { Database } from "@/types/database.types";
 
 type VendorProfileUpdate =
@@ -16,6 +17,8 @@ async function guard() {
   if (session instanceof NextResponse) return { error: session };
   const roleCheck = requireRole(session, "admin", "manager");
   if (roleCheck) return { error: roleCheck };
+  const scopeCheck = await rejectScopedOperationsManager(session);
+  if (scopeCheck) return { error: scopeCheck };
   return { error: null };
 }
 

@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiError, apiSuccess, getAuthSession, requireRole } from "@/lib/api-utils";
+import { isUuid } from "@/lib/id-utils";
 import { OPERATIONS_ITEM_STATUSES, type OperationsItemStatus } from "@/lib/operations";
 import { resolveOperationsAccess } from "@/lib/operations-auth";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
-
-function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(value);
-}
 
 export async function PATCH(
   request: NextRequest,
@@ -81,4 +78,3 @@ export async function PATCH(
     return apiError("The operations item could not be updated", 500);
   }
 }
-

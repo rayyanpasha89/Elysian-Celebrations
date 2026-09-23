@@ -153,6 +153,9 @@ export default function OperationsCommandCenterPage() {
   const canManageIncidents = permissions.includes("MANAGE_INCIDENTS");
   const canPrint = permissions.includes("PRINT_EVENT_BOOK");
   const canViewFinancials = permissions.includes("VIEW_FINANCIALS");
+  const canReadExternalMessages = permissions.some((permission) =>
+    ["MESSAGE_CLIENT", "MESSAGE_VENDORS"].includes(permission)
+  );
 
   const createItem = async (event: FormEvent) => {
     event.preventDefault();
@@ -218,7 +221,7 @@ export default function OperationsCommandCenterPage() {
         <div className="relative flex min-h-[20rem] flex-col justify-between gap-8 p-7 md:p-10">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div><p className="font-accent text-[10px] uppercase tracking-[0.24em] text-khaki-beige">Live operations · {event.eventType}</p><h1 className="mt-3 max-w-3xl font-display text-4xl leading-tight md:text-6xl">{event.name}</h1><div className="mt-4 flex flex-wrap gap-4 font-heading text-xs text-ivory/62"><span className="flex items-center gap-1.5"><CalendarClock className="h-4 w-4" />{dateLabel(event.date)}</span><span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" />{event.destination ?? "Destination pending"}</span><span className="flex items-center gap-1.5"><Users className="h-4 w-4" />{event.clientName}</span></div></div>
-            <div className="flex flex-wrap gap-2">{canPrint ? <Link href={`/manager/operations/${id}/print`} target="_blank" className="inline-flex items-center gap-2 border border-khaki-beige/50 bg-charcoal-brown/35 px-4 py-3 font-accent text-[9px] uppercase tracking-[0.18em] text-khaki-beige backdrop-blur hover:bg-khaki-beige hover:text-charcoal-brown"><Printer className="h-4 w-4" /> Print event book</Link> : null}<Link href="/manager/messages" className="inline-flex items-center gap-2 border border-ivory/18 bg-charcoal-brown/35 px-4 py-3 font-accent text-[9px] uppercase tracking-[0.18em] text-ivory/70 backdrop-blur hover:border-khaki-beige"><MessageSquare className="h-4 w-4" /> External messages</Link></div>
+            <div className="flex flex-wrap gap-2">{canPrint ? <Link href={`/manager/operations/${id}/print`} target="_blank" className="inline-flex items-center gap-2 border border-khaki-beige/50 bg-charcoal-brown/35 px-4 py-3 font-accent text-[9px] uppercase tracking-[0.18em] text-khaki-beige backdrop-blur hover:bg-khaki-beige hover:text-charcoal-brown"><Printer className="h-4 w-4" /> Print event book</Link> : null}{canReadExternalMessages ? <Link href="/manager/messages" className="inline-flex items-center gap-2 border border-ivory/18 bg-charcoal-brown/35 px-4 py-3 font-accent text-[9px] uppercase tracking-[0.18em] text-ivory/70 backdrop-blur hover:border-khaki-beige"><MessageSquare className="h-4 w-4" /> External messages</Link> : null}</div>
           </div>
           <div className="grid max-w-3xl grid-cols-2 gap-px bg-ivory/12 sm:grid-cols-4">
             {[["Open items", pulse.open], ["Urgent", pulse.urgent], ["Functions ready", `${pulse.ready}/${functions.length}`], ["Partners", pulse.vendors]].map(([label, value]) => <div key={label} className="bg-charcoal-brown/76 px-4 py-4 backdrop-blur"><p className="font-display text-2xl">{value}</p><p className="mt-1 font-accent text-[8px] uppercase tracking-[0.18em] text-ivory/45">{label}</p></div>)}

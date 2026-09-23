@@ -6,6 +6,7 @@ import {
   apiError,
   apiSuccess,
 } from "@/lib/api-utils";
+import { rejectScopedOperationsManager } from "@/lib/operations-auth";
 import type { Database } from "@/types/database.types";
 
 type ContactInquiryUpdate =
@@ -32,6 +33,8 @@ export async function GET() {
   if (session instanceof NextResponse) return session;
   const roleCheck = requireRole(session, "admin", "manager");
   if (roleCheck) return roleCheck;
+  const scopeCheck = await rejectScopedOperationsManager(session);
+  if (scopeCheck) return scopeCheck;
 
   try {
     const supabase = createAdminSupabaseClient();
@@ -57,6 +60,8 @@ export async function PATCH(request: NextRequest) {
   if (session instanceof NextResponse) return session;
   const roleCheck = requireRole(session, "admin", "manager");
   if (roleCheck) return roleCheck;
+  const scopeCheck = await rejectScopedOperationsManager(session);
+  if (scopeCheck) return scopeCheck;
 
   try {
     const supabase = createAdminSupabaseClient();

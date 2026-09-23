@@ -6,12 +6,15 @@ import {
   apiError,
   apiSuccess,
 } from "@/lib/api-utils";
+import { rejectScopedOperationsManager } from "@/lib/operations-auth";
 
 export async function GET() {
   const session = await getAuthSession();
   if (session instanceof NextResponse) return session;
   const roleCheck = requireRole(session, "admin", "manager");
   if (roleCheck) return roleCheck;
+  const scopeCheck = await rejectScopedOperationsManager(session);
+  if (scopeCheck) return scopeCheck;
 
   try {
     const supabase = createAdminSupabaseClient();

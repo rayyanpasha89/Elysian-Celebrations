@@ -5,8 +5,17 @@ import {
   requireRole,
   apiError,
   apiSuccess,
+  type AuthSession,
 } from "@/lib/api-utils";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { loadOperationsStaffScope } from "@/lib/operations-auth";
+import { isUuid } from "@/lib/id-utils";
+
+function canReadOperationsMessages(permissions: readonly string[]) {
+  return permissions.some((permission) =>
+    ["MESSAGE_CLIENT", "MESSAGE_VENDORS"].includes(permission)
+  );
+}
 
 function relTime(iso: string): string {
   const d = new Date(iso);
@@ -74,6 +83,7 @@ type BookingRow = {
   }>;
   wedding_event: SingleOrArray<{
     id: string;
+    wedding_id: string;
     name: string | null;
     event_type: string | null;
     date: string | null;
@@ -154,7 +164,7 @@ type Conversation = {
 const MESSAGE_PAGE_SIZE = 40;
 const MESSAGE_PAGE_QUERY_SIZE = MESSAGE_PAGE_SIZE + 1;
 const BOOKING_SELECT =
-  "id, status, event_date, created_at, notes, client:client_profiles(user_id, partner_name), vendor:vendor_profiles(user_id, business_name, slug), service:vendor_services(id, name, service_scope), wedding_event:wedding_events(id, name, event_type, date, start_time, venue, wedding_day:wedding_days!wedding_events_wedding_day_id_fkey(id, name, date))";
+  "id, status, event_date, created_at, notes, client:client_profiles(user_id, partner_name), vendor:vendor_profiles(user_id, business_name, slug), service:vendor_services(id, name, service_scope), wedding_event:wedding_events(id, wedding_id, name, event_type, date, start_time, venue, wedding_day:wedding_days!wedding_events_wedding_day_id_fkey(id, name, date))";
 
 function deriveBookingContext(booking: BookingRow): BookingContext {
   const service = pickOne(booking.service);
@@ -347,15 +357,9 @@ async function loadInboxSnapshots(
   return byBooking;
 }
 
-function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value
-  );
-}
-
 async function loadOlderMessagePage(
   supabase: ReturnType<typeof createAdminSupabaseClient>,
-  session: { userId: string; role: string },
+  session: AuthSession,
   searchParams: URLSearchParams
 ) {
   const bookingId = searchParams.get("bookingId")?.trim() ?? "";
@@ -374,7 +378,7 @@ async function loadOlderMessagePage(
   const { data: booking, error: bookingError } = await supabase
     .from("bookings")
     .select(
-      "id, client:client_profiles(user_id), vendor:vendor_profiles(user_id)"
+      "id, client:client_profiles(user_id), vendor:vendor_profiles(user_id), wedding_event:wedding_events(wedding_id)"
     )
     .eq("id", bookingId)
     .maybeSingle();
@@ -387,8 +391,14 @@ async function loadOlderMessagePage(
 
   const client = pickOne(booking.client);
   const vendor = pickOne(booking.vendor);
+  const bookingEvent = pickOne(booking.wedding_event);
+  const managerScope = await loadOperationsStaffScope(session);
   const canRead =
-    session.role === "manager" ||
+    (session.role === "manager" &&
+      (!managerScope ||
+        (canReadOperationsMessages(managerScope.permissions) &&
+          bookingEvent &&
+          managerScope.eventIds.includes(bookingEvent.wedding_id)))) ||
     session.role === "admin" ||
     client?.user_id === session.userId ||
     vendor?.user_id === session.userId;
@@ -550,10 +560,35 @@ export async function GET(request: Request) {
     }
 
     if (session.role === "manager" || session.role === "admin") {
-      const { data: bookings, error: bErr } = await supabase
+      const managerScope = await loadOperationsStaffScope(session);
+      if (
+        managerScope &&
+        !canReadOperationsMessages(managerScope.permissions)
+      ) {
+        return apiError("External message access is not enabled for this role", 403);
+      }
+      if (managerScope && managerScope.eventIds.length === 0) {
+        return apiSuccess({ conversations: [] });
+      }
+      const { data: assignedFunctions, error: functionError } = managerScope
+        ? await supabase
+            .from("wedding_events")
+            .select("id")
+            .in("wedding_id", managerScope.eventIds)
+        : { data: null, error: null };
+      if (functionError) throw functionError;
+      const functionIds = (assignedFunctions ?? []).map((event) => event.id);
+      if (managerScope && functionIds.length === 0) {
+        return apiSuccess({ conversations: [] });
+      }
+      let bookingQuery = supabase
         .from("bookings")
         .select(BOOKING_SELECT)
         .order("created_at", { ascending: false });
+      if (managerScope) {
+        bookingQuery = bookingQuery.in("wedding_event_id", functionIds);
+      }
+      const { data: bookings, error: bErr } = await bookingQuery;
 
       if (bErr) {
         console.error("bookings:", bErr);
@@ -616,7 +651,7 @@ export async function PATCH(request: Request) {
     const supabase = createAdminSupabaseClient();
     const { data: booking, error: bookingErr } = await supabase
       .from("bookings")
-      .select("id, client:client_profiles(user_id), vendor:vendor_profiles(user_id)")
+      .select("id, client:client_profiles(user_id), vendor:vendor_profiles(user_id), wedding_event:wedding_events(wedding_id)")
       .eq("id", bookingId)
       .maybeSingle();
 
@@ -634,9 +669,15 @@ export async function PATCH(request: Request) {
     const vendorRelation = Array.isArray(booking.vendor)
       ? booking.vendor[0]
       : booking.vendor;
+    const bookingEvent = pickOne(booking.wedding_event);
+    const managerScope = await loadOperationsStaffScope(session);
 
     const canRead =
-      session.role === "manager" ||
+      (session.role === "manager" &&
+        (!managerScope ||
+          (canReadOperationsMessages(managerScope.permissions) &&
+            bookingEvent &&
+            managerScope.eventIds.includes(bookingEvent.wedding_id)))) ||
       session.role === "admin" ||
       clientRelation?.user_id === session.userId ||
       vendorRelation?.user_id === session.userId;

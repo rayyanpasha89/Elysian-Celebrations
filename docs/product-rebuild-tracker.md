@@ -4,7 +4,7 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
 
 ## Deployment Handoff
 
-- Current verified source branch: `codex/production-readiness`
+- Current verified source branch: `codex/live-operations`
 - Primary GitHub remote: `origin` -> `rayyanpasha89/Elysian-Celebrations`
 - Vercel handoff path: merge/push to `origin/main` only after explicit launch approval
 - Base pushed commit before this tracker was added: `e79873b Deepen wedding planning and event budgets`
@@ -67,6 +67,9 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
   - `20260901193028_make_event_plan_deletion_atomic.sql`
   - `20260902072526_add_billing_gateway_transactions.sql`
   - `20260902073945_retry_unmatched_billing_webhooks.sql`
+  - `20260923072223_preserve_retired_venue_selections.sql`
+  - `20260923180753_add_admin_billing_summary.sql`
+  - `20260923190000_event_operations_command_center.sql`
 - Remote table/column checks passed for:
   - `wedding_event_menus`
   - `wedding_event_menu_items`
@@ -119,6 +122,37 @@ claims that the changes are committed, deployed, or active in the remote databas
   Realtime remains deferred pending a Clerk-to-Supabase JWT bridge.
 
 ## Shipped Recently
+
+- Added an event-scoped live operations layer for Elysian employees. Admin can
+  configure operations role templates, granular capabilities, active state,
+  contact details, shifts, event roles, and exact event assignments through
+  `/admin/team`; a Manager identity receives no event access until the profile
+  and assignment are active.
+- Added `/manager/operations` and an event command center that reshapes the
+  existing event plan for delivery: live pulse, day/function run of show,
+  partner and team contacts, internal updates, incidents, decisions,
+  escalations, acknowledgement/resolution history, ownership, due times, and
+  permission-gated financial context.
+- Added a printable event book at `/manager/operations/[id]/print` using the
+  same authorized server read model as the command center. The print output
+  includes open attention, schedule, tasks, menus, logistics, partners, and
+  team handoffs while preserving financial permission boundaries.
+- Added the rollback-clean operations database contract and authenticated
+  journey coverage for admin assignment, manager scope, incident lifecycle,
+  client denial, dynamic command-center rendering, and print rendering.
+- Closed the legacy Manager escape hatch for profiled operations employees.
+  Their navigation is reduced to assigned operations, permitted external
+  message oversight, and settings; broad client/vendor/inquiry/booking/payment
+  APIs reject them, while message reads are filtered to functions belonging to
+  their assigned events. Inactive profiles remain scoped rather than regaining
+  platform-manager access.
+- Broadened visible portal language and first-run defaults beyond weddings,
+  added editorial imagery to all four dashboard homes, and kept legacy schema
+  names only where compatibility requires them.
+- Added `docs/elysian-full-platform-walkthrough-script.md`, a role-by-role
+  recording script covering marketing, client planning, vendor delivery,
+  pricing/billing, employee permissions, live operations, and print without
+  presenting the separate Shobiz pilot as shipped work.
 
 - Replaced the Layer 2 editor's event PATCH + planning PATCH + booking create/delete
   chain with one `/api/wedding/events/[id]/workspace` request backed by the
@@ -268,11 +302,13 @@ claims that the changes are committed, deployed, or active in the remote databas
 - `npm run build`
 - `npm audit --omit=dev` (zero vulnerabilities after the Next/PostCSS/Sharp patch upgrade)
 - `npm run db:migrations`
-- `npm run db:push:dry-run` (remote up to date through `20260902073945`)
+- `npm run db:push:dry-run` (remote up to date through `20260923190000`)
 - `npm run test:event-plan` (5 focused cases)
 - `npm run test:planning-atomic` (15 focused cases with full rollback)
 - `npm run test:event-function` (8 focused cases with full rollback)
 - `npm run test:event-plan-delete` (6 focused cases with full rollback)
+- `npm run test:operations` (event-scoped access, assignee integrity, and
+  incident lifecycle with full rollback)
 - `npm run test:ownership` (14 focused cases with full rollback)
 - `npm run test:venue` (6 focused cases)
 - `npm run test:payments` (8 focused cases with full rollback)
@@ -280,7 +316,8 @@ claims that the changes are committed, deployed, or active in the remote databas
 - `npm run test:billing-gateway` (13 focused cases with full rollback)
 - `npm run test:readiness` (8 focused cases)
 - `npm run test:abuse-controls` (rate limit, grants, RLS, and media reservations)
-- `npm run test:journeys` (9 authenticated groups, including all 48 portal routes)
+- `npm run test:journeys` (10 authenticated groups, including event-scoped
+  operations and every portal navigation destination)
 - `npx supabase db lint --schema public --level warning --fail-on error`
 - `npm run db:query` for newly added Supabase tables and columns
 - `npm run db:push` for pending media + realtime migrations

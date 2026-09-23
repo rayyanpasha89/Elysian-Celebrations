@@ -7,6 +7,7 @@ import {
 } from "@/lib/api-utils";
 import { isPaymentMethod } from "@/lib/payment-ledger";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { rejectScopedOperationsManager } from "@/lib/operations-auth";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database.types";
 
@@ -54,6 +55,8 @@ export async function PATCH(
   if (session instanceof NextResponse) return session;
   const roleCheck = requireRole(session, "admin", "manager");
   if (roleCheck) return roleCheck;
+  const scopeCheck = await rejectScopedOperationsManager(session);
+  if (scopeCheck) return scopeCheck;
 
   const limited = await enforceRateLimit(request, {
     scope: "payment-action",

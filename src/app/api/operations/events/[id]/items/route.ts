@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiError, apiSuccess, getAuthSession, requireRole } from "@/lib/api-utils";
+import { isUuid } from "@/lib/id-utils";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import {
   OPERATIONS_ITEM_KINDS,
@@ -12,13 +13,6 @@ import { createAdminSupabaseClient } from "@/lib/supabase/server";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isUuid(value: unknown): value is string {
-  return (
-    typeof value === "string" &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(value)
-  );
 }
 
 function text(value: unknown, maximum: number) {
@@ -121,4 +115,3 @@ export async function POST(
     return apiError("The operations update could not be saved", 500);
   }
 }
-

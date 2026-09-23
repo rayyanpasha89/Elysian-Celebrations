@@ -75,19 +75,13 @@ const PORTAL_ROUTE_MATRIX = {
     "/vendor/settings",
   ],
   manager: [
-    "/manager",
-    "/manager/inquiries",
-    "/manager/bookings",
+    "/manager/operations",
     "/manager/messages",
-    "/manager/clients",
-    "/manager/vendors",
-    "/manager/configurator",
-    "/manager/destinations",
-    "/manager/weddings",
     "/manager/settings",
   ],
   admin: [
     "/admin",
+    "/admin/team",
     "/admin/analytics",
     "/admin/pricing",
     "/admin/billing",
@@ -427,6 +421,7 @@ async function cleanupFixture(supabase: TestSupabase, fixture: Fixture) {
     sha256(`vendor-catalogue-read:ip:${fixture.requestAddress}`),
     sha256(`message-send:${fixture.userIds.client}`),
     sha256(`message-send:${fixture.userIds.vendor}`),
+    sha256(`operations-feed-create:${fixture.userIds.manager}`),
     sha256(`billing-invoice-issue:${fixture.userIds.admin}`),
   ];
   const cleanupActions: [string, PromiseLike<{ error: { message: string } | null }>][] = [
@@ -948,6 +943,132 @@ async function runJourneys(
     );
   });
 
+  await check("admin assigns event-scoped operations access and incidents preserve lifecycle", async () => {
+    assert.ok(fixture.weddingId && fixture.eventId);
+
+    await http.request("admin", "/api/admin/team", {
+      method: "PATCH",
+      body: {
+        action: "PROFILE",
+        userId: fixture.userIds.manager,
+        roleTemplate: "OPS_LEAD",
+        jobTitle: "Journey operations lead",
+        phone: "+910000000000",
+        isActive: true,
+      },
+    });
+    await http.request("admin", "/api/admin/team", {
+      method: "PATCH",
+      body: {
+        action: "ASSIGNMENT",
+        userId: fixture.userIds.manager,
+        eventId: fixture.weddingId,
+        eventRole: "Event lead",
+        shiftStart: "2027-02-20T02:30:00.000Z",
+        shiftEnd: "2027-02-20T15:30:00.000Z",
+        notes: "Authenticated journey handoff.",
+        permissions: null,
+        isActive: true,
+      },
+    });
+
+    const team = asRecord(
+      (await http.request("admin", "/api/admin/team")).payload,
+      "admin team"
+    );
+    const manager = asArray(team.staff, "admin team staff")
+      .map((entry) => asRecord(entry, "admin team member"))
+      .find((entry) => entry.id === fixture.userIds.manager);
+    assert.ok(manager, "manager should appear in the operations team directory");
+    assert.equal(
+      asRecord(manager.profile, "manager operations profile").role_template,
+      "OPS_LEAD"
+    );
+    assert.equal(asArray(manager.assignments, "manager assignments").length, 1);
+
+    for (const path of [
+      "/api/dashboard/manager",
+      "/api/admin/clients",
+      "/api/admin/users",
+      "/api/admin/vendors",
+      "/api/admin/inquiries",
+      "/api/bookings",
+    ]) {
+      await http.request("manager", path, { expectedStatus: 403 });
+    }
+
+    const eventsPayload = asRecord(
+      (await http.request("manager", "/api/operations/events")).payload,
+      "operations event list"
+    );
+    assert.equal(asArray(eventsPayload.events, "operations events").length, 1);
+    assert.equal(
+      asRecord(asArray(eventsPayload.events, "operations events")[0], "operations event").id,
+      fixture.weddingId
+    );
+
+    const workspace = asRecord(
+      (
+        await http.request(
+          "manager",
+          `/api/operations/events/${fixture.weddingId}`
+        )
+      ).payload,
+      "operations workspace"
+    );
+    assert.equal(asRecord(workspace.event, "operations workspace event").id, fixture.weddingId);
+    assert.equal(asArray(workspace.team, "operations workspace team").length, 1);
+    assert.equal(
+      hasKeyDeep(workspace, "vendorAmount"),
+      false,
+      "operations workspace must never expose vendor settlement amounts"
+    );
+
+    const created = asRecord(
+      (
+        await http.request(
+          "manager",
+          `/api/operations/events/${fixture.weddingId}/items`,
+          {
+            method: "POST",
+            expectedStatus: 201,
+            body: {
+              kind: "INCIDENT",
+              severity: "URGENT",
+              title: "Journey shuttle delayed",
+              body: "Driver is ten minutes behind the call time.",
+              eventId: fixture.eventId,
+              assigneeUserId: fixture.userIds.manager,
+              dueAt: "2027-02-20T03:00:00.000Z",
+            },
+          }
+        )
+      ).payload,
+      "operations item creation"
+    );
+    const itemId = String(asRecord(created.item, "operations item").id);
+    await http.request(
+      "manager",
+      `/api/operations/events/${fixture.weddingId}/items/${itemId}`,
+      { method: "PATCH", body: { status: "ACKNOWLEDGED" } }
+    );
+    const resolved = asRecord(
+      (
+        await http.request(
+          "manager",
+          `/api/operations/events/${fixture.weddingId}/items/${itemId}`,
+          { method: "PATCH", body: { status: "RESOLVED" } }
+        )
+      ).payload,
+      "resolved operations item"
+    );
+    assert.equal(asRecord(resolved.item, "resolved item").status, "RESOLVED");
+
+    await http.request("client", "/api/operations/events", { expectedStatus: 403 });
+    await http.page("manager", `/manager/operations/${fixture.weddingId}`);
+    await http.page("manager", `/manager/operations/${fixture.weddingId}/print`);
+  });
+
   await check("vendor discovery, detail, and shortlist are connected", async () => {
     assert.ok(fixture.vendorProfileId && fixture.vendorServiceId);
     const discovery = await http.request(
@@ -1038,6 +1159,13 @@ async function runJourneys(
         .map((entry) => asRecord(entry, `${role} conversation`))
         .find((entry) => entry.id === fixture.bookingId);
       assert.ok(conversation, `${role} should see the test conversation`);
+      if (role === "manager") {
+        assert.equal(
+          conversations.length,
+          1,
+          "event-scoped operations employees must not see unassigned threads"
+        );
+      }
       const messageTexts = asArray(conversation.messages, `${role} thread messages`).map(
         (entry) => String(asRecord(entry, `${role} thread message`).text)
       );

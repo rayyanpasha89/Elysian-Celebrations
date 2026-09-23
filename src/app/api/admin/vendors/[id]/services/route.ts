@@ -6,6 +6,7 @@ import {
   apiError,
   apiSuccess,
 } from "@/lib/api-utils";
+import { rejectScopedOperationsManager } from "@/lib/operations-auth";
 import { deleteVendorServiceImage } from "@/lib/supabase/storage";
 import type { Database } from "@/types/database.types";
 
@@ -24,6 +25,8 @@ async function guard() {
   if (session instanceof NextResponse) return session;
   const roleCheck = requireRole(session, "admin", "manager");
   if (roleCheck) return roleCheck;
+  const scopeCheck = await rejectScopedOperationsManager(session);
+  if (scopeCheck) return scopeCheck;
   return null;
 }
 

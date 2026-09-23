@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getOptionalAuthSession } from "@/lib/api-utils";
+import { loadOperationsStaffScope } from "@/lib/operations-auth";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import {
   dashBtn,
@@ -95,6 +96,9 @@ async function loadWeddings(): Promise<LoadResult> {
   const session = await getOptionalAuthSession();
   if (!session) return { kind: "unauthenticated" };
   if (session.role !== "manager" && session.role !== "admin") {
+    return { kind: "forbidden" };
+  }
+  if (await loadOperationsStaffScope(session)) {
     return { kind: "forbidden" };
   }
 
