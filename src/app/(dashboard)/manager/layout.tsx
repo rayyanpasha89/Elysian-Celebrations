@@ -12,6 +12,8 @@ const navGroups: NavGroup[] = [
   {
     title: "Operations",
     items: [
+      { label: "Live Operations", href: "/manager/operations" },
+      { label: "Event Directory", href: "/manager/weddings" },
       { label: "Inquiries", href: "/manager/inquiries" },
       { label: "Bookings", href: "/manager/bookings" },
       { label: "Messages", href: "/manager/messages" },
@@ -44,9 +46,9 @@ export default async function ManagerLayout({
   return (
     <PortalShell
       groups={navGroups}
-      portalName="Manager Portal"
+      portalName="Operations Portal"
       portalHref="/manager"
-      fallbackName="Manager"
+      fallbackName="Operations"
       role={session.role}
     >
       {children}

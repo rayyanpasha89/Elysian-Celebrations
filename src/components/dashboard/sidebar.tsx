@@ -74,6 +74,7 @@ const ICON_BY_HREF: Record<string, LucideIcon> = {
   "/admin/vendors": Store,
   "/admin/destinations": MapPin,
   "/admin/users": Users,
+  "/admin/team": Users,
   "/admin/clients": Contact,
   "/admin/bookings": CalendarCheck,
   "/admin/inquiries": Inbox,
@@ -85,6 +86,7 @@ const ICON_BY_HREF: Record<string, LucideIcon> = {
   "/admin/settings": Settings,
   // Manager
   "/manager": LayoutDashboard,
+  "/manager/operations": CalendarClock,
   "/manager/inquiries": Inbox,
   "/manager/bookings": CalendarCheck,
   "/manager/messages": MessageSquare,
@@ -115,7 +117,7 @@ export function Sidebar({ groups, portalName, portalHref }: SidebarProps) {
   const pathname = usePathname();
 
   return (
-    <aside className="fixed bottom-4 left-4 top-4 z-40 hidden w-56 overflow-hidden border border-ivory/10 bg-midnight text-ivory shadow-[0_24px_80px_rgba(0,0,0,0.32)] lg:flex lg:flex-col">
+    <aside className="portal-sidebar fixed bottom-4 left-4 top-4 z-40 hidden w-56 overflow-hidden border border-ivory/10 bg-midnight text-ivory shadow-[0_24px_80px_rgba(0,0,0,0.32)] lg:flex lg:flex-col">
       <div className="pointer-events-none absolute inset-0 opacity-80 [background-image:linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] [background-size:24px_24px]" />
       <div className="pointer-events-none absolute -top-28 left-1/2 h-56 w-56 -translate-x-1/2 bg-gold-primary/20 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-20 right-0 h-40 w-40 bg-sage/10 blur-3xl" />
@@ -232,7 +234,7 @@ export function MobileSidebar({ groups, portalName, portalHref }: SidebarProps) 
         ref={triggerRef}
         type="button"
         onClick={() => setIsOpen(true)}
-        className="fixed left-4 top-4 z-50 flex h-10 w-10 items-center justify-center border border-charcoal/15 bg-ivory/95 text-charcoal shadow-[0_12px_32px_rgba(24,24,20,0.12)] backdrop-blur transition-colors hover:border-gold-primary lg:hidden"
+        className="portal-mobile-nav fixed left-4 top-4 z-50 flex h-10 w-10 items-center justify-center border border-charcoal/15 bg-ivory/95 text-charcoal shadow-[0_12px_32px_rgba(24,24,20,0.12)] backdrop-blur transition-colors hover:border-gold-primary lg:hidden"
         aria-label="Open menu"
         aria-haspopup="dialog"
         aria-expanded={isOpen}

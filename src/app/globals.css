@@ -132,6 +132,45 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+@media print {
+  body:has(.event-book-print) {
+    background: white;
+  }
+
+  body:has(.event-book-print) .portal-sidebar,
+  body:has(.event-book-print) .portal-mobile-nav,
+  body:has(.event-book-print) .portal-topbar,
+  body:has(.event-book-print) .event-book-screen-actions {
+    display: none !important;
+  }
+
+  body:has(.event-book-print) .portal-content-shell {
+    padding-left: 0 !important;
+  }
+
+  body:has(.event-book-print) .portal-main {
+    padding: 0 !important;
+  }
+
+  .event-book-print {
+    color: #222;
+    font-size: 10pt;
+  }
+
+  .event-book-print .event-book-section {
+    break-inside: avoid;
+  }
+
+  .event-book-print .event-book-day {
+    break-before: page;
+  }
+
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+}
+
 :focus-visible {
   outline: 2px solid var(--gold-primary);
   outline-offset: 2px;

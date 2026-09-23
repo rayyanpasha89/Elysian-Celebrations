@@ -35,12 +35,12 @@ export function PortalShell({
       <PortalRoleGuard role={role} />
       <Sidebar groups={groups} portalName={portalName} portalHref={portalHref} />
       <MobileSidebar groups={groups} portalName={portalName} portalHref={portalHref} />
-      <div className="lg:pl-64">
+      <div className="portal-content-shell lg:pl-64">
         <Topbar
           userName={user?.fullName ?? fallbackName}
           userRole={dashboardRoleLabel(role, fallbackName)}
         />
-        <main className="px-6 py-8 lg:px-8">{children}</main>
+        <main className="portal-main px-6 py-8 lg:px-8">{children}</main>
       </div>
     </>
   );

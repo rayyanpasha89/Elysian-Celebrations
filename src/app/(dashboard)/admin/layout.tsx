@@ -41,6 +41,7 @@ const navGroups: NavGroup[] = [
     title: "System",
     items: [
       { label: "Users", href: "/admin/users" },
+      { label: "Team & Permissions", href: "/admin/team" },
       { label: "Settings", href: "/admin/settings" },
     ],
   },
