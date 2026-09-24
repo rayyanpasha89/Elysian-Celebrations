@@ -24,6 +24,7 @@ type Fixture = {
   vendorName: string;
   vendorProfileId: string | null;
   vendorServiceId: string | null;
+  freshVendorServiceId: string | null;
   weddingId: string | null;
   dayId: string | null;
   eventId: string | null;
@@ -150,6 +151,7 @@ function makeFixture(): Fixture {
     vendorName: `Journey Atelier ${runId}`,
     vendorProfileId: null,
     vendorServiceId: null,
+    freshVendorServiceId: null,
     weddingId: null,
     dayId: null,
     eventId: null,
@@ -380,6 +382,31 @@ async function seedFixture(supabase: TestSupabase, fixture: Fixture) {
     );
   }
   fixture.vendorServiceId = service.id;
+
+  const { data: freshService, error: freshServiceError } = await supabase
+    .from("vendor_services")
+    .insert({
+      vendor_profile_id: vendorProfile.id,
+      name: "Authenticated Journey Production Desk",
+      description: "A second test-only service used to prove first-time booking inserts.",
+      service_scope: "A production desk for one event function.",
+      base_price: 75_000,
+      max_price: 110_000,
+      unit: "event",
+      event_type_fit: ["corporate", "conference"],
+      inclusions: ["Production lead"],
+      deliverables: ["Production cue sheet"],
+      add_ons: ["Speaker ready room"],
+      is_active: true,
+    })
+    .select("id")
+    .single();
+  if (freshServiceError || !freshService) {
+    throw new Error(
+      `Creating fresh-booking vendor service: ${freshServiceError?.message ?? "no row returned"}`
+    );
+  }
+  fixture.freshVendorServiceId = freshService.id;
 }
 
 async function cleanupFixture(supabase: TestSupabase, fixture: Fixture) {
@@ -1337,7 +1364,7 @@ async function runJourneys(
     const detailBody = asRecord(detail.payload, "vendor detail");
     assert.equal(detailBody.id, fixture.vendorProfileId);
     assert.equal(hasKeyDeep(detailBody, "user_id"), false, "public detail must not leak user ids");
-    assert.equal(asArray(detailBody.services, "vendor services").length, 1);
+    assert.equal(asArray(detailBody.services, "vendor services").length, 2);
 
     const saved = await http.request("client", "/api/saved-vendors", {
       method: "POST",
@@ -1354,7 +1381,29 @@ async function runJourneys(
   });
 
   await check("booking and two-way messaging work with ownership enforcement", async () => {
-    assert.ok(fixture.vendorProfileId && fixture.vendorServiceId && fixture.eventId);
+    assert.ok(
+      fixture.vendorProfileId &&
+        fixture.vendorServiceId &&
+        fixture.freshVendorServiceId &&
+        fixture.eventId
+    );
+
+    const freshBookingResponse = await http.request("client", "/api/bookings", {
+      method: "POST",
+      expectedStatus: 201,
+      body: {
+        vendorProfileId: fixture.vendorProfileId,
+        vendorServiceId: fixture.freshVendorServiceId,
+        weddingEventId: fixture.eventId,
+        notes: "A genuinely new booking that must exercise the database insert path.",
+      },
+    });
+    const freshBooking = asRecord(
+      freshBookingResponse.payload,
+      "freshly created booking"
+    );
+    assert.match(String(freshBooking.id), /^[0-9a-f-]{36}$/i);
+
     const bookingResponse = await http.request("client", "/api/bookings", {
       method: "POST",
       expectedStatus: 200,
@@ -1411,10 +1460,17 @@ async function runJourneys(
         .find((entry) => entry.id === fixture.bookingId);
       assert.ok(conversation, `${role} should see the test conversation`);
       if (role === "manager") {
+        const visibleConversationIds = conversations.map((entry) =>
+          String(asRecord(entry, "manager conversation").id)
+        );
         assert.equal(
           conversations.length,
-          1,
+          2,
           "event-scoped operations employees must not see unassigned threads"
+        );
+        assert.ok(
+          visibleConversationIds.includes(String(freshBooking.id)),
+          "event-scoped operations employees should see every assigned booking"
         );
       }
       const messageTexts = asArray(conversation.messages, `${role} thread messages`).map(
