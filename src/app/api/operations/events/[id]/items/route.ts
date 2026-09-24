@@ -28,6 +28,11 @@ function optionalDate(value: unknown) {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
+function optionalUuid(value: unknown) {
+  if (value === null || value === undefined || value === "") return null;
+  return typeof value === "string" && isUuid(value) ? value : undefined;
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -69,6 +74,8 @@ export async function POST(
     const body = text(raw.body, 4000);
     const functionId = raw.eventId === null ? null : raw.eventId;
     const assigneeUserId = raw.assigneeUserId === null ? null : raw.assigneeUserId;
+    const departmentId = optionalUuid(raw.departmentId);
+    const zoneId = optionalUuid(raw.zoneId);
     const dueAt = optionalDate(raw.dueAt);
     if (!title) return apiError("Add a concise title", 400);
     if (functionId !== null && !isUuid(functionId)) {
@@ -78,6 +85,9 @@ export async function POST(
       return apiError("Choose a valid assignee", 400);
     }
     if (dueAt === undefined) return apiError("Choose a valid due time", 400);
+    if (departmentId === undefined || zoneId === undefined) {
+      return apiError("Choose a valid department and zone", 400);
+    }
 
     const supabase = createAdminSupabaseClient();
     const { data, error } = await supabase
@@ -90,6 +100,8 @@ export async function POST(
         title,
         body,
         assignee_user_id: assigneeUserId,
+        department_id: departmentId,
+        zone_id: zoneId,
         reported_by: session.userId,
         due_at: dueAt,
       })

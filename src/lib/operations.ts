@@ -87,6 +87,23 @@ export const OPERATIONS_ITEM_STATUSES = [
 ] as const;
 export type OperationsItemStatus = (typeof OPERATIONS_ITEM_STATUSES)[number];
 
+export const OPERATIONS_SHIFT_STATUSES = [
+  "PLANNED",
+  "CHECKED_IN",
+  "CHECKED_OUT",
+  "NO_SHOW",
+  "CANCELLED",
+] as const;
+export type OperationsShiftStatus = (typeof OPERATIONS_SHIFT_STATUSES)[number];
+
+export const OPERATIONS_BRIEFING_PRIORITIES = [
+  "NORMAL",
+  "HIGH",
+  "CRITICAL",
+] as const;
+export type OperationsBriefingPriority =
+  (typeof OPERATIONS_BRIEFING_PRIORITIES)[number];
+
 export function isOperationsPermission(value: unknown): value is OperationsPermission {
   return (
     typeof value === "string" &&
@@ -116,4 +133,3 @@ export function effectiveOperationsPermissions(
   const source = assignmentPermissions ?? profilePermissions;
   return normalizeOperationsPermissions(source);
 }
-

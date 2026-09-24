@@ -98,11 +98,12 @@ export default async function EventBookPage({
           </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-5 md:grid-cols-4">
+        <div className="mt-6 grid grid-cols-2 gap-5 md:grid-cols-5">
           {[
             ["Destination", workspace.event.destination ?? "Pending"],
             ["Client", workspace.event.clientName],
             ["Functions", functions.length],
+            ["Crew shifts", workspace.shifts.filter((shift) => shift.status !== "CANCELLED").length],
             ["Open issues", openItems.length],
           ].map(([label, value]) => (
             <div key={label}>
@@ -256,6 +257,43 @@ export default async function EventBookPage({
           </div>
         </section>
       ))}
+
+      {workspace.briefings.length ? (
+        <section className="event-book-day mt-8">
+          <div className="border-b-2 border-charcoal-brown pb-3">
+            <p className="font-accent text-[9px] uppercase tracking-[0.22em] text-saddle-brown">Command communications</p>
+            <h2 className="mt-1 font-display text-3xl">Published briefings</h2>
+          </div>
+          <div className="mt-5 space-y-4">
+            {workspace.briefings.map((briefing) => (
+              <article key={briefing.id} className="event-book-section border border-charcoal/15 p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="font-accent text-[8px] uppercase tracking-[0.16em] text-saddle-brown">{briefing.priority} · {briefing.departmentName ?? "All departments"} · {briefing.zoneName ?? "All zones"}</p>
+                    <h3 className="mt-2 font-display text-xl">{briefing.title}</h3>
+                  </div>
+                  <p className="font-heading text-[10px] text-slate">{briefing.acknowledgementCount} acknowledged</p>
+                </div>
+                <p className="mt-3 whitespace-pre-wrap font-heading text-xs leading-5 text-slate">{briefing.body}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <section className="event-book-day mt-8">
+        <div className="border-b-2 border-charcoal-brown pb-3">
+          <p className="font-accent text-[9px] uppercase tracking-[0.22em] text-saddle-brown">Deployment matrix</p>
+          <h2 className="mt-1 font-display text-3xl">Crew call sheet</h2>
+        </div>
+        <div className="mt-5 overflow-hidden border border-charcoal/15">
+          <table className="w-full border-collapse text-left">
+            <thead><tr className="border-b border-charcoal/15 bg-cream">{["Crew", "Role", "Department / zone", "Function", "Window", "Status"].map((heading) => <th key={heading} className="px-2 py-2 font-accent text-[7px] uppercase tracking-[0.14em] text-slate">{heading}</th>)}</tr></thead>
+            <tbody>{workspace.shifts.map((shift) => <tr key={shift.id} className="border-b border-charcoal/10"><td className="px-2 py-2 font-heading text-[10px] font-semibold">{shift.staffName}</td><td className="px-2 py-2 font-heading text-[10px]">{shift.roleLabel}</td><td className="px-2 py-2 font-heading text-[10px]">{shift.departmentName ?? "General"}<span className="block text-[9px] text-slate">{shift.zoneName ?? "Event-wide"}</span></td><td className="px-2 py-2 font-heading text-[10px]">{shift.eventName ?? "Whole event"}</td><td className="px-2 py-2 font-heading text-[9px]">{dateLabel(shift.shiftStart, true)}<span className="block text-slate">to {dateLabel(shift.shiftEnd, true)}</span></td><td className="px-2 py-2 font-accent text-[7px] uppercase tracking-[0.12em]">{shift.status.replaceAll("_", " ")}</td></tr>)}</tbody>
+          </table>
+          {workspace.shifts.length === 0 ? <p className="p-6 text-center font-heading text-xs text-slate">No crew shifts scheduled.</p> : null}
+        </div>
+      </section>
 
       <section className="event-book-day mt-8">
         <div className="border-b-2 border-charcoal-brown pb-3">

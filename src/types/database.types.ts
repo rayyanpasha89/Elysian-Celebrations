@@ -819,6 +819,525 @@ export type Database = {
         Relationships: [
         ]
       }
+      "event_crew_shifts": {
+        Row:
+        {
+          "id": string
+          "wedding_id": string
+          "assignment_id": string
+          "wedding_event_id": string | null
+          "department_id": string | null
+          "zone_id": string | null
+          "supervisor_assignment_id": string | null
+          "role_label": string
+          "shift_start": string
+          "shift_end": string
+          "status": string
+          "checked_in_at": string | null
+          "checked_out_at": string | null
+          "handoff_notes": string | null
+          "created_by": string | null
+          "updated_by": string | null
+          "created_at": string
+          "updated_at": string
+        }
+        Insert:
+        {
+          "id"?: string
+          "wedding_id": string
+          "assignment_id": string
+          "wedding_event_id"?: string | null
+          "department_id"?: string | null
+          "zone_id"?: string | null
+          "supervisor_assignment_id"?: string | null
+          "role_label": string
+          "shift_start": string
+          "shift_end": string
+          "status"?: string
+          "checked_in_at"?: string | null
+          "checked_out_at"?: string | null
+          "handoff_notes"?: string | null
+          "created_by"?: string | null
+          "updated_by"?: string | null
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Update:
+        {
+          "id"?: string
+          "wedding_id"?: string
+          "assignment_id"?: string
+          "wedding_event_id"?: string | null
+          "department_id"?: string | null
+          "zone_id"?: string | null
+          "supervisor_assignment_id"?: string | null
+          "role_label"?: string
+          "shift_start"?: string
+          "shift_end"?: string
+          "status"?: string
+          "checked_in_at"?: string | null
+          "checked_out_at"?: string | null
+          "handoff_notes"?: string | null
+          "created_by"?: string | null
+          "updated_by"?: string | null
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_crew_shift_assignment_fk"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "event_staff_assignments"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_crew_shift_assignment_fk"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "event_staff_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_crew_shift_assignment_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_staff_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_crew_shift_assignment_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_staff_assignments"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_crew_shift_department_fk"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_departments"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_crew_shift_department_fk"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_crew_shift_department_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_crew_shift_department_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_departments"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_crew_shift_function_fk"
+            columns: ["wedding_event_id"]
+            isOneToOne: false
+            referencedRelation: "wedding_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_crew_shift_function_fk"
+            columns: ["wedding_event_id"]
+            isOneToOne: false
+            referencedRelation: "wedding_events"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_crew_shift_function_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "wedding_events"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_crew_shift_function_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "wedding_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_crew_shift_supervisor_fk"
+            columns: ["supervisor_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "event_staff_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_crew_shift_supervisor_fk"
+            columns: ["supervisor_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "event_staff_assignments"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_crew_shift_supervisor_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_staff_assignments"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_crew_shift_supervisor_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_staff_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_crew_shift_zone_fk"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_zones"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_crew_shift_zone_fk"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_zones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_crew_shift_zone_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_zones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_crew_shift_zone_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_zones"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_crew_shifts_wedding_id_fkey"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "weddings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      "event_operations_briefing_reads": {
+        Row:
+        {
+          "wedding_id": string
+          "briefing_id": string
+          "assignment_id": string
+          "acknowledged_at": string
+        }
+        Insert:
+        {
+          "wedding_id": string
+          "briefing_id": string
+          "assignment_id": string
+          "acknowledged_at"?: string
+        }
+        Update:
+        {
+          "wedding_id"?: string
+          "briefing_id"?: string
+          "assignment_id"?: string
+          "acknowledged_at"?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_operations_briefing_read_assignment_fk"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "event_staff_assignments"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_operations_briefing_read_assignment_fk"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "event_staff_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_operations_briefing_read_assignment_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_staff_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_operations_briefing_read_assignment_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_staff_assignments"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_operations_briefing_read_briefing_fk"
+            columns: ["briefing_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_briefings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_operations_briefing_read_briefing_fk"
+            columns: ["briefing_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_briefings"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_operations_briefing_read_briefing_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_briefings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_operations_briefing_read_briefing_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_briefings"
+            referencedColumns: ["wedding_id"]
+          },
+        ]
+      }
+      "event_operations_briefings": {
+        Row:
+        {
+          "id": string
+          "wedding_id": string
+          "wedding_event_id": string | null
+          "department_id": string | null
+          "zone_id": string | null
+          "title": string
+          "body": string
+          "priority": string
+          "requires_acknowledgement": boolean
+          "published_by": string
+          "published_at": string
+          "expires_at": string | null
+          "created_at": string
+          "updated_at": string
+        }
+        Insert:
+        {
+          "id"?: string
+          "wedding_id": string
+          "wedding_event_id"?: string | null
+          "department_id"?: string | null
+          "zone_id"?: string | null
+          "title": string
+          "body": string
+          "priority"?: string
+          "requires_acknowledgement"?: boolean
+          "published_by": string
+          "published_at"?: string
+          "expires_at"?: string | null
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Update:
+        {
+          "id"?: string
+          "wedding_id"?: string
+          "wedding_event_id"?: string | null
+          "department_id"?: string | null
+          "zone_id"?: string | null
+          "title"?: string
+          "body"?: string
+          "priority"?: string
+          "requires_acknowledgement"?: boolean
+          "published_by"?: string
+          "published_at"?: string
+          "expires_at"?: string | null
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_operations_briefing_department_fk"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_operations_briefing_department_fk"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_departments"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_operations_briefing_department_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_operations_briefing_department_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_departments"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_operations_briefing_function_fk"
+            columns: ["wedding_event_id"]
+            isOneToOne: false
+            referencedRelation: "wedding_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_operations_briefing_function_fk"
+            columns: ["wedding_event_id"]
+            isOneToOne: false
+            referencedRelation: "wedding_events"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_operations_briefing_function_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "wedding_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_operations_briefing_function_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "wedding_events"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_operations_briefing_zone_fk"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_zones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_operations_briefing_zone_fk"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_zones"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_operations_briefing_zone_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_zones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_operations_briefing_zone_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_zones"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_operations_briefings_wedding_id_fkey"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "weddings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      "event_operations_departments": {
+        Row:
+        {
+          "id": string
+          "wedding_id": string
+          "name": string
+          "code": string
+          "color": string
+          "lead_assignment_id": string | null
+          "sort_order": number
+          "created_by": string | null
+          "created_at": string
+          "updated_at": string
+        }
+        Insert:
+        {
+          "id"?: string
+          "wedding_id": string
+          "name": string
+          "code": string
+          "color"?: string
+          "lead_assignment_id"?: string | null
+          "sort_order"?: number
+          "created_by"?: string | null
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Update:
+        {
+          "id"?: string
+          "wedding_id"?: string
+          "name"?: string
+          "code"?: string
+          "color"?: string
+          "lead_assignment_id"?: string | null
+          "sort_order"?: number
+          "created_by"?: string | null
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_operations_department_lead_fk"
+            columns: ["lead_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "event_staff_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_operations_department_lead_fk"
+            columns: ["lead_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "event_staff_assignments"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_operations_department_lead_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_staff_assignments"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_operations_department_lead_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_staff_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_operations_departments_wedding_id_fkey"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "weddings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       "event_operations_items": {
         Row:
         {
@@ -839,6 +1358,8 @@ export type Database = {
           "resolved_by": string | null
           "created_at": string
           "updated_at": string
+          "department_id": string | null
+          "zone_id": string | null
         }
         Insert:
         {
@@ -859,6 +1380,8 @@ export type Database = {
           "resolved_by"?: string | null
           "created_at"?: string
           "updated_at"?: string
+          "department_id"?: string | null
+          "zone_id"?: string | null
         }
         Update:
         {
@@ -879,6 +1402,8 @@ export type Database = {
           "resolved_by"?: string | null
           "created_at"?: string
           "updated_at"?: string
+          "department_id"?: string | null
+          "zone_id"?: string | null
         }
         Relationships: [
           {
@@ -900,13 +1425,69 @@ export type Database = {
             columns: ["wedding_id"]
             isOneToOne: false
             referencedRelation: "wedding_events"
-            referencedColumns: ["wedding_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "event_operations_event_fk"
             columns: ["wedding_id"]
             isOneToOne: false
             referencedRelation: "wedding_events"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_operations_item_department_fk"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_operations_item_department_fk"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_departments"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_operations_item_department_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_departments"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_operations_item_department_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_operations_item_zone_fk"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_zones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_operations_item_zone_fk"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_zones"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_operations_item_zone_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_zones"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_operations_item_zone_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_zones"
             referencedColumns: ["id"]
           },
           {
@@ -918,6 +1499,59 @@ export type Database = {
           },
           {
             foreignKeyName: "event_operations_items_wedding_id_fkey"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "weddings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      "event_operations_zones": {
+        Row:
+        {
+          "id": string
+          "wedding_id": string
+          "name": string
+          "code": string
+          "capacity": number | null
+          "meeting_point": string | null
+          "emergency_notes": string | null
+          "sort_order": number
+          "created_by": string | null
+          "created_at": string
+          "updated_at": string
+        }
+        Insert:
+        {
+          "id"?: string
+          "wedding_id": string
+          "name": string
+          "code": string
+          "capacity"?: number | null
+          "meeting_point"?: string | null
+          "emergency_notes"?: string | null
+          "sort_order"?: number
+          "created_by"?: string | null
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Update:
+        {
+          "id"?: string
+          "wedding_id"?: string
+          "name"?: string
+          "code"?: string
+          "capacity"?: number | null
+          "meeting_point"?: string | null
+          "emergency_notes"?: string | null
+          "sort_order"?: number
+          "created_by"?: string | null
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_operations_zones_wedding_id_fkey"
             columns: ["wedding_id"]
             isOneToOne: false
             referencedRelation: "weddings"

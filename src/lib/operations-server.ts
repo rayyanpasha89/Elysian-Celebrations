@@ -160,6 +160,46 @@ export async function loadOperationsWorkspace(
     : { data: [], error: null };
   if (functionError) throw functionError;
 
+  const [
+    { data: departments, error: departmentError },
+    { data: zones, error: zoneError },
+    { data: shifts, error: shiftError },
+    { data: briefings, error: briefingError },
+    { data: briefingReads, error: briefingReadError },
+  ] = await Promise.all([
+    supabase
+      .from("event_operations_departments")
+      .select("*")
+      .eq("wedding_id", weddingId)
+      .order("sort_order")
+      .order("name"),
+    supabase
+      .from("event_operations_zones")
+      .select("*")
+      .eq("wedding_id", weddingId)
+      .order("sort_order")
+      .order("name"),
+    supabase
+      .from("event_crew_shifts")
+      .select("*")
+      .eq("wedding_id", weddingId)
+      .order("shift_start"),
+    supabase
+      .from("event_operations_briefings")
+      .select("*")
+      .eq("wedding_id", weddingId)
+      .order("published_at", { ascending: false }),
+    supabase
+      .from("event_operations_briefing_reads")
+      .select("briefing_id, assignment_id, acknowledged_at")
+      .eq("wedding_id", weddingId),
+  ]);
+  if (departmentError) throw departmentError;
+  if (zoneError) throw zoneError;
+  if (shiftError) throw shiftError;
+  if (briefingError) throw briefingError;
+  if (briefingReadError) throw briefingReadError;
+
   const canViewFinancials = access.permissions.includes("VIEW_FINANCIALS");
   const vendorUserIds = [
     ...new Set(
@@ -233,6 +273,23 @@ export async function loadOperationsWorkspace(
       notes: assignment.notes,
     };
   });
+  const teamByAssignmentId = new Map(team.map((member) => [member.id, member]));
+  const departmentById = new Map(
+    (departments ?? []).map((department) => [department.id, department])
+  );
+  const zoneById = new Map((zones ?? []).map((zone) => [zone.id, zone]));
+  const functionById = new Map(
+    eventFunctions.map((event) => [event.id, event])
+  );
+  const currentAssignment = team.find(
+    (member) => member.userId === session.userId
+  );
+  const briefingReadMap = new Map<string, typeof briefingReads>();
+  for (const read of briefingReads ?? []) {
+    const existing = briefingReadMap.get(read.briefing_id) ?? [];
+    existing.push(read);
+    briefingReadMap.set(read.briefing_id, existing);
+  }
 
   const authorIds = [
     ...new Set(
@@ -272,6 +329,89 @@ export async function loadOperationsWorkspace(
       ),
     })),
     team,
+    departments: (departments ?? []).map((department) => ({
+      id: department.id,
+      name: department.name,
+      code: department.code,
+      color: department.color,
+      leadAssignmentId: department.lead_assignment_id,
+      leadName: department.lead_assignment_id
+        ? teamByAssignmentId.get(department.lead_assignment_id)?.name ?? null
+        : null,
+    })),
+    zones: (zones ?? []).map((zone) => ({
+      id: zone.id,
+      name: zone.name,
+      code: zone.code,
+      capacity: zone.capacity,
+      meetingPoint: zone.meeting_point,
+      emergencyNotes: zone.emergency_notes,
+    })),
+    shifts: (shifts ?? []).map((shift) => {
+      const member = teamByAssignmentId.get(shift.assignment_id);
+      const supervisor = shift.supervisor_assignment_id
+        ? teamByAssignmentId.get(shift.supervisor_assignment_id)
+        : null;
+      return {
+        id: shift.id,
+        assignmentId: shift.assignment_id,
+        staffUserId: member?.userId ?? null,
+        staffName: member?.name ?? "Team member",
+        staffPhone: member?.phone ?? null,
+        eventId: shift.wedding_event_id,
+        eventName: shift.wedding_event_id
+          ? functionById.get(shift.wedding_event_id)?.name ?? null
+          : null,
+        departmentId: shift.department_id,
+        departmentName: shift.department_id
+          ? departmentById.get(shift.department_id)?.name ?? null
+          : null,
+        departmentColor: shift.department_id
+          ? departmentById.get(shift.department_id)?.color ?? null
+          : null,
+        zoneId: shift.zone_id,
+        zoneName: shift.zone_id
+          ? zoneById.get(shift.zone_id)?.name ?? null
+          : null,
+        supervisorName: supervisor?.name ?? null,
+        roleLabel: shift.role_label,
+        shiftStart: shift.shift_start,
+        shiftEnd: shift.shift_end,
+        status: shift.status,
+        checkedInAt: shift.checked_in_at,
+        checkedOutAt: shift.checked_out_at,
+        handoffNotes: shift.handoff_notes,
+        isOwn: member?.userId === session.userId,
+      };
+    }),
+    briefings: (briefings ?? []).map((briefing) => {
+      const reads = briefingReadMap.get(briefing.id) ?? [];
+      return {
+        id: briefing.id,
+        eventId: briefing.wedding_event_id,
+        eventName: briefing.wedding_event_id
+          ? functionById.get(briefing.wedding_event_id)?.name ?? null
+          : null,
+        departmentId: briefing.department_id,
+        departmentName: briefing.department_id
+          ? departmentById.get(briefing.department_id)?.name ?? null
+          : null,
+        zoneId: briefing.zone_id,
+        zoneName: briefing.zone_id
+          ? zoneById.get(briefing.zone_id)?.name ?? null
+          : null,
+        title: briefing.title,
+        body: briefing.body,
+        priority: briefing.priority,
+        requiresAcknowledgement: briefing.requires_acknowledgement,
+        publishedAt: briefing.published_at,
+        expiresAt: briefing.expires_at,
+        acknowledgementCount: reads.length,
+        acknowledged: currentAssignment
+          ? reads.some((read) => read.assignment_id === currentAssignment.id)
+          : false,
+      };
+    }),
     feed: (operationsItems ?? []).map((item) => ({
       id: item.id,
       eventId: item.wedding_event_id,
@@ -281,6 +421,12 @@ export async function loadOperationsWorkspace(
       title: item.title,
       body: item.body,
       assigneeUserId: item.assignee_user_id,
+      departmentId: item.department_id,
+      departmentName: item.department_id
+        ? departmentById.get(item.department_id)?.name ?? null
+        : null,
+      zoneId: item.zone_id,
+      zoneName: item.zone_id ? zoneById.get(item.zone_id)?.name ?? null : null,
       reportedBy: item.reported_by,
       reportedByName: authorMap.get(item.reported_by) ?? "Team member",
       dueAt: item.due_at,

@@ -449,6 +449,7 @@ async function cleanupFixture(supabase: TestSupabase, fixture: Fixture) {
     sha256(`message-send:${fixture.userIds.client}`),
     sha256(`message-send:${fixture.userIds.vendor}`),
     sha256(`operations-feed-create:${fixture.userIds.manager}`),
+    sha256(`operations-workforce-write:${fixture.userIds.manager}`),
     sha256(`billing-invoice-issue:${fixture.userIds.admin}`),
   ];
   const cleanupActions: [string, PromiseLike<{ error: { message: string } | null }>][] = [
@@ -1300,6 +1301,169 @@ async function runJourneys(
       hasKeyDeep(workspace, "vendorAmount"),
       false,
       "operations workspace must never expose vendor settlement amounts"
+    );
+
+    const department = asRecord(
+      (
+        await http.request(
+          "manager",
+          `/api/operations/events/${fixture.weddingId}/workforce`,
+          {
+            method: "POST",
+            expectedStatus: 201,
+            body: {
+              action: "CREATE_DEPARTMENT",
+              name: "Guest Experience",
+              code: "GUEST",
+              color: "#656d4a",
+            },
+          }
+        )
+      ).payload,
+      "operations department creation"
+    );
+    const departmentId = String(
+      asRecord(department.department, "operations department").id
+    );
+    const zone = asRecord(
+      (
+        await http.request(
+          "manager",
+          `/api/operations/events/${fixture.weddingId}/workforce`,
+          {
+            method: "POST",
+            expectedStatus: 201,
+            body: {
+              action: "CREATE_ZONE",
+              name: "Arrival lobby",
+              code: "ARRIVAL",
+              capacity: 80,
+              meetingPoint: "North entrance desk",
+            },
+          }
+        )
+      ).payload,
+      "operations zone creation"
+    );
+    const zoneId = String(asRecord(zone.zone, "operations zone").id);
+    const shift = asRecord(
+      (
+        await http.request(
+          "manager",
+          `/api/operations/events/${fixture.weddingId}/workforce`,
+          {
+            method: "POST",
+            expectedStatus: 201,
+            body: {
+              action: "CREATE_SHIFT_BATCH",
+              staffUserIds: [fixture.userIds.manager],
+              eventId: fixture.eventId,
+              departmentId,
+              zoneId,
+              roleLabel: "Arrival lead",
+              shiftStart: "2027-02-20T02:30:00.000Z",
+              shiftEnd: "2027-02-20T06:30:00.000Z",
+            },
+          }
+        )
+      ).payload,
+      "operations shift creation"
+    );
+    const shiftId = String(
+      asRecord(asArray(shift.shifts, "operations shifts")[0], "operations shift").id
+    );
+    const briefing = asRecord(
+      (
+        await http.request(
+          "manager",
+          `/api/operations/events/${fixture.weddingId}/workforce`,
+          {
+            method: "POST",
+            expectedStatus: 201,
+            body: {
+              action: "CREATE_BRIEFING",
+              title: "Arrival opening brief",
+              body: "Open the guest desk before the first shuttle lands.",
+              priority: "HIGH",
+              departmentId,
+              zoneId,
+              requiresAcknowledgement: true,
+            },
+          }
+        )
+      ).payload,
+      "operations briefing creation"
+    );
+    const briefingId = String(
+      asRecord(briefing.briefing, "operations briefing").id
+    );
+
+    await http.request(
+      "manager",
+      `/api/operations/events/${fixture.weddingId}/workforce`,
+      {
+        method: "PATCH",
+        body: { action: "UPDATE_SHIFT_STATUS", shiftId, status: "CHECKED_IN" },
+      }
+    );
+    await http.request(
+      "manager",
+      `/api/operations/events/${fixture.weddingId}/workforce`,
+      {
+        method: "PATCH",
+        body: { action: "ACKNOWLEDGE_BRIEFING", briefingId },
+      }
+    );
+    const workforceWorkspace = asRecord(
+      (
+        await http.request(
+          "manager",
+          `/api/operations/events/${fixture.weddingId}`
+        )
+      ).payload,
+      "operations workforce workspace"
+    );
+    assert.equal(
+      asArray(workforceWorkspace.departments, "operations departments").length,
+      1
+    );
+    assert.equal(asArray(workforceWorkspace.zones, "operations zones").length, 1);
+    assert.equal(asArray(workforceWorkspace.shifts, "operations shifts").length, 1);
+    assert.equal(
+      asRecord(asArray(workforceWorkspace.shifts, "operations shifts")[0], "operations shift").status,
+      "CHECKED_IN"
+    );
+    assert.equal(
+      asRecord(
+        asArray(workforceWorkspace.briefings, "operations briefings")[0],
+        "operations briefing"
+      ).acknowledged,
+      true
+    );
+    const standardStructure = asRecord(
+      (
+        await http.request(
+          "manager",
+          `/api/operations/events/${fixture.weddingId}/workforce`,
+          {
+            method: "POST",
+            expectedStatus: 201,
+            body: { action: "BOOTSTRAP_STRUCTURE" },
+          }
+        )
+      ).payload,
+      "standard operations structure"
+    );
+    assert.equal(standardStructure.departmentCount, 10);
+    assert.equal(standardStructure.zoneCount, 9);
+    await http.request(
+      "client",
+      `/api/operations/events/${fixture.weddingId}/workforce`,
+      {
+        method: "POST",
+        expectedStatus: 403,
+        body: { action: "CREATE_ZONE", name: "Forbidden", code: "NOPE" },
+      }
     );
 
     const created = asRecord(

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { CalendarRange, Check, ShieldCheck, UserRoundCog } from "lucide-react";
 import { toast } from "sonner";
 import { DashboardLoadError } from "@/components/dashboard/dashboard-load-error";
@@ -453,21 +454,22 @@ export default function AdminTeamPage() {
                           </div>
                           <label className="block space-y-2"><span className={dashLabel}>Event role</span><input value={eventRole} onChange={(event) => setEventRole(event.target.value)} className="w-full border border-charcoal/15 bg-ivory px-3 py-2.5 font-heading text-sm outline-none focus:border-gold-primary" /></label>
                           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 2xl:grid-cols-2">
-                            <label className="space-y-2"><span className={dashLabel}>Shift starts</span><input type="datetime-local" value={shiftStart} onChange={(event) => setShiftStart(event.target.value)} className="w-full border border-charcoal/15 bg-ivory px-3 py-2.5 font-heading text-xs outline-none focus:border-gold-primary" /></label>
-                            <label className="space-y-2"><span className={dashLabel}>Shift ends</span><input type="datetime-local" value={shiftEnd} onChange={(event) => setShiftEnd(event.target.value)} className="w-full border border-charcoal/15 bg-ivory px-3 py-2.5 font-heading text-xs outline-none focus:border-gold-primary" /></label>
+                            <label className="space-y-2"><span className={dashLabel}>Access starts</span><input type="datetime-local" value={shiftStart} onChange={(event) => setShiftStart(event.target.value)} className="w-full border border-charcoal/15 bg-ivory px-3 py-2.5 font-heading text-xs outline-none focus:border-gold-primary" /></label>
+                            <label className="space-y-2"><span className={dashLabel}>Access ends</span><input type="datetime-local" value={shiftEnd} onChange={(event) => setShiftEnd(event.target.value)} className="w-full border border-charcoal/15 bg-ivory px-3 py-2.5 font-heading text-xs outline-none focus:border-gold-primary" /></label>
                           </div>
                           <label className="block space-y-2"><span className={dashLabel}>Handoff notes</span><textarea value={assignmentNotes} onChange={(event) => setAssignmentNotes(event.target.value)} rows={3} className="w-full resize-none border border-charcoal/15 bg-ivory px-3 py-2.5 font-heading text-sm outline-none focus:border-gold-primary" /></label>
                           <div className="flex flex-wrap gap-2">
                             <button type="button" disabled={saving} onClick={() => saveAssignment(true)} className={dashBtn}>{selectedAssignment?.is_active ? "Update assignment" : "Assign to event"}</button>
+                            {selectedAssignment?.is_active ? <Link href={`/manager/operations/${selectedEventId}`} className="border border-dusty-olive/35 px-4 py-3 font-accent text-[10px] uppercase tracking-[0.16em] text-dusty-olive hover:bg-dry-sage/20">Open workforce board</Link> : null}
                             {selectedAssignment?.is_active ? <button type="button" disabled={saving} onClick={() => saveAssignment(false)} className="font-accent border border-charcoal/15 px-4 py-3 text-[10px] uppercase tracking-[0.16em] text-slate hover:border-saddle-brown hover:text-saddle-brown">Remove access</button> : null}
                           </div>
-                          <div className="flex gap-2 border-t border-charcoal/8 pt-4 font-heading text-xs leading-5 text-slate"><ShieldCheck className="mt-0.5 h-4 w-4 flex-none text-dusty-olive" /><span>This assignment inherits the employee capabilities above and exposes only this event.</span></div>
+                          <div className="flex gap-2 border-t border-charcoal/8 pt-4 font-heading text-xs leading-5 text-slate"><ShieldCheck className="mt-0.5 h-4 w-4 flex-none text-dusty-olive" /><span>This grants event access. Departments, zones, multiple shifts, attendance, and briefings are managed inside the workforce board.</span></div>
                         </div>
                       ) : (
                         <div className="flex min-h-64 flex-col items-center justify-center text-center">
                           <CalendarRange className="h-8 w-8 text-camel" />
                           <p className="mt-4 font-display text-xl text-charcoal">Choose an event</p>
-                          <p className="mt-2 max-w-xs font-heading text-xs leading-5 text-slate">Assignments, shift windows, and handoff notes are configured per event.</p>
+                          <p className="mt-2 max-w-xs font-heading text-xs leading-5 text-slate">Choose an event to grant access, then use its workforce board for departments, zones, and shifts.</p>
                         </div>
                       )}
                     </div>
