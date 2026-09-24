@@ -1302,6 +1302,12 @@ async function runJourneys(
       false,
       "operations workspace must never expose vendor settlement amounts"
     );
+    const assignmentId = String(
+      asRecord(
+        asArray(workspace.team, "operations workspace team")[0],
+        "operations workspace team member"
+      ).id
+    );
 
     const department = asRecord(
       (
@@ -1505,6 +1511,122 @@ async function runJourneys(
       "resolved operations item"
     );
     assert.equal(asRecord(resolved.item, "resolved item").status, "RESOLVED");
+
+    const productionCreated = asRecord(
+      (
+        await http.request(
+          "manager",
+          `/api/operations/events/${fixture.weddingId}/production`,
+          {
+            method: "POST",
+            expectedStatus: 201,
+            body: {
+              recordType: "TRANSPORT",
+              title: "Journey airport transfer manifest",
+              description: "Own the vehicle, route, and arrival handoff in one record.",
+              status: "OPEN",
+              visibility: "OPERATIONS",
+              eventId: fixture.eventId,
+              departmentId,
+              zoneId,
+              ownerAssignmentId: assignmentId,
+              ownerLabel: "Transport partner",
+              dueAt: "2027-02-20T02:00:00.000Z",
+              amount: 18000,
+              currency: "INR",
+              payload: { notes: "Two vehicles, north entrance handoff." },
+              attachments: [
+                {
+                  title: "Transfer reference",
+                  url: "https://example.test/transfer-reference",
+                  classification: "INTERNAL",
+                },
+              ],
+            },
+          }
+        )
+      ).payload,
+      "production record creation"
+    );
+    const productionRecord = asRecord(productionCreated.record, "created production record");
+    const productionRecordId = String(productionRecord.id);
+    const productionList = asRecord(
+      (
+        await http.request(
+          "manager",
+          `/api/operations/events/${fixture.weddingId}/production`
+        )
+      ).payload,
+      "production record list"
+    );
+    const savedProductionRecord = asArray(productionList.records, "production records")
+      .map((entry) => asRecord(entry, "production record"))
+      .find((entry) => entry.id === productionRecordId);
+    assert.ok(savedProductionRecord, "the production record must be visible after creation");
+    assert.equal(asArray(savedProductionRecord.attachments, "production attachments").length, 1);
+
+    const productionUpdated = asRecord(
+      (
+        await http.request(
+          "manager",
+          `/api/operations/events/${fixture.weddingId}/production/${productionRecordId}`,
+          {
+            method: "PATCH",
+            body: {
+              recordType: "TRANSPORT",
+              title: "Journey airport transfer manifest",
+              description: "Own the vehicle, route, and arrival handoff in one record.",
+              status: "DONE",
+              visibility: "OPERATIONS",
+              eventId: fixture.eventId,
+              departmentId,
+              zoneId,
+              ownerAssignmentId: assignmentId,
+              ownerLabel: "Transport partner",
+              dueAt: "2027-02-20T02:00:00.000Z",
+              amount: 18000,
+              currency: "INR",
+              payload: { notes: "Two vehicles, north entrance handoff." },
+              version: productionRecord.version,
+            },
+          }
+        )
+      ).payload,
+      "production record update"
+    );
+    assert.equal(asRecord(productionUpdated.record, "updated production record").status, "DONE");
+
+    const productionAttachment = asRecord(
+      (
+        await http.request(
+          "manager",
+          `/api/operations/events/${fixture.weddingId}/production/${productionRecordId}/attachments`,
+          {
+            method: "POST",
+            expectedStatus: 201,
+            body: {
+              title: "Vehicle roster",
+              url: "https://example.test/vehicle-roster",
+              classification: "INTERNAL",
+            },
+          }
+        )
+      ).payload,
+      "production attachment creation"
+    );
+    const productionAttachmentId = String(
+      asRecord(productionAttachment.attachment, "production attachment").id
+    );
+    await http.request(
+      "manager",
+      `/api/operations/events/${fixture.weddingId}/production/${productionRecordId}/attachments/${productionAttachmentId}`,
+      { method: "DELETE" }
+    );
+    await http.request(
+      "client",
+      `/api/operations/events/${fixture.weddingId}/production`,
+      { expectedStatus: 403 }
+    );
 
     await http.request("client", "/api/operations/events", { expectedStatus: 403 });
     await http.page("manager", `/manager/operations/${fixture.weddingId}`);

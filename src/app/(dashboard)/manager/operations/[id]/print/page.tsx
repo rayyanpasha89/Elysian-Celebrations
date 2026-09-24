@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PrintEventBookButton } from "@/components/dashboard/print-event-book-button";
+import { productionTypeMeta } from "@/lib/event-production";
+import { loadPrintableProductionRecords } from "@/lib/event-production-server";
 import { loadOperationsWorkspace } from "@/lib/operations-server";
 import { requirePortalPageRole } from "@/lib/portal-auth";
 import { cn } from "@/lib/utils";
@@ -55,6 +57,10 @@ export default async function EventBookPage({
   }
 
   const functions = workspace.days.flatMap((day) => day.functions);
+  const productionRecords = await loadPrintableProductionRecords(
+    id,
+    workspace.access.permissions
+  );
   const openItems = workspace.feed.filter((item) => item.status !== "RESOLVED");
   const financeVisible = workspace.access.permissions.includes("VIEW_FINANCIALS");
   const printedAt = new Date().toLocaleString("en-IN", {
@@ -275,6 +281,42 @@ export default async function EventBookPage({
                   <p className="font-heading text-[10px] text-slate">{briefing.acknowledgementCount} acknowledged</p>
                 </div>
                 <p className="mt-3 whitespace-pre-wrap font-heading text-xs leading-5 text-slate">{briefing.body}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {productionRecords.length ? (
+        <section className="event-book-day mt-8">
+          <div className="border-b-2 border-charcoal-brown pb-3">
+            <p className="font-accent text-[9px] uppercase tracking-[0.22em] text-saddle-brown">Production control</p>
+            <h2 className="mt-1 font-display text-3xl">Dossier and readiness register</h2>
+          </div>
+          <div className="mt-5 space-y-4">
+            {productionRecords.map((record) => (
+              <article key={record.id} className="event-book-section border border-charcoal/15 p-4">
+                <div className="grid gap-3 md:grid-cols-[9rem_1fr_auto]">
+                  <div>
+                    <p className="font-accent text-[8px] uppercase tracking-[0.16em] text-saddle-brown">
+                      {productionTypeMeta(record.record_type).label}
+                    </p>
+                    <p className="mt-2 font-accent text-[7px] uppercase tracking-[0.13em] text-slate">
+                      {record.status.replaceAll("_", " ")}
+                    </p>
+                  </div>
+                  <div>
+                    <h3 className="font-display text-xl">{record.title}</h3>
+                    {record.description ? <p className="mt-1 font-heading text-xs leading-5 text-slate">{record.description}</p> : null}
+                    {record.notes ? <p className="mt-2 border-l border-camel pl-3 font-heading text-[10px] leading-4 text-charcoal">{record.notes}</p> : null}
+                    {record.attachments.length ? <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">{record.attachments.map((attachment) => <a key={attachment.id} href={attachment.url} className="font-heading text-[9px] text-saddle-brown underline">{attachment.title}</a>)}</div> : null}
+                  </div>
+                  <div className="font-heading text-[10px] leading-5 text-slate md:text-right">
+                    <p>{record.owner_label ?? "Owner unassigned"}</p>
+                    <p>{record.due_at ? `Due ${dateLabel(record.due_at, true)}` : "No deadline"}</p>
+                    {financeVisible && record.amount != null ? <p>{money(record.amount)}</p> : null}
+                  </div>
+                </div>
               </article>
             ))}
           </div>

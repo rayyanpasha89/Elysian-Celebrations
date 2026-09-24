@@ -28,6 +28,8 @@
     "test:event-function": "tsx --tsconfig tsconfig.json scripts/verify-event-function-lifecycle.ts",
     "test:event-plan-delete": "tsx --tsconfig tsconfig.json scripts/verify-event-plan-deletion.ts",
     "test:operations": "tsx --tsconfig tsconfig.json scripts/verify-event-operations.ts",
+    "test:production": "tsx --tsconfig tsconfig.json scripts/verify-event-production.ts",
+    "test:production-domain": "tsx --tsconfig tsconfig.json scripts/verify-event-production-domain.ts",
     "test:message-pagination": "tsx --tsconfig tsconfig.json scripts/verify-message-pagination.ts",
     "test:journeys": "tsx --tsconfig tsconfig.json scripts/verify-authenticated-journeys.ts"
   },

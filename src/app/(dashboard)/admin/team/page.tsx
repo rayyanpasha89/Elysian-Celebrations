@@ -68,6 +68,7 @@ const PERMISSION_COPY: Record<OperationsPermission, string> = {
   MESSAGE_VENDORS: "Use vendor communication tools",
   VIEW_FINANCIALS: "View published client totals and collections",
   MANAGE_STAFF: "Manage the assigned event team",
+  MANAGE_PRODUCTION: "Manage production records, approvals, and documents",
   PRINT_EVENT_BOOK: "Print the event operations book",
 };
 

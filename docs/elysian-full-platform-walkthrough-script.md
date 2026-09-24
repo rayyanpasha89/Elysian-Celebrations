@@ -268,7 +268,7 @@ The same source of truth is viewed differently by clients, vendors, operations e
 
 "Clerk controls the broad portal identity. Elysian then applies a capability profile and event assignment in the database. A manager account does not automatically see every event. The administrator chooses what the employee can do and exactly which event the employee can open."
 
-## 19:15-23:30 | Operations Portal: Manage the Live Event
+## 19:15-24:30 | Operations Portal: Manage the Live Event
 
 **Account:** Assigned operations employee
 
@@ -315,26 +315,50 @@ The same source of truth is viewed differently by clients, vendors, operations e
 
 "The internal feed separates operations truth from external client and vendor chat. Every item keeps its reporter, severity, owner, due time, acknowledgement, resolver, and timestamps. Nothing is deleted from the live history just to make the dashboard look clean."
 
+### Production dossier
+
+**Actions:**
+
+1. Open `Production Dossier`.
+2. Point to active, overdue, approval, and reference metrics.
+3. Filter to `Travel & rooming`, then `Compliance`.
+4. Expand `Add an operational record`.
+5. Show record type, event/function scope, department, zone, assigned owner,
+   external POC, due date, visibility, amount, key details, and a classified
+   reference link.
+6. Open a saved record and update its status.
+7. Add a reference link, then point to its classification and audit count.
+
+**Presenter 2:**
+
+"This dossier replaces the shared operational spreadsheet row. Contracts,
+riders, permissions, recce findings, transport, rooming, hospitality, guest
+communications, inventory, packing, field expenses, and family briefs can all
+be owned, dated, scoped, and tracked against the event. Creation and the first
+reference link save atomically. Updates use record versions so one operator
+cannot silently overwrite another, and every change is appended to the audit
+history. Finance and private records remain permission-gated."
+
 ### Team and print
 
 **Actions:**
 
 1. Open `Team` and show roles, contacts, shifts, and handoff notes.
 2. Click `Print event book`.
-3. Scroll through cover, open attention, each day, function schedule, tasks, logistics, menus, partners, and team directory.
+3. Scroll through cover, open attention, each day, function schedule, tasks, logistics, menus, partners, production dossier, and team directory.
 4. Click `Print or save PDF`, then cancel the system print dialog.
 
 **Presenter 2:**
 
 "The event book is generated from the same live source. It is useful as a field backup, venue handoff, or printed control-room reference. Financial details remain permission-gated in print as well as on screen."
 
-## 23:30-25:00 | Close the Story
+## 24:30-26:00 | Close the Story
 
 **Action:** Return to the operations event header, then the admin dashboard.
 
 **Presenter 1:**
 
-"Elysian now carries an event through one connected operating lifecycle: define the structure, compose each function, select real vendor services, estimate and publish cost, coordinate guests and timing, assign an event team, manage live incidents, and preserve a printable delivery record.
+"Elysian now carries an event through one connected operating lifecycle: define the structure, compose each function, select real vendor services, estimate and publish cost, coordinate guests and timing, control production records, assign an event team, manage live incidents, and preserve a printable delivery record.
 
 Clients see their event and complete published price. Vendors see their work and agreed payout. Operations employees see only assigned events and permitted information. Administrators control people, access, pricing, billing, catalogue quality, and portfolio readiness.
 
@@ -416,8 +440,8 @@ The main script above remains the recommended narrative cut.
 | --- | --- | --- |
 | Operations Dashboard | `/manager` | Broad portfolio overview before employee scoping |
 | Live Operations | `/manager/operations` | Assigned event cards and live attention metrics |
-| Event Command Center | `/manager/operations/[id]` | Pulse, run of show, feed, team, incidents and decisions |
-| Printable Event Book | `/manager/operations/[id]/print` | Permission-safe field backup generated from live source |
+| Event Command Center | `/manager/operations/[id]` | Pulse, run of show, feed, production dossier, crew, briefings, incidents, and decisions |
+| Printable Event Book | `/manager/operations/[id]/print` | Permission-safe field backup including production records, generated from the live source |
 | Event Directory | `/manager/weddings` | Read-only event list for platform managers |
 | Inquiries | `/manager/inquiries` | Operational inquiry context |
 | Bookings | `/manager/bookings` | Booking delivery context |
