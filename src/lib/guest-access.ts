@@ -53,3 +53,31 @@ export async function getGuestListIdsForClient(
   if (error || !data) return [];
   return data.map((r) => r.id);
 }
+
+export async function guestBelongsToClient(
+  supabase: AdminClient,
+  guestId: string,
+  clientProfileId: string
+): Promise<boolean> {
+  const { data: guest, error: guestError } = await supabase
+    .from("guests")
+    .select("guest_list_id")
+    .eq("id", guestId)
+    .maybeSingle();
+  if (guestError || !guest) return false;
+  return guestListBelongsToClient(supabase, guest.guest_list_id, clientProfileId);
+}
+
+export async function eventBelongsToClient(
+  supabase: AdminClient,
+  weddingId: string,
+  clientProfileId: string
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("weddings")
+    .select("id")
+    .eq("id", weddingId)
+    .eq("client_profile_id", clientProfileId)
+    .maybeSingle();
+  return !error && !!data;
+}

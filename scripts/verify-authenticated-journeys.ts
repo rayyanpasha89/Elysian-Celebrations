@@ -1025,6 +1025,148 @@ async function runJourneys(
     assert.equal(updatedGuest.rsvp_status, "CONFIRMED");
     assert.equal(updatedGuest.table_number, 4);
 
+    assert.ok(fixture.weddingId);
+    const emptyGuestOperations = asRecord(
+      asRecord(
+        (
+          await http.request(
+            "client",
+            `/api/guests/${guestId}/travel?weddingId=${fixture.weddingId}`
+          )
+        ).payload,
+        "empty guest operations response"
+      ).snapshot,
+      "empty guest operations snapshot"
+    );
+    assert.equal(emptyGuestOperations.version, null);
+    assert.equal(asArray(emptyGuestOperations.travelLegs, "empty travel legs").length, 0);
+    await http.request(
+      "manager",
+      `/api/guests/${guestId}/travel?weddingId=${fixture.weddingId}`,
+      { expectedStatus: 403 }
+    );
+
+    const savedGuestOperations = asRecord(
+      asRecord(
+        (
+          await http.request("client", `/api/guests/${guestId}/travel`, {
+            method: "PUT",
+            body: {
+              weddingId: fixture.weddingId,
+              version: null,
+              profile: {
+                householdName: "Journey household",
+                relationshipGroup: "Leadership guests",
+                invitationStatus: "CONFIRMED",
+                vipLevel: "VIP",
+                accessibilityNotes: "Step-free transfer",
+                ownerLabel: "Journey hospitality lead",
+              },
+              travelLegs: [
+                {
+                  mode: "FLIGHT",
+                  provider: "Journey Airways",
+                  referenceLabel: "Confirmed booking",
+                  origin: "Mumbai",
+                  destination: "Test City",
+                  departureAt: "2027-02-20T02:30:00.000Z",
+                  arrivalAt: "2027-02-20T04:30:00.000Z",
+                  status: "BOOKED",
+                  pickupRequired: true,
+                  notes: "Meet at arrivals",
+                },
+              ],
+              stays: [
+                {
+                  hotelName: "Journey Hotel",
+                  roomType: "Deluxe",
+                  roomNumber: "Assigned at check-in",
+                  checkInDate: "2027-02-20",
+                  checkOutDate: "2027-02-22",
+                  status: "ALLOCATED",
+                  keyStatus: "READY",
+                  luggageStatus: "EXPECTED",
+                  notes: "Near lift",
+                },
+              ],
+              transfers: [
+                {
+                  travelLegIndex: 0,
+                  vehicleLabel: "Journey Coach 01",
+                  routeLabel: "Airport to hotel",
+                  pickupAt: "2027-02-20T05:00:00.000Z",
+                  pickupLocation: "Test City airport",
+                  dropLocation: "Journey Hotel",
+                  seatLabel: "A1",
+                  status: "ASSIGNED",
+                  notes: "Guest assistance requested",
+                },
+              ],
+              hospitalityItems: [
+                {
+                  type: "WELCOME",
+                  title: "Place welcome hamper",
+                  status: "PLANNED",
+                  ownerLabel: "Journey hospitality lead",
+                  dueAt: "2027-02-20T06:00:00.000Z",
+                  notes: "Vegetarian hamper",
+                },
+              ],
+            },
+          })
+        ).payload,
+        "saved guest operations response"
+      ).snapshot,
+      "saved guest operations snapshot"
+    );
+    assert.equal(savedGuestOperations.version, 1);
+    assert.equal(asArray(savedGuestOperations.travelLegs, "saved travel legs").length, 1);
+    assert.equal(asArray(savedGuestOperations.stays, "saved stays").length, 1);
+    assert.equal(asArray(savedGuestOperations.transfers, "saved transfers").length, 1);
+    assert.equal(
+      asArray(savedGuestOperations.hospitalityItems, "saved hospitality items").length,
+      1
+    );
+
+    const guestManifest = await http.request(
+      "client",
+      `/api/guests/operations/export?weddingId=${fixture.weddingId}`
+    );
+    assert.match(
+      guestManifest.response.headers.get("content-type") ?? "",
+      /text\/csv/
+    );
+    assert.match(String(guestManifest.payload), /Journey Guest/);
+    assert.match(String(guestManifest.payload), /Mumbai to Test City/);
+    assert.doesNotMatch(String(guestManifest.payload), /journey-guest@example\.test/);
+    assert.doesNotMatch(String(guestManifest.payload), /Confirmed booking/);
+    assert.doesNotMatch(String(guestManifest.payload), /Step-free transfer/);
+    await http.request(
+      "manager",
+      `/api/guests/operations/export?weddingId=${fixture.weddingId}`,
+      { expectedStatus: 403 }
+    );
+    await http.page(
+      "client",
+      `/client/guests/operations/print?weddingId=${fixture.weddingId}`
+    );
+
+    await http.request("client", `/api/guests/${guestId}/travel`, {
+      method: "PUT",
+      expectedStatus: 409,
+      body: {
+        weddingId: fixture.weddingId,
+        version: 99,
+        profile: savedGuestOperations.profile,
+        travelLegs: savedGuestOperations.travelLegs,
+        stays: savedGuestOperations.stays,
+        transfers: asArray(savedGuestOperations.transfers, "stale transfers").map(
+          (value) => ({ ...asRecord(value, "stale transfer"), travelLegIndex: 0 })
+        ),
+        hospitalityItems: savedGuestOperations.hospitalityItems,
+      },
+    });
+
     const timelineItem = asRecord(
       (
         await http.request("client", "/api/timeline", {

@@ -41,7 +41,7 @@
 **Interfaces:**
 - Produces `event_production_records`, `event_production_attachments`, and `event_production_activity` with event-scoped foreign keys, constrained record/status/visibility values, optimistic version, and append-only activity.
 
-- [ ] **Step 1: Write the failing database regression**
+- [x] **Step 1: Write the failing database regression**
 
 ```ts
 await client.query("insert into event_production_records (wedding_id, record_type, title, created_by) values ($1, 'LICENSE', 'Music license', $2)", [eventId, adminId]);
@@ -49,11 +49,11 @@ await assertRejects(() => client.query("update event_production_records set wedd
 await assertRejects(() => anon.query("select * from event_production_records"), "browser grant");
 ```
 
-- [ ] **Step 2: Run `npx tsx scripts/verify-event-production.ts` and confirm the missing-table failure.**
-- [ ] **Step 3: Generate the migration with `npx supabase migration new event_production_register`.**
-- [ ] **Step 4: Add constrained tables, indexes, updated-at trigger, RLS, grants, and audit trigger.**
-- [ ] **Step 5: Regenerate database types and run the regression to green.**
-- [ ] **Step 6: Commit only the migration, test, generated type, and package script.**
+- [x] **Step 2: Run `npx tsx scripts/verify-event-production.ts` and confirm the missing-table failure.**
+- [x] **Step 3: Generate the migration with `npx supabase migration new event_production_register`.**
+- [x] **Step 4: Add constrained tables, indexes, updated-at trigger, RLS, grants, and audit trigger.**
+- [x] **Step 5: Regenerate database types and run the regression to green.**
+- [x] **Step 6: Commit only the migration, test, generated type, and package script.**
 
 ### Task 2: Permission-Safe Production API
 
@@ -67,11 +67,11 @@ await assertRejects(() => anon.query("select * from event_production_records"), 
 **Interfaces:**
 - Produces typed `ProductionRecord`, `ProductionRecordType`, `ProductionStatus`, `GET/POST /api/operations/events/:id/production`, and `PATCH/DELETE /api/operations/events/:id/production/:recordId`.
 
-- [ ] **Step 1: Add failing journey cases for unassigned manager, read-only employee, cross-event record ID, stale version, successful create/update, and protected-history delete.**
-- [ ] **Step 2: Run `npm run test:journeys` and confirm the new endpoint cases fail.**
-- [ ] **Step 3: Implement Zod payload validation, event-access recheck, capability checks, optimistic version updates, bounded arrays/text, and activity writes.**
-- [ ] **Step 4: Run journey and production regressions to green.**
-- [ ] **Step 5: Commit API, types, permissions, and tests.**
+- [x] **Step 1: Add failing journey cases for unassigned manager, read-only employee, cross-event record ID, stale version, successful create/update, and protected-history delete.**
+- [x] **Step 2: Run `npm run test:journeys` and confirm the new endpoint cases fail.**
+- [x] **Step 3: Implement Zod payload validation, event-access recheck, capability checks, optimistic version updates, bounded arrays/text, and activity writes.**
+- [x] **Step 4: Run journey and production regressions to green.**
+- [x] **Step 5: Commit API, types, permissions, and tests.**
 
 ### Task 3: Production Dossier Workspace
 
@@ -84,12 +84,12 @@ await assertRejects(() => anon.query("select * from event_production_records"), 
 - Consumes production APIs.
 - Produces tabs for Procurement, Documents & compliance, Recces & approvals, Inventory & stationery, Travel & rooming, Guest communications, and Expenses.
 
-- [ ] **Step 1: Add browser journey assertions for tab availability, empty guidance, create, validation failure, status transition, and reload persistence.**
-- [ ] **Step 2: Run the journey and confirm UI assertions fail.**
-- [ ] **Step 3: Build the panel with record-type templates, event/function scope, department/zone/owner, due date, money, structured details, attachments, status, and activity history.**
-- [ ] **Step 4: Extend print output with safe records while excluding `PRIVATE_IDENTITY` attachments and internal financial notes.**
-- [ ] **Step 5: Run browser journey, lint, TypeScript, and build.**
-- [ ] **Step 6: Commit the dossier workspace.**
+- [x] **Step 1: Add browser journey assertions for tab availability, empty guidance, create, validation failure, status transition, and reload persistence.**
+- [x] **Step 2: Run the journey and confirm UI assertions fail.**
+- [x] **Step 3: Build the panel with record-type templates, event/function scope, department/zone/owner, due date, money, structured details, attachments, status, and activity history.**
+- [x] **Step 4: Extend print output with safe records while excluding `PRIVATE_IDENTITY` attachments and internal financial notes.**
+- [x] **Step 5: Run browser journey, lint, TypeScript, and build.**
+- [x] **Step 6: Commit the dossier workspace.**
 
 ### Task 4: Guest Travel, Rooming, And Hospitality
 
@@ -105,12 +105,12 @@ await assertRejects(() => anon.query("select * from event_production_records"), 
 **Interfaces:**
 - Produces household/relationship, invitation state, travel legs, transport allocation, hotel/room, key/luggage/check-in/out, accessibility, and hospitality owner records.
 
-- [ ] **Step 1: Add failing ownership, cross-guest, travel-leg chronology, room-night, and reload-persistence cases.**
-- [ ] **Step 2: Generate migration and add owned child tables with restrictive sensitive-field access.**
-- [ ] **Step 3: Add API validation and guest workspace tabs for List, Seating, Travel, and Rooming.**
-- [ ] **Step 4: Add manifest CSV/print export with sensitive fields omitted by default.**
-- [ ] **Step 5: Run guest journeys, lint, TypeScript, build, and migration dry-run.**
-- [ ] **Step 6: Commit guest operations.**
+- [x] **Step 1: Add failing ownership, cross-guest, travel-leg chronology, room-night, and reload-persistence cases.**
+- [x] **Step 2: Generate migration and add owned child tables with restrictive sensitive-field access.**
+- [x] **Step 3: Add API validation and guest workspace tabs for List, Seating, Travel, and Rooming.**
+- [x] **Step 4: Add manifest CSV/print export with sensitive fields omitted by default.**
+- [x] **Step 5: Run guest journeys, lint, TypeScript, build, and migration dry-run.**
+- [x] **Step 6: Commit guest operations.**
 
 ### Task 5: Vendor And Crew Travel
 

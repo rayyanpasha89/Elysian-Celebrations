@@ -14,8 +14,11 @@ import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import {
   Armchair,
+  BedDouble,
   Check,
+  Download,
   Plus,
+  Printer,
   Search,
   Trash2,
   UserPlus,
@@ -23,7 +26,9 @@ import {
   UtensilsCrossed,
   X,
 } from "lucide-react";
+import Link from "next/link";
 import { fadeUp, staggerContainer } from "@/animations/variants";
+import { GuestOperationsPanel } from "@/components/dashboard/guest-operations-panel";
 import { DASHBOARD_CHART_COLORS } from "@/lib/dashboard-styles";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +48,12 @@ type Guest = {
   plus_one: boolean;
   table_number: number | null;
   notes: string | null;
+};
+
+type EventPlanSummary = {
+  id: string;
+  name: string | null;
+  date: string | null;
 };
 
 const SIDES: { key: GuestSide; label: string; short: string; color: string }[] = [
@@ -96,7 +107,10 @@ const dashLabel = "font-accent text-[10px] uppercase tracking-[0.2em] text-slate
 export default function GuestStudioPage() {
   const [guests, setGuests] = useState<Guest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<"list" | "seating">("list");
+  const [view, setView] = useState<"list" | "seating" | "operations">("list");
+  const [eventPlan, setEventPlan] = useState<EventPlanSummary | null>(null);
+  const [eventPlanLoaded, setEventPlanLoaded] = useState(false);
+  const [operationsGuestId, setOperationsGuestId] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
   const [sideFilter, setSideFilter] = useState<GuestSide | "ALL">("ALL");
@@ -123,6 +137,41 @@ export default function GuestStudioPage() {
   useEffect(() => {
     void refetch();
   }, [refetch]);
+
+  useEffect(() => {
+    if (view !== "operations" || eventPlanLoaded) return;
+    let cancelled = false;
+    async function loadEventPlan() {
+      try {
+        const response = await fetch("/api/wedding");
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error ?? "Could not load event plan");
+        if (!cancelled) {
+          setEventPlan((payload.wedding ?? null) as EventPlanSummary | null);
+          setEventPlanLoaded(true);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setEventPlanLoaded(true);
+          toast.error(error instanceof Error ? error.message : "Could not load event plan");
+        }
+      }
+    }
+    void loadEventPlan();
+    return () => {
+      cancelled = true;
+    };
+  }, [eventPlanLoaded, view]);
+
+  useEffect(() => {
+    if (guests.length === 0) {
+      setOperationsGuestId(null);
+      return;
+    }
+    if (!operationsGuestId || !guests.some((guest) => guest.id === operationsGuestId)) {
+      setOperationsGuestId(guests[0].id);
+    }
+  }, [guests, operationsGuestId]);
 
   // Optimistic patch — update locally, persist, revert on failure.
   const mutateGuest = useCallback(async (id: string, patch: Partial<Guest>) => {
@@ -261,6 +310,7 @@ export default function GuestStudioPage() {
             [
               { key: "list", label: "Guest list", icon: Users },
               { key: "seating", label: "Seating", icon: Armchair },
+              { key: "operations", label: "Travel & rooms", icon: BedDouble },
             ] as const
           ).map((tab) => {
             const Icon = tab.icon;
@@ -316,7 +366,7 @@ export default function GuestStudioPage() {
               emptyAll={guests.length === 0}
             />
           </motion.div>
-        ) : (
+        ) : view === "seating" ? (
           <motion.div
             key="seating"
             initial={{ opacity: 0, y: 8 }}
@@ -326,9 +376,145 @@ export default function GuestStudioPage() {
           >
             <SeatingPlanner guests={guests} onMutate={mutateGuest} />
           </motion.div>
+        ) : (
+          <motion.div
+            key="operations"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25 }}
+          >
+            <GuestOperationsWorkspace
+              guests={guests}
+              selectedGuestId={operationsGuestId}
+              onSelectGuest={setOperationsGuestId}
+              eventPlan={eventPlan}
+              eventPlanLoaded={eventPlanLoaded}
+            />
+          </motion.div>
         )}
       </AnimatePresence>
     </motion.div>
+  );
+}
+
+function GuestOperationsWorkspace({
+  guests,
+  selectedGuestId,
+  onSelectGuest,
+  eventPlan,
+  eventPlanLoaded,
+}: {
+  guests: Guest[];
+  selectedGuestId: string | null;
+  onSelectGuest: (id: string) => void;
+  eventPlan: EventPlanSummary | null;
+  eventPlanLoaded: boolean;
+}) {
+  const [search, setSearch] = useState("");
+  const selectedGuest = guests.find((guest) => guest.id === selectedGuestId) ?? null;
+  const visibleGuests = guests.filter((guest) =>
+    guest.name.toLowerCase().includes(search.trim().toLowerCase())
+  );
+
+  if (!eventPlanLoaded) {
+    return (
+      <div className="grid min-h-64 place-items-center border border-charcoal/10 bg-ivory">
+        <p className={dashLabel}>Loading event operations...</p>
+      </div>
+    );
+  }
+
+  if (!eventPlan) {
+    return (
+      <div className="border border-dashed border-gold-primary/35 bg-gold-primary/5 p-8 text-center">
+        <p className="font-display text-xl text-charcoal">Create an event before assigning travel</p>
+        <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-slate">
+          Guest travel, rooms, transfers, and hospitality are event-specific so dates and handovers stay accurate.
+        </p>
+        <Link href="/client/onboarding" className="mt-5 inline-flex border border-gold-primary bg-gold-primary px-5 py-3 font-accent text-[10px] uppercase tracking-[0.18em] text-midnight">
+          Create event structure
+        </Link>
+      </div>
+    );
+  }
+
+  if (guests.length === 0) {
+    return (
+      <div className="border border-dashed border-charcoal/15 bg-ivory p-8 text-center">
+        <p className="font-display text-xl text-charcoal">Add guests before planning their movement</p>
+        <p className="mt-2 text-sm text-slate">Return to Guest list and add the first people travelling to this event.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 border border-charcoal/10 bg-ivory p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className={dashLabel}>Field-ready manifest</p>
+          <p className="mt-1 break-words font-heading text-sm text-charcoal">
+            Export arrival, room, transfer, and care assignments without contacts, full references, or private notes.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <a
+            href={`/api/guests/operations/export?weddingId=${encodeURIComponent(eventPlan.id)}`}
+            className="inline-flex min-h-10 items-center gap-2 border border-charcoal/15 px-3 py-2 font-accent text-[9px] uppercase tracking-[0.16em] text-charcoal transition-colors hover:border-gold-primary"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Download CSV
+          </a>
+          <Link
+            href={`/client/guests/operations/print?weddingId=${encodeURIComponent(eventPlan.id)}`}
+            target="_blank"
+            className="inline-flex min-h-10 items-center gap-2 border border-gold-primary bg-gold-primary px-3 py-2 font-accent text-[9px] uppercase tracking-[0.16em] text-midnight transition-colors hover:bg-gold-dark"
+          >
+            <Printer className="h-3.5 w-3.5" />
+            Print manifest
+          </Link>
+        </div>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[17rem_minmax(0,1fr)]">
+      <aside className="self-start border border-charcoal/10 bg-ivory xl:sticky xl:top-20">
+        <div className="border-b border-charcoal/10 p-4">
+          <p className="font-accent text-[10px] uppercase tracking-[0.2em] text-gold-dark">Choose a guest</p>
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search guest…"
+            className="mt-3 w-full border border-charcoal/15 bg-cream/20 px-3 py-2 font-heading text-sm text-charcoal outline-none focus:border-gold-primary"
+          />
+        </div>
+        <div className="scrollbar-elysian max-h-[34rem] overflow-y-auto p-2">
+          {visibleGuests.map((guest) => (
+            <button
+              key={guest.id}
+              type="button"
+              onClick={() => onSelectGuest(guest.id)}
+              className={cn(
+                "w-full border-b border-charcoal/8 px-3 py-3 text-left transition-colors last:border-b-0",
+                guest.id === selectedGuestId ? "bg-charcoal text-ivory" : "text-charcoal hover:bg-cream"
+              )}
+            >
+              <span className="block font-heading text-sm">{guest.name}</span>
+              <span className={cn("mt-1 block font-accent text-[9px] uppercase tracking-[0.12em]", guest.id === selectedGuestId ? "text-gold-primary" : "text-slate")}>{RSVP_MAP[guest.rsvp_status].label} · {SIDE_MAP[guest.side].short}</span>
+            </button>
+          ))}
+          {visibleGuests.length === 0 ? <p className="p-4 text-center text-xs text-slate">No guest matches that search.</p> : null}
+        </div>
+      </aside>
+      {selectedGuest ? (
+        <GuestOperationsPanel
+          guest={selectedGuest}
+          weddingId={eventPlan.id}
+          eventName={eventPlan.name || "Event plan"}
+          eventDate={eventPlan.date ?? ""}
+        />
+      ) : null}
+      </div>
+    </div>
   );
 }
 
