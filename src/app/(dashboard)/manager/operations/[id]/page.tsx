@@ -148,6 +148,29 @@ export default function OperationsCommandCenterPage() {
     };
   }, [load, reloadKey]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const refreshWorkspace = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const result = await load();
+        if (!cancelled) setWorkspace(result);
+      } catch {
+        // Keep the last usable command-center snapshot during a transient refresh failure.
+      }
+    };
+    const interval = window.setInterval(() => void refreshWorkspace(), 15_000);
+    const refreshOnFocus = () => void refreshWorkspace();
+    window.addEventListener("focus", refreshOnFocus);
+    document.addEventListener("visibilitychange", refreshOnFocus);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshOnFocus);
+      document.removeEventListener("visibilitychange", refreshOnFocus);
+    };
+  }, [load]);
+
   const functions = useMemo(
     () => workspace?.days.flatMap((day) => day.functions.map((event) => ({ ...event, dayName: day.name, dayDate: day.date }))) ?? [],
     [workspace]
