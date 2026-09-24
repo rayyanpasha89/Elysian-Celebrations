@@ -82,6 +82,19 @@ export async function resolveOperationsAccess(
   }
   if (session.role !== "manager") return null;
 
+  const staffScope = await loadOperationsStaffScope(session);
+  if (!staffScope) {
+    return {
+      userId: session.userId,
+      isAdmin: false,
+      permissions: [...OPERATIONS_PERMISSIONS],
+      eventRole: "Platform manager",
+    };
+  }
+  if (!staffScope.isActive || !staffScope.eventIds.includes(weddingId)) {
+    return null;
+  }
+
   const supabase = createAdminSupabaseClient();
   const { data, error } = await supabase
     .from("event_staff_assignments")

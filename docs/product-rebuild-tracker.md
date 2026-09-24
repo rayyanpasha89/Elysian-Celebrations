@@ -123,6 +123,17 @@ claims that the changes are committed, deployed, or active in the remote databas
 
 ## Shipped Recently
 
+- Retired the non-persistent manager configurator. Its legacy route now sends
+  users to the real event directory, while the manager dashboard points to
+  persisted bookings and live operations instead of a simulated price card.
+- Corrected the manager access model end to end. An unprofiled platform manager
+  retains broad operational oversight; once Admin creates an operations profile,
+  active state, event assignments, and explicit capabilities become authoritative.
+- Expanded the rollback-clean authenticated suite to 12 groups. It now proves
+  client settings, guests, run-of-show items, mood-board items, vendor profile,
+  vendor settings, services, notifications, broad platform-manager oversight,
+  scoped employee denial, and cleanup in addition to the core planning and
+  financial journeys.
 - Added an event-scoped live operations layer for Elysian employees. Admin can
   configure operations role templates, granular capabilities, active state,
   contact details, shifts, event roles, and exact event assignments through
@@ -316,7 +327,7 @@ claims that the changes are committed, deployed, or active in the remote databas
 - `npm run test:billing-gateway` (13 focused cases with full rollback)
 - `npm run test:readiness` (8 focused cases)
 - `npm run test:abuse-controls` (rate limit, grants, RLS, and media reservations)
-- `npm run test:journeys` (10 authenticated groups, including event-scoped
+- `npm run test:journeys` (12 authenticated groups, including event-scoped
   operations and every portal navigation destination)
 - `npx supabase db lint --schema public --level warning --fail-on error`
 - `npm run db:query` for newly added Supabase tables and columns

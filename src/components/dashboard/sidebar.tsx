@@ -22,7 +22,6 @@ import {
   Palette,
   Quote,
   Settings,
-  SlidersHorizontal,
   Star,
   Store,
   UserCircle,
@@ -93,7 +92,6 @@ const ICON_BY_HREF: Record<string, LucideIcon> = {
   "/manager/clients": Users,
   "/manager/vendors": Store,
   "/manager/weddings": CalendarRange,
-  "/manager/configurator": SlidersHorizontal,
   "/manager/destinations": MapPin,
   "/manager/settings": Settings,
 };

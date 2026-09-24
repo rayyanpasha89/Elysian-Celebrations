@@ -67,7 +67,6 @@ const DASHBOARD_ROUTE_TITLES: Record<string, string> = {
   "/manager/messages": "Messages",
   "/manager/clients": "Clients",
   "/manager/vendors": "Vendors",
-  "/manager/configurator": "Event Configurator",
   "/manager/destinations": "Destinations",
   "/manager/weddings": "Events",
   "/manager/settings": "Settings",

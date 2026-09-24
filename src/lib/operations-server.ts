@@ -2,7 +2,10 @@ import "server-only";
 
 import type { AuthSession } from "@/lib/api-utils";
 import { evaluateEventReadiness, type EventReadinessRow } from "@/lib/event-readiness";
-import { resolveOperationsAccess } from "@/lib/operations-auth";
+import {
+  loadOperationsStaffScope,
+  resolveOperationsAccess,
+} from "@/lib/operations-auth";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 
 type Relation<T> = T | T[] | null | undefined;
@@ -22,23 +25,15 @@ export async function loadOperationsEventList(session: AuthSession) {
 
   if (session.role !== "admin") {
     if (session.role !== "manager") return { events: [], needsProfile: false };
-    const { data: profile } = await supabase
-      .from("operations_staff_profiles")
-      .select("is_active")
-      .eq("user_id", session.userId)
-      .maybeSingle();
-    if (!profile?.is_active) {
+    const staffScope = await loadOperationsStaffScope(session);
+    if (staffScope && !staffScope.isActive) {
       needsProfile = true;
       return { events: [], needsProfile };
     }
-    const { data: assignments, error: assignmentError } = await supabase
-      .from("event_staff_assignments")
-      .select("wedding_id")
-      .eq("staff_user_id", session.userId)
-      .eq("is_active", true);
-    if (assignmentError) throw assignmentError;
-    eventIds = (assignments ?? []).map((assignment) => assignment.wedding_id);
-    if (eventIds.length === 0) return { events: [], needsProfile };
+    if (staffScope) {
+      eventIds = staffScope.eventIds;
+      if (eventIds.length === 0) return { events: [], needsProfile };
+    }
   }
 
   let eventQuery = supabase

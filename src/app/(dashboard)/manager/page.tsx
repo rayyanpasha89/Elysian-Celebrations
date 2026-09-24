@@ -66,7 +66,7 @@ const quickLinks = [
   { label: "Inquiries", href: "/manager/inquiries" },
   { label: "Events", href: "/manager/weddings" },
   { label: "Vendors", href: "/manager/vendors" },
-  { label: "Configurator", href: "/manager/configurator" },
+  { label: "Bookings", href: "/manager/bookings" },
   { label: "Messages", href: "/manager/messages" },
 ];
 
@@ -273,16 +273,16 @@ export default function ManagerDashboard() {
             )}
           </div>
 
-          {/* Configurator CTA */}
+          {/* Delivery workspace CTA */}
           <div className="border border-gold-primary/20 bg-[radial-gradient(ellipse_at_bottom_right,rgba(201,169,110,0.08),transparent_60%)] p-6">
-            <p className={dashLabel}>Event Planning</p>
-            <h3 className="font-display mt-2 text-xl text-charcoal">Event Configurator</h3>
-            <p className="font-heading mt-2 text-sm text-slate">Build a custom event proposal for a client with real-time pricing and package selection.</p>
+            <p className={dashLabel}>Live Delivery</p>
+            <h3 className="font-display mt-2 text-xl text-charcoal">Operations workspace</h3>
+            <p className="font-heading mt-2 text-sm text-slate">Open the assigned event board for run-of-show, incidents, decisions, team handoffs, and the printable event book.</p>
             <Link
-              href="/manager/configurator"
+              href="/manager/operations"
               className="mt-4 inline-block font-accent border border-gold-primary px-5 py-2.5 text-[10px] uppercase tracking-[0.2em] text-gold-primary transition-colors hover:bg-gold-primary hover:text-midnight"
             >
-              Open configurator
+              Open live operations
             </Link>
           </div>
 

@@ -350,3 +350,82 @@ This is the current Elysian platform. A future Shobiz workflow may extend it, bu
 - Never call proposed AI, quotation, or Shobiz-specific work complete.
 - Use `event`, `host`, `client`, `function`, and `operations team` unless the selected event is specifically a wedding.
 - End on the connected operating lifecycle, not a list of screens.
+
+## Complete Dashboard Coverage Appendix
+
+Use this appendix for a long-form product recording or a route-by-route QA pass.
+The main script above remains the recommended narrative cut.
+
+### Client portal
+
+| Screen | Route | Proof to show |
+| --- | --- | --- |
+| Dashboard | `/client` | Event readiness, next action, recent plan context |
+| Event Plan | `/client/wedding` | Three layers, map navigation, scoped save, finalization |
+| Cost Estimate | `/client/budget` | Category and event views, totals, paid/due/variance |
+| Vendors | `/client/vendors` | Requirement-aware discovery, real catalogue, shortlist |
+| Guest List | `/client/guests` | Host groups, RSVP, dietary data, seating |
+| Run of Show | `/client/timeline` | Chronological functions and persisted schedule items |
+| Mood Board | `/client/mood-board` | Saved references, category, deletion |
+| Messages | `/client/messages` | Booking-bound conversation and context rail |
+| Bookings | `/client/bookings` | Service, function, status, final client price |
+| Billing | `/client/billing` | Published invoice, amount received, balance due |
+| Settings | `/client/settings` | Persisted profile and event defaults |
+
+### Vendor portal
+
+| Screen | Route | Proof to show |
+| --- | --- | --- |
+| Dashboard | `/vendor` | Inquiries, confirmed work, payout summary, next action |
+| Analytics | `/vendor/analytics` | Real booking and inquiry trends without fabricated views |
+| Profile | `/vendor/profile` | Public identity, coverage, imagery, inquiry availability |
+| Services | `/vendor/services` | Scope, event fit, inclusions, deliverables, add-ons, catalogue |
+| Portfolio | `/vendor/portfolio` | Cover and visual references |
+| Reviews | `/vendor/reviews` | Published versus pending feedback |
+| Inquiries | `/vendor/inquiries` | Event and service context before response |
+| Confirmed | `/vendor/bookings` | Delivery status and vendor payout only |
+| Calendar | `/vendor/calendar` | Upcoming confirmed functions grouped by month |
+| Messages | `/vendor/messages` | Client thread with booking context |
+| Settings | `/vendor/settings` | Tax identifier and availability persistence |
+
+### Administrator portal
+
+| Screen | Route | Proof to show |
+| --- | --- | --- |
+| Dashboard | `/admin` | Portfolio health and attention queues |
+| Analytics | `/admin/analytics` | Platform activity and category distribution |
+| Final Pricing | `/admin/pricing` | Vendor amount + fixed Elysian fee = final client price |
+| Client Billing | `/admin/billing` | Invoice, receipt, refund, vendor settlement state |
+| Client Progress | `/admin/progress` | Canonical event readiness and exact gaps |
+| Revenue Dashboard | `/admin/revenue` | Collected client totals and controlled settlement direction |
+| Vendors | `/admin/vendors` | Verification, visibility, inquiry availability |
+| Clients | `/admin/clients` | Event ownership and onboarding state |
+| Destinations | `/admin/destinations` | Catalogue content and availability |
+| Packages | `/admin/packages` | Published package configuration |
+| Venues | `/admin/venues` | Searchable venue catalogue used by client dropdowns |
+| Blog Posts | `/admin/blog` | Editorial content lifecycle |
+| Client Stories | `/admin/testimonials` | Testimonial publishing state |
+| Inquiries | `/admin/inquiries` | Contact pipeline and ownership |
+| Users | `/admin/users` | Platform identity and broad role |
+| Team & Permissions | `/admin/team` | Capabilities, active state, assignments, shifts, handoff |
+| Settings | `/admin/settings` | Persisted platform settings |
+
+### Manager and operations portal
+
+| Screen | Route | Proof to show |
+| --- | --- | --- |
+| Operations Dashboard | `/manager` | Broad portfolio overview before employee scoping |
+| Live Operations | `/manager/operations` | Assigned event cards and live attention metrics |
+| Event Command Center | `/manager/operations/[id]` | Pulse, run of show, feed, team, incidents and decisions |
+| Printable Event Book | `/manager/operations/[id]/print` | Permission-safe field backup generated from live source |
+| Event Directory | `/manager/weddings` | Read-only event list for platform managers |
+| Inquiries | `/manager/inquiries` | Operational inquiry context |
+| Bookings | `/manager/bookings` | Booking delivery context |
+| Messages | `/manager/messages` | External oversight only when permission allows |
+| Clients | `/manager/clients` | Client directory for broad platform managers |
+| Vendors | `/manager/vendors` | Vendor network for broad platform managers |
+| Destinations | `/manager/destinations` | Destination reference for broad platform managers |
+| Settings | `/manager/settings` | Employee account and portal settings |
+
+The former `/manager/configurator` address is compatibility-only and redirects
+to the event directory. It is not a product surface and should not be recorded.

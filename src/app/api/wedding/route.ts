@@ -29,6 +29,7 @@ import {
   totalsFromPayments,
   type PaymentLedgerRow,
 } from "@/lib/payment-ledger";
+import { isTestAuthEnabled } from "@/lib/test-auth";
 
 type WeddingEventRow = {
   id: string;
@@ -773,34 +774,36 @@ export async function POST(request: NextRequest) {
       body as Record<string, unknown>
     );
 
-    try {
-      const clerk = await clerkClient();
-      const clerkUser = await clerk.users.getUser(session.userId);
-      const primaryEmail =
-        clerkUser.emailAddresses.find(
-          (entry) => entry.id === clerkUser.primaryEmailAddressId
-        )?.emailAddress ??
-        clerkUser.emailAddresses[0]?.emailAddress ??
-        null;
-      const displayName =
-        [clerkUser.firstName, clerkUser.lastName]
-          .filter(Boolean)
-          .join(" ")
-          .trim() ||
-        primaryEmail?.split("@")[0] ||
-        "User";
+    if (!isTestAuthEnabled()) {
+      try {
+        const clerk = await clerkClient();
+        const clerkUser = await clerk.users.getUser(session.userId);
+        const primaryEmail =
+          clerkUser.emailAddresses.find(
+            (entry) => entry.id === clerkUser.primaryEmailAddressId
+          )?.emailAddress ??
+          clerkUser.emailAddresses[0]?.emailAddress ??
+          null;
+        const displayName =
+          [clerkUser.firstName, clerkUser.lastName]
+            .filter(Boolean)
+            .join(" ")
+            .trim() ||
+          primaryEmail?.split("@")[0] ||
+          "User";
 
-      await supabase.from("users").upsert(
-        {
-          id: session.userId,
-          email: primaryEmail,
-          name: displayName,
-          role: "CLIENT",
-        },
-        { onConflict: "id" }
-      );
-    } catch (error) {
-      console.error("user upsert:", error);
+        await supabase.from("users").upsert(
+          {
+            id: session.userId,
+            email: primaryEmail,
+            name: displayName,
+            role: "CLIENT",
+          },
+          { onConflict: "id" }
+        );
+      } catch (error) {
+        console.error("user upsert:", error);
+      }
     }
 
     const { data: existingProfile, error: profileError } = await supabase

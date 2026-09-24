@@ -943,6 +943,257 @@ async function runJourneys(
     );
   });
 
+  await check("supporting client and vendor workspaces persist without orphaning data", async () => {
+    assert.ok(fixture.vendorServiceId);
+
+    await http.request("client", "/api/settings/client", {
+      method: "PATCH",
+      body: {
+        name: "Authenticated Journey Client",
+        phone: "+910000000001",
+        partnerName: "Journey Co-host",
+        guestCount: 84,
+      },
+    });
+    const clientSettings = asRecord(
+      (await http.request("client", "/api/settings/client")).payload,
+      "client settings"
+    );
+    assert.equal(
+      asRecord(clientSettings.user, "client settings user").phone,
+      "+910000000001"
+    );
+    assert.equal(
+      asRecord(clientSettings.clientProfile, "client settings profile").guestCount,
+      84
+    );
+
+    const guest = asRecord(
+      (
+        await http.request("client", "/api/guests", {
+          method: "POST",
+          expectedStatus: 201,
+          body: {
+            name: "Journey Guest",
+            email: "journey-guest@example.test",
+            side: "COUPLE",
+            mealPref: "Vegetarian",
+            plusOne: false,
+          },
+        })
+      ).payload,
+      "created guest"
+    );
+    const guestId = String(guest.id);
+    const updatedGuest = asRecord(
+      (
+        await http.request("client", `/api/guests/${guestId}`, {
+          method: "PATCH",
+          body: { rsvp_status: "CONFIRMED", table_number: 4 },
+        })
+      ).payload,
+      "updated guest"
+    );
+    assert.equal(updatedGuest.rsvp_status, "CONFIRMED");
+    assert.equal(updatedGuest.table_number, 4);
+
+    const timelineItem = asRecord(
+      (
+        await http.request("client", "/api/timeline", {
+          method: "POST",
+          expectedStatus: 201,
+          body: {
+            title: "Journey dashboard follow-up",
+            description: "Created by the authenticated dashboard closure test.",
+            dueDate: "2027-02-19T12:00:00.000Z",
+          },
+        })
+      ).payload,
+      "created timeline item"
+    );
+    const timelineId = String(timelineItem.id);
+    const updatedTimelineItem = asRecord(
+      (
+        await http.request("client", `/api/timeline/${timelineId}`, {
+          method: "PATCH",
+          body: { isCompleted: true },
+        })
+      ).payload,
+      "updated timeline item"
+    );
+    assert.equal(updatedTimelineItem.is_completed, true);
+
+    const moodItem = asRecord(
+      (
+        await http.request("client", "/api/mood-boards", {
+          method: "POST",
+          expectedStatus: 201,
+          body: {
+            imageUrl: "https://images.unsplash.com/photo-1519167758481-83f550bb49b3",
+            caption: "Journey reference board",
+            category: "Venue",
+          },
+        })
+      ).payload,
+      "created mood-board item"
+    );
+    const moodItemId = String(moodItem.id);
+
+    await http.request("vendor", "/api/vendor/profile", {
+      method: "PUT",
+      body: {
+        businessName: fixture.vendorName,
+        shortBio: "Verified through the authenticated dashboard closure journey.",
+        city: "Test City",
+        state: "Test State",
+        experience: 6,
+      },
+    });
+    await http.request("vendor", "/api/settings/vendor", {
+      method: "PATCH",
+      body: {
+        phone: "+910000000002",
+        businessName: fixture.vendorName,
+        city: "Test City",
+        state: "Test State",
+        country: "India",
+        taxId: "TEST-GST-001",
+        acceptingInquiries: true,
+      },
+    });
+    const vendorSettings = asRecord(
+      (await http.request("vendor", "/api/settings/vendor")).payload,
+      "vendor settings"
+    );
+    assert.equal(
+      asRecord(vendorSettings.user, "vendor settings user").phone,
+      "+910000000002"
+    );
+    assert.equal(
+      asRecord(vendorSettings.vendor, "vendor settings profile").taxId,
+      "TEST-GST-001"
+    );
+
+    const updatedService = asRecord(
+      (
+        await http.request(
+          "vendor",
+          `/api/vendor/services/${fixture.vendorServiceId}`,
+          {
+            method: "PATCH",
+            body: {
+              serviceScope: "Journey-tested coordination and live delivery.",
+              eventTypeFit: ["corporate", "conference", "retreat"],
+              inclusions: ["Planning lead", "Run-of-show", "Event handoff"],
+              deliverables: ["Final operations brief"],
+              addOns: ["Guest desk"],
+            },
+          }
+        )
+      ).payload,
+      "updated vendor service"
+    );
+    assert.equal(
+      updatedService.service_scope,
+      "Journey-tested coordination and live delivery."
+    );
+
+    for (const role of ["client", "vendor", "manager", "admin"] as const) {
+      const notificationPayload = asRecord(
+        (await http.request(role, "/api/notifications")).payload,
+        `${role} notifications`
+      );
+      assert.ok(Array.isArray(notificationPayload.notifications));
+      await http.request(role, "/api/notifications", {
+        method: "PATCH",
+        body: { all: true },
+      });
+    }
+
+    await http.request("client", `/api/mood-boards/items/${moodItemId}`, {
+      method: "DELETE",
+    });
+    await http.request("client", `/api/timeline/${timelineId}`, {
+      method: "DELETE",
+    });
+    await http.request("client", `/api/guests/${guestId}`, {
+      method: "DELETE",
+    });
+
+    const [guests, timeline, moodBoards] = await Promise.all([
+      http.request("client", "/api/guests"),
+      http.request("client", "/api/timeline"),
+      http.request("client", "/api/mood-boards"),
+    ]);
+    assert.equal(
+      asArray(asRecord(guests.payload, "guest list").guests, "guest rows").some(
+        (entry) => asRecord(entry, "guest row").id === guestId
+      ),
+      false
+    );
+    assert.equal(
+      asArray(asRecord(timeline.payload, "timeline").items, "timeline rows").some(
+        (entry) => asRecord(entry, "timeline row").id === timelineId
+      ),
+      false
+    );
+    assert.equal(
+      asArray(asRecord(moodBoards.payload, "mood boards").items, "mood-board rows").some(
+        (entry) => asRecord(entry, "mood-board row").id === moodItemId
+      ),
+      false
+    );
+  });
+
+  await check("platform manager can oversee every persisted event before employee scoping", async () => {
+    assert.ok(fixture.weddingId);
+
+    const eventsPayload = asRecord(
+      (await http.request("manager", "/api/operations/events")).payload,
+      "platform manager operations event list"
+    );
+    const event = asArray(eventsPayload.events, "platform manager operations events")
+      .map((entry) => asRecord(entry, "platform manager operations event"))
+      .find((entry) => entry.id === fixture.weddingId);
+    assert.ok(event, "an unprofiled platform manager should see the created event");
+
+    const workspace = asRecord(
+      (
+        await http.request(
+          "manager",
+          `/api/operations/events/${fixture.weddingId}`
+        )
+      ).payload,
+      "platform manager operations workspace"
+    );
+    assert.equal(
+      asRecord(workspace.event, "platform manager workspace event").id,
+      fixture.weddingId
+    );
+    assert.equal(
+      asRecord(workspace.access, "platform manager workspace access").eventRole,
+      "Platform manager"
+    );
+
+    for (const path of [
+      "/manager",
+      "/manager/operations",
+      `/manager/operations/${fixture.weddingId}`,
+      `/manager/operations/${fixture.weddingId}/print`,
+      "/manager/inquiries",
+      "/manager/bookings",
+      "/manager/messages",
+      "/manager/clients",
+      "/manager/vendors",
+      "/manager/weddings",
+      "/manager/destinations",
+      "/manager/settings",
+    ]) {
+      await http.page("manager", path);
+    }
+    await http.page("manager", "/manager/configurator");
+  });
+
   await check("admin assigns event-scoped operations access and incidents preserve lifecycle", async () => {
     assert.ok(fixture.weddingId && fixture.eventId);
 

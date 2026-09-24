@@ -116,7 +116,7 @@ async function loadWeddings(): Promise<LoadResult> {
 
   if (error) {
     console.error("manager weddings:", error);
-    return { kind: "error", message: "Could not load weddings." };
+    return { kind: "error", message: "Could not load events." };
   }
 
   const weddings = ((data ?? []) as WeddingRow[]).map((row) => {

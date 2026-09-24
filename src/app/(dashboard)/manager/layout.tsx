@@ -26,7 +26,6 @@ const navGroups: NavGroup[] = [
   {
     title: "Planning",
     items: [
-      { label: "Event Configurator", href: "/manager/configurator" },
       { label: "Destinations", href: "/manager/destinations" },
     ],
   },
