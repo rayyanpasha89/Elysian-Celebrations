@@ -450,6 +450,7 @@ async function cleanupFixture(supabase: TestSupabase, fixture: Fixture) {
     sha256(`message-send:${fixture.userIds.vendor}`),
     sha256(`operations-feed-create:${fixture.userIds.manager}`),
     sha256(`operations-workforce-write:${fixture.userIds.manager}`),
+    sha256(`event-partner-travel-save:${fixture.userIds.manager}`),
     sha256(`billing-invoice-issue:${fixture.userIds.admin}`),
   ];
   const cleanupActions: [string, PromiseLike<{ error: { message: string } | null }>][] = [
@@ -1984,6 +1985,228 @@ async function runJourneys(
       .map((entry) => asRecord(entry, "vendor booking"))
       .find((entry) => entry.id === fixture.bookingId);
     assert.ok(vendorBooking, "vendor should see the confirmed booking");
+  });
+
+  await check("partner travel follows selected bookings with scoped financial access", async () => {
+    assert.ok(
+      fixture.weddingId &&
+        fixture.eventId &&
+        fixture.bookingId &&
+        fixture.vendorProfileId
+    );
+
+    const endpoint = `/api/operations/events/${fixture.weddingId}/travel`;
+    const initial = asRecord(
+      (await http.request("manager", endpoint)).payload,
+      "initial partner travel workspace"
+    );
+    const bookingReference = asArray(
+      asRecord(initial.references, "partner travel references").bookings,
+      "partner travel booking references"
+    )
+      .map((entry) => asRecord(entry, "partner travel booking reference"))
+      .find((entry) => entry.id === fixture.bookingId);
+    assert.ok(bookingReference, "confirmed booking should be available to the travel desk");
+
+    const draft = {
+      partyId: null,
+      version: null,
+      party: {
+        bookingId: fixture.bookingId,
+        vendorProfileId: fixture.vendorProfileId,
+        weddingEventId: fixture.eventId,
+        partyType: "ARTIST",
+        name: "Journey Ensemble",
+        company: fixture.vendorName,
+        departmentLabel: "Entertainment",
+        roleLabel: "Headline act",
+        headCount: 8,
+        contactLabel: "Tour manager",
+        foodPlan: "Eight vegetarian crew meals",
+        perDiemAmount: 12000,
+        ownerLabel: "Artist liaison",
+        notes: "Soundcheck before guest arrival",
+      },
+      travelLegs: [
+        {
+          id: null,
+          mode: "FLIGHT",
+          provider: "Journey Air",
+          referenceLabel: "Eight confirmed seats",
+          origin: "Mumbai",
+          destination: "Goa",
+          departureAt: "2027-02-20T02:30:00.000Z",
+          arrivalAt: "2027-02-20T04:00:00.000Z",
+          status: "BOOKED",
+          pickupRequired: true,
+        },
+      ],
+      stays: [
+        {
+          id: null,
+          hotelName: "Journey Hotel",
+          roomType: "Twin",
+          roomCount: 4,
+          checkInDate: "2027-02-20",
+          checkOutDate: "2027-02-22",
+          status: "ALLOCATED",
+          foodPlan: "Breakfast and dinner",
+        },
+      ],
+      transfers: [
+        {
+          id: null,
+          travelLegIndex: 0,
+          routeLabel: "Airport to hotel",
+          pickupAt: "2027-02-20T04:30:00.000Z",
+          pickupLocation: "Goa airport",
+          dropLocation: "Journey Hotel",
+          vehicleLabel: "Tempo 01",
+          status: "ASSIGNED",
+        },
+      ],
+    };
+    const created = asRecord(
+      asRecord(
+        (
+          await http.request("manager", endpoint, {
+            method: "POST",
+            expectedStatus: 201,
+            body: draft,
+          })
+        ).payload,
+        "created partner travel response"
+      ).party,
+      "created partner travel party"
+    );
+    const partyId = String(created.partyId);
+    assert.match(partyId, /^[0-9a-f-]{36}$/i);
+    assert.equal(asRecord(created.party, "created partner travel profile").perDiemAmount, 12000);
+    assert.equal(asArray(created.travelLegs, "created partner travel legs").length, 1);
+
+    const reloaded = asRecord(
+      (await http.request("manager", endpoint)).payload,
+      "reloaded partner travel workspace"
+    );
+    const persisted = asArray(reloaded.parties, "reloaded partner travel parties")
+      .map((entry) => asRecord(entry, "reloaded partner travel party"))
+      .find((entry) => entry.partyId === partyId);
+    assert.ok(persisted, "saved partner travel should persist after reload");
+    const version = Number(persisted.version);
+
+    const updatedBody = {
+      ...draft,
+      partyId,
+      version,
+      party: { ...draft.party, ownerLabel: "Updated artist liaison" },
+      travelLegs: asArray(persisted.travelLegs, "persisted partner travel legs"),
+      stays: asArray(persisted.stays, "persisted partner stays"),
+      transfers: asArray(persisted.transfers, "persisted partner transfers"),
+    };
+    const updated = asRecord(
+      asRecord(
+        (
+          await http.request("manager", endpoint, {
+            method: "PUT",
+            body: updatedBody,
+          })
+        ).payload,
+        "updated partner travel response"
+      ).party,
+      "updated partner travel party"
+    );
+    assert.equal(
+      asRecord(updated.party, "updated partner travel profile").ownerLabel,
+      "Updated artist liaison"
+    );
+    assert.equal(Number(updated.version), version + 1);
+
+    await http.request("manager", endpoint, {
+      method: "PUT",
+      expectedStatus: 409,
+      body: updatedBody,
+    });
+    await http.request("client", endpoint, { expectedStatus: 403 });
+
+    await http.request("admin", "/api/admin/team", {
+      method: "PATCH",
+      body: {
+        action: "ASSIGNMENT",
+        userId: fixture.userIds.manager,
+        eventId: fixture.weddingId,
+        eventRole: "Event lead",
+        shiftStart: "2027-02-20T02:30:00.000Z",
+        shiftEnd: "2027-02-20T15:30:00.000Z",
+        notes: "Financially restricted travel verification.",
+        permissions: ["VIEW_EVENT", "MANAGE_PRODUCTION"],
+        isActive: true,
+      },
+    });
+    const restricted = asRecord(
+      (await http.request("manager", endpoint)).payload,
+      "restricted partner travel workspace"
+    );
+    const restrictedParty = asRecord(
+      asArray(restricted.parties, "restricted partner travel parties")[0],
+      "restricted partner travel party"
+    );
+    assert.equal(
+      asRecord(restrictedParty.party, "restricted partner travel profile").perDiemAmount,
+      null
+    );
+    const restrictedBody = {
+      ...restrictedParty,
+      party: {
+        ...asRecord(restrictedParty.party, "restricted save profile"),
+        ownerLabel: "Restricted coordinator save",
+      },
+    };
+    const restrictedSave = asRecord(
+      asRecord(
+        (
+          await http.request("manager", endpoint, {
+            method: "PUT",
+            body: restrictedBody,
+          })
+        ).payload,
+        "restricted partner travel save response"
+      ).party,
+      "restricted partner travel saved party"
+    );
+    assert.equal(
+      asRecord(restrictedSave.party, "restricted saved profile").perDiemAmount,
+      null
+    );
+    const adminTravel = asRecord(
+      (await http.request("admin", endpoint)).payload,
+      "admin partner travel workspace"
+    );
+    assert.equal(
+      asRecord(
+        asRecord(
+          asArray(adminTravel.parties, "admin partner travel parties")[0],
+          "admin partner travel party"
+        ).party,
+        "admin partner travel profile"
+      ).perDiemAmount,
+      12000,
+      "a restricted coordinator save must preserve the hidden per-diem amount"
+    );
+
+    await http.request("admin", "/api/admin/team", {
+      method: "PATCH",
+      body: {
+        action: "ASSIGNMENT",
+        userId: fixture.userIds.manager,
+        eventId: fixture.weddingId,
+        eventRole: "Event lead",
+        shiftStart: "2027-02-20T02:30:00.000Z",
+        shiftEnd: "2027-02-20T15:30:00.000Z",
+        notes: "Authenticated journey handoff.",
+        permissions: null,
+        isActive: true,
+      },
+    });
   });
 
   await check("budget reflects the planner vendor selection without exposing pricing", async () => {

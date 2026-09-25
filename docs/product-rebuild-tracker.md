@@ -70,6 +70,10 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
   - `20260923072223_preserve_retired_venue_selections.sql`
   - `20260923180753_add_admin_billing_summary.sql`
   - `20260923190000_event_operations_command_center.sql`
+  - `20260925120000_partner_travel_manifest.sql`
+  - `20260925123000_partner_travel_cascade_scope.sql`
+  - `20260925124500_partner_travel_activity_cascade.sql`
+  - `20260925130000_partner_travel_consistent_snapshot.sql`
 - Remote table/column checks passed for:
   - `wedding_event_menus`
   - `wedding_event_menu_items`
@@ -123,6 +127,12 @@ claims that the changes are committed, deployed, or active in the remote databas
 
 ## Shipped Recently
 
+- Added the manager Partner Travel desk for event-scoped vendor, artist, crew,
+  speaker, and performer movement. Parties can be linked to real selected
+  bookings and functions, then coordinated through journey, stay, food/per-diem,
+  pickup, arrival, and departure records with exception filters and versioned
+  atomic saves. Raw passport, Aadhaar, PAN, government-ID, and PNR values are
+  rejected; secure document custody remains a separate restricted-vault task.
 - Retired the non-persistent manager configurator. Its legacy route now sends
   users to the real event directory, while the manager dashboard points to
   persisted bookings and live operations instead of a simulated price card.

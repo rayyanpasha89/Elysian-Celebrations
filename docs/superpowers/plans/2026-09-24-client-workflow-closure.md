@@ -124,10 +124,10 @@ await assertRejects(() => anon.query("select * from event_production_records"), 
 **Interfaces:**
 - Produces vendor/artist/crew travelers, travel legs, accommodation, food/per-diem, pickup, arrival, and departure status.
 
-- [ ] **Step 1: Add failing event-scope, booking/vendor association, chronology, and restricted-identity tests.**
-- [ ] **Step 2: Build schema and API with encrypted-storage references instead of raw document values.**
-- [ ] **Step 3: Build the transport and rooming manifest UI with department/function filters and arrival exception states.**
-- [ ] **Step 4: Verify regressions and commit.**
+- [x] **Step 1: Add failing event-scope, booking/vendor association, chronology, and restricted-identity tests.**
+- [x] **Step 2: Build the event-scoped schema and atomic API while rejecting raw passport, Aadhaar, PAN, government-ID, and PNR values. Secure document custody remains a separate vault workflow.**
+- [x] **Step 3: Build the transport and rooming manifest UI with selected-booking linkage, department/function filters, and arrival exception states.**
+- [x] **Step 4: Verify rollback-clean database cases, authenticated role journeys, desktop/mobile UI, lint, TypeScript, build, and migration state; commit the isolated slice.**
 
 ### Task 6: Guest Communication Campaigns
 

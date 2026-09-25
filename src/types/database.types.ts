@@ -889,20 +889,13 @@ export type Database = {
             columns: ["assignment_id"]
             isOneToOne: false
             referencedRelation: "event_staff_assignments"
-            referencedColumns: ["wedding_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "event_crew_shift_assignment_fk"
             columns: ["assignment_id"]
             isOneToOne: false
             referencedRelation: "event_staff_assignments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "event_crew_shift_assignment_fk"
-            columns: ["wedding_id"]
-            isOneToOne: false
-            referencedRelation: "event_staff_assignments"
             referencedColumns: ["wedding_id"]
           },
           {
@@ -913,11 +906,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "event_crew_shift_department_fk"
-            columns: ["department_id"]
+            foreignKeyName: "event_crew_shift_assignment_fk"
+            columns: ["wedding_id"]
             isOneToOne: false
-            referencedRelation: "event_operations_departments"
-            referencedColumns: ["id"]
+            referencedRelation: "event_staff_assignments"
+            referencedColumns: ["wedding_id"]
           },
           {
             foreignKeyName: "event_crew_shift_department_fk"
@@ -925,6 +918,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "event_operations_departments"
             referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_crew_shift_department_fk"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_departments"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "event_crew_shift_department_fk"
@@ -945,14 +945,14 @@ export type Database = {
             columns: ["wedding_event_id"]
             isOneToOne: false
             referencedRelation: "wedding_events"
-            referencedColumns: ["wedding_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "event_crew_shift_function_fk"
             columns: ["wedding_event_id"]
             isOneToOne: false
             referencedRelation: "wedding_events"
-            referencedColumns: ["id"]
+            referencedColumns: ["wedding_id"]
           },
           {
             foreignKeyName: "event_crew_shift_function_fk"
@@ -987,14 +987,14 @@ export type Database = {
             columns: ["wedding_id"]
             isOneToOne: false
             referencedRelation: "event_staff_assignments"
-            referencedColumns: ["wedding_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "event_crew_shift_supervisor_fk"
             columns: ["wedding_id"]
             isOneToOne: false
             referencedRelation: "event_staff_assignments"
-            referencedColumns: ["id"]
+            referencedColumns: ["wedding_id"]
           },
           {
             foreignKeyName: "event_crew_shift_zone_fk"
@@ -1142,14 +1142,14 @@ export type Database = {
             columns: ["event_guest_operation_id"]
             isOneToOne: false
             referencedRelation: "event_guest_operations"
-            referencedColumns: ["id"]
+            referencedColumns: ["wedding_id"]
           },
           {
             foreignKeyName: "event_guest_operations_activity_parent_fk"
             columns: ["event_guest_operation_id"]
             isOneToOne: false
             referencedRelation: "event_guest_operations"
-            referencedColumns: ["wedding_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "event_guest_operations_activity_parent_fk"
@@ -1202,14 +1202,14 @@ export type Database = {
             columns: ["assignment_id"]
             isOneToOne: false
             referencedRelation: "event_staff_assignments"
-            referencedColumns: ["wedding_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "event_operations_briefing_read_assignment_fk"
             columns: ["assignment_id"]
             isOneToOne: false
             referencedRelation: "event_staff_assignments"
-            referencedColumns: ["id"]
+            referencedColumns: ["wedding_id"]
           },
           {
             foreignKeyName: "event_operations_briefing_read_assignment_fk"
@@ -1313,20 +1313,13 @@ export type Database = {
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "event_operations_departments"
-            referencedColumns: ["id"]
+            referencedColumns: ["wedding_id"]
           },
           {
             foreignKeyName: "event_operations_briefing_department_fk"
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "event_operations_departments"
-            referencedColumns: ["wedding_id"]
-          },
-          {
-            foreignKeyName: "event_operations_briefing_department_fk"
-            columns: ["wedding_id"]
-            isOneToOne: false
-            referencedRelation: "event_operations_departments"
             referencedColumns: ["id"]
           },
           {
@@ -1337,10 +1330,10 @@ export type Database = {
             referencedColumns: ["wedding_id"]
           },
           {
-            foreignKeyName: "event_operations_briefing_function_fk"
-            columns: ["wedding_event_id"]
+            foreignKeyName: "event_operations_briefing_department_fk"
+            columns: ["wedding_id"]
             isOneToOne: false
-            referencedRelation: "wedding_events"
+            referencedRelation: "event_operations_departments"
             referencedColumns: ["id"]
           },
           {
@@ -1352,7 +1345,7 @@ export type Database = {
           },
           {
             foreignKeyName: "event_operations_briefing_function_fk"
-            columns: ["wedding_id"]
+            columns: ["wedding_event_id"]
             isOneToOne: false
             referencedRelation: "wedding_events"
             referencedColumns: ["id"]
@@ -1365,10 +1358,10 @@ export type Database = {
             referencedColumns: ["wedding_id"]
           },
           {
-            foreignKeyName: "event_operations_briefing_zone_fk"
-            columns: ["zone_id"]
+            foreignKeyName: "event_operations_briefing_function_fk"
+            columns: ["wedding_id"]
             isOneToOne: false
-            referencedRelation: "event_operations_zones"
+            referencedRelation: "wedding_events"
             referencedColumns: ["id"]
           },
           {
@@ -1377,6 +1370,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "event_operations_zones"
             referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_operations_briefing_zone_fk"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_zones"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "event_operations_briefing_zone_fk"
@@ -1447,14 +1447,14 @@ export type Database = {
             columns: ["lead_assignment_id"]
             isOneToOne: false
             referencedRelation: "event_staff_assignments"
-            referencedColumns: ["wedding_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "event_operations_department_lead_fk"
             columns: ["lead_assignment_id"]
             isOneToOne: false
             referencedRelation: "event_staff_assignments"
-            referencedColumns: ["id"]
+            referencedColumns: ["wedding_id"]
           },
           {
             foreignKeyName: "event_operations_department_lead_fk"
@@ -1552,14 +1552,14 @@ export type Database = {
             columns: ["wedding_event_id"]
             isOneToOne: false
             referencedRelation: "wedding_events"
-            referencedColumns: ["wedding_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "event_operations_event_fk"
             columns: ["wedding_event_id"]
             isOneToOne: false
             referencedRelation: "wedding_events"
-            referencedColumns: ["id"]
+            referencedColumns: ["wedding_id"]
           },
           {
             foreignKeyName: "event_operations_event_fk"
@@ -1594,20 +1594,13 @@ export type Database = {
             columns: ["wedding_id"]
             isOneToOne: false
             referencedRelation: "event_operations_departments"
-            referencedColumns: ["wedding_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "event_operations_item_department_fk"
             columns: ["wedding_id"]
             isOneToOne: false
             referencedRelation: "event_operations_departments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "event_operations_item_zone_fk"
-            columns: ["zone_id"]
-            isOneToOne: false
-            referencedRelation: "event_operations_zones"
             referencedColumns: ["wedding_id"]
           },
           {
@@ -1616,6 +1609,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "event_operations_zones"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_operations_item_zone_fk"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_zones"
+            referencedColumns: ["wedding_id"]
           },
           {
             foreignKeyName: "event_operations_item_zone_fk"
@@ -1700,6 +1700,477 @@ export type Database = {
           },
         ]
       }
+      "event_partner_stays": {
+        Row:
+        {
+          "id": string
+          "party_id": string
+          "wedding_id": string
+          "hotel_name": string
+          "room_type": string | null
+          "room_count": number
+          "check_in_date": string
+          "check_out_date": string
+          "status": string
+          "food_plan": string | null
+          "sort_order": number
+          "created_at": string
+          "updated_at": string
+        }
+        Insert:
+        {
+          "id"?: string
+          "party_id": string
+          "wedding_id": string
+          "hotel_name": string
+          "room_type"?: string | null
+          "room_count"?: number
+          "check_in_date": string
+          "check_out_date": string
+          "status"?: string
+          "food_plan"?: string | null
+          "sort_order"?: number
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Update:
+        {
+          "id"?: string
+          "party_id"?: string
+          "wedding_id"?: string
+          "hotel_name"?: string
+          "room_type"?: string | null
+          "room_count"?: number
+          "check_in_date"?: string
+          "check_out_date"?: string
+          "status"?: string
+          "food_plan"?: string | null
+          "sort_order"?: number
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_partner_stay_parent_fk"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "event_partner_travel_parties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_partner_stay_parent_fk"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "event_partner_travel_parties"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_partner_stay_parent_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_partner_travel_parties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_partner_stay_parent_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_partner_travel_parties"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_partner_stays_wedding_id_fkey"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "weddings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      "event_partner_transfers": {
+        Row:
+        {
+          "id": string
+          "party_id": string
+          "wedding_id": string
+          "travel_leg_id": string | null
+          "route_label": string
+          "pickup_at": string
+          "pickup_location": string
+          "drop_location": string
+          "vehicle_label": string | null
+          "status": string
+          "sort_order": number
+          "created_at": string
+          "updated_at": string
+        }
+        Insert:
+        {
+          "id"?: string
+          "party_id": string
+          "wedding_id": string
+          "travel_leg_id"?: string | null
+          "route_label": string
+          "pickup_at": string
+          "pickup_location": string
+          "drop_location": string
+          "vehicle_label"?: string | null
+          "status"?: string
+          "sort_order"?: number
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Update:
+        {
+          "id"?: string
+          "party_id"?: string
+          "wedding_id"?: string
+          "travel_leg_id"?: string | null
+          "route_label"?: string
+          "pickup_at"?: string
+          "pickup_location"?: string
+          "drop_location"?: string
+          "vehicle_label"?: string | null
+          "status"?: string
+          "sort_order"?: number
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_partner_transfer_leg_fk"
+            columns: ["travel_leg_id"]
+            isOneToOne: false
+            referencedRelation: "event_partner_travel_legs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_partner_transfer_leg_fk"
+            columns: ["travel_leg_id"]
+            isOneToOne: false
+            referencedRelation: "event_partner_travel_legs"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_partner_transfer_leg_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_partner_travel_legs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_partner_transfer_leg_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_partner_travel_legs"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_partner_transfer_parent_fk"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "event_partner_travel_parties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_partner_transfer_parent_fk"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "event_partner_travel_parties"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_partner_transfer_parent_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_partner_travel_parties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_partner_transfer_parent_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_partner_travel_parties"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_partner_transfers_wedding_id_fkey"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "weddings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      "event_partner_travel_activity": {
+        Row:
+        {
+          "id": string
+          "party_id": string
+          "wedding_id": string
+          "action": string
+          "actor_user_id": string
+          "version": number
+          "snapshot": Json
+          "created_at": string
+        }
+        Insert:
+        {
+          "id"?: string
+          "party_id": string
+          "wedding_id": string
+          "action": string
+          "actor_user_id": string
+          "version": number
+          "snapshot"?: Json
+          "created_at"?: string
+        }
+        Update:
+        {
+          "id"?: string
+          "party_id"?: string
+          "wedding_id"?: string
+          "action"?: string
+          "actor_user_id"?: string
+          "version"?: number
+          "snapshot"?: Json
+          "created_at"?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_partner_travel_activity_parent_fk"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "event_partner_travel_parties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_partner_travel_activity_parent_fk"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "event_partner_travel_parties"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_partner_travel_activity_parent_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_partner_travel_parties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_partner_travel_activity_parent_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_partner_travel_parties"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_partner_travel_activity_wedding_id_fkey"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "weddings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      "event_partner_travel_legs": {
+        Row:
+        {
+          "id": string
+          "party_id": string
+          "wedding_id": string
+          "mode": string
+          "provider": string | null
+          "reference_label": string | null
+          "origin": string
+          "destination": string
+          "departure_at": string
+          "arrival_at": string
+          "status": string
+          "pickup_required": boolean
+          "sort_order": number
+          "created_at": string
+          "updated_at": string
+        }
+        Insert:
+        {
+          "id"?: string
+          "party_id": string
+          "wedding_id": string
+          "mode": string
+          "provider"?: string | null
+          "reference_label"?: string | null
+          "origin": string
+          "destination": string
+          "departure_at": string
+          "arrival_at": string
+          "status"?: string
+          "pickup_required"?: boolean
+          "sort_order"?: number
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Update:
+        {
+          "id"?: string
+          "party_id"?: string
+          "wedding_id"?: string
+          "mode"?: string
+          "provider"?: string | null
+          "reference_label"?: string | null
+          "origin"?: string
+          "destination"?: string
+          "departure_at"?: string
+          "arrival_at"?: string
+          "status"?: string
+          "pickup_required"?: boolean
+          "sort_order"?: number
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_partner_travel_leg_parent_fk"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "event_partner_travel_parties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_partner_travel_leg_parent_fk"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "event_partner_travel_parties"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_partner_travel_leg_parent_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_partner_travel_parties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_partner_travel_leg_parent_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_partner_travel_parties"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_partner_travel_legs_wedding_id_fkey"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "weddings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      "event_partner_travel_parties": {
+        Row:
+        {
+          "id": string
+          "wedding_id": string
+          "booking_id": string | null
+          "vendor_profile_id": string | null
+          "wedding_event_id": string | null
+          "party_type": string
+          "name": string
+          "company": string | null
+          "department_label": string | null
+          "role_label": string | null
+          "head_count": number
+          "contact_label": string | null
+          "food_plan": string | null
+          "per_diem_amount": number | null
+          "owner_label": string | null
+          "notes": string | null
+          "version": number
+          "created_by": string
+          "updated_by": string
+          "created_at": string
+          "updated_at": string
+        }
+        Insert:
+        {
+          "id"?: string
+          "wedding_id": string
+          "booking_id"?: string | null
+          "vendor_profile_id"?: string | null
+          "wedding_event_id"?: string | null
+          "party_type": string
+          "name": string
+          "company"?: string | null
+          "department_label"?: string | null
+          "role_label"?: string | null
+          "head_count"?: number
+          "contact_label"?: string | null
+          "food_plan"?: string | null
+          "per_diem_amount"?: number | null
+          "owner_label"?: string | null
+          "notes"?: string | null
+          "version"?: number
+          "created_by": string
+          "updated_by": string
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Update:
+        {
+          "id"?: string
+          "wedding_id"?: string
+          "booking_id"?: string | null
+          "vendor_profile_id"?: string | null
+          "wedding_event_id"?: string | null
+          "party_type"?: string
+          "name"?: string
+          "company"?: string | null
+          "department_label"?: string | null
+          "role_label"?: string | null
+          "head_count"?: number
+          "contact_label"?: string | null
+          "food_plan"?: string | null
+          "per_diem_amount"?: number | null
+          "owner_label"?: string | null
+          "notes"?: string | null
+          "version"?: number
+          "created_by"?: string
+          "updated_by"?: string
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_partner_travel_parties_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_partner_travel_parties_vendor_profile_id_fkey"
+            columns: ["vendor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_partner_travel_parties_wedding_event_id_fkey"
+            columns: ["wedding_event_id"]
+            isOneToOne: false
+            referencedRelation: "wedding_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_partner_travel_parties_wedding_id_fkey"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "weddings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       "event_production_activity": {
         Row:
         {
@@ -1740,20 +2211,13 @@ export type Database = {
             columns: ["record_id"]
             isOneToOne: false
             referencedRelation: "event_production_records"
-            referencedColumns: ["wedding_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "event_production_activity_record_fk"
             columns: ["record_id"]
             isOneToOne: false
             referencedRelation: "event_production_records"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "event_production_activity_record_fk"
-            columns: ["wedding_id"]
-            isOneToOne: false
-            referencedRelation: "event_production_records"
             referencedColumns: ["wedding_id"]
           },
           {
@@ -1762,6 +2226,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "event_production_records"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_production_activity_record_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_production_records"
+            referencedColumns: ["wedding_id"]
           },
           {
             foreignKeyName: "event_production_activity_wedding_id_fkey"
@@ -1818,20 +2289,13 @@ export type Database = {
             columns: ["record_id"]
             isOneToOne: false
             referencedRelation: "event_production_records"
-            referencedColumns: ["wedding_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "event_production_attachment_record_fk"
             columns: ["record_id"]
             isOneToOne: false
             referencedRelation: "event_production_records"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "event_production_attachment_record_fk"
-            columns: ["wedding_id"]
-            isOneToOne: false
-            referencedRelation: "event_production_records"
             referencedColumns: ["wedding_id"]
           },
           {
@@ -1840,6 +2304,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "event_production_records"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_production_attachment_record_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_production_records"
+            referencedColumns: ["wedding_id"]
           },
           {
             foreignKeyName: "event_production_attachments_wedding_id_fkey"
@@ -1946,14 +2417,14 @@ export type Database = {
             columns: ["wedding_id"]
             isOneToOne: false
             referencedRelation: "event_operations_departments"
-            referencedColumns: ["wedding_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "event_production_record_department_fk"
             columns: ["wedding_id"]
             isOneToOne: false
             referencedRelation: "event_operations_departments"
-            referencedColumns: ["id"]
+            referencedColumns: ["wedding_id"]
           },
           {
             foreignKeyName: "event_production_record_function_fk"
@@ -1974,20 +2445,13 @@ export type Database = {
             columns: ["wedding_id"]
             isOneToOne: false
             referencedRelation: "wedding_events"
-            referencedColumns: ["wedding_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "event_production_record_function_fk"
             columns: ["wedding_id"]
             isOneToOne: false
             referencedRelation: "wedding_events"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "event_production_record_owner_fk"
-            columns: ["owner_assignment_id"]
-            isOneToOne: false
-            referencedRelation: "event_staff_assignments"
             referencedColumns: ["wedding_id"]
           },
           {
@@ -1996,6 +2460,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "event_staff_assignments"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_production_record_owner_fk"
+            columns: ["owner_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "event_staff_assignments"
+            referencedColumns: ["wedding_id"]
           },
           {
             foreignKeyName: "event_production_record_owner_fk"
@@ -2016,20 +2487,13 @@ export type Database = {
             columns: ["zone_id"]
             isOneToOne: false
             referencedRelation: "event_operations_zones"
-            referencedColumns: ["wedding_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "event_production_record_zone_fk"
             columns: ["zone_id"]
             isOneToOne: false
             referencedRelation: "event_operations_zones"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "event_production_record_zone_fk"
-            columns: ["wedding_id"]
-            isOneToOne: false
-            referencedRelation: "event_operations_zones"
             referencedColumns: ["wedding_id"]
           },
           {
@@ -2038,6 +2502,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "event_operations_zones"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_production_record_zone_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_zones"
+            referencedColumns: ["wedding_id"]
           },
           {
             foreignKeyName: "event_production_records_wedding_id_fkey"
@@ -2177,14 +2648,14 @@ export type Database = {
             columns: ["wedding_id"]
             isOneToOne: false
             referencedRelation: "event_guest_operations"
-            referencedColumns: ["wedding_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "guest_hospitality_items_parent_fk"
             columns: ["wedding_id"]
             isOneToOne: false
             referencedRelation: "event_guest_operations"
-            referencedColumns: ["id"]
+            referencedColumns: ["wedding_id"]
           },
           {
             foreignKeyName: "guest_hospitality_items_wedding_id_fkey"
@@ -2305,14 +2776,14 @@ export type Database = {
             columns: ["wedding_id"]
             isOneToOne: false
             referencedRelation: "event_guest_operations"
-            referencedColumns: ["wedding_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "guest_stays_parent_fk"
             columns: ["wedding_id"]
             isOneToOne: false
             referencedRelation: "event_guest_operations"
-            referencedColumns: ["id"]
+            referencedColumns: ["wedding_id"]
           },
           {
             foreignKeyName: "guest_stays_wedding_id_fkey"
@@ -2384,20 +2855,13 @@ export type Database = {
             columns: ["event_guest_operation_id"]
             isOneToOne: false
             referencedRelation: "event_guest_operations"
-            referencedColumns: ["wedding_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "guest_transfers_parent_fk"
             columns: ["event_guest_operation_id"]
             isOneToOne: false
             referencedRelation: "event_guest_operations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "guest_transfers_parent_fk"
-            columns: ["wedding_id"]
-            isOneToOne: false
-            referencedRelation: "event_guest_operations"
             referencedColumns: ["wedding_id"]
           },
           {
@@ -2406,6 +2870,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "event_guest_operations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guest_transfers_parent_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_guest_operations"
+            referencedColumns: ["wedding_id"]
           },
           {
             foreignKeyName: "guest_transfers_travel_fk"
@@ -2426,14 +2897,14 @@ export type Database = {
             columns: ["wedding_id"]
             isOneToOne: false
             referencedRelation: "guest_travel_legs"
-            referencedColumns: ["wedding_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "guest_transfers_travel_fk"
             columns: ["wedding_id"]
             isOneToOne: false
             referencedRelation: "guest_travel_legs"
-            referencedColumns: ["id"]
+            referencedColumns: ["wedding_id"]
           },
           {
             foreignKeyName: "guest_transfers_wedding_id_fkey"
@@ -2508,20 +2979,13 @@ export type Database = {
             columns: ["event_guest_operation_id"]
             isOneToOne: false
             referencedRelation: "event_guest_operations"
-            referencedColumns: ["wedding_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "guest_travel_legs_parent_fk"
             columns: ["event_guest_operation_id"]
             isOneToOne: false
             referencedRelation: "event_guest_operations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "guest_travel_legs_parent_fk"
-            columns: ["wedding_id"]
-            isOneToOne: false
-            referencedRelation: "event_guest_operations"
             referencedColumns: ["wedding_id"]
           },
           {
@@ -2530,6 +2994,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "event_guest_operations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guest_travel_legs_parent_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_guest_operations"
+            referencedColumns: ["wedding_id"]
           },
           {
             foreignKeyName: "guest_travel_legs_wedding_id_fkey"
@@ -4040,14 +4511,14 @@ export type Database = {
             columns: ["wedding_id"]
             isOneToOne: false
             referencedRelation: "wedding_days"
-            referencedColumns: ["wedding_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "wedding_events_day_ownership_fkey"
             columns: ["wedding_id"]
             isOneToOne: false
             referencedRelation: "wedding_days"
-            referencedColumns: ["id"]
+            referencedColumns: ["wedding_id"]
           },
           {
             foreignKeyName: "wedding_events_venue_id_fkey"
@@ -4380,6 +4851,23 @@ export type Database = {
           "reserved_bytes": number
           "remaining_bytes": number
         }[]
+      }
+      "save_event_partner_travel_party": {
+        Args: {
+          "p_wedding_id": string
+          "p_party_id": string | null
+          "p_expected_version": number | null
+          "p_party": Json
+          "p_travel_legs": Json
+          "p_stays": Json
+          "p_transfers": Json
+          "p_actor_user_id": string
+        }
+        Returns: string
+      }
+      "load_event_partner_travel_snapshot": {
+        Args: { "p_wedding_id": string }
+        Returns: Json
       }
       "save_event_planning": {
         Args: {

@@ -32,6 +32,8 @@
     "test:production-domain": "tsx --tsconfig tsconfig.json scripts/verify-event-production-domain.ts",
     "test:guest-operations-domain": "tsx --tsconfig tsconfig.json scripts/verify-guest-operations-domain.ts",
     "test:guest-operations": "tsx --tsconfig tsconfig.json scripts/verify-guest-operations.ts",
+    "test:partner-travel-domain": "tsx --tsconfig tsconfig.json scripts/verify-partner-travel-domain.ts",
+    "test:partner-travel": "tsx --tsconfig tsconfig.json scripts/verify-partner-travel.ts",
     "test:message-pagination": "tsx --tsconfig tsconfig.json scripts/verify-message-pagination.ts",
     "test:journeys": "tsx --tsconfig tsconfig.json scripts/verify-authenticated-journeys.ts"
   },
