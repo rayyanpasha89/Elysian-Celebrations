@@ -389,6 +389,13 @@ claims that the changes are committed, deployed, or active in the remote databas
   remain a separate audited ledger direction. The API capability now exposes
   `FULL_CLIENT_PRICE` so client, admin, and test contracts cannot drift back to a
   fee-only interpretation.
+- Added consent-aware guest communication campaigns to the manager operations
+  room. Eight event-message templates support audience segments, schedules,
+  per-channel consent, approval, immutable recipient snapshots, human CSV or
+  WhatsApp handoff, delivery-result import, and the explicit
+  `DRAFT -> APPROVED -> EXPORTED -> SENT` lifecycle. No provider send is
+  simulated. Domain, rollback-clean database, TypeScript, lint, and the full
+  authenticated 14-group role journey are green.
 
 ## Current Rebuild Order
 

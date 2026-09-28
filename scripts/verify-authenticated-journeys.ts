@@ -451,6 +451,7 @@ async function cleanupFixture(supabase: TestSupabase, fixture: Fixture) {
     sha256(`operations-feed-create:${fixture.userIds.manager}`),
     sha256(`operations-workforce-write:${fixture.userIds.manager}`),
     sha256(`event-partner-travel-save:${fixture.userIds.manager}`),
+    sha256(`guest-communications-write:${fixture.userIds.manager}`),
     sha256(`billing-invoice-issue:${fixture.userIds.admin}`),
   ];
   const cleanupActions: [string, PromiseLike<{ error: { message: string } | null }>][] = [
@@ -1985,6 +1986,131 @@ async function runJourneys(
       .map((entry) => asRecord(entry, "vendor booking"))
       .find((entry) => entry.id === fixture.bookingId);
     assert.ok(vendorBooking, "vendor should see the confirmed booking");
+  });
+
+  await check("guest campaigns require consent-aware approval before human export", async () => {
+    assert.ok(fixture.weddingId && fixture.eventId);
+    const guest = asRecord(
+      (
+        await http.request("client", "/api/guests", {
+          method: "POST",
+          expectedStatus: 201,
+          body: {
+            name: "Communication Journey Guest",
+            email: "communication-journey@example.test",
+            phone: "+919876500009",
+            side: "COUPLE",
+            mealPref: "Vegetarian",
+            plusOne: false,
+          },
+        })
+      ).payload,
+      "communication guest",
+    );
+    const guestId = String(guest.id);
+    const endpoint = `/api/operations/events/${fixture.weddingId}/communications`;
+    const initial = asRecord(
+      (await http.request("manager", endpoint)).payload,
+      "initial communication workspace",
+    );
+    assert.ok(asArray(initial.templates, "communication templates").length >= 8);
+
+    const draft = {
+      campaignId: null,
+      version: null,
+      campaignType: "FUNCTION_INVITATION",
+      title: "Journey dinner reminder",
+      messageBody:
+        "Hello {{guest_name}}, {{function_name}} begins at {{time}} on {{date}} at {{venue}}.",
+      weddingEventId: fixture.eventId,
+      channel: "WHATSAPP",
+      scheduledFor: "2027-02-20T12:30:00.000Z",
+      audience: {
+        sides: [],
+        rsvpStatuses: [],
+        invitationStatuses: [],
+        vipLevels: [],
+        relationshipGroups: [],
+        guestIds: [guestId],
+      },
+    };
+    const created = asRecord(
+      asRecord(
+        (
+          await http.request("manager", endpoint, {
+            method: "POST",
+            expectedStatus: 201,
+            body: draft,
+          })
+        ).payload,
+        "created communication response",
+      ).campaign,
+      "created communication campaign",
+    );
+    const campaignId = String(created.id);
+    const version = Number(created.version);
+    assert.equal(created.status, "DRAFT");
+
+    await http.request("manager", endpoint, {
+      method: "PATCH",
+      expectedStatus: 409,
+      body: { action: "EXPORT", campaignId, version },
+    });
+    await http.request("manager", endpoint, {
+      method: "PATCH",
+      body: {
+        action: "UPDATE_CONSENT",
+        guestId,
+        channel: "WHATSAPP",
+        consentStatus: "OPTED_OUT",
+        source: "Authenticated journey",
+      },
+    });
+    const approved = asRecord(
+      asRecord(
+        (
+          await http.request("manager", endpoint, {
+            method: "PATCH",
+            body: { action: "APPROVE", campaignId, version },
+          })
+        ).payload,
+        "approved communication response",
+      ).campaign,
+      "approved communication campaign",
+    );
+    assert.equal(approved.status, "APPROVED");
+    assert.equal(asArray(approved.recipients, "approved recipients").length, 1);
+    assert.equal(
+      asRecord(asArray(approved.recipients, "approved recipients")[0], "approved recipient")
+        .deliveryStatus,
+      "EXCLUDED",
+      "an opted-out guest must never enter the export audience",
+    );
+    const exported = asRecord(
+      (
+        await http.request("manager", endpoint, {
+          method: "PATCH",
+          body: {
+            action: "EXPORT",
+            campaignId,
+            version: Number(approved.version),
+          },
+        })
+      ).payload,
+      "exported communication response",
+    );
+    assert.match(String(asRecord(exported.export, "communication export").csv), /recipient_name/);
+    assert.doesNotMatch(
+      String(asRecord(exported.export, "communication export").csv),
+      /\+919876500009/,
+      "opted-out contacts must be absent from human export",
+    );
+    await http.request("manager", endpoint, {
+      method: "PATCH",
+      expectedStatus: 409,
+      body: { action: "APPROVE", campaignId, version },
+    });
+    await http.request("client", endpoint, { expectedStatus: 403 });
   });
 
   await check("partner travel follows selected bookings with scoped financial access", async () => {

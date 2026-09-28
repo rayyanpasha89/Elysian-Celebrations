@@ -917,20 +917,13 @@ export type Database = {
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "event_operations_departments"
-            referencedColumns: ["wedding_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "event_crew_shift_department_fk"
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "event_operations_departments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "event_crew_shift_department_fk"
-            columns: ["wedding_id"]
-            isOneToOne: false
-            referencedRelation: "event_operations_departments"
             referencedColumns: ["wedding_id"]
           },
           {
@@ -939,6 +932,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "event_operations_departments"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_crew_shift_department_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_departments"
+            referencedColumns: ["wedding_id"]
           },
           {
             foreignKeyName: "event_crew_shift_function_fk"
@@ -1001,20 +1001,13 @@ export type Database = {
             columns: ["zone_id"]
             isOneToOne: false
             referencedRelation: "event_operations_zones"
-            referencedColumns: ["wedding_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "event_crew_shift_zone_fk"
             columns: ["zone_id"]
             isOneToOne: false
             referencedRelation: "event_operations_zones"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "event_crew_shift_zone_fk"
-            columns: ["wedding_id"]
-            isOneToOne: false
-            referencedRelation: "event_operations_zones"
             referencedColumns: ["wedding_id"]
           },
           {
@@ -1023,9 +1016,332 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "event_operations_zones"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_crew_shift_zone_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_zones"
+            referencedColumns: ["wedding_id"]
           },
           {
             foreignKeyName: "event_crew_shifts_wedding_id_fkey"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "weddings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      "event_guest_communication_activity": {
+        Row:
+        {
+          "id": string
+          "campaign_id": string
+          "wedding_id": string
+          "action": string
+          "actor_user_id": string
+          "version": number
+          "snapshot": Json
+          "created_at": string
+        }
+        Insert:
+        {
+          "id"?: string
+          "campaign_id": string
+          "wedding_id": string
+          "action": string
+          "actor_user_id": string
+          "version": number
+          "snapshot"?: Json
+          "created_at"?: string
+        }
+        Update:
+        {
+          "id"?: string
+          "campaign_id"?: string
+          "wedding_id"?: string
+          "action"?: string
+          "actor_user_id"?: string
+          "version"?: number
+          "snapshot"?: Json
+          "created_at"?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_guest_communication_activity_campaign_fk"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "event_guest_communication_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_guest_communication_activity_campaign_fk"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "event_guest_communication_campaigns"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_guest_communication_activity_campaign_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_guest_communication_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_guest_communication_activity_campaign_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_guest_communication_campaigns"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_guest_communication_activity_wedding_id_fkey"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "weddings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      "event_guest_communication_campaigns": {
+        Row:
+        {
+          "id": string
+          "wedding_id": string
+          "wedding_event_id": string | null
+          "campaign_type": string
+          "title": string
+          "message_body": string
+          "channel": string
+          "audience_definition": Json
+          "scheduled_for": string | null
+          "status": string
+          "version": number
+          "approved_by": string | null
+          "approved_at": string | null
+          "exported_by": string | null
+          "exported_at": string | null
+          "sent_by": string | null
+          "sent_at": string | null
+          "created_by": string
+          "updated_by": string
+          "created_at": string
+          "updated_at": string
+        }
+        Insert:
+        {
+          "id"?: string
+          "wedding_id": string
+          "wedding_event_id"?: string | null
+          "campaign_type": string
+          "title": string
+          "message_body": string
+          "channel": string
+          "audience_definition"?: Json
+          "scheduled_for"?: string | null
+          "status"?: string
+          "version"?: number
+          "approved_by"?: string | null
+          "approved_at"?: string | null
+          "exported_by"?: string | null
+          "exported_at"?: string | null
+          "sent_by"?: string | null
+          "sent_at"?: string | null
+          "created_by": string
+          "updated_by": string
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Update:
+        {
+          "id"?: string
+          "wedding_id"?: string
+          "wedding_event_id"?: string | null
+          "campaign_type"?: string
+          "title"?: string
+          "message_body"?: string
+          "channel"?: string
+          "audience_definition"?: Json
+          "scheduled_for"?: string | null
+          "status"?: string
+          "version"?: number
+          "approved_by"?: string | null
+          "approved_at"?: string | null
+          "exported_by"?: string | null
+          "exported_at"?: string | null
+          "sent_by"?: string | null
+          "sent_at"?: string | null
+          "created_by"?: string
+          "updated_by"?: string
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_guest_communication_campaigns_wedding_event_id_fkey"
+            columns: ["wedding_event_id"]
+            isOneToOne: false
+            referencedRelation: "wedding_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_guest_communication_campaigns_wedding_id_fkey"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "weddings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      "event_guest_communication_recipients": {
+        Row:
+        {
+          "id": string
+          "campaign_id": string
+          "wedding_id": string
+          "guest_id": string | null
+          "recipient_name": string
+          "channel": string
+          "destination": string | null
+          "consent_snapshot": string
+          "rendered_message": string
+          "delivery_status": string
+          "exclusion_reason": string | null
+          "result_reference": string | null
+          "delivered_at": string | null
+          "created_at": string
+          "updated_at": string
+        }
+        Insert:
+        {
+          "id"?: string
+          "campaign_id": string
+          "wedding_id": string
+          "guest_id"?: string | null
+          "recipient_name": string
+          "channel": string
+          "destination"?: string | null
+          "consent_snapshot"?: string
+          "rendered_message": string
+          "delivery_status"?: string
+          "exclusion_reason"?: string | null
+          "result_reference"?: string | null
+          "delivered_at"?: string | null
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Update:
+        {
+          "id"?: string
+          "campaign_id"?: string
+          "wedding_id"?: string
+          "guest_id"?: string | null
+          "recipient_name"?: string
+          "channel"?: string
+          "destination"?: string | null
+          "consent_snapshot"?: string
+          "rendered_message"?: string
+          "delivery_status"?: string
+          "exclusion_reason"?: string | null
+          "result_reference"?: string | null
+          "delivered_at"?: string | null
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_guest_communication_recipients_guest_id_fkey"
+            columns: ["guest_id"]
+            isOneToOne: false
+            referencedRelation: "guests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_guest_communication_recipients_wedding_id_fkey"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "weddings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_guest_recipient_campaign_fk"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "event_guest_communication_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_guest_recipient_campaign_fk"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "event_guest_communication_campaigns"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_guest_recipient_campaign_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_guest_communication_campaigns"
+            referencedColumns: ["wedding_id"]
+          },
+          {
+            foreignKeyName: "event_guest_recipient_campaign_fk"
+            columns: ["wedding_id"]
+            isOneToOne: false
+            referencedRelation: "event_guest_communication_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      "event_guest_contact_preferences": {
+        Row:
+        {
+          "id": string
+          "wedding_id": string
+          "guest_id": string
+          "channel": string
+          "consent_status": string
+          "source": string | null
+          "updated_by": string
+          "created_at": string
+          "updated_at": string
+        }
+        Insert:
+        {
+          "id"?: string
+          "wedding_id": string
+          "guest_id": string
+          "channel": string
+          "consent_status"?: string
+          "source"?: string | null
+          "updated_by": string
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Update:
+        {
+          "id"?: string
+          "wedding_id"?: string
+          "guest_id"?: string
+          "channel"?: string
+          "consent_status"?: string
+          "source"?: string | null
+          "updated_by"?: string
+          "created_at"?: string
+          "updated_at"?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_guest_contact_preferences_guest_id_fkey"
+            columns: ["guest_id"]
+            isOneToOne: false
+            referencedRelation: "guests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_guest_contact_preferences_wedding_id_fkey"
             columns: ["wedding_id"]
             isOneToOne: false
             referencedRelation: "weddings"
@@ -1202,20 +1518,13 @@ export type Database = {
             columns: ["assignment_id"]
             isOneToOne: false
             referencedRelation: "event_staff_assignments"
-            referencedColumns: ["id"]
+            referencedColumns: ["wedding_id"]
           },
           {
             foreignKeyName: "event_operations_briefing_read_assignment_fk"
             columns: ["assignment_id"]
             isOneToOne: false
             referencedRelation: "event_staff_assignments"
-            referencedColumns: ["wedding_id"]
-          },
-          {
-            foreignKeyName: "event_operations_briefing_read_assignment_fk"
-            columns: ["wedding_id"]
-            isOneToOne: false
-            referencedRelation: "event_staff_assignments"
             referencedColumns: ["id"]
           },
           {
@@ -1226,11 +1535,11 @@ export type Database = {
             referencedColumns: ["wedding_id"]
           },
           {
-            foreignKeyName: "event_operations_briefing_read_briefing_fk"
-            columns: ["briefing_id"]
+            foreignKeyName: "event_operations_briefing_read_assignment_fk"
+            columns: ["wedding_id"]
             isOneToOne: false
-            referencedRelation: "event_operations_briefings"
-            referencedColumns: ["wedding_id"]
+            referencedRelation: "event_staff_assignments"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "event_operations_briefing_read_briefing_fk"
@@ -1238,6 +1547,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "event_operations_briefings"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_operations_briefing_read_briefing_fk"
+            columns: ["briefing_id"]
+            isOneToOne: false
+            referencedRelation: "event_operations_briefings"
+            referencedColumns: ["wedding_id"]
           },
           {
             foreignKeyName: "event_operations_briefing_read_briefing_fk"
@@ -1369,14 +1685,14 @@ export type Database = {
             columns: ["zone_id"]
             isOneToOne: false
             referencedRelation: "event_operations_zones"
-            referencedColumns: ["wedding_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "event_operations_briefing_zone_fk"
             columns: ["zone_id"]
             isOneToOne: false
             referencedRelation: "event_operations_zones"
-            referencedColumns: ["id"]
+            referencedColumns: ["wedding_id"]
           },
           {
             foreignKeyName: "event_operations_briefing_zone_fk"
@@ -4741,6 +5057,12 @@ export type Database = {
         }
         Returns: string
       }
+      "load_event_partner_travel_snapshot": {
+        Args: {
+          "p_wedding_id": string
+        }
+        Returns: Json
+      }
       "load_guest_operations_snapshot": {
         Args: {
           "p_wedding_id": string
@@ -4865,10 +5187,6 @@ export type Database = {
         }
         Returns: string
       }
-      "load_event_partner_travel_snapshot": {
-        Args: { "p_wedding_id": string }
-        Returns: Json
-      }
       "save_event_planning": {
         Args: {
           "p_actor_user_id": string
@@ -4892,6 +5210,16 @@ export type Database = {
           "p_vendor_selections": Json
         }
         Returns: Json
+      }
+      "save_guest_communication_campaign": {
+        Args: {
+          "p_wedding_id": string
+          "p_campaign_id": string | null
+          "p_expected_version": number | null
+          "p_campaign": Json
+          "p_actor_user_id": string
+        }
+        Returns: string
       }
       "save_guest_operations_snapshot": {
         Args: {
@@ -4950,6 +5278,17 @@ export type Database = {
           "p_paid_at": string
           "p_reference": string
           "p_actor_user_id": string
+        }
+        Returns: string
+      }
+      "transition_guest_communication_campaign": {
+        Args: {
+          "p_wedding_id": string
+          "p_campaign_id": string
+          "p_expected_version": number
+          "p_next_status": string
+          "p_actor_user_id": string
+          "p_payload": Json
         }
         Returns: string
       }

@@ -141,11 +141,11 @@ await assertRejects(() => anon.query("select * from event_production_records"), 
 **Interfaces:**
 - Produces templates, segments, scheduled messages, approval, human-approved export, delivery/import status, and consent/opt-out handling; no automatic provider send.
 
-- [ ] **Step 1: Add failing tests for unapproved export, opted-out guest inclusion, cross-event audience, and immutable sent snapshot.**
-- [ ] **Step 2: Implement campaign schema and API with an explicit `DRAFT -> APPROVED -> EXPORTED -> SENT` state machine.**
-- [ ] **Step 3: Build template library for RSVP, arrival, room keys, function invitations, breakfast, departure, emergency, and thank-you messages.**
-- [ ] **Step 4: Add CSV/WhatsApp-ready export and delivery-result import.**
-- [ ] **Step 5: Verify and commit.**
+- [x] **Step 1: Add failing tests for unapproved export, opted-out guest inclusion, cross-event audience, and immutable sent snapshot.**
+- [x] **Step 2: Implement campaign schema and API with an explicit `DRAFT -> APPROVED -> EXPORTED -> SENT` state machine.**
+- [x] **Step 3: Build template library for RSVP, arrival, room keys, function invitations, breakfast, departure, emergency, and thank-you messages.**
+- [x] **Step 4: Add CSV/WhatsApp-ready export and delivery-result import.**
+- [x] **Step 5: Verify and commit.**
 
 ### Task 7: Procurement Comparison And Commercial Approval
 

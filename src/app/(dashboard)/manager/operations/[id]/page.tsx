@@ -26,6 +26,7 @@ import {
 } from "@/components/dashboard/operations-workforce-panel";
 import { OperationsProductionPanel } from "@/components/dashboard/operations-production-panel";
 import { OperationsTravelPanel } from "@/components/dashboard/operations-travel-panel";
+import { GuestCommunicationsPanel } from "@/components/dashboard/guest-communications-panel";
 import {
   OPERATIONS_ITEM_KINDS,
   OPERATIONS_SEVERITIES,
@@ -74,7 +75,7 @@ type Workspace = {
   feed: FeedItem[];
 };
 
-type Tab = "overview" | "run" | "feed" | "travel" | "production" | "crew" | "briefings";
+type Tab = "overview" | "run" | "feed" | "travel" | "communications" | "production" | "crew" | "briefings";
 
 function list<T>(value: Relation<T>): T[] {
   return Array.isArray(value) ? value : value ? [value] : [];
@@ -271,8 +272,16 @@ export default function OperationsCommandCenterPage() {
       </section>
 
       <nav className="scrollbar-elysian flex overflow-x-auto border-b border-charcoal/12" aria-label="Operations workspace sections">
-        {([[
-          "overview", "Live pulse"], ["run", "Run of show"], ["feed", `Feed · ${pulse.open}`], ["travel", "Partner travel"], ["production", "Production dossier"], ["crew", `Crew · ${workspace.shifts.length}`], ["briefings", `Briefings · ${workspace.briefings.length}`]] as [Tab, string][]).map(([value, label]) => <button key={value} type="button" onClick={() => setTab(value)} className={cn("whitespace-nowrap border-b-2 px-5 py-3 font-accent text-[10px] uppercase tracking-[0.18em]", tab === value ? "border-gold-primary text-charcoal" : "border-transparent text-slate hover:text-charcoal")}>{label}</button>)}
+        {([
+          ["overview", "Live pulse"],
+          ["run", "Run of show"],
+          ["feed", `Feed · ${pulse.open}`],
+          ["travel", "Partner travel"],
+          ["communications", "Guest communications"],
+          ["production", "Production dossier"],
+          ["crew", `Crew · ${workspace.shifts.length}`],
+          ["briefings", `Briefings · ${workspace.briefings.length}`],
+        ] as [Tab, string][]).map(([value, label]) => <button key={value} type="button" onClick={() => setTab(value)} className={cn("whitespace-nowrap border-b-2 px-5 py-3 font-accent text-[10px] uppercase tracking-[0.18em]", tab === value ? "border-gold-primary text-charcoal" : "border-transparent text-slate hover:text-charcoal")}>{label}</button>)}
       </nav>
 
       {tab === "overview" ? (
@@ -294,6 +303,8 @@ export default function OperationsCommandCenterPage() {
       {tab === "production" ? <OperationsProductionPanel eventId={id} permissions={permissions} team={workspace.team.map((member) => ({ id: member.id, name: member.name, eventRole: member.eventRole }))} functions={functions.map((item) => ({ id: item.id, label: `${item.dayName} · ${item.name}` }))} departments={workspace.departments.map((item) => ({ id: item.id, label: item.name }))} zones={workspace.zones.map((item) => ({ id: item.id, label: item.name }))} /> : null}
 
       {tab === "travel" ? <OperationsTravelPanel eventId={id} /> : null}
+
+      {tab === "communications" ? <GuestCommunicationsPanel eventId={id} /> : null}
 
       {tab === "crew" || tab === "briefings" ? <OperationsWorkforcePanel eventId={id} mode={tab} permissions={permissions} team={workspace.team.map((member) => ({ id: member.id, userId: member.userId, name: member.name, eventRole: member.eventRole, phone: member.phone }))} functions={functions.map((item) => ({ id: item.id, label: `${item.dayName} · ${item.name}` }))} departments={workspace.departments} zones={workspace.zones} shifts={workspace.shifts} briefings={workspace.briefings} onChanged={() => setReloadKey((value) => value + 1)} /> : null}
     </div>

@@ -89,6 +89,7 @@ The source is a connected event-production system spread across documents:
 | Run of show basics | Function times, load-in, host call, guest arrival, custom moments, tasks, and completion | Client Run of Show and timeline APIs |
 | Inspiration | Categorized mood-board items with image and source links | Client Mood Board |
 | Booking-linked communication | Client/vendor/manager threads with booking and function context | Messages APIs and dashboards |
+| Guest communication campaigns | Consent-aware RSVP, arrival, room-key, function, breakfast, departure, emergency, and thank-you templates with segments, schedule, approval, immutable recipient snapshot, human CSV/WhatsApp handoff, result import, opt-out exclusion, and explicit `DRAFT -> APPROVED -> EXPORTED -> SENT` lifecycle | Manager Guest Communications desk, atomic campaign RPCs, database regression, authenticated cross-role journey |
 | Employee permissions | Admin-created operations profiles, role templates, active state, and event-scoped capabilities | Admin Team and permission APIs |
 | Live event command | Assigned event queue, schedule, departments, zones, crew shifts, check-in/out, briefings, acknowledgements, updates, incidents, decisions, escalations, and print event book | Manager Operations and operations database tests |
 | Shared production dossier | Event/function-scoped contracts, riders, permissions, recce, approvals, transport, rooming, hospitality, communications, inventory, packing, finance, and family records with owner, due date, status, visibility, reference links, optimistic updates, and append-only activity | Production Dossier tab, production APIs, atomic RPC, print event book, database and authenticated journey tests |
@@ -120,30 +121,27 @@ represented to the client as shipped:
 2. **Vendor comparison and procurement board** with option rows, quantities,
    unit rates, taxes, inclusions/exclusions, travel/stay, overtime, hidden costs,
    recommendation, selection, approvals, and source media.
-3. **Guest broadcast communications** with templates, audience segments,
-   scheduled messages, approval, human send/WhatsApp export, delivery status,
-   and opt-out/consent controls.
-4. **Recce workflow** with agenda, participants, findings, decisions, images,
+3. **Recce workflow** with agenda, participants, findings, decisions, images,
    follow-ups, owners, due dates, and conversion into plan changes.
-5. **Inventory, sourcing, packing, and truck control** with quantities,
+4. **Inventory, sourcing, packing, and truck control** with quantities,
    purchase/source, custody, box/vehicle, load/unload, event allocation,
    consumption, return, damage, and reconciliation.
-6. **Stationery and signage production** with artwork, dimensions, material,
+5. **Stationery and signage production** with artwork, dimensions, material,
    quantity, designer, printer, approval, print status, delivery, placement,
    and cost.
-7. **License and compliance register** covering music, alcohol, drone, fire,
+6. **License and compliance register** covering music, alcohol, drone, fire,
    venue permissions, security, insurance, documents, deadlines, owner, and
    approval evidence.
-8. **Alcohol and bar inventory** with brand, quantity, issue/return, seal/open
+7. **Alcohol and bar inventory** with brand, quantity, issue/return, seal/open
     state, handover, license, supplier, consumption, and reconciliation.
-9. **Expense, advance, reimbursement, and petty-cash workflow** separate from
+8. **Expense, advance, reimbursement, and petty-cash workflow** separate from
     client invoices and vendor payout obligations.
-10. **Family relationship and photography brief** with relationship groups,
+9. **Family relationship and photography brief** with relationship groups,
     VIP handling, ritual roles, portrait groups, and shot completion.
-11. **Structured hotel operations** with room-night blocks, guaranteed
+10. **Structured hotel operations** with room-night blocks, guaranteed
     minimums, incidentals policy, VIP flags, early/late check-in, amenities,
     keys, floors, and hotel action owners.
-12. **Approvals and change control** across procurement, creative, operations,
+11. **Approvals and change control** across procurement, creative, operations,
     commercial exceptions, documents, menus, and live decisions.
 
 ## External And Source Blockers
@@ -168,11 +166,10 @@ represented to the client as shipped:
 1. First-party secure file storage and identity-document controls on top of the
    shipped production dossier and classified reference links.
 2. Procurement comparison and final-selection register.
-3. Guest communication campaign and human-approved send/export workflow.
-4. Inventory, packing, truck, sourcing, stationery, and handover controls.
-5. Specialized field views for the dossier's licenses, riders, contracts,
+3. Inventory, packing, truck, sourcing, stationery, and handover controls.
+4. Specialized field views for the dossier's licenses, riders, contracts,
    recce, compliance, approvals, and change-control records.
-6. Client-facing cross-workstream review/export pack beyond the internal event
+5. Client-facing cross-workstream review/export pack beyond the internal event
    book that now includes permission-safe production records.
 
 ### P1 - Required For Operational Maturity
