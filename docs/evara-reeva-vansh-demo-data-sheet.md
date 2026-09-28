@@ -16,10 +16,10 @@
 | Programme | 21-23 February |
 | Demo year | 2027, shifted forward so live planning and operations views remain useful |
 | Guests | 240 headline count; presentation-safe grouped guest records |
-| Client account | `testing+reeva-vansh@elysiancelebrations.app` |
-| Operations account | `testing+evara-manager@elysiancelebrations.app` |
-| Admin account | `testing+admin@elysiancelebrations.app` |
-| Password handling | Uses the locally configured `ELYSIAN_TEST_USER_PASSWORD`; do not place it in recordings or documents |
+| Client account | `rayyanh799@gmail.com` |
+| Operations account | `testing+clerk_test_evara-manager@elysiancelebrations.app` |
+| Admin account | `testing+clerk_test_admin@elysiancelebrations.app` |
+| Sign-in method | Use Google or the verification code delivered to the client mailbox; complete sign-in before recording |
 
 ## Three-Day Programme
 
@@ -66,6 +66,8 @@ Published client totals and vendor payouts remain separate. Elysian collects the
 
 The demo uses a 12% fixed Elysian fee on published bookings. These are synthetic presentation figures. They demonstrate client invoice, receipt, vendor payout, outstanding balance, and role-safe visibility without claiming to reproduce Evara's confidential commercial terms.
 
+The Cost Estimation workspace currently exposes ₹1,09,54,888 across the three fully scoped, function-linked bookings: Sangeet Night, Wedding Ceremony, and Departure Hospitality. The whole-event planning retainer remains in Bookings and Billing rather than being assigned to one function, so it is not double-counted in the function chart.
+
 ## Source-To-Platform Mapping
 
 | Evara source area | What is represented in Elysian | Where to show it |
@@ -90,6 +92,7 @@ The demo uses a 12% fixed Elysian fee on published bookings. These are synthetic
 ## Recording-Safe Data Coverage
 
 - Three days and nine functions are visible in the event map.
+- Three function-linked published estimates are execution-ready and total ₹1,09,54,888 in Cost Estimation.
 - Twelve grouped demo guests cover both host sides, family, friends, VIPs, senior guests, children, and wedding party.
 - Seven selected partners produce bookings, pricing states, payment progress, and four active message threads.
 - Budget categories cover venue/hospitality, design/decor, photo/film/beauty, guest logistics, welcome hospitality, and contingency.

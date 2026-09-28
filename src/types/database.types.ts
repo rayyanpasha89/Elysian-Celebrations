@@ -4008,6 +4008,7 @@ export type Database = {
           "is_active": boolean
           "created_at": string
           "updated_at": string
+          "is_test_fixture": boolean
         }
         Insert:
         {
@@ -4020,6 +4021,7 @@ export type Database = {
           "is_active"?: boolean
           "created_at"?: string
           "updated_at"?: string
+          "is_test_fixture"?: boolean
         }
         Update:
         {
@@ -4032,6 +4034,7 @@ export type Database = {
           "is_active"?: boolean
           "created_at"?: string
           "updated_at"?: string
+          "is_test_fixture"?: boolean
         }
         Relationships: [
         ]

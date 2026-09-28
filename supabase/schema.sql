@@ -23,6 +23,7 @@ create table users (
   avatar text,
   role user_role not null default 'CLIENT',
   is_active boolean not null default true,
+  is_test_fixture boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

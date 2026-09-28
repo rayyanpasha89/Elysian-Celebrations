@@ -74,6 +74,7 @@ This is the working tracker for the recent Elysian Celebrations rebuild push. Ke
   - `20260925123000_partner_travel_cascade_scope.sql`
   - `20260925124500_partner_travel_activity_cascade.sql`
   - `20260925130000_partner_travel_consistent_snapshot.sql`
+  - `20260928110645_allow_explicit_demo_fixture_identities.sql`
 - Remote table/column checks passed for:
   - `wedding_event_menus`
   - `wedding_event_menu_items`
@@ -126,6 +127,18 @@ claims that the changes are committed, deployed, or active in the remote databas
   Realtime remains deferred pending a Clerk-to-Supabase JWT bridge.
 
 ## Shipped Recently
+
+- Moved the complete Reeva & Vansh Evara presentation workspace onto
+  `rayyanh799@gmail.com` without changing its Google sign-in method. The account
+  is now the active client identity for one 3-day, 9-function Gateway Bekal
+  workspace; the duplicate test profile is retired.
+- Added a server-managed `users.is_test_fixture` marker so deterministic demo
+  reseeds can safely purge their own financial fixtures without weakening the
+  production guard for normal users. The privileged purge RPC remains restricted
+  to `service_role` and records an admin audit entry.
+- Refreshed the Evara data sheet and 17-minute recording script locally and in
+  Google Docs, including the real client sign-in and Clerk test-address flows for
+  manager, vendor, and admin presentation roles.
 
 - Added the manager Partner Travel desk for event-scoped vendor, artist, crew,
   speaker, and performer movement. Parties can be linked to real selected
@@ -337,7 +350,7 @@ claims that the changes are committed, deployed, or active in the remote databas
 - `npm run test:billing-gateway` (13 focused cases with full rollback)
 - `npm run test:readiness` (8 focused cases)
 - `npm run test:abuse-controls` (rate limit, grants, RLS, and media reservations)
-- `npm run test:journeys` (12 authenticated groups, including event-scoped
+- `npm run test:journeys` (14 authenticated groups, including event-scoped
   operations and every portal navigation destination)
 - `npx supabase db lint --schema public --level warning --fail-on error`
 - `npm run db:query` for newly added Supabase tables and columns

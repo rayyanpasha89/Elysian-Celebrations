@@ -202,9 +202,16 @@ export default function ClientCommandCenter() {
     const heads = (rows: GuestRow[]) => rows.reduce((s, g) => s + 1 + (g.plus_one ? 1 : 0), 0);
 
     const picks = budget?.planLineItems ?? [];
-    const estimated =
-      budget?.eventPlanSpend?.totalEstimated ??
-      (budget ? picks.reduce((sum, pick) => sum + pick.estimatedCost, 0) : null);
+    const eventPlanEstimate = budget?.eventPlanSpend?.totalEstimated ?? 0;
+    const vendorEstimate = picks.reduce(
+      (sum, pick) => sum + pick.estimatedCost,
+      0
+    );
+    const estimated = budget
+      ? eventPlanEstimate > 0
+        ? eventPlanEstimate
+        : vendorEstimate
+      : null;
     const bookings = {
       total: picks.length,
       selected: picks.filter((p) => p.stage === "selected").length,

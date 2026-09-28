@@ -9,7 +9,7 @@
 1. Run the app locally and use a clean desktop browser window at 1440 x 900 or larger.
 2. Keep zoom at 100%, close personal tabs, and hide bookmarks and notification previews.
 3. Use the Reeva & Vansh client account first, then the Evara manager, one vendor, and the admin account.
-4. Use the shared QA password already configured in `ELYSIAN_TEST_USER_PASSWORD`. Never display the password manager, environment files, Supabase, Clerk, or terminal in the recording.
+4. Sign in to the Reeva & Vansh workspace with `rayyanh799@gmail.com` using Google or the code delivered to that mailbox. For the remaining `+clerk_test` accounts, choose **Use another method**, select the full test address, and complete Clerk's documented development-instance email-code flow. Never display inboxes, verification codes, environment files, Supabase, Clerk, or the terminal in the recording.
 5. Do not display private source workbooks, phone numbers, government IDs, PNRs, or family-tree files.
 6. Do not click `Mark sent` in Guest Communications unless demonstrating a prepared sample; explain that provider delivery is intentionally human-controlled.
 
@@ -23,7 +23,7 @@
 
 ## 00:45-02:00 - Client Command Center
 
-**Action:** Sign in as `testing+reeva-vansh@elysiancelebrations.app`. Open `/client`.
+**Action:** Sign in as `rayyanh799@gmail.com` with Google or a real mailbox verification code. Complete authentication before recording, then open `/client` so no inbox or code appears on screen.
 
 **Say:**
 
@@ -85,15 +85,15 @@
 
 ## 07:20-08:30 - Cost, Budget, Billing, Timeline
 
-**Action:** Open `Cost Estimate`, then `Budget`, then `Billing`, then `Timeline`.
+**Action:** Open `Cost Estimate`, switch through the event, day, category, vendor, final-vs-estimate, and paid-vs-due views, then open `Billing` and `Timeline`.
 
 **Say:**
 
-"Spend can be read by function, day, category, vendor, payment state, and the whole event rather than one undifferentiated total. Planner selections flow into the budget context. Billing then separates the client invoice and receipt history from vendor settlements, including installments, manual reconciliation, refunds, and audit-safe voids. The timeline turns planning decisions into dated actions."
+"Spend can be read by function, day, category, vendor, payment state, and the whole event rather than one undifferentiated total. Three fully scoped functions already show Elysian-published pricing, while incomplete functions remain clearly locked instead of exposing a misleading partial total. Billing then separates the client invoice and receipt history from vendor settlements, including installments, manual reconciliation, refunds, and audit-safe voids. The timeline turns planning decisions into dated actions."
 
 ## 08:30-10:50 - Evara Live Operations
 
-**Action:** Sign out and sign in as `testing+evara-manager@elysiancelebrations.app`. Open `Operations`, then Reeva & Vansh.
+**Action:** Sign out and sign in as `testing+clerk_test_evara-manager@elysiancelebrations.app`. Open `Operations`, then Reeva & Vansh.
 
 **Say:**
 
@@ -141,7 +141,7 @@
 
 ## 13:35-14:35 - Vendor Portal
 
-**Action:** Sign in as `testing+the-story-room@elysiancelebrations.app`. Show Dashboard, Services, Bookings, Messages, Calendar, Portfolio, and Analytics.
+**Action:** Sign in as `testing+clerk_test_the-story-room@elysiancelebrations.app`. Show Dashboard, Services, Bookings, Messages, Calendar, Portfolio, and Analytics.
 
 **Say:**
 
@@ -149,7 +149,7 @@
 
 ## 14:35-16:10 - Admin Control
 
-**Action:** Sign in as `testing+admin@elysiancelebrations.app`. Show Events/Progress, Team, Venues, Vendors, Pricing, and Billing.
+**Action:** Sign in as `testing+clerk_test_admin@elysiancelebrations.app`. Show Events/Progress, Team, Venues, Vendors, Pricing, and Billing.
 
 **Say:**
 

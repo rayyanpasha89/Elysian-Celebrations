@@ -51,6 +51,19 @@ type RoutineDefinition = {
   parameters: RoutineParameterRow[];
 };
 
+// PostgreSQL routine arguments do not expose a NOT NULL contract in the
+// catalog. These RPCs deliberately use null to distinguish create/first-write
+// requests from versioned updates, so preserve that application-level contract
+// when the official Supabase generator is unavailable.
+const nullableRoutineArguments = new Set([
+  "save_event_partner_travel_party.p_party_id",
+  "save_event_partner_travel_party.p_expected_version",
+  "save_guest_communication_campaign.p_campaign_id",
+  "save_guest_communication_campaign.p_expected_version",
+  "save_guest_operations_snapshot.p_expected_version",
+  "save_guest_operations_snapshot_internal.p_expected_version",
+]);
+
 function requiredEnv(name: string) {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`Missing required environment variable: ${name}`);
@@ -376,8 +389,18 @@ async function generateFromCatalog() {
 
         output.push(`      ${propertyName(routine.name)}: {`, "        Args: {");
         for (const parameter of inputs) {
+          const baseType = routineValueType(
+            parameter.data_type,
+            parameter.udt_name,
+            enumNames,
+          );
+          const parameterType = nullableRoutineArguments.has(
+            `${routine.name}.${parameter.parameter_name}`,
+          )
+            ? `${baseType} | null`
+            : baseType;
           output.push(
-            `          ${propertyName(parameter.parameter_name!)}: ${routineValueType(parameter.data_type, parameter.udt_name, enumNames)}`,
+            `          ${propertyName(parameter.parameter_name!)}: ${parameterType}`,
           );
         }
         output.push("        }");

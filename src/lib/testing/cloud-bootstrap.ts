@@ -8,6 +8,8 @@ type FixtureIdentity = {
   key: string;
   label: string;
   email: string;
+  previousEmails?: string[];
+  managePassword?: boolean;
   firstName: string;
   lastName: string;
   role: PortalRole;
@@ -127,8 +129,6 @@ type ServiceRecord = {
 type BookingRecord = {
   id: string;
 };
-
-const DEFAULT_TEST_PASSWORD = "ElysianTesting123!";
 
 const VENDOR_CATEGORY_FIXTURES = [
   {
@@ -548,7 +548,7 @@ const TESTIMONIAL_FIXTURES = [
 const ADMIN_FIXTURE: FixtureIdentity = {
   key: "platform-admin",
   label: "Platform Admin",
-  email: "testing+admin@elysiancelebrations.app",
+  email: "testing+clerk_test_admin@elysiancelebrations.app",
   firstName: "Elysian",
   lastName: "Admin",
   role: "ADMIN",
@@ -558,7 +558,7 @@ const ADMIN_FIXTURE: FixtureIdentity = {
 const MANAGER_FIXTURE: FixtureIdentity = {
   key: "platform-manager",
   label: "Evara Operations Manager",
-  email: "testing+evara-manager@elysiancelebrations.app",
+  email: "testing+clerk_test_evara-manager@elysiancelebrations.app",
   firstName: "Evara",
   lastName: "Operations",
   role: "MANAGER",
@@ -569,7 +569,7 @@ const CLIENT_FIXTURES: ClientFixture[] = [
   {
     key: "priya-arjun",
     label: "Priya & Arjun",
-    email: "testing+priya-arjun@elysiancelebrations.app",
+    email: "testing+clerk_test_priya-arjun@elysiancelebrations.app",
     firstName: "Priya",
     lastName: "Malhotra",
     role: "CLIENT",
@@ -608,7 +608,7 @@ const CLIENT_FIXTURES: ClientFixture[] = [
   {
     key: "aisha-rohan",
     label: "Aisha & Rohan",
-    email: "testing+aisha-rohan@elysiancelebrations.app",
+    email: "testing+clerk_test_aisha-rohan@elysiancelebrations.app",
     firstName: "Aisha",
     lastName: "Kapoor",
     role: "CLIENT",
@@ -647,7 +647,12 @@ const CLIENT_FIXTURES: ClientFixture[] = [
   {
     key: "reeva-vansh",
     label: "Reeva & Vansh",
-    email: "testing+reeva-vansh@elysiancelebrations.app",
+    email: "rayyanh799@gmail.com",
+    previousEmails: [
+      "testing+clerk_test_reeva-vansh@elysiancelebrations.app",
+      "testing+reeva-vansh@elysiancelebrations.app",
+    ],
+    managePassword: false,
     firstName: "Reeva",
     lastName: "Sakaria",
     role: "CLIENT",
@@ -788,7 +793,7 @@ const VENDOR_FIXTURES: VendorFixture[] = [
   {
     key: "the-story-room",
     label: "The Story Room",
-    email: "testing+the-story-room@elysiancelebrations.app",
+    email: "testing+clerk_test_the-story-room@elysiancelebrations.app",
     firstName: "Rana",
     lastName: "Sethi",
     role: "VENDOR",
@@ -832,7 +837,7 @@ const VENDOR_FIXTURES: VendorFixture[] = [
   {
     key: "house-of-petals",
     label: "House of Petals",
-    email: "testing+house-of-petals@elysiancelebrations.app",
+    email: "testing+clerk_test_house-of-petals@elysiancelebrations.app",
     firstName: "Naina",
     lastName: "Bedi",
     role: "VENDOR",
@@ -876,7 +881,7 @@ const VENDOR_FIXTURES: VendorFixture[] = [
   {
     key: "saffron-feast",
     label: "Saffron Feast",
-    email: "testing+saffron-feast@elysiancelebrations.app",
+    email: "testing+clerk_test_saffron-feast@elysiancelebrations.app",
     firstName: "Kabir",
     lastName: "Ahuja",
     role: "VENDOR",
@@ -920,7 +925,7 @@ const VENDOR_FIXTURES: VendorFixture[] = [
   {
     key: "velvet-notes-collective",
     label: "Velvet Notes Collective",
-    email: "testing+velvet-notes@elysiancelebrations.app",
+    email: "testing+clerk_test_velvet-notes@elysiancelebrations.app",
     firstName: "Ira",
     lastName: "Shah",
     role: "VENDOR",
@@ -964,7 +969,7 @@ const VENDOR_FIXTURES: VendorFixture[] = [
   {
     key: "atlas-guest-logistics",
     label: "Atlas Guest Logistics",
-    email: "testing+atlas-logistics@elysiancelebrations.app",
+    email: "testing+clerk_test_atlas-logistics@elysiancelebrations.app",
     firstName: "Aarav",
     lastName: "Mehta",
     role: "VENDOR",
@@ -1010,7 +1015,7 @@ const VENDOR_FIXTURES: VendorFixture[] = [
   {
     key: "noor-bridal-atelier",
     label: "Noor Bridal Atelier",
-    email: "testing+noor-bridal@elysiancelebrations.app",
+    email: "testing+clerk_test_noor-bridal@elysiancelebrations.app",
     firstName: "Noor",
     lastName: "Chawla",
     role: "VENDOR",
@@ -1054,7 +1059,7 @@ const VENDOR_FIXTURES: VendorFixture[] = [
   {
     key: "the-wedding-chapter",
     label: "The Wedding Chapter",
-    email: "testing+the-wedding-chapter@elysiancelebrations.app",
+    email: "testing+clerk_test_the-wedding-chapter@elysiancelebrations.app",
     firstName: "Sonia",
     lastName: "Bajaj",
     role: "VENDOR",
@@ -1292,6 +1297,18 @@ const BOOKING_FIXTURES = [
   },
 ] as const;
 
+function publishedClientPriceForEvent(clientKey: string, eventName: string) {
+  return BOOKING_FIXTURES.filter(
+    (booking) =>
+      booking.clientKey === clientKey &&
+      booking.eventName === eventName &&
+      ["CONFIRMED", "DEPOSIT_PAID", "COMPLETED"].includes(booking.status)
+  ).reduce(
+    (total, booking) => total + Math.round(booking.totalAmount * 1.12),
+    0
+  );
+}
+
 const REVIEW_FIXTURES = [
   {
     clientKey: "priya-arjun",
@@ -1493,36 +1510,86 @@ async function ensureFixtureUser(
     emailAddress: [fixture.email],
     limit: 1,
   });
+  const previousEmails = Array.from(
+    new Set([
+      ...(fixture.previousEmails ?? []),
+      ...(fixture.email.includes("+clerk_test_")
+        ? [fixture.email.replace("+clerk_test_", "+")]
+        : []),
+    ])
+  ).filter((email) => email !== fixture.email);
+  const previousUsers = existing.data[0]
+    ? []
+    : (
+        await Promise.all(
+          previousEmails.map((emailAddress) =>
+            clerk.users.getUserList({ emailAddress: [emailAddress], limit: 1 })
+          )
+        )
+      ).flatMap((result) => result.data);
+  const migratedUser = previousUsers[0] ?? null;
+  const shouldManagePassword = fixture.managePassword !== false;
 
   const createPayload = {
     firstName: fixture.firstName,
     lastName: fixture.lastName,
-    password,
-    skipPasswordChecks: true,
-    skipPasswordRequirement: true,
+    ...(shouldManagePassword
+      ? {
+          password,
+          skipPasswordChecks: true,
+          skipPasswordRequirement: true,
+        }
+      : {}),
     publicMetadata: {
       role: fixture.role.toLowerCase(),
     },
   };
-  const updatePayload = {
+  const updatePayload = (currentMetadata: Record<string, unknown>) => ({
     firstName: fixture.firstName,
     lastName: fixture.lastName,
-    password,
-    skipPasswordChecks: true,
+    ...(shouldManagePassword
+      ? {
+          password,
+          skipPasswordChecks: true,
+        }
+      : {}),
     publicMetadata: {
+      ...currentMetadata,
       role: fixture.role.toLowerCase(),
     },
-  };
+  });
 
-  const clerkUser =
-    existing.data[0] ??
-    (await clerk.users.createUser({
-      emailAddress: [fixture.email],
-      ...createPayload,
-    }));
+  let clerkUser = existing.data[0] ?? migratedUser;
 
-  if (existing.data[0]) {
-    await clerk.users.updateUser(clerkUser.id, updatePayload);
+  if (clerkUser && !existing.data[0]) {
+    await clerk.emailAddresses.createEmailAddress({
+      userId: clerkUser.id,
+      emailAddress: fixture.email,
+      verified: true,
+      primary: true,
+    });
+    clerkUser = await clerk.users.getUser(clerkUser.id);
+  }
+
+  clerkUser ??= await clerk.users.createUser({
+    emailAddress: [fixture.email],
+    ...createPayload,
+  });
+
+  if (existing.data[0] || migratedUser) {
+    await clerk.users.updateUser(
+      clerkUser.id,
+      updatePayload(clerkUser.publicMetadata as Record<string, unknown>)
+    );
+  }
+
+  for (const previousEmail of previousEmails) {
+    const staleEmail = clerkUser.emailAddresses.find(
+      (address) => address.emailAddress === previousEmail
+    );
+    if (staleEmail && staleEmail.id !== clerkUser.primaryEmailAddressId) {
+      await clerk.emailAddresses.deleteEmailAddress(staleEmail.id);
+    }
   }
 
   const displayName = `${fixture.firstName} ${fixture.lastName}`.trim();
@@ -1535,6 +1602,7 @@ async function ensureFixtureUser(
         name: displayName,
         role: fixture.role,
         is_active: true,
+        is_test_fixture: true,
       },
       { onConflict: "id" }
     )
@@ -1546,6 +1614,86 @@ async function ensureFixtureUser(
   }
 
   return userRow as UserRecord;
+}
+
+async function loadRetiredFixtureState(
+  supabase: SupabaseClient,
+  fixtures: FixtureIdentity[],
+  activeUserIds: string[]
+) {
+  const previousEmails = Array.from(
+    new Set(fixtures.flatMap((fixture) => fixture.previousEmails ?? []))
+  );
+  if (previousEmails.length === 0) {
+    return { userIds: [] as string[], clientProfileIds: [] as string[] };
+  }
+
+  const { data: previousUsers, error: usersError } = await supabase
+    .from("users")
+    .select("id")
+    .in("email", previousEmails);
+  if (usersError) {
+    throw new Error(`Loading retired fixture users: ${usersError.message}`);
+  }
+
+  const activeIds = new Set(activeUserIds);
+  const userIds = (previousUsers ?? [])
+    .map((user) => user.id as string)
+    .filter((userId) => !activeIds.has(userId));
+  if (userIds.length === 0) {
+    return { userIds, clientProfileIds: [] as string[] };
+  }
+
+  const { data: profiles, error: profilesError } = await supabase
+    .from("client_profiles")
+    .select("id")
+    .in("user_id", userIds);
+  if (profilesError) {
+    throw new Error(`Loading retired fixture profiles: ${profilesError.message}`);
+  }
+
+  return {
+    userIds,
+    clientProfileIds: (profiles ?? []).map((profile) => profile.id as string),
+  };
+}
+
+async function retireFixtureState(
+  supabase: SupabaseClient,
+  userIds: string[],
+  clientProfileIds: string[]
+) {
+  if (clientProfileIds.length > 0) {
+    await ensureSuccess(
+      "Removing retired fixture profiles",
+      supabase.from("client_profiles").delete().in("id", clientProfileIds)
+    );
+  }
+  if (userIds.length > 0) {
+    await ensureSuccess(
+      "Deactivating retired fixture users",
+      supabase.from("users").update({ is_active: false }).in("id", userIds)
+    );
+  }
+}
+
+async function clearIncompatibleStaffProfiles(
+  supabase: SupabaseClient,
+  users: Map<string, UserRecord>
+) {
+  const clientUserIds = CLIENT_FIXTURES.flatMap((fixture) => {
+    const user = users.get(fixture.key);
+    return user ? [user.id] : [];
+  });
+  if (clientUserIds.length === 0) return;
+
+  await ensureSuccess(
+    "Clearing staff access from client fixtures",
+    supabase
+      .from("operations_staff_profiles")
+      .delete()
+      .in("user_id", clientUserIds)
+  );
 }
 
 async function loadLookupMap(
@@ -2122,32 +2270,48 @@ async function seedClientPlanningData(
     }
 
     const dayIdByDate = new Map(
-      (dayRows ?? []).map((row) => [row.date as string, row.id as string])
+      (dayRows ?? []).map((row) => [
+        String(row.date).slice(0, 10),
+        row.id as string,
+      ])
     );
 
     const { data: eventRows, error: eventError } = await supabase
       .from("wedding_events")
       .insert(
-        fixture.eventBlueprint.map((event, index) => ({
-          wedding_id: (wedding as WeddingRecord).id,
-          wedding_day_id: dayIdByDate.get(addDays(fixture.weddingDate, event.offsetDays).slice(0, 10)),
-          name: event.name,
-          date: addDays(fixture.weddingDate, event.offsetDays),
-          venue: event.venue,
-          notes: event.notes,
-          sort_order: index,
-          event_type: event.eventType ?? event.name,
-          time_block: event.timeBlock ?? null,
-          start_time: event.startTime ?? null,
-          end_time: event.endTime ?? null,
-          guest_count: event.guestCount ?? fixture.guestCount,
-          food_style: event.foodStyle ?? null,
-          food_preferences: ["Vegetarian", "Jain", "Non-vegetarian"],
-          menu_notes: "Confirm dietary counts and hotel service timing before the final banquet order.",
-          decor_style: event.decorStyle ?? null,
-          decor_notes: "Protect guest movement, production access, and weather contingency while preserving the visual direction.",
-          attire_notes: "Function-specific attire guidance is included in the guest communication plan.",
-        }))
+        fixture.eventBlueprint.map((event, index) => {
+          const publishedEstimate = publishedClientPriceForEvent(
+            fixture.key,
+            event.name
+          );
+
+          return {
+            wedding_id: (wedding as WeddingRecord).id,
+            wedding_day_id: dayIdByDate.get(
+              addDays(fixture.weddingDate, event.offsetDays).slice(0, 10)
+            ),
+            name: event.name,
+            date: addDays(fixture.weddingDate, event.offsetDays),
+            venue: event.venue,
+            notes: event.notes,
+            sort_order: index,
+            event_type: event.eventType ?? event.name,
+            time_block: event.timeBlock ?? null,
+            start_time: event.startTime ?? null,
+            end_time: event.endTime ?? null,
+            guest_count: event.guestCount ?? fixture.guestCount,
+            estimated_budget: publishedEstimate > 0 ? publishedEstimate : null,
+            food_style: event.foodStyle ?? null,
+            food_preferences: ["Vegetarian", "Jain", "Non-vegetarian"],
+            menu_notes:
+              "Confirm dietary counts and hotel service timing before the final banquet order.",
+            decor_style: event.decorStyle ?? null,
+            decor_notes:
+              "Protect guest movement, production access, and weather contingency while preserving the visual direction.",
+            attire_notes:
+              "Function-specific attire guidance is included in the guest communication plan.",
+          };
+        })
       )
       .select("id, name");
 
@@ -3135,8 +3299,7 @@ async function seedContactInquiries(supabase: SupabaseClient) {
 export async function bootstrapCloudTestingData(): Promise<CloudBootstrapSummary> {
   const clerk = createClerkAdminClient();
   const supabase = createSupabaseAdminClient();
-  const password =
-    process.env.ELYSIAN_TEST_USER_PASSWORD?.trim() || DEFAULT_TEST_PASSWORD;
+  const password = requireEnv("ELYSIAN_TEST_USER_PASSWORD");
 
   await seedReferenceData(supabase);
 
@@ -3152,6 +3315,13 @@ export async function bootstrapCloudTestingData(): Promise<CloudBootstrapSummary
     users.set(fixture.key, await ensureFixtureUser(clerk, supabase, fixture, password));
   }
 
+  const retiredState = await loadRetiredFixtureState(
+    supabase,
+    allFixtures,
+    [...users.values()].map((user) => user.id)
+  );
+  await clearIncompatibleStaffProfiles(supabase, users);
+
   const categoryIds = await loadLookupMap(supabase, "vendor_categories");
   const destinationIds = await loadLookupMap(supabase, "destinations");
   const packageTierIds = await loadLookupMap(supabase, "package_tiers");
@@ -3161,10 +3331,21 @@ export async function bootstrapCloudTestingData(): Promise<CloudBootstrapSummary
 
   await resetFixtureData(
     supabase,
-    [...users.values()].map((user) => user.id),
-    [...clientProfiles.values()].map((profile) => profile.id),
+    [
+      ...Array.from(users.values(), (user) => user.id),
+      ...retiredState.userIds,
+    ],
+    [
+      ...clientProfiles.values().map((profile) => profile.id),
+      ...retiredState.clientProfileIds,
+    ],
     [...vendorProfiles.values()].map((profile) => profile.id),
     CONTACT_INQUIRY_FIXTURES.map((fixture) => fixture.email)
+  );
+  await retireFixtureState(
+    supabase,
+    retiredState.userIds,
+    retiredState.clientProfileIds
   );
 
   const services = await seedVendorServicesAndDestinations(
