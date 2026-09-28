@@ -1,16 +1,12 @@
 import "dotenv/config";
-import {
-  bootstrapCloudTestingData,
-  getCloudBootstrapPassword,
-} from "../src/lib/testing/cloud-bootstrap";
+import { bootstrapCloudTestingData } from "../src/lib/testing/cloud-bootstrap";
 
 async function main() {
   const summary = await bootstrapCloudTestingData();
-  const password = getCloudBootstrapPassword();
 
   console.log("");
   console.log("Elysian cloud testing bootstrap complete.");
-  console.log(`Password: ${password}`);
+  console.log("Password: use the configured ELYSIAN_TEST_USER_PASSWORD value.");
   console.log("");
   console.log("Fixture logins:");
   for (const login of summary.logins) {

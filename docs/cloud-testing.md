@@ -5,8 +5,9 @@ This app uses Clerk for identity and Supabase for product data. Because of that 
 ## What it seeds
 
 - 1 admin account
-- 2 client accounts with weddings, events, budgets, guests, timeline items, mood boards, bookings, messages, notifications
-- 6 vendor accounts with profiles, services, destination links, reviews, and analytics-ready bookings
+- 3 client accounts with weddings, structured days/functions, budgets, guests, timeline items, mood boards, bookings, messages, notifications
+- 1 platform manager account for the cross-event operations walkthrough
+- 7 vendor accounts with profiles, services, destination links, reviews, and analytics-ready bookings
 - contact inquiries, destinations, venues, package tiers, blog posts, and testimonials
 
 ## Environment
@@ -62,6 +63,8 @@ After bootstrapping, these accounts are available:
 - `testing+admin@elysiancelebrations.app` -> `/admin`
 - `testing+priya-arjun@elysiancelebrations.app` -> `/client`
 - `testing+aisha-rohan@elysiancelebrations.app` -> `/client`
+- `testing+reeva-vansh@elysiancelebrations.app` -> `/client`
+- `testing+evara-manager@elysiancelebrations.app` -> `/manager`
 - `testing+the-story-room@elysiancelebrations.app` -> `/vendor`
 - `testing+house-of-petals@elysiancelebrations.app` -> `/vendor`
 - `testing+saffron-feast@elysiancelebrations.app` -> `/vendor`

@@ -2,7 +2,7 @@ import { createClerkClient, type ClerkClient } from "@clerk/backend";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseSecretKey, getSupabaseUrl } from "@/lib/supabase/env";
 
-type PortalRole = "ADMIN" | "CLIENT" | "VENDOR";
+type PortalRole = "ADMIN" | "CLIENT" | "VENDOR" | "MANAGER";
 
 type FixtureIdentity = {
   key: string;
@@ -11,7 +11,7 @@ type FixtureIdentity = {
   firstName: string;
   lastName: string;
   role: PortalRole;
-  defaultRoute: `/${"admin" | "client" | "vendor"}`;
+  defaultRoute: `/${"admin" | "client" | "vendor" | "manager"}`;
 };
 
 type ClientFixture = FixtureIdentity & {
@@ -29,6 +29,13 @@ type ClientFixture = FixtureIdentity & {
     offsetDays: number;
     venue: string;
     notes: string;
+    eventType?: string;
+    timeBlock?: "MORNING" | "AFTERNOON" | "EVENING";
+    startTime?: string;
+    endTime?: string;
+    guestCount?: number;
+    foodStyle?: string;
+    decorStyle?: string;
   }[];
 };
 
@@ -400,6 +407,19 @@ const VENUE_FIXTURES = [
     gallery: [],
     amenities: ["Backwater View", "Houseboat", "Ayurvedic Spa", "Kerala Cuisine"],
   },
+  {
+    destination_slug: "kerala",
+    name: "Gateway Bekal",
+    slug: "gateway-bekal",
+    description: "A coastal Kerala resort with lawns, indoor celebration spaces, and guest-room operations suited to multi-day weddings.",
+    address: "Bekal, Kasaragod, Kerala",
+    capacity: 300,
+    price_range: "Rs 25L-Rs 80L",
+    hero_image:
+      "https://images.unsplash.com/photo-1602216056096-3b40cc0c9944?auto=format&fit=crop&w=1400&q=80",
+    gallery: [],
+    amenities: ["Beach Lawn", "Celebration Hall", "Lotus Lawn", "Guest Transport", "Spa"],
+  },
 ] as const;
 
 const PACKAGE_TIER_FIXTURES = [
@@ -535,6 +555,16 @@ const ADMIN_FIXTURE: FixtureIdentity = {
   defaultRoute: "/admin",
 };
 
+const MANAGER_FIXTURE: FixtureIdentity = {
+  key: "platform-manager",
+  label: "Evara Operations Manager",
+  email: "testing+evara-manager@elysiancelebrations.app",
+  firstName: "Evara",
+  lastName: "Operations",
+  role: "MANAGER",
+  defaultRoute: "/manager",
+};
+
 const CLIENT_FIXTURES: ClientFixture[] = [
   {
     key: "priya-arjun",
@@ -611,6 +641,144 @@ const CLIENT_FIXTURES: ClientFixture[] = [
         offsetDays: 0,
         venue: "Grand Hyatt Goa",
         notes: "Late-night DJ set, custom lighting package, and recovery brunch invitations.",
+      },
+    ],
+  },
+  {
+    key: "reeva-vansh",
+    label: "Reeva & Vansh",
+    email: "testing+reeva-vansh@elysiancelebrations.app",
+    firstName: "Reeva",
+    lastName: "Sakaria",
+    role: "CLIENT",
+    defaultRoute: "/client",
+    partnerName: "Reeva & Vansh",
+    weddingDate: "2027-02-22T18:00:00.000Z",
+    estimatedBudget: 16800000,
+    guestCount: 240,
+    notes:
+      "Presentation-safe reconstruction of a three-day Gateway Bekal wedding, covering guest hospitality, vendor movement, production, showflow, and commercial control without source phone numbers, IDs, or PNRs.",
+    destinationSlug: "kerala",
+    packageTierSlug: "bespoke",
+    weddingStatus: "CONFIRMED",
+    weddingName: "Reeva & Vansh at Gateway Bekal",
+    eventBlueprint: [
+      {
+        name: "Bhaat Ceremony",
+        offsetDays: -1,
+        venue: "Lotus Lawn, Gateway Bekal",
+        notes: "Family ritual, live folk welcome, ritual trays, floral details, and photography call sheet.",
+        eventType: "BHAAT",
+        timeBlock: "MORNING",
+        startTime: "10:00",
+        endTime: "11:30",
+        guestCount: 90,
+        foodStyle: "Ritual refreshments",
+        decorStyle: "Kerala garden with marigold details",
+      },
+      {
+        name: "Dakshin Lunch",
+        offsetDays: -1,
+        venue: "Restaurant, Gateway Bekal",
+        notes: "South Indian lunch, menu stationery, guest welcome desk, and dietary service plan.",
+        eventType: "LUNCH",
+        timeBlock: "AFTERNOON",
+        startTime: "12:00",
+        endTime: "15:00",
+        guestCount: 180,
+        foodStyle: "Regional seated and buffet service",
+        decorStyle: "Banana leaf and brass table details",
+      },
+      {
+        name: "Sangeet Night",
+        offsetDays: -1,
+        venue: "Celebration Hall, Gateway Bekal",
+        notes: "Family performances, anchor, DJ, show calling, VJ content, choreography, and late-night hospitality.",
+        eventType: "SANGEET",
+        timeBlock: "EVENING",
+        startTime: "19:00",
+        endTime: "23:30",
+        guestCount: 220,
+        foodStyle: "Cocktails, live counters, and dinner",
+        decorStyle: "Performance stage, lounge clusters, and warm intelligent lighting",
+      },
+      {
+        name: "Haldi Celebration",
+        offsetDays: 0,
+        venue: "Lawn Area, Gateway Bekal",
+        notes: "Haldi rituals, guest games, salon coordination, protective production plan, and family portraits.",
+        eventType: "HALDI",
+        timeBlock: "MORNING",
+        startTime: "10:00",
+        endTime: "13:00",
+        guestCount: 200,
+        foodStyle: "Brunch and hydration stations",
+        decorStyle: "Yellow floral canopy with washable soft furnishings",
+      },
+      {
+        name: "Guest Lunch & Hospitality",
+        offsetDays: 0,
+        venue: "Restaurant and Lobby, Gateway Bekal",
+        notes: "Lunch service, room-key and luggage support, salon desk, transport reconfirmation, and guest help desk.",
+        eventType: "HOSPITALITY",
+        timeBlock: "AFTERNOON",
+        startTime: "13:00",
+        endTime: "16:00",
+        guestCount: 230,
+        foodStyle: "Multi-cuisine buffet with dietary desk",
+        decorStyle: "Quiet hospitality styling and directional signage",
+      },
+      {
+        name: "Wedding Ceremony",
+        offsetDays: 0,
+        venue: "Beach Lawn, Gateway Bekal",
+        notes: "Baraat, milni, musical pheras, family photography groups, wedding dinner, and weather contingency.",
+        eventType: "WEDDING",
+        timeBlock: "EVENING",
+        startTime: "18:00",
+        endTime: "22:30",
+        guestCount: 240,
+        foodStyle: "Wedding dinner with regional and global counters",
+        decorStyle: "Coastal mandap, floral aisle, and candlelit dinner",
+      },
+      {
+        name: "Farewell Breakfast",
+        offsetDays: 1,
+        venue: "Restaurant, Gateway Bekal",
+        notes: "Staggered breakfast, departure reminders, luggage desk, and final room-key reconciliation.",
+        eventType: "BREAKFAST",
+        timeBlock: "MORNING",
+        startTime: "08:00",
+        endTime: "11:00",
+        guestCount: 180,
+        foodStyle: "Breakfast buffet with takeaway options",
+        decorStyle: "Minimal farewell stationery",
+      },
+      {
+        name: "Departure Hospitality",
+        offsetDays: 1,
+        venue: "Gateway Bekal Lobby",
+        notes: "Airport manifests, coach and car dispatch, guest follow-up, luggage closure, and room release.",
+        eventType: "DEPARTURE",
+        timeBlock: "AFTERNOON",
+        startTime: "11:00",
+        endTime: "16:00",
+        guestCount: 180,
+        foodStyle: "Travel snacks and hydration",
+        decorStyle: "Departure desk and transport signage",
+      },
+      {
+        name: "Post-wedding Sundowner",
+        offsetDays: 1,
+        venue: "Beach Lawn, Gateway Bekal",
+        notes: "Small family sundowner with acoustic music and final photography moments.",
+        eventType: "SUNDOWNER",
+        timeBlock: "EVENING",
+        startTime: "17:00",
+        endTime: "20:00",
+        guestCount: 120,
+        foodStyle: "Canapes and light dinner",
+        decorStyle: "Low coastal lounges and lanterns",
       },
     ],
   },
@@ -1038,6 +1206,90 @@ const BOOKING_FIXTURES = [
     vendorPaidAmount: 420000,
     notes: "Planning retainer closed after final reconciliation.",
   },
+  {
+    key: "reeva-photo",
+    clientKey: "reeva-vansh",
+    vendorSlug: "the-story-room",
+    serviceName: "Wedding Day Coverage",
+    eventName: "Wedding Ceremony",
+    status: "CONFIRMED",
+    totalAmount: 750000,
+    paidAmount: 250000,
+    vendorPaidAmount: 0,
+    notes: "Cover all three days, preserve the family portrait list, and coordinate sunrise and ritual calls.",
+  },
+  {
+    key: "reeva-decor",
+    clientKey: "reeva-vansh",
+    vendorSlug: "house-of-petals",
+    serviceName: "Sangeet Production Decor",
+    eventName: "Sangeet Night",
+    status: "DEPOSIT_PAID",
+    totalAmount: 4184400,
+    paidAmount: 1800000,
+    vendorPaidAmount: 300000,
+    notes: "Stage, lounges, technical masking, signage placements, guest circulation, and overnight changeover.",
+  },
+  {
+    key: "reeva-catering",
+    clientKey: "reeva-vansh",
+    vendorSlug: "saffron-feast",
+    serviceName: "Signature Wedding Menu",
+    eventName: "Wedding Ceremony",
+    status: "CONFIRMED",
+    totalAmount: 3276750,
+    paidAmount: 1100000,
+    vendorPaidAmount: 500000,
+    notes: "Regional and global counters, Jain separation, vendor food, travel snacks, and late-night service.",
+  },
+  {
+    key: "reeva-entertainment",
+    clientKey: "reeva-vansh",
+    vendorSlug: "velvet-notes-collective",
+    serviceName: "Sangeet Music Direction",
+    eventName: "Sangeet Night",
+    status: "CONFIRMED",
+    totalAmount: 340000,
+    paidAmount: 75000,
+    vendorPaidAmount: 0,
+    notes: "Coordinate family performances, anchor handoffs, VJ cues, DJ set, rehearsals, and after-party transition.",
+  },
+  {
+    key: "reeva-makeup",
+    clientKey: "reeva-vansh",
+    vendorSlug: "noor-bridal-atelier",
+    serviceName: "Bridal Ceremony Glam",
+    eventName: "Wedding Ceremony",
+    status: "CONFIRMED",
+    totalAmount: 515000,
+    paidAmount: 250000,
+    vendorPaidAmount: 0,
+    notes: "Bride, family styling continuity, floral requirements, salon desk timing, and touch-up coverage.",
+  },
+  {
+    key: "reeva-logistics",
+    clientKey: "reeva-vansh",
+    vendorSlug: "atlas-guest-logistics",
+    serviceName: "Guest Movement Matrix",
+    eventName: "Departure Hospitality",
+    status: "CONFIRMED",
+    totalAmount: 715000,
+    paidAmount: 50000,
+    vendorPaidAmount: 0,
+    notes: "Airport arrivals, coach and car dispatch, internal carts, day-use vehicles, luggage, and departure closure.",
+  },
+  {
+    key: "reeva-planning",
+    clientKey: "reeva-vansh",
+    vendorSlug: "the-wedding-chapter",
+    serviceName: "Full Planning Retainer",
+    eventName: null,
+    status: "CONFIRMED",
+    totalAmount: 900000,
+    paidAmount: 550000,
+    vendorPaidAmount: 200000,
+    notes: "Three-day planning, family coordination, vendor management, hospitality, production, and event-day command.",
+  },
 ] as const;
 
 const REVIEW_FIXTURES = [
@@ -1092,6 +1344,22 @@ const MESSAGE_BLUEPRINTS: Record<string, string[]> = {
   "aisha-planning": [
     "Thanks again for getting the rooming and transport matrix under control.",
     "Glad it helped. We have closed the final reconciliation and shared the last planning notes.",
+  ],
+  "reeva-photo": [
+    "Please keep the family portrait groups, ritual calls, and candid coverage visible in one photography brief.",
+    "Confirmed. We will align every portrait group with the function showflow and family coordinators.",
+  ],
+  "reeva-decor": [
+    "The Sangeet changeover must protect guest circulation and technical access without losing the visual impact.",
+    "We have mapped the stage, lounges, load-in lane, masking, signage, and overnight handover as one production plan.",
+  ],
+  "reeva-catering": [
+    "Please keep Jain service separate and include team meals, arrival refreshments, and late-night food in the final plan.",
+    "Understood. The service plan now separates dietary counters and includes guest, vendor, and travel hospitality windows.",
+  ],
+  "reeva-logistics": [
+    "We need arrivals, internal carts, room-key handoff, luggage, and departures to run from the same guest manifest.",
+    "The movement desk will work from one consent-safe manifest with assigned vehicles and exception flags.",
   ],
 };
 
@@ -1456,10 +1724,6 @@ async function resetFixtureData(
       supabase.from("vendor_profile_views").delete().in("vendor_profile_id", vendorProfileIds)
     );
     await ensureSuccess(
-      "Clearing vendor services",
-      supabase.from("vendor_services").delete().in("vendor_profile_id", vendorProfileIds)
-    );
-    await ensureSuccess(
       "Clearing vendor destinations",
       supabase.from("vendor_destinations").delete().in("vendor_profile_id", vendorProfileIds)
     );
@@ -1487,6 +1751,15 @@ async function seedVendorServicesAndDestinations(
 ) {
   const serviceRows: ServiceRecord[] = [];
 
+  const { data: existingServiceRows, error: existingServiceError } = await supabase
+    .from("vendor_services")
+    .select("id, name, vendor_profile_id")
+    .in("vendor_profile_id", [...vendorProfiles.values()].map((profile) => profile.id));
+
+  if (existingServiceError) {
+    throw new Error(`Loading existing vendor services: ${existingServiceError.message}`);
+  }
+
   for (const fixture of VENDOR_FIXTURES) {
     const vendorProfile = vendorProfiles.get(fixture.slug);
     if (!vendorProfile) {
@@ -1509,26 +1782,32 @@ async function seedVendorServicesAndDestinations(
       )
     );
 
-    const { data: insertedServices, error } = await supabase
-      .from("vendor_services")
-      .insert(
-        fixture.services.map((service) => ({
-          vendor_profile_id: vendorProfile.id,
-          name: service.name,
-          description: service.description,
-          base_price: service.basePrice,
-          max_price: service.maxPrice,
-          unit: service.unit,
-          is_active: true,
-        }))
-      )
-      .select("id, name, vendor_profile_id");
+    for (const service of fixture.services) {
+      const existing = (existingServiceRows ?? []).find(
+        (row) => row.vendor_profile_id === vendorProfile.id && row.name === service.name
+      );
+      const payload = {
+        vendor_profile_id: vendorProfile.id,
+        name: service.name,
+        description: service.description,
+        base_price: service.basePrice,
+        max_price: service.maxPrice,
+        unit: service.unit,
+        is_active: true,
+      };
+      const query = existing
+        ? supabase.from("vendor_services").update(payload).eq("id", existing.id)
+        : supabase.from("vendor_services").insert(payload);
+      const { data: savedService, error } = await query
+        .select("id, name, vendor_profile_id")
+        .single();
 
-    if (error) {
-      throw new Error(`Seeding services for ${fixture.slug}: ${error.message}`);
+      if (error || !savedService) {
+        throw new Error(`Seeding service ${service.name} for ${fixture.slug}: ${error?.message ?? "No row returned"}`);
+      }
+
+      serviceRows.push(savedService as ServiceRecord);
     }
-
-    serviceRows.push(...((insertedServices ?? []) as ServiceRecord[]));
   }
 
   return serviceRows;
@@ -1666,6 +1945,8 @@ function buildGuestRows(client: ClientFixture) {
   const prefixes =
     client.key === "priya-arjun"
       ? ["Malhotra", "Singh", "Bedi", "Khanna", "Ahuja", "Mehra"]
+      : client.key === "reeva-vansh"
+        ? ["Bride Parents", "Groom Parents", "Bride Sibling", "Groom Sibling", "Grandparents", "Close Family", "College Friends", "Work Friends", "VIP Guests", "Senior Guests", "Kids Group", "Wedding Party"]
       : ["Kapoor", "Rao", "Shah", "Gupta", "Kohli", "Sethi"];
 
   return prefixes.map((family, index) => ({
@@ -1673,11 +1954,11 @@ function buildGuestRows(client: ClientFixture) {
     email: `testing+${client.key}-guest-${index + 1}@elysiancelebrations.app`,
     phone: `+91 98765${String(20000 + index).padStart(5, "0")}`,
     side: index % 2 === 0 ? "BRIDE" : "GROOM",
-    rsvp_status: index < 4 ? "CONFIRMED" : "PENDING",
+    rsvp_status: index < Math.ceil(prefixes.length * 0.75) ? "CONFIRMED" : "PENDING",
     meal_pref: index % 3 === 0 ? "Vegetarian" : "No preference",
     plus_one: index % 2 === 0,
     table_number: index < 4 ? index + 1 : null,
-    notes: index === 0 ? "Needs airport pickup coordination." : null,
+    notes: index === 0 ? "Needs airport pickup coordination." : index === 9 ? "Senior guest assistance and shorter walking route." : null,
   }));
 }
 
@@ -1803,6 +2084,14 @@ async function seedClientPlanningData(
         destination_id: destinationId,
         package_tier_id: packageTierId,
         status: fixture.weddingStatus,
+        event_type: "WEDDING",
+        event_platform_version: 1,
+        definition_payload: {
+          eventName: fixture.weddingName,
+          eventType: "WEDDING",
+          dayCount: new Set(fixture.eventBlueprint.map((event) => event.offsetDays)).size,
+          source: "presentation-safe-demo",
+        },
       })
       .select("id")
       .single();
@@ -1813,16 +2102,51 @@ async function seedClientPlanningData(
 
     weddingIds.set(fixture.key, (wedding as WeddingRecord).id);
 
+    const dayOffsets = [...new Set(fixture.eventBlueprint.map((event) => event.offsetDays))]
+      .sort((left, right) => left - right);
+    const { data: dayRows, error: dayError } = await supabase
+      .from("wedding_days")
+      .insert(
+        dayOffsets.map((offsetDays, index) => ({
+          wedding_id: (wedding as WeddingRecord).id,
+          name: `Day ${index + 1}`,
+          date: addDays(fixture.weddingDate, offsetDays).slice(0, 10),
+          notes: index === 0 ? "Arrival, rituals, and opening celebrations." : index === dayOffsets.length - 1 ? "Farewell hospitality and departures." : "Main celebration programme.",
+          sort_order: index,
+        }))
+      )
+      .select("id, date");
+
+    if (dayError) {
+      throw new Error(`Creating wedding days for ${fixture.key}: ${dayError.message}`);
+    }
+
+    const dayIdByDate = new Map(
+      (dayRows ?? []).map((row) => [row.date as string, row.id as string])
+    );
+
     const { data: eventRows, error: eventError } = await supabase
       .from("wedding_events")
       .insert(
         fixture.eventBlueprint.map((event, index) => ({
           wedding_id: (wedding as WeddingRecord).id,
+          wedding_day_id: dayIdByDate.get(addDays(fixture.weddingDate, event.offsetDays).slice(0, 10)),
           name: event.name,
           date: addDays(fixture.weddingDate, event.offsetDays),
           venue: event.venue,
           notes: event.notes,
           sort_order: index,
+          event_type: event.eventType ?? event.name,
+          time_block: event.timeBlock ?? null,
+          start_time: event.startTime ?? null,
+          end_time: event.endTime ?? null,
+          guest_count: event.guestCount ?? fixture.guestCount,
+          food_style: event.foodStyle ?? null,
+          food_preferences: ["Vegetarian", "Jain", "Non-vegetarian"],
+          menu_notes: "Confirm dietary counts and hotel service timing before the final banquet order.",
+          decor_style: event.decorStyle ?? null,
+          decor_notes: "Protect guest movement, production access, and weather contingency while preserving the visual direction.",
+          attire_notes: "Function-specific attire guidance is included in the guest communication plan.",
         }))
       )
       .select("id, name");
@@ -1833,6 +2157,108 @@ async function seedClientPlanningData(
 
     for (const row of eventRows ?? []) {
       eventIds.set(`${fixture.key}:${row.name as string}`, row.id as string);
+    }
+
+    if (fixture.key === "reeva-vansh") {
+      const requirementCategories = [
+        ["food", "Food and beverage"],
+        ["decor", "Decor and spatial design"],
+        ["photo-video", "Photography and film"],
+        ["entertainment", "Entertainment and show"],
+        ["hospitality", "Guest hospitality"],
+        ["logistics", "Travel and logistics"],
+      ] as const;
+
+      for (const event of fixture.eventBlueprint) {
+        const weddingEventId = eventIds.get(`${fixture.key}:${event.name}`);
+        if (!weddingEventId) continue;
+
+        await ensureSuccess(
+          `Creating requirements for ${event.name}`,
+          supabase.from("wedding_event_requirements").insert(
+            requirementCategories.map(([category, title], index) => ({
+              wedding_event_id: weddingEventId,
+              category,
+              title,
+              status: index < 3 ? "IN_PROGRESS" : "PLANNED",
+              priority: index < 2 ? "HIGH" : "MEDIUM",
+              notes: `Demo requirement mapped from the Evara ${event.name} operating brief.`,
+              sort_order: index,
+            }))
+          )
+        );
+
+        await ensureSuccess(
+          `Creating tasks for ${event.name}`,
+          supabase.from("wedding_event_tasks").insert([
+            {
+              wedding_event_id: weddingEventId,
+              title: `Lock the final ${event.name} run of show`,
+              owner: "Showflow lead",
+              status: "IN_PROGRESS",
+              due_date: addDays(fixture.weddingDate, event.offsetDays - 7),
+              sort_order: 0,
+            },
+            {
+              wedding_event_id: weddingEventId,
+              title: "Confirm vendor load-in and technical handover",
+              owner: "Production lead",
+              status: "TODO",
+              due_date: addDays(fixture.weddingDate, event.offsetDays - 5),
+              sort_order: 1,
+            },
+            {
+              wedding_event_id: weddingEventId,
+              title: "Approve guest communication and hospitality cue",
+              owner: "Guest experience lead",
+              status: "TODO",
+              due_date: addDays(fixture.weddingDate, event.offsetDays - 3),
+              sort_order: 2,
+            },
+          ])
+        );
+
+        await ensureSuccess(
+          `Creating logistics for ${event.name}`,
+          supabase.from("wedding_event_logistics").insert({
+            wedding_event_id: weddingEventId,
+            guest_arrival_time: event.startTime ? event.startTime.replace(/^([0-9]{2}):([0-9]{2})$/, (_, hour, minute) => `${String(Math.max(0, Number(hour) - 1)).padStart(2, "0")}:${minute}`) : null,
+            vendor_load_in_time: event.startTime ? "06:00" : null,
+            family_call_time: event.startTime ? "08:30" : null,
+            transport_notes: "Stage coaches, cars, and internal resort movement against the guest manifest.",
+            rooming_notes: "Keep VIP, elderly, family, and team room actions visible to the hospitality desk.",
+            weather_plan: "Move guest holding and sensitive production into the assigned indoor backup area.",
+            ceremony_notes: event.notes,
+          })
+        );
+
+        const { data: menu, error: menuError } = await supabase
+          .from("wedding_event_menus")
+          .insert({
+            wedding_event_id: weddingEventId,
+            name: `${event.name} menu`,
+            meal_period: event.timeBlock === "MORNING" ? "BREAKFAST" : event.timeBlock === "AFTERNOON" ? "LUNCH" : "DINNER",
+            service_style: event.foodStyle ?? "Hotel banquet service",
+            notes: "Presentation-safe representative menu; final hotel BEO remains the operational source until approved.",
+            sort_order: 0,
+          })
+          .select("id")
+          .single();
+
+        if (menuError || !menu) {
+          throw new Error(`Creating menu for ${event.name}: ${menuError?.message ?? "No row returned"}`);
+        }
+
+        await ensureSuccess(
+          `Creating menu items for ${event.name}`,
+          supabase.from("wedding_event_menu_items").insert([
+            { menu_id: menu.id, name: "Welcome beverage station", course: "BEVERAGE", dietary_tags: ["Vegetarian"], notes: "Seasonal drinks and infused water.", sort_order: 0 },
+            { menu_id: menu.id, name: "Regional live counter", course: "LIVE_COUNTER", dietary_tags: ["Vegetarian", "Jain"], notes: "Service flow adapted to the function schedule.", sort_order: 1 },
+            { menu_id: menu.id, name: "Main course spread", course: "MAIN", dietary_tags: ["Vegetarian", "Jain", "Non-vegetarian"], notes: "Regional and global dishes with clearly separated service.", sort_order: 2 },
+            { menu_id: menu.id, name: "Dessert and late-night bite", course: "DESSERT", dietary_tags: ["Vegetarian"], notes: "Closing service timed to guest departures.", sort_order: 3 },
+          ])
+        );
+      }
     }
 
     const { data: budget, error: budgetError } = await supabase
@@ -2062,6 +2488,464 @@ async function seedBookings(
   return bookingIds;
 }
 
+async function seedEvaraOperationsDemo(
+  supabase: SupabaseClient,
+  users: Map<string, UserRecord>,
+  weddingIds: Map<string, string>,
+  eventIds: Map<string, string>,
+  bookingIds: Map<string, string>,
+  vendorProfiles: Map<string, VendorProfileRecord>
+) {
+  const manager = users.get(MANAGER_FIXTURE.key);
+  const weddingId = weddingIds.get("reeva-vansh");
+  const sangeetEventId = eventIds.get("reeva-vansh:Sangeet Night");
+  const weddingEventId = eventIds.get("reeva-vansh:Wedding Ceremony");
+  const logisticsBookingId = bookingIds.get("reeva-logistics");
+  const logisticsVendor = vendorProfiles.get("atlas-guest-logistics");
+
+  if (
+    !manager ||
+    !weddingId ||
+    !sangeetEventId ||
+    !weddingEventId ||
+    !logisticsBookingId ||
+    !logisticsVendor
+  ) {
+    throw new Error("Missing Reeva & Vansh operations demo references");
+  }
+
+  await ensureSuccess(
+    "Creating Evara operations profile",
+    supabase.from("operations_staff_profiles").upsert(
+      {
+        user_id: manager.id,
+        role_template: "OPS_LEAD",
+        job_title: "Event Operations Lead",
+        phone: null,
+        permissions: [
+          "VIEW_EVENT",
+          "EDIT_RUN_OF_SHOW",
+          "MANAGE_TASKS",
+          "MANAGE_INCIDENTS",
+          "POST_INTERNAL_UPDATES",
+          "MESSAGE_CLIENT",
+          "MESSAGE_VENDORS",
+          "VIEW_FINANCIALS",
+          "MANAGE_STAFF",
+          "MANAGE_PRODUCTION",
+          "PRINT_EVENT_BOOK",
+        ],
+        is_active: true,
+        created_by: manager.id,
+        updated_by: manager.id,
+      },
+      { onConflict: "user_id" }
+    )
+  );
+
+  const { data: assignment, error: assignmentError } = await supabase
+    .from("event_staff_assignments")
+    .insert({
+      wedding_id: weddingId,
+      staff_user_id: manager.id,
+      event_role: "Event Operations Lead",
+      permissions: null,
+      shift_start: "2027-02-20T12:00:00+05:30",
+      shift_end: "2027-02-24T18:00:00+05:30",
+      notes: "Owns the Evara command room, escalation path, and final event-book release.",
+      is_active: true,
+      assigned_by: manager.id,
+    })
+    .select("id")
+    .single();
+
+  if (assignmentError || !assignment) {
+    throw new Error(
+      `Creating Evara event assignment: ${assignmentError?.message ?? "No row returned"}`
+    );
+  }
+
+  const assignmentId = assignment.id as string;
+  const { data: departments, error: departmentError } = await supabase
+    .from("event_operations_departments")
+    .insert([
+      {
+        wedding_id: weddingId,
+        name: "Show & Production",
+        code: "SHOW",
+        color: "#7f4f24",
+        lead_assignment_id: assignmentId,
+        sort_order: 0,
+        created_by: manager.id,
+      },
+      {
+        wedding_id: weddingId,
+        name: "Guest Hospitality",
+        code: "GUEST",
+        color: "#656d4a",
+        lead_assignment_id: assignmentId,
+        sort_order: 1,
+        created_by: manager.id,
+      },
+      {
+        wedding_id: weddingId,
+        name: "Movement & Logistics",
+        code: "MOVE",
+        color: "#936639",
+        lead_assignment_id: assignmentId,
+        sort_order: 2,
+        created_by: manager.id,
+      },
+    ])
+    .select("id, code");
+
+  if (departmentError) {
+    throw new Error(`Creating operations departments: ${departmentError.message}`);
+  }
+
+  const departmentIds = new Map(
+    (departments ?? []).map((row) => [row.code as string, row.id as string])
+  );
+  const { data: zones, error: zoneError } = await supabase
+    .from("event_operations_zones")
+    .insert([
+      {
+        wedding_id: weddingId,
+        name: "Celebration Hall & Backstage",
+        code: "HALL",
+        capacity: 300,
+        meeting_point: "Backstage production desk",
+        emergency_notes: "Keep the guest corridor and service lane clear at all times.",
+        sort_order: 0,
+        created_by: manager.id,
+      },
+      {
+        wedding_id: weddingId,
+        name: "Beach Lawn & Mandap",
+        code: "BEACH",
+        capacity: 300,
+        meeting_point: "Weather-control desk beside the service entrance",
+        emergency_notes: "Use the Celebration Hall fallback when the weather escalation is activated.",
+        sort_order: 1,
+        created_by: manager.id,
+      },
+      {
+        wedding_id: weddingId,
+        name: "Lobby & Transport Desk",
+        code: "LOBBY",
+        capacity: 120,
+        meeting_point: "Evara hospitality desk",
+        emergency_notes: "Keep luggage and vehicle queues separated from hotel check-in.",
+        sort_order: 2,
+        created_by: manager.id,
+      },
+    ])
+    .select("id, code");
+
+  if (zoneError) {
+    throw new Error(`Creating operations zones: ${zoneError.message}`);
+  }
+
+  const zoneIds = new Map(
+    (zones ?? []).map((row) => [row.code as string, row.id as string])
+  );
+
+  await ensureSuccess(
+    "Creating Evara operations feed",
+    supabase.from("event_operations_items").insert([
+      {
+        wedding_id: weddingId,
+        wedding_event_id: sangeetEventId,
+        kind: "DECISION",
+        severity: "INFO",
+        status: "RESOLVED",
+        title: "Sangeet guest corridor protected",
+        body: "The lounge cluster moved inward so the hotel service lane and backstage path remain clear.",
+        assignee_user_id: manager.id,
+        reported_by: manager.id,
+        due_at: "2027-02-21T17:00:00+05:30",
+        acknowledged_at: "2027-02-10T10:30:00+05:30",
+        acknowledged_by: manager.id,
+        resolved_at: "2027-02-10T11:15:00+05:30",
+        resolved_by: manager.id,
+        department_id: departmentIds.get("SHOW"),
+        zone_id: zoneIds.get("HALL"),
+      },
+      {
+        wedding_id: weddingId,
+        wedding_event_id: weddingEventId,
+        kind: "ESCALATION",
+        severity: "WATCH",
+        status: "ACKNOWLEDGED",
+        title: "Weather fallback hold",
+        body: "Keep the indoor ceremony fallback dressed to 70 percent until the final weather call.",
+        assignee_user_id: manager.id,
+        reported_by: manager.id,
+        due_at: "2027-02-22T14:00:00+05:30",
+        acknowledged_at: "2027-02-10T12:00:00+05:30",
+        acknowledged_by: manager.id,
+        resolved_at: null,
+        resolved_by: null,
+        department_id: departmentIds.get("SHOW"),
+        zone_id: zoneIds.get("BEACH"),
+      },
+      {
+        wedding_id: weddingId,
+        wedding_event_id: null,
+        kind: "UPDATE",
+        severity: "INFO",
+        status: "OPEN",
+        title: "Departure manifests staged",
+        body: "Coach, car, luggage, and room-key exception lists are ready for final confirmation.",
+        assignee_user_id: manager.id,
+        reported_by: manager.id,
+        due_at: "2027-02-22T20:00:00+05:30",
+        acknowledged_at: null,
+        acknowledged_by: null,
+        resolved_at: null,
+        resolved_by: null,
+        department_id: departmentIds.get("MOVE"),
+        zone_id: zoneIds.get("LOBBY"),
+      },
+    ])
+  );
+
+  await ensureSuccess(
+    "Creating Evara crew shift",
+    supabase.from("event_crew_shifts").insert({
+      wedding_id: weddingId,
+      assignment_id: assignmentId,
+      wedding_event_id: weddingEventId,
+      department_id: departmentIds.get("SHOW"),
+      zone_id: zoneIds.get("BEACH"),
+      supervisor_assignment_id: null,
+      role_label: "Event Operations Lead",
+      shift_start: "2027-02-22T12:00:00+05:30",
+      shift_end: "2027-02-22T23:30:00+05:30",
+      status: "PLANNED",
+      checked_in_at: null,
+      checked_out_at: null,
+      handoff_notes: "Take the final weather call, approve guest release, and close the vendor handover.",
+      created_by: manager.id,
+      updated_by: manager.id,
+    })
+  );
+
+  await ensureSuccess(
+    "Creating Evara briefing",
+    supabase.from("event_operations_briefings").insert({
+      wedding_id: weddingId,
+      wedding_event_id: weddingEventId,
+      department_id: departmentIds.get("SHOW"),
+      zone_id: zoneIds.get("BEACH"),
+      title: "Wedding-day command briefing",
+      body: "Confirm baraat release, family portrait groups, ceremony audio, weather fallback, dinner handoff, and departure-desk overnight ownership.",
+      priority: "HIGH",
+      requires_acknowledgement: true,
+      published_by: manager.id,
+      published_at: "2027-02-20T18:00:00+05:30",
+      expires_at: "2027-02-23T02:00:00+05:30",
+    })
+  );
+
+  await ensureSuccess(
+    "Creating Evara production dossier",
+    supabase.from("event_production_records").insert([
+      {
+        wedding_id: weddingId,
+        wedding_event_id: sangeetEventId,
+        record_type: "RIDER",
+        title: "Sangeet technical rider and cue stack",
+        description: "Audio, VJ, anchor, family performance, DJ transition, power, and backstage call requirements.",
+        status: "IN_PROGRESS",
+        visibility: "OPERATIONS",
+        department_id: departmentIds.get("SHOW"),
+        zone_id: zoneIds.get("HALL"),
+        owner_assignment_id: assignmentId,
+        owner_label: "Show & Production",
+        due_at: "2027-02-18T18:00:00+05:30",
+        amount: null,
+        currency: "INR",
+        payload: { source: "presentation-safe-demo", checklist: ["audio", "video", "power", "backstage"] },
+        sort_order: 0,
+        created_by: manager.id,
+        updated_by: manager.id,
+      },
+      {
+        wedding_id: weddingId,
+        wedding_event_id: weddingEventId,
+        record_type: "RECCE",
+        title: "Gateway Bekal final recce actions",
+        description: "Mandap orientation, rain route, power distribution, family holding, dinner release, and emergency access.",
+        status: "APPROVED",
+        visibility: "CLIENT",
+        department_id: departmentIds.get("SHOW"),
+        zone_id: zoneIds.get("BEACH"),
+        owner_assignment_id: assignmentId,
+        owner_label: "Event Operations Lead",
+        due_at: "2027-02-15T18:00:00+05:30",
+        amount: null,
+        currency: "INR",
+        payload: { source: "presentation-safe-demo", decisionCount: 6 },
+        sort_order: 1,
+        created_by: manager.id,
+        updated_by: manager.id,
+      },
+      {
+        wedding_id: weddingId,
+        wedding_event_id: null,
+        record_type: "PACKING",
+        title: "Production load-in and return register",
+        description: "Track signage, stationery, ritual material, hospitality stock, radios, and return ownership.",
+        status: "OPEN",
+        visibility: "OPERATIONS",
+        department_id: departmentIds.get("MOVE"),
+        zone_id: zoneIds.get("LOBBY"),
+        owner_assignment_id: assignmentId,
+        owner_label: "Movement & Logistics",
+        due_at: "2027-02-20T12:00:00+05:30",
+        amount: null,
+        currency: "INR",
+        payload: { source: "presentation-safe-demo", groups: ["signage", "stationery", "ritual", "hospitality", "radios"] },
+        sort_order: 2,
+        created_by: manager.id,
+        updated_by: manager.id,
+      },
+      {
+        wedding_id: weddingId,
+        wedding_event_id: null,
+        record_type: "GUEST_COMMUNICATION",
+        title: "Arrival and room-key communication approval",
+        description: "Approval record for consent-safe arrival, hotel desk, function, breakfast, and departure messages.",
+        status: "WAITING",
+        visibility: "OPERATIONS",
+        department_id: departmentIds.get("GUEST"),
+        zone_id: zoneIds.get("LOBBY"),
+        owner_assignment_id: assignmentId,
+        owner_label: "Guest Hospitality",
+        due_at: "2027-02-19T18:00:00+05:30",
+        amount: null,
+        currency: "INR",
+        payload: { source: "presentation-safe-demo", channels: ["WHATSAPP", "EMAIL"] },
+        sort_order: 3,
+        created_by: manager.id,
+        updated_by: manager.id,
+      },
+    ])
+  );
+
+  const { data: travelParty, error: travelPartyError } = await supabase
+    .from("event_partner_travel_parties")
+    .insert({
+      wedding_id: weddingId,
+      booking_id: logisticsBookingId,
+      vendor_profile_id: logisticsVendor.id,
+      wedding_event_id: null,
+      party_type: "VENDOR",
+      name: "Atlas Guest Logistics advance team",
+      company: "Atlas Guest Logistics",
+      department_label: "Movement & Logistics",
+      role_label: "Arrival and departure desk",
+      head_count: 6,
+      contact_label: "Operations group contact",
+      food_plan: "Hotel team meals from dinner on 20 February through lunch on 23 February.",
+      per_diem_amount: 12000,
+      owner_label: "Evara transport lead",
+      notes: "Presentation-safe manifest. No personal phone, identity, ticket, or PNR data is stored.",
+      version: 1,
+      created_by: manager.id,
+      updated_by: manager.id,
+    })
+    .select("id")
+    .single();
+
+  if (travelPartyError || !travelParty) {
+    throw new Error(
+      `Creating partner travel party: ${travelPartyError?.message ?? "No row returned"}`
+    );
+  }
+
+  const partyId = travelParty.id as string;
+  const { data: travelLeg, error: travelLegError } = await supabase
+    .from("event_partner_travel_legs")
+    .insert({
+      party_id: partyId,
+      wedding_id: weddingId,
+      mode: "FLIGHT",
+      provider: "Demo airline",
+      reference_label: "Arrival group A",
+      origin: "Mumbai",
+      destination: "Mangaluru",
+      departure_at: "2027-02-20T08:00:00+05:30",
+      arrival_at: "2027-02-20T09:30:00+05:30",
+      status: "BOOKED",
+      pickup_required: true,
+      sort_order: 0,
+    })
+    .select("id")
+    .single();
+
+  if (travelLegError || !travelLeg) {
+    throw new Error(
+      `Creating partner travel leg: ${travelLegError?.message ?? "No row returned"}`
+    );
+  }
+
+  const [stayResult, transferResult] = await Promise.all([
+    supabase.from("event_partner_stays").insert({
+      party_id: partyId,
+      wedding_id: weddingId,
+      hotel_name: "Gateway Bekal staff block",
+      room_type: "Twin sharing",
+      room_count: 3,
+      check_in_date: "2027-02-20",
+      check_out_date: "2027-02-24",
+      status: "ALLOCATED",
+      food_plan: "Breakfast and team meals included.",
+      sort_order: 0,
+    }),
+    supabase.from("event_partner_transfers").insert({
+      party_id: partyId,
+      wedding_id: weddingId,
+      travel_leg_id: travelLeg.id as string,
+      route_label: "Mangaluru airport to Gateway Bekal",
+      pickup_at: "2027-02-20T10:00:00+05:30",
+      pickup_location: "Mangaluru airport arrivals",
+      drop_location: "Gateway Bekal operations desk",
+      vehicle_label: "Tempo traveller - demo assignment",
+      status: "ASSIGNED",
+      sort_order: 0,
+    }),
+  ]);
+  if (stayResult.error || transferResult.error) {
+    throw new Error(
+      `Creating partner stay and transfer: ${stayResult.error?.message ?? transferResult.error?.message}`
+    );
+  }
+
+  await ensureSuccess(
+    "Creating guest communication demo",
+    supabase.from("event_guest_communication_campaigns").insert({
+      wedding_id: weddingId,
+      wedding_event_id: null,
+      campaign_type: "ARRIVAL",
+      title: "Gateway Bekal arrival and hospitality note",
+      message_body: "Welcome to Reeva and Vansh's celebration. Your Evara hospitality desk will guide room keys, luggage, event movement, and any assistance required during the stay.",
+      channel: "WHATSAPP",
+      audience_definition: {
+        segment: "arriving-guests",
+        consentRequired: true,
+        source: "presentation-safe-demo",
+      },
+      scheduled_for: "2027-02-20T18:00:00+05:30",
+      status: "DRAFT",
+      version: 1,
+      created_by: manager.id,
+      updated_by: manager.id,
+    })
+  );
+}
+
 async function seedMessagesAndNotifications(
   supabase: SupabaseClient,
   users: Map<string, UserRecord>,
@@ -2117,6 +3001,20 @@ async function seedMessagesAndNotifications(
       title: "Mood board ready",
       message: "Your Goa mood board has been preloaded with visual references.",
       link: "/client/mood-board",
+    },
+    {
+      user_id: users.get("reeva-vansh")?.id,
+      type: "SYSTEM",
+      title: "Gateway Bekal workspace ready",
+      message: "Your three-day event map, guests, partners, budget, and showflow are ready to review.",
+      link: "/client/wedding",
+    },
+    {
+      user_id: users.get("reeva-vansh")?.id,
+      type: "BOOKING_UPDATE",
+      title: "Partner plan updated",
+      message: "Your selected decor, catering, photo, entertainment, beauty, logistics, and planning partners are connected to the event.",
+      link: "/client/bookings",
     },
     {
       user_id: users.get("the-story-room")?.id,
@@ -2245,6 +3143,7 @@ export async function bootstrapCloudTestingData(): Promise<CloudBootstrapSummary
   const users = new Map<string, UserRecord>();
   const allFixtures: FixtureIdentity[] = [
     ADMIN_FIXTURE,
+    MANAGER_FIXTURE,
     ...CLIENT_FIXTURES,
     ...VENDOR_FIXTURES,
   ];
@@ -2273,7 +3172,7 @@ export async function bootstrapCloudTestingData(): Promise<CloudBootstrapSummary
     vendorProfiles,
     destinationIds
   );
-  const { eventIds } = await seedClientPlanningData(
+  const { weddingIds, eventIds } = await seedClientPlanningData(
     supabase,
     clientProfiles,
     destinationIds,
@@ -2285,6 +3184,14 @@ export async function bootstrapCloudTestingData(): Promise<CloudBootstrapSummary
     vendorProfiles,
     services,
     eventIds
+  );
+  await seedEvaraOperationsDemo(
+    supabase,
+    users,
+    weddingIds,
+    eventIds,
+    bookingIds,
+    vendorProfiles
   );
   const { messageCount, notificationCount } =
     await seedMessagesAndNotifications(supabase, users, bookingIds);
@@ -2310,8 +3217,4 @@ export async function bootstrapCloudTestingData(): Promise<CloudBootstrapSummary
     },
     ranAt: new Date().toISOString(),
   };
-}
-
-export function getCloudBootstrapPassword() {
-  return process.env.ELYSIAN_TEST_USER_PASSWORD?.trim() || DEFAULT_TEST_PASSWORD;
 }

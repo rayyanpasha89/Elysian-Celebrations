@@ -5,10 +5,7 @@ import {
   getAuthSession,
   requireRole,
 } from "@/lib/api-utils";
-import {
-  bootstrapCloudTestingData,
-  getCloudBootstrapPassword,
-} from "@/lib/testing/cloud-bootstrap";
+import { bootstrapCloudTestingData } from "@/lib/testing/cloud-bootstrap";
 
 export async function POST() {
   const session = await getAuthSession();
@@ -24,10 +21,7 @@ export async function POST() {
   try {
     const summary = await bootstrapCloudTestingData();
 
-    return apiSuccess({
-      ...summary,
-      testPassword: getCloudBootstrapPassword(),
-    });
+    return apiSuccess(summary);
   } catch (error) {
     console.error("POST /api/admin/testing/bootstrap", error);
     return apiError("Failed to bootstrap cloud testing data", 500);
